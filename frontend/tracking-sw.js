@@ -11,7 +11,7 @@
  *  - Saves apiBase to IndexedDB so it survives SW restart
  */
 
-const API_BASE    = 'https://krishihr.onrender.com/api';
+const API_BASE    = 'https://krishihr-zuui.onrender.com/api';
 const INTERVAL    = 30 * 1000;   // 30 seconds
 const MAX_GPS_WAIT = 10000;      // 10 second GPS timeout per tick
 
