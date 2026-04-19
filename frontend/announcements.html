@@ -445,7 +445,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 Auth.guard();
 buildSidebar('announcements.html');
 
-const API = 'https://krishihr.onrender.com/api'; // FIX: use correct Render API URL
+const API = 'https://krishihr-zuui.onrender.com/api'; // FIX: use correct Render API URL
 const token = localStorage.getItem('krishihr_token');
 const user  = JSON.parse(localStorage.getItem('krishihr_user') || '{}');
 let allAnnouncements = [];
