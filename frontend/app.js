@@ -1,5 +1,5 @@
 // app.js — Shared utilities for all KrishiHR pages
-const API_BASE = 'https://krishihr.onrender.com/api';
+const API_BASE = 'https://krishihr-zuui.onrender.com/api';
 
 const Auth = {
   getToken:   () => localStorage.getItem('krishihr_token'),
