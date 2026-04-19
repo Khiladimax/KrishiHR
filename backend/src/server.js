@@ -701,7 +701,7 @@ start();
 const https = require('https');
 
 function pingServer() {
-  https.get('https://krishihr.onrender.com/health', (res) => {
+  https.get('https://krishihr-zuui.onrender.com/health', (res) => {
     console.log(`[Keep-Alive] ✅ ping OK — ${res.statusCode} at ${new Date().toISOString()}`);
   }).on('error', (err) => {
     console.log(`[Keep-Alive] ⚠️ ping failed: ${err.message} — retrying in 30s`);
