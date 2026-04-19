@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR — Geofence & Locations</title>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA&libraries=geometry"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+
+<style>
+  /* ── Page Layout ─────────────────────────────────────────── */
+  .geo-grid {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .geo-grid { grid-template-columns: 1fr; } }
+
+  /* ── Location Cards ───────────────────────────────────────── */
+  .loc-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all .18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .loc-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .18s;
+  }
+  .loc-card:hover { border-color: var(--accent); transform: translateX(2px); box-shadow: var(--shadow-sm); }
+  .loc-card.active { border-color: var(--accent); background: var(--accent-l); box-shadow: var(--shadow-sm); }
+  .loc-card.active::before { opacity: 1; }
+  .loc-card.global-zone { border-style: dashed; }
+
+  .loc-type-badge {
+    font-size: 9.5px; font-weight: 800; padding: 2px 7px;
+    border-radius: 20px; text-transform: uppercase; letter-spacing: .6px;
+  }
+  .loc-type-office  { background: #dbeafe; color: #1d4ed8; }
+  .loc-type-state   { background: var(--accent-l); color: var(--accent); }
+  .loc-type-wfh     { background: var(--purple-l); color: var(--purple-d); }
+  .loc-type-inactive{ background: #f1f5f9; color: #64748b; }
+
+  /* ── Map ─────────────────────────────────────────────────── */
+  #main-map {
+    width: 100%; height: 420px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+  }
+
+  /* ── Employee Assignment List ─────────────────────────────── */
+  .emp-assign-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+  .emp-assign-row:last-child { border-bottom: none; }
+
+  /* ── Buffer Slider ────────────────────────────────────────── */
+  .buffer-slider {
+    -webkit-appearance: none;
+    width: 100%; height: 6px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent) var(--pct, 30%), var(--border) var(--pct, 30%));
+    outline: none; cursor: pointer;
+  }
+  .buffer-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid #fff;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+  }
+
+  /* ── Tab System ───────────────────────────────────────────── */
+  .tab-bar {
+    display: flex; gap: 2px;
+    background: var(--surface2); border-radius: var(--radius-sm);
+    padding: 3px; margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1; padding: 7px 10px; border: none; border-radius: 7px;
+    background: none; font-size: 12px; font-weight: 600; color: var(--muted);
+    cursor: pointer; transition: all .15s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-xs); }
+
+  /* ── Stats Strip ──────────────────────────────────────────── */
+  .geo-stats {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px;
+  }
+  .geo-stat-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
+
+  /* ── Search ────────────────────────────────────────────────── */
+  .search-input {
+    width: 100%; padding: 8px 12px 8px 34px;
+    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; background: var(--surface2); color: var(--text);
+    outline: none; transition: all .15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(74,140,28,.1); }
+  .search-wrap { position: relative; margin-bottom: 14px; }
+  .search-wrap::before {
+    content: '🔍'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div>
+    </div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">📍 Geofence & Locations</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-primary btn-sm" onclick="openAddLocation()">+ Add Location</button>
+      <div class="topbar-icon-btn notif-btn" onclick="openNotifications()" title="Notifications">
+        🔔<span id="notif-badge"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+
+    <!-- Stats Strip -->
+    <div class="geo-stats" id="geo-stats">
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Total Locations</div><div style="font-size:28px;font-weight:800;color:var(--text)" id="stat-total">—</div></div>
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Office (Strict)</div><div style="font-size:28px;font-weight:800;color:#1d4ed8" id="stat-offices">—</div></div>
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Global Zones</div><div style="font-size:28px;font-weight:800;color:var(--accent)" id="stat-global">—</div></div>
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Assigned Employees</div><div style="font-size:28px;font-weight:800;color:var(--green)" id="stat-assigned">—</div></div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="geo-grid">
+
+      <!-- LEFT: Location List -->
+      <div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <span>All Locations</span>
+            <span id="loc-count" style="font-size:11px;color:var(--muted)"></span>
+          </div>
+          <div class="search-wrap">
+            <input class="search-input" id="loc-search" placeholder="Search locations…" oninput="filterLocations()">
+          </div>
+          <div id="locations-list"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Map + Details -->
+      <div>
+        <!-- Map -->
+        <div class="card" style="padding:16px;margin-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;color:var(--text)" id="map-title">📍 All Locations Overview</div>
+            <button class="btn btn-ghost btn-sm" onclick="resetMapView()">Reset View</button>
+          </div>
+          <div id="main-map"></div>
+          <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <div style="width:12px;height:12px;background:#1d4ed8;border-radius:3px"></div> Office (Strict)
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <div style="width:12px;height:12px;background:var(--accent);border-radius:3px"></div> State Zone (Global)
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <div style="width:12px;height:12px;background:var(--purple);border-radius:3px"></div> Work From Home
+            </div>
+          </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <div class="card" id="detail-panel" style="display:none">
+          <div id="detail-content"></div>
+        </div>
+
+        <!-- No selection placeholder -->
+        <div id="no-selection" style="text-align:center;padding:40px 20px;color:var(--muted)">
+          <div style="font-size:36px;margin-bottom:12px">📍</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">Select a location</div>
+          <div style="font-size:13px">Click any location from the list to view details, edit buffer, and manage employee assignments</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       EMPLOYEE BUFFER RULES PANEL
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="content fade-in" style="margin-top:0;padding-top:0">
+    <div class="card" style="margin-top:18px">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="card-title">🛡️ Employee Buffer Rules</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Set state / district / office boundary per employee</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadAllRules()">↻ Refresh</button>
+      </div>
+
+      <!-- Layout: left = form, right = table -->
+      <div style="display:grid;grid-template-columns:340px 1fr;gap:20px;padding:16px;align-items:start">
+
+        <!-- ── FORM ── -->
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px" id="br-form-title">Assign Rule</div>
+
+          <div class="form-group">
+            <label class="form-label">Employee</label>
+            <input class="search-input" id="br-emp-search" placeholder="Type name or code…"
+              oninput="brFilterEmps(this.value)" autocomplete="off" style="width:100%;margin-bottom:4px">
+            <div id="br-emp-dropdown" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);max-height:200px;overflow-y:auto;position:relative;z-index:10"></div>
+            <input type="hidden" id="br-emp-id">
+            <div id="br-emp-selected" style="display:none;margin-top:6px;padding:8px 10px;background:var(--accent-l);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between">
+              <span id="br-emp-selected-name" style="font-size:13px;font-weight:600;color:var(--accent)"></span>
+              <button onclick="brClearEmp()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px">✕</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Rule Type</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <label class="br-radio-label" onclick="brSetRuleType('office')">
+                <input type="radio" name="br-rule" value="office"> 
+                <div>
+                  <div style="font-weight:600;font-size:13px">🏢 Office</div>
+                  <div style="font-size:11px;color:var(--muted)">Must be within office radius (onsite)</div>
+                </div>
+              </label>
+              <label class="br-radio-label" onclick="brSetRuleType('district')">
+                <input type="radio" name="br-rule" value="district">
+                <div>
+                  <div style="font-weight:600;font-size:13px">📍 District</div>
+                  <div style="font-size:11px;color:var(--muted)">Must be inside assigned district</div>
+                </div>
+              </label>
+              <label class="br-radio-label" onclick="brSetRuleType('state')">
+                <input type="radio" name="br-rule" value="state">
+                <div>
+                  <div style="font-weight:600;font-size:13px">🗺️ State</div>
+                  <div style="font-size:11px;color:var(--muted)">Must be inside assigned state</div>
+                </div>
+              </label>
+              <label class="br-radio-label" onclick="brSetRuleType('universal')">
+                <input type="radio" name="br-rule" value="universal">
+                <div>
+                  <div style="font-weight:600;font-size:13px">🌍 Universal</div>
+                  <div style="font-size:11px;color:var(--muted)">Punch from anywhere (WFH)</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Office picker (shown when rule=office) -->
+          <div class="form-group" id="br-office-group" style="display:none">
+            <label class="form-label">Office Location</label>
+            <select class="form-control" id="br-office-sel">
+              <option value="">— select office —</option>
+            </select>
+          </div>
+
+          <!-- State picker (shown when rule=state or district) -->
+          <div class="form-group" id="br-state-group" style="display:none">
+            <label class="form-label">State</label>
+            <select class="form-control" id="br-state-sel" onchange="brStateChanged()">
+              <option value="">— select state —</option>
+            </select>
+          </div>
+
+          <!-- District picker (shown when rule=district) -->
+          <div class="form-group" id="br-district-group" style="display:none">
+            <label class="form-label">District</label>
+            <select class="form-control" id="br-district-sel">
+              <option value="">— select district —</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn btn-primary" style="flex:1" onclick="brSave()">Save Rule</button>
+            <button class="btn btn-outline btn-sm" onclick="brReset()">Clear</button>
+          </div>
+          <div id="br-form-msg" style="margin-top:8px;font-size:12px;display:none"></div>
+        </div>
+
+        <!-- ── TABLE ── -->
+        <div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+            <input class="search-input" id="br-table-search" placeholder="Search employee…"
+              oninput="brFilterTable(this.value)" style="max-width:220px">
+            <select class="form-control" id="br-filter-type" onchange="brFilterTable()" style="max-width:160px">
+              <option value="">All types</option>
+              <option value="office">Office</option>
+              <option value="district">District</option>
+              <option value="state">State</option>
+              <option value="universal">Universal</option>
+              <option value="none">Not set</option>
+            </select>
+            <span id="br-table-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:var(--surface2)">
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Employee</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Type</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Rule</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Boundary</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="br-table-body">
+                <tr><td colspan="5" style="padding:30px;text-align:center;color:var(--muted)"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .br-radio-label {
+      display:flex;align-items:flex-start;gap:10px;padding:8px 10px;
+      border-radius:var(--radius-sm);border:1.5px solid var(--border);
+      cursor:pointer;transition:all .15s;background:var(--surface);
+    }
+    .br-radio-label:hover { border-color:var(--accent);background:var(--accent-l); }
+    .br-radio-label input[type=radio] { margin-top:3px;accent-color:var(--accent);flex-shrink:0; }
+    .br-emp-row {
+      padding:8px 12px;cursor:pointer;font-size:13px;
+      display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);
+    }
+    .br-emp-row:hover { background:var(--accent-l); }
+    .br-emp-row:last-child { border-bottom:none; }
+    .br-badge {
+      display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;
+    }
+    .br-office   { background:#dbeafe;color:#1d4ed8; }
+    .br-district { background:#dcfce7;color:#166534; }
+    .br-state    { background:#fef9c3;color:#854d0e; }
+    .br-universal{ background:var(--purple-l,#ede9fe);color:#5b21b6; }
+    .br-none     { background:var(--surface2);color:var(--muted); }
+    .br-emp-type { display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase; }
+    .br-onsite  { background:#dbeafe;color:#1d4ed8; }
+    .br-offsite { background:#dcfce7;color:#166534; }
+    .br-wfh     { background:var(--purple-l,#ede9fe);color:#5b21b6; }
+  </style>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ADD / EDIT LOCATION MODAL
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="loc-modal">
+  <div class="modal" style="width:500px">
+    <div class="modal-header">
+      <div class="modal-title" id="loc-modal-title">Add Location</div>
+      <button class="modal-close" onclick="closeModal('loc-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="loc-edit-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Location Name *</label>
+          <input id="loc-name" class="form-control" placeholder="e.g. Head Quarter – Mumbai">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select id="loc-type-sel" class="form-control" onchange="onLocTypeChange()">
+            <option value="office">Office (Strict Geofence)</option>
+            <option value="state">State Zone (Global)</option>
+            <option value="wfh">Work From Home (Global)</option>
+          </select>
+        </div>
+      </div>
+      <div id="lat-lng-fields">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Latitude *</label>
+            <input id="loc-lat" class="form-control" type="number" step="0.000001" placeholder="19.131006">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Longitude *</label>
+            <input id="loc-lng" class="form-control" type="number" step="0.000001" placeholder="72.855686">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Buffer Radius (meters) — <span id="radius-lbl">500</span>m</label>
+          <input type="range" class="buffer-slider" id="loc-radius-slider" min="50" max="5000" step="50" value="500"
+                 oninput="document.getElementById('radius-lbl').textContent=this.value;document.getElementById('loc-radius').value=this.value;updateSliderBg(this)">
+          <input type="number" id="loc-radius" class="form-control" value="500" style="margin-top:6px"
+                 oninput="const s=document.getElementById('loc-radius-slider');s.value=this.value;document.getElementById('radius-lbl').textContent=this.value;updateSliderBg(s)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Address</label>
+        <textarea id="loc-address" class="form-control" rows="2" placeholder="Full address"></textarea>
+      </div>
+      <div id="loc-global-note" style="display:none;background:var(--accent-l);border-radius:var(--radius-sm);padding:10px 13px;border-left:3px solid var(--accent);font-size:12px;color:var(--accent);font-weight:600;margin-top:4px">
+        🌍 Global zone — employees assigned here can punch in from anywhere. No GPS check is enforced.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('loc-modal')">Cancel</button>
+      <button class="btn btn-primary" id="loc-save-btn" onclick="saveLocation()">Save Location</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ASSIGN EMPLOYEES MODAL
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="assign-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="assign-modal-title">Assign Employees</div>
+      <button class="modal-close" onclick="closeModal('assign-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="search-wrap">
+        <input class="search-input" id="assign-search" placeholder="Search employees…" oninput="filterAssignList()">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-ghost btn-sm" onclick="selectAllAssign()">Select All</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAllAssign()">Clear All</button>
+        <span id="assign-sel-count" style="font-size:12px;color:var(--muted);align-self:center"></span>
+      </div>
+      <div id="assign-emp-list" style="max-height:380px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('assign-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAssignments()">Save Assignments</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DELETE BLOCKED MODAL (employees still assigned)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="delete-blocked-modal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title">🚫 Cannot Delete Location</div>
+      <button class="modal-close" onclick="closeModal('delete-blocked-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;font-size:13px;color:#b91c1c;font-weight:600">
+        Reassign or remove these employees from this location before deleting.
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="delete-blocked-count"></div>
+      <div id="delete-blocked-list" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('delete-blocked-modal')">Close</button>
+      <button class="btn btn-primary" onclick="closeModal('delete-blocked-modal'); openAssignModal(_deleteLocId)">👤 Manage Assignments</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DELETE CONFIRM MODAL (no employees assigned)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="delete-confirm-modal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title">🗑️ Delete Location</div>
+      <button class="modal-close" onclick="closeModal('delete-confirm-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:#b91c1c;font-weight:600">
+        ⚠️ This will permanently delete the location. This cannot be undone.
+      </div>
+      <div style="margin-top:12px;font-size:13px;color:var(--text)">
+        Location: <strong id="delete-confirm-name"></strong>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('delete-confirm-modal')">Cancel</button>
+      <button class="btn btn-danger" id="delete-confirm-btn" onclick="confirmHardDelete()">Delete Permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS PANEL -->
+<div id="notif-overlay" style="display:none;position:fixed;inset:0;z-index:190" onclick="closeNotifications()"></div>
+<div id="notif-panel">
+  <div class="flex-between" style="margin-bottom:20px">
+    <div class="card-title">Notifications</div>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost btn-sm" onclick="markAllRead()">Mark all read</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeNotifications()" style="padding:6px 8px">✕</button>
+    </div>
+  </div>
+  <div id="notif-list"></div>
+</div>
+
+<script src="app.js"></script>
+<script>
+Auth.guard();
+buildSidebar('geofence.html');
+loadNotifBadge();
+
+let _map = null, _mapMarkers = [], _mapCircles = [], _allLocations = [], _allEmployees = [];
+let _selectedLoc = null, _assignLocId = null, _geoInfoWin = null;
+
+// ── INIT MAP ────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  _map = new google.maps.Map(document.getElementById('main-map'), {
+    zoom: 5,
+    center: { lat: 21.0, lng: 78.0 },
+    mapTypeId: 'roadmap',
+    streetViewControl: false,
+    mapTypeControl: true,
+    mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
+    gestureHandling: 'greedy'
+  });
+  _geoInfoWin = new google.maps.InfoWindow();
+  loadAll();
+});
+
+async function loadAll() {
+  // buffer rules panel init (after locations loaded)
+  setTimeout(() => initBufferRules(), 300);
+  const [locData, empData] = await Promise.all([
+    api('GET', '/geofence/locations'),
+    api('GET', '/employees')
+  ]);
+  _allLocations = locData?.data || [];
+  _allEmployees = empData?.data || [];
+  renderLocList();
+  renderMapMarkers();
+  updateStats();
+}
+
+function updateStats() {
+  const locs    = _allLocations.filter(l => l.is_active);
+  const offices = locs.filter(l => l.radius_meters < 10000);
+  const global  = locs.filter(l => l.radius_meters >= 10000);
+  const assigned = new Set();
+  _allEmployees.forEach(e => {
+    if (_allLocations.some(l => (l.assigned_employees||[]).includes(e.id) || true)) {}
+  });
+  document.getElementById('stat-total').textContent    = locs.length;
+  document.getElementById('stat-offices').textContent  = offices.length;
+  document.getElementById('stat-global').textContent   = global.length;
+  // assigned count — sum of assigned_count from locations
+  const totalAssigned = locs.reduce((s,l) => s + (parseInt(l.assigned_count)||0), 0);
+  document.getElementById('stat-assigned').textContent = totalAssigned;
+}
+
+// ── LOCATION LIST ───────────────────────────────────────────────
+function filterLocations() {
+  renderLocList(document.getElementById('loc-search').value.toLowerCase());
+}
+
+function renderLocList(filter = '') {
+  const el = document.getElementById('locations-list');
+  const locs = _allLocations.filter(l => !filter || l.name.toLowerCase().includes(filter));
+  document.getElementById('loc-count').textContent = locs.length + ' locations';
+
+  if (!locs.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div><p>No locations found</p></div>';
+    return;
+  }
+
+  const offices = locs.filter(l => l.radius_meters < 10000);
+  const global  = locs.filter(l => l.radius_meters >= 10000);
+
+  let html = '';
+  if (offices.length) {
+    html += `<div style="font-size:9.5px;font-weight:800;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🏢 Office Locations</div>`;
+    html += offices.map(l => locCard(l)).join('');
+  }
+  if (global.length) {
+    html += `<div style="font-size:9.5px;font-weight:800;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px">🌍 Global / State Zones</div>`;
+    html += global.map(l => locCard(l)).join('');
+  }
+  el.innerHTML = html;
+}
+
+function locCard(l) {
+  const isGlobal  = l.radius_meters >= 10000;
+  const isWFH     = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
+  const typeClass = isWFH ? 'loc-type-wfh' : isGlobal ? 'loc-type-state' : 'loc-type-office';
+  const typeLabel = isWFH ? 'WFH' : isGlobal ? 'Global' : 'Office';
+  const active    = _selectedLoc?.id === l.id ? 'active' : '';
+  const globalCls = isGlobal ? 'global-zone' : '';
+
+  return `<div class="loc-card ${active} ${globalCls}" onclick="selectLocation(${l.id})">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+      <div style="font-size:13px;font-weight:700;color:var(--text)">${l.name}</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="loc-type-badge ${typeClass}">${typeLabel}</span>
+        ${!l.is_active ? '<span class="loc-type-badge loc-type-inactive">Inactive</span>' : ''}
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;font-size:11px;color:var(--muted)">
+      ${isGlobal
+        ? '<span>🌍 Universal access</span>'
+        : `<span>📏 ${l.radius_meters}m buffer</span>`}
+      <span>👤 ${l.assigned_count || 0} employees</span>
+    </div>
+    ${l.address ? `<div style="font-size:11px;color:var(--muted2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.address}</div>` : ''}
+  </div>`;
+}
+
+// ── MAP MARKERS ─────────────────────────────────────────────────
+function renderMapMarkers() {
+  _mapMarkers.forEach(m => m.setMap(null));
+  _mapCircles.forEach(c => c.setMap(null));
+  _mapMarkers = []; _mapCircles = [];
+
+  _allLocations.filter(l => l.is_active).forEach(l => {
+    const lat = parseFloat(l.latitude);
+    const lng = parseFloat(l.longitude);
+    if (!lat || !lng || (lat === 0 && lng === 0)) return;
+
+    const isGlobal = l.radius_meters >= 10000;
+    const isWFH    = l.name.toLowerCase().includes('work from home');
+    const color    = isWFH ? '#8b5cf6' : isGlobal ? '#4a8c1c' : '#1d4ed8';
+    const shortName = l.name.split('–')[0].split('-')[0].trim().substring(0, 14);
+
+    // Circle (skip for global zones)
+    if (!isGlobal) {
+      const circle = new google.maps.Circle({
+        map: _map,
+        center: { lat, lng },
+        radius: l.radius_meters,
+        strokeColor: color, strokeOpacity: 0.7, strokeWeight: 2,
+        fillColor: color, fillOpacity: 0.1
+      });
+      _mapCircles.push(circle);
+    }
+
+    // Marker with label
+    const svgW = Math.max(70, shortName.length * 7 + 20);
+    const svgIcon = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="26"><rect rx="7" width="${svgW}" height="26" fill="${color}"/><text x="${svgW/2}" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="white" font-family="Arial,sans-serif">${shortName}</text></svg>`);
+    const marker = new google.maps.Marker({
+      position: { lat, lng },
+      map: _map,
+      title: l.name,
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + svgIcon,
+        scaledSize: new google.maps.Size(svgW, 26),
+        anchor: new google.maps.Point(svgW / 2, 13)
+      },
+      zIndex: isGlobal ? 1 : 5
+    });
+    marker.addListener('click', () => {
+      _geoInfoWin.setContent(`<div style="font-family:sans-serif;padding:4px"><b>${l.name}</b><br>${isGlobal ? '🌍 Global zone' : `📏 Buffer: ${l.radius_meters}m`}<br>👤 ${l.assigned_count||0} employees</div>`);
+      _geoInfoWin.open(_map, marker);
+      selectLocation(l.id);
+    });
+    _mapMarkers.push(marker);
+  });
+}
+
+function resetMapView() {
+  _map.setCenter({ lat: 21.0, lng: 78.0 });
+  _map.setZoom(5);
+  document.getElementById('map-title').textContent = '📍 All Locations Overview';
+}
+
+// ── SELECT LOCATION ─────────────────────────────────────────────
+async function selectLocation(id) {
+  _selectedLoc = _allLocations.find(l => l.id === id);
+  if (!_selectedLoc) return;
+  renderLocList(document.getElementById('loc-search').value.toLowerCase());
+  renderDetailPanel(_selectedLoc);
+
+  const lat = parseFloat(_selectedLoc.latitude);
+  const lng = parseFloat(_selectedLoc.longitude);
+  if (lat && lng && !(lat === 0 && lng === 0)) {
+    _map.panTo({ lat, lng });
+    _map.setZoom(_selectedLoc.radius_meters < 10000 ? 16 : 10);
+    document.getElementById('map-title').textContent = `📍 ${_selectedLoc.name}`;
+  }
+}
+
+async function renderDetailPanel(loc) {
+  document.getElementById('no-selection').style.display = 'none';
+  document.getElementById('detail-panel').style.display = '';
+
+  const isGlobal = loc.radius_meters >= 10000;
+  const isWFH    = loc.name.toLowerCase().includes('work from home');
+  const typeLabel = isWFH ? '🏠 Work From Home' : isGlobal ? '🌍 State Zone (Global)' : '🏢 Office (Strict Geofence)';
+  const typeColor = isWFH ? '#8b5cf6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
+
+  // Fetch assigned employees for this location
+  const assigned = await fetchAssignedEmployees(loc.id);
+
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">${loc.name}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:${typeColor}">${typeLabel}</span>
+          ${loc.is_active
+            ? '<span style="font-size:10px;background:#d1fae5;color:#059669;padding:2px 7px;border-radius:20px;font-weight:700">Active</span>'
+            : '<span style="font-size:10px;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:20px;font-weight:700">Inactive</span>'}
+        </div>
+        ${loc.address ? `<div style="font-size:12px;color:var(--muted);margin-top:5px">${loc.address}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditLocation(${loc.id})">✏️ Edit</button>
+        <button class="btn btn-primary btn-sm" onclick="openAssignModal(${loc.id})">👤 Manage Employees</button>
+        ${loc.is_active
+          ? `<button class="btn btn-ghost btn-sm" style="color:#b45309;border-color:#b45309" onclick="toggleLocActive(${loc.id}, false)">⏸ Deactivate</button>`
+          : `<button class="btn btn-ghost btn-sm" style="color:#059669;border-color:#059669" onclick="toggleLocActive(${loc.id}, true)">▶ Activate</button>`
+        }
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="openDeleteLocation(${loc.id}, '${loc.name.replace(/'/g, "\\'")}')">🗑️ Delete</button>
+      </div>
+    </div>
+
+    ${!isGlobal ? `
+    <!-- Buffer Radius Editor -->
+    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px;border:1.5px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">📏 Geofence Buffer Radius</div>
+        <div style="font-size:20px;font-weight:800;color:var(--accent)" id="live-radius-lbl">${loc.radius_meters}m</div>
+      </div>
+      <input type="range" class="buffer-slider" id="live-radius-slider"
+             min="50" max="2000" step="50" value="${loc.radius_meters}"
+             oninput="onLiveRadiusChange(this.value)">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
+        <span>50m</span><span>500m</span><span>1000m</span><span>2000m</span>
+      </div>
+      <button class="btn btn-success btn-sm" style="margin-top:10px" onclick="saveRadius(${loc.id})">💾 Save Buffer</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Employees must punch in within this radius from the office center.</div>
+    </div>
+    ` : `
+    <div style="background:var(--accent-l);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;border-left:3px solid var(--accent)">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px">🌍 Universal Access Zone</div>
+      <div style="font-size:12px;color:var(--accent)">Employees assigned here can punch in from anywhere — no GPS distance check is enforced. Suitable for field staff, WFH employees, and state-level operations.</div>
+    </div>
+    `}
+
+    <!-- Coordinates (non-WFH only) -->
+    ${(!isWFH && parseFloat(loc.latitude) !== 0) ? `
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Latitude</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace">${parseFloat(loc.latitude).toFixed(6)}</div>
+      </div>
+      <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Longitude</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace">${parseFloat(loc.longitude).toFixed(6)}</div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Assigned Employees -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">👥 Assigned Employees (${assigned.length})</div>
+        <button class="btn btn-outline btn-sm" onclick="openAssignModal(${loc.id})">+ Manage</button>
+      </div>
+      ${assigned.length ? `
+      <div style="max-height:240px;overflow-y:auto">
+        ${assigned.map(e => `
+          <div class="emp-assign-row">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
+              <div>
+                <div style="font-size:12.5px;font-weight:600">${e.first_name} ${e.last_name}</div>
+                <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.designation_title||e.role}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${e.is_universal
+                ? '<span style="font-size:9.5px;font-weight:700;background:var(--accent-l);color:var(--accent);padding:2px 7px;border-radius:20px">Universal</span>'
+                : '<span style="font-size:9.5px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:20px">Strict</span>'}
+              <button onclick="removeAssignment(${loc.id}, ${e.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px;line-height:1" title="Remove">✕</button>
+            </div>
+          </div>`).join('')}
+      </div>` : `
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+        No employees assigned yet. <a href="#" onclick="openAssignModal(${loc.id});return false" style="color:var(--accent)">Add now →</a>
+      </div>`}
+    </div>
+  `;
+
+  updateSliderBg(document.getElementById('live-radius-slider'));
+}
+
+function onLiveRadiusChange(val) {
+  document.getElementById('live-radius-lbl').textContent = val + 'm';
+  const slider = document.getElementById('live-radius-slider');
+  updateSliderBg(slider);
+
+  // Update circle on map
+  _mapCircles.forEach(c => c.setMap(null));
+  _mapCircles = [];
+  const lat = parseFloat(_selectedLoc.latitude);
+  const lng = parseFloat(_selectedLoc.longitude);
+  if (lat && lng) {
+    const c = new google.maps.Circle({
+      map: _map,
+      center: { lat, lng },
+      radius: parseInt(val),
+      strokeColor: '#1d4ed8', strokeOpacity: 0.8, strokeWeight: 2,
+      fillColor: '#1d4ed8', fillOpacity: 0.1
+    });
+    _mapCircles.push(c);
+  }
+}
+
+function updateSliderBg(slider) {
+  if (!slider) return;
+  const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+  slider.style.background = `linear-gradient(90deg, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+}
+
+async function saveRadius(locId) {
+  const val = parseInt(document.getElementById('live-radius-slider').value);
+  const data = await api('PUT', `/geofence/locations/${locId}`, { radius_meters: val });
+  if (data?.success) {
+    toast(`Buffer updated to ${val}m`);
+    const loc = _allLocations.find(l => l.id === locId);
+    if (loc) loc.radius_meters = val;
+    renderMapMarkers();
+  } else {
+    toast(data?.message || 'Update failed', 'error');
+  }
+}
+
+async function toggleLocActive(locId, activate) {
+  const data = await api('PUT', `/geofence/locations/${locId}`, { is_active: activate });
+  if (data?.success) {
+    toast(activate ? 'Location activated' : 'Location deactivated');
+    await loadAll();
+    if (_selectedLoc) selectLocation(_selectedLoc.id);
+  } else toast(data?.message || 'Failed', 'error');
+}
+
+// ── DELETE LOCATION ──────────────────────────────────────────
+let _deleteLocId = null;
+
+async function openDeleteLocation(locId, locName) {
+  _deleteLocId = locId;
+
+  // Check assigned employees first
+  const data = await api('GET', `/geofence/locations/${locId}/employees`);
+  if (!data?.success) { toast('Failed to check assigned employees', 'error'); return; }
+
+  const employees = data.data || [];
+
+  if (employees.length > 0) {
+    // Show blocking modal
+    document.getElementById('delete-blocked-count').textContent =
+      `${employees.length} employee${employees.length > 1 ? 's are' : ' is'} currently assigned to this location:`;
+    document.getElementById('delete-blocked-list').innerHTML = employees.map(e => {
+      const fullName = e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unknown';
+      const empCode  = e.code || e.employee_code || '';
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">
+          ${(fullName || '?')[0].toUpperCase()}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${fullName}</div>
+          <div style="font-size:11px;color:var(--muted)">${empCode}</div>
+        </div>
+      </div>`;
+    }).join('');
+    openModal('delete-blocked-modal');
+  } else {
+    // Show confirmation modal
+    document.getElementById('delete-confirm-name').textContent = locName;
+    openModal('delete-confirm-modal');
+  }
+}
+
+async function confirmHardDelete() {
+  if (!_deleteLocId) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+
+  const data = await api('DELETE', `/geofence/locations/${_deleteLocId}`);
+  btn.disabled = false;
+  btn.textContent = 'Delete Permanently';
+
+  if (data?.success) {
+    closeModal('delete-confirm-modal');
+    toast('Location permanently deleted');
+    _selectedLoc = null;
+    document.getElementById('detail-content').innerHTML =
+      '<div style="text-align:center;padding:40px 0;color:var(--muted)">Select a location to view details</div>';
+    await loadAll();
+  } else {
+    toast(data?.message || 'Delete failed', 'error');
+  }
+}
+
+// ── FETCH ASSIGNED EMPLOYEES ────────────────────────────────────
+async function fetchAssignedEmployees(locId) {
+  // Get all employees and check which are assigned to this location
+  // Use geofence/employee/:id for each, or better — filter from employee list
+  // Since API gives us assigned_count but not the list, we iterate employees
+  // Alternatively call a location-specific endpoint if available
+  // We'll use the employee geofence endpoint per location (manual join)
+  try {
+    // Filter employees who have this location assigned
+    // We need to call individual employee geofence endpoints — do it in parallel for displayed employees
+    const results = await Promise.all(
+      _allEmployees.slice(0, 60).map(async e => {
+        const r = await api('GET', `/geofence/employee/${e.id}`);
+        if (r?.data?.some(g => g.office_location_id === locId)) {
+          const match = r.data.find(g => g.office_location_id === locId);
+          return { ...e, is_universal: match?.is_universal };
+        }
+        return null;
+      })
+    );
+    return results.filter(Boolean);
+  } catch { return []; }
+}
+
+// ── ADD / EDIT LOCATION ─────────────────────────────────────────
+function openAddLocation() {
+  document.getElementById('loc-edit-id').value = '';
+  document.getElementById('loc-modal-title').textContent = 'Add Location';
+  document.getElementById('loc-name').value = '';
+  document.getElementById('loc-lat').value = '';
+  document.getElementById('loc-lng').value = '';
+  document.getElementById('loc-radius').value = 500;
+  document.getElementById('loc-radius-slider').value = 500;
+  document.getElementById('radius-lbl').textContent = '500';
+  document.getElementById('loc-address').value = '';
+  document.getElementById('loc-type-sel').value = 'office';
+  document.getElementById('loc-save-btn').textContent = 'Add Location';
+  onLocTypeChange();
+  updateSliderBg(document.getElementById('loc-radius-slider'));
+  openModal('loc-modal');
+}
+
+function openEditLocation(id) {
+  const loc = _allLocations.find(l => l.id === id);
+  if (!loc) return;
+  const isGlobal = loc.radius_meters >= 10000;
+  const isWFH    = loc.name.toLowerCase().includes('work from home');
+
+  document.getElementById('loc-edit-id').value = id;
+  document.getElementById('loc-modal-title').textContent = `Edit — ${loc.name}`;
+  document.getElementById('loc-name').value = loc.name;
+  document.getElementById('loc-lat').value = loc.latitude;
+  document.getElementById('loc-lng').value = loc.longitude;
+  document.getElementById('loc-radius').value = isGlobal ? 500 : loc.radius_meters;
+  document.getElementById('loc-radius-slider').value = isGlobal ? 500 : loc.radius_meters;
+  document.getElementById('radius-lbl').textContent = isGlobal ? '500' : loc.radius_meters;
+  document.getElementById('loc-address').value = loc.address || '';
+  document.getElementById('loc-type-sel').value = isWFH ? 'wfh' : isGlobal ? 'state' : 'office';
+  document.getElementById('loc-save-btn').textContent = 'Save Changes';
+  onLocTypeChange();
+  updateSliderBg(document.getElementById('loc-radius-slider'));
+  openModal('loc-modal');
+}
+
+function onLocTypeChange() {
+  const type = document.getElementById('loc-type-sel').value;
+  const showLatLng = type === 'office' || type === 'state';
+  document.getElementById('lat-lng-fields').style.display = type === 'wfh' ? 'none' : '';
+  document.getElementById('loc-global-note').style.display = type !== 'office' ? '' : 'none';
+}
+
+async function saveLocation() {
+  const id      = document.getElementById('loc-edit-id').value;
+  const name    = document.getElementById('loc-name').value.trim();
+  const type    = document.getElementById('loc-type-sel').value;
+  const lat     = parseFloat(document.getElementById('loc-lat').value) || 0;
+  const lng     = parseFloat(document.getElementById('loc-lng').value) || 0;
+  const radius  = type !== 'office' ? 999999 : parseInt(document.getElementById('loc-radius').value) || 500;
+  const address = document.getElementById('loc-address').value.trim();
+
+  if (!name) { toast('Location name required', 'error'); return; }
+  if (type === 'office' && (!lat || !lng)) { toast('Latitude & longitude required for office', 'error'); return; }
+
+  // FIX: include location_type so backend knows office vs state/wfh zone
+  const is_active = true;
+  const body = { name, location_type: type, latitude: lat, longitude: lng, radius_meters: radius, address, is_active };
+  let data;
+
+  // Show saving indicator
+  const saveBtn = document.getElementById('loc-save-btn');
+  const origText = saveBtn.textContent;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    if (id) {
+      data = await api('PUT', `/geofence/locations/${id}`, body);
+    } else {
+      data = await api('POST', '/geofence/locations', body);
+    }
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = origText;
+  }
+
+  if (data?.success) {
+    toast(id ? 'Location updated' : 'Location added');
+    closeModal('loc-modal');
+    await loadAll();
+    if (_selectedLoc) selectLocation(_selectedLoc.id);
+  } else {
+    toast(data?.message || 'Failed', 'error');
+  }
+}
+
+// ── ASSIGN EMPLOYEES MODAL ──────────────────────────────────────
+let _assignLocName = '';
+
+async function openAssignModal(locId) {
+  _assignLocId = locId;
+  const loc = _allLocations.find(l => l.id === locId);
+  _assignLocName = loc?.name || '';
+  document.getElementById('assign-modal-title').textContent = `👤 Assign Employees — ${_assignLocName}`;
+  document.getElementById('assign-search').value = '';
+
+  // Get currently assigned employees
+  const assigned = await fetchAssignedEmployees(locId);
+  const assignedIds = new Set(assigned.map(e => e.id));
+  const isGlobalLoc = (loc?.radius_meters || 0) >= 10000;
+
+  document.getElementById('assign-emp-list').innerHTML = _allEmployees.map(e => {
+    const isChecked = assignedIds.has(e.id);
+    const isUniversal = assigned.find(a => a.id === e.id)?.is_universal ?? isGlobalLoc;
+    return `<div class="emp-assign-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="acheck-${e.id}" ${isChecked?'checked':''} onchange="updateAssignCount()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
+        <div class="avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
+        <div>
+          <div style="font-size:12.5px;font-weight:600">${e.first_name} ${e.last_name}</div>
+          <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.city||'—'}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="auniv-${e.id}" ${isUniversal?'checked':''} style="accent-color:var(--accent)">
+          Universal
+        </label>
+        <span style="font-size:10px;background:var(--surface2);padding:2px 7px;border-radius:20px;color:var(--muted)">${e.city||'—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateAssignCount();
+  openModal('assign-modal');
+}
+
+function updateAssignCount() {
+  const checked = document.querySelectorAll('[id^="acheck-"]:checked').length;
+  document.getElementById('assign-sel-count').textContent = `${checked} selected`;
+}
+
+function filterAssignList() {
+  const q = document.getElementById('assign-search').value.toLowerCase();
+  document.querySelectorAll('[id^="arow-"]').forEach(row => {
+    row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+
+function selectAllAssign() {
+  document.querySelectorAll('[id^="acheck-"]').forEach(cb => cb.checked = true);
+  updateAssignCount();
+}
+function clearAllAssign() {
+  document.querySelectorAll('[id^="acheck-"]').forEach(cb => cb.checked = false);
+  updateAssignCount();
+}
+
+async function saveAssignments() {
+  const checked = [], unchecked = [];
+  _allEmployees.forEach(e => {
+    const cb = document.getElementById(`acheck-${e.id}`);
+    if (!cb) return;
+    if (cb.checked) checked.push(e.id);
+    else unchecked.push(e.id);
+  });
+
+  const isUniversalFor = {};
+  _allEmployees.forEach(e => {
+    const ucb = document.getElementById(`auniv-${e.id}`);
+    if (ucb) isUniversalFor[e.id] = ucb.checked;
+  });
+
+  let ok = true;
+
+  // Assign checked employees
+  if (checked.length) {
+    // Group by is_universal value
+    const univIds    = checked.filter(id => isUniversalFor[id]);
+    const strictIds  = checked.filter(id => !isUniversalFor[id]);
+
+    if (univIds.length) {
+      const r = await api('POST', '/geofence/bulk-assign', { employee_ids: univIds, office_location_id: _assignLocId, is_universal: true });
+      if (!r?.success) ok = false;
+    }
+    if (strictIds.length) {
+      const r = await api('POST', '/geofence/bulk-assign', { employee_ids: strictIds, office_location_id: _assignLocId, is_universal: false });
+      if (!r?.success) ok = false;
+    }
+  }
+
+  // Remove unchecked employees
+  for (const id of unchecked) {
+    await api('DELETE', `/geofence/${id}/${_assignLocId}`);
+  }
+
+  if (ok) {
+    toast(`Assignments saved for ${checked.length} employees`);
+    closeModal('assign-modal');
+    await loadAll();
+    if (_selectedLoc) renderDetailPanel(_selectedLoc);
+    // Refresh stats
+    const locData = await api('GET', '/geofence/locations');
+    _allLocations = locData?.data || [];
+    renderLocList();
+    updateStats();
+  } else {
+    toast('Some assignments failed', 'error');
+  }
+}
+
+async function removeAssignment(locId, empId) {
+  if (!confirm('Remove this employee from the location?')) return;
+  const data = await api('DELETE', `/geofence/${empId}/${locId}`);
+  if (data?.success) {
+    toast('Assignment removed');
+    renderDetailPanel(_selectedLoc);
+    const locData = await api('GET', '/geofence/locations');
+    _allLocations = locData?.data || [];
+    renderLocList();
+    updateStats();
+  } else toast('Failed', 'error');
+}
+
+// ── NOTIFICATIONS ───────────────────────────────────────────────
+async function openNotifications() {
+  document.getElementById('notif-panel').style.right = '0';
+  document.getElementById('notif-overlay').style.display = 'block';
+  const data = await api('GET', '/notifications');
+  if (!data?.success) return;
+  const el = document.getElementById('notif-list');
+  el.innerHTML = data.data.length
+    ? data.data.slice(0,10).map(n => `<div class="notif-item ${n.is_read?'':'unread'}">
+        <div style="font-weight:600;font-size:13px">${n.title}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">${n.message}</div>
+        <div class="text-muted2" style="margin-top:5px">${fmt.ago(n.created_at)}</div>
+      </div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">🔔</div><p>No notifications</p></div>';
+}
+
+function closeNotifications() {
+  document.getElementById('notif-panel').style.right = '-400px';
+  document.getElementById('notif-overlay').style.display = 'none';
+}
+
+async function markAllRead() {
+  await api('PATCH', '/notifications/read-all');
+  toast('All notifications marked read');
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ══════════════════════════════════════════════════════════════════
+//  BUFFER RULES — frontend logic
+// ══════════════════════════════════════════════════════════════════
+const BR_STATES = ["ANDAMAN & NICOBAR", "ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHANDIGARH", "CHHATTISGARH", "DADRA,NAGAR HAVELI,DAMAN & DIU", "DELHI", "GOA", "GUJARAT", "HARYANA", "HIMACHAL PRADESH", "JAMMU & KASHMIR", "JHARKHAND", "KARNATAKA", "KERALA", "LADAKH", "LAKSHADWEEP", "MADHYA PRADESH", "MAHARASHTRA", "MANIPUR", "MEGHALAYA", "MIZORAM", "NAGALAND", "ODISHA", "PUDUCHERRY", "PUNJAB", "RAJASTHAN", "SIKKIM", "TAMIL NADU", "TELANGANA", "TRIPURA", "UTTAR PRADESH", "UTTARAKHAND", "WEST BENGAL"];
+const BR_DISTRICTS = {"ANDAMAN & NICOBAR": ["Nicobars", "North And Middle Andaman", "South Andamans"], "ANDHRA PRADESH": ["Alluri Sitharama Raju", "Anakapalli", "Anantapur", "Annamayya", "Bapatla", "Chittoor", "East Godavari", "Eluru", "Guntur", "Kakinada", "Konaseema", "Krishna", "Kurnool", "Nandyal", "Ntr", "Palnadu", "Parvathipuram Manyam", "Prakasam", "Spsr Nellore", "Sri Sathya Sai", "Srikakulam", "Tirupati", "Visakhapatanam", "Vizianagaram", "West Godavari", "Y.S.R."], "ARUNACHAL PRADESH": ["Anjaw", "Changlang", "Dibang Valley", "East Kameng", "East Siang", "Kamle", "Kra Daadi", "Kurung Kumey", "Leparada", "Lohit", "Longding", "Lower Dibang Valley", "Lower Siang", "Lower Subansiri", "Namsai", "Pakke Kessang", "Papum Pare", "Shi Yomi", "Siang", "Tawang", "Tirap", "Upper Siang", "Upper Subansiri", "West Kameng", "West Siang"], "ASSAM": ["Bajali", "Baksa", "Barpeta", "Biswanath", "Bongaigaon", "Cachar", "Charaideo", "Chirang", "Darrang", "Dhemaji", "Dhubri", "Dibrugarh", "Dima Hasao", "Goalpara", "Golaghat", "Hailakandi", "Hojai", "Jorhat", "Kamrup", "Kamrup Metro", "Karbi Anglong", "Karimganj", "Kokrajhar", "Lakhimpur", "Majuli", "Marigaon", "Nagaon", "Nalbari", "Sivasagar", "Sonitpur", "South Salmara Mancachar", "Tamulpur", "Tinsukia", "Udalguri", "West Karbi Anglong"], "BIHAR": ["Araria", "Arwal", "Aurangabad", "Banka", "Begusarai", "Bhagalpur", "Bhojpur", "Buxar", "Darbhanga", "Gaya", "Gopalganj", "Jamui", "Jehanabad", "Kaimur (Bhabua)", "Katihar", "Khagaria", "Kishanganj", "Lakhisarai", "Madhepura", "Madhubani", "Munger", "Muzaffarpur", "Nalanda", "Nawada", "Pashchim Champaran", "Patna", "Purbi Champaran", "Purnia", "Rohtas", "Saharsa", "Samastipur", "Saran", "Sheikhpura", "Sheohar", "Sitamarhi", "Siwan", "Supaul", "Vaishali"], "CHANDIGARH": ["Chandigarh"], "CHHATTISGARH": ["Balod", "Baloda Bazar", "Balrampur", "Bastar", "Bemetara", "Bijapur", "Bilaspur", "Dantewada", "Dhamtari", "Durg", "Gariyaband", "Gaurella Pendra Marwahi", "Janjgir-Champa", "Jashpur", "Kabirdham", "Kanker", "Khairgarh Chhuikhadan Gandai", "Kondagaon", "Korba", "Korea", "Mahasamund", "Manendragarh Chirimiri Bharatpur", "Mohla Manpur Ambagarh Chouki", "Mungeli", "Narayanpur", "Raigarh", "Raipur", "Rajnandgaon", "Sakti", "Sarangarh Bilaigarh", "Sukma", "Surajpur", "Surguja"], "DADRA,NAGAR HAVELI,DAMAN & DIU": ["Dadra And Nagar Haveli", "Daman", "Diu"], "DELHI": ["Central", "East", "New Delhi", "North", "North East", "North West", "Shahdara", "South", "South East", "South West", "West"], "GOA": ["North Goa", "South Goa"], "GUJARAT": ["Ahmadabad", "Amreli", "Anand", "Arvalli", "Banas Kantha", "Bharuch", "Bhavnagar", "Botad", "Chhotaudepur", "Dang", "Devbhumi Dwarka", "Dohad", "Gandhinagar", "Gir Somnath", "Jamnagar", "Junagadh", "Kachchh", "Kheda", "Mahesana", "Mahisagar", "Morbi", "Narmada", "Navsari", "Panch Mahals", "Patan", "Porbandar", "Rajkot", "Sabar Kantha", "Surat", "Surendranagar", "Tapi", "Vadodara", "Valsad"], "HARYANA": ["Ambala", "Bhiwani", "Charki Dadri", "Faridabad", "Fatehabad", "Gurugram", "Hisar", "Jhajjar", "Jind", "Kaithal", "Karnal", "Kurukshetra", "Mahendragarh", "Nuh", "Palwal", "Panchkula", "Panipat", "Rewari", "Rohtak", "Sirsa", "Sonipat", "Yamunanagar"], "HIMACHAL PRADESH": ["Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu", "Lahul And Spiti", "Mandi", "Shimla", "Sirmaur", "Solan", "Una"], "JAMMU & KASHMIR": ["Anantnag", "Bandipora", "Baramulla", "Budgam", "Doda", "Ganderbal", "Jammu", "Kathua", "Kishtwar", "Kulgam", "Kupwara", "Mirpur", "Muzaffarabad", "Poonch", "Pulwama", "Rajouri", "Ramban", "Reasi", "Samba", "Shopian", "Srinagar", "Udhampur"], "JHARKHAND": ["Bokaro", "Chatra", "Deoghar", "Dhanbad", "Dumka", "East Singhbum", "Garhwa", "Giridih", "Godda", "Gumla", "Hazaribagh", "Jamtara", "Khunti", "Koderma", "Latehar", "Lohardaga", "Pakur", "Palamu", "Ramgarh", "Ranchi", "Sahebganj", "Saraikela Kharsawan", "Simdega", "West Singhbhum"], "KARNATAKA": ["Bagalkote", "Ballari", "Belagavi", "Bengaluru Rural", "Bengaluru Urban", "Bidar", "Chamarajanagara", "Chikkaballapura", "Chikkamagaluru", "Chitradurga", "Dakshina Kannada", "Davangere", "Dharwad", "Gadag", "Hassan", "Haveri", "Kalaburagi", "Kodagu", "Kolar", "Koppal", "Mandya", "Mysuru", "Raichur", "Ramanagara", "Shivamogga", "Tumakuru", "Udupi", "Uttara Kannada", "Vijayanagar", "Vijayapura", "Yadgir"], "KERALA": ["Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod", "Kollam", "Kottayam", "Kozhikode", "Malappuram", "Palakkad", "Pathanamthitta", "Thiruvananthapuram", "Thrissur", "Wayanad"], "LADAKH": ["Kargil", "Leh Ladakh"], "LAKSHADWEEP": ["Lakshadweep District"], "MADHYA PRADESH": ["Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani", "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara", "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "East Nimar", "Guna", "Gwalior", "Harda", "Indore", "Jabalpur", "Jhabua", "Katni", "Khargone", "Mandla", "Mandsaur", "Morena", "Narmadapuram", "Narsinghpur", "Neemuch", "Niwari", "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa", "Sagar", "Satna", "Sehore", "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri", "Sidhi", "Singrauli", "Tikamgarh", "Ujjain", "Umaria", "Vidisha"], "MAHARASHTRA": ["Ahmednagar", "Akola", "Amravati", "Aurangabad", "Beed", "Bhandara", "Buldhana", "Chandrapur", "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon", "Jalna", "Kolhapur", "Latur", "Mumbai", "Mumbai Suburban", "Nagpur", "Nanded", "Nandurbar", "Nashik", "Osmanabad", "Palghar", "Parbhani", "Pune", "Raigad", "Ratnagiri", "Sangli", "Satara", "Sindhudurg", "Solapur", "Thane", "Wardha", "Washim", "Yavatmal"], "MANIPUR": ["Bishnupur", "Chandel", "Churachandpur", "Imphal East", "Imphal West", "Jiribam", "Kakching", "Kamjong", "Kangpokpi", "Noney", "Pherzawl", "Senapati", "Tamenglong", "Tengnoupal", "Thoubal", "Ukhrul"], "MEGHALAYA": ["East Garo Hills", "East Jaintia Hills", "East Khasi Hills", "Eastern West Khasi Hills", "North Garo Hills", "Ri Bhoi", "South Garo Hills", "South West Garo Hills", "South West Khasi Hills", "West Garo Hills", "West Jaintia Hills", "West Khasi Hills"], "MIZORAM": ["Aizawl", "Champhai", "Hnahthial", "Khawzawl", "Kolasib", "Lawngtlai", "Lunglei", "Mamit", "Saiha", "Saitual", "Serchhip"], "NAGALAND": ["Chumoukedima", "Dimapur", "Kiphire", "Kohima", "Longleng", "Mokokchung", "Mon", "Niuland", "Noklak", "Peren", "Phek", "Shamator", "Tseminyu", "Tuensang", "Wokha", "Zunheboto"], "ODISHA": ["Anugul", "Balangir", "Baleshwar", "Bargarh", "Bhadrak", "Boudh", "Cuttack", "Deogarh", "Dhenkanal", "Gajapati", "Ganjam", "Jagatsinghapur", "Jajapur", "Jharsuguda", "Kalahandi", "Kandhamal", "Kendrapara", "Kendujhar", "Khordha", "Koraput", "Malkangiri", "Mayurbhanj", "Nabarangpur", "Nayagarh", "Nuapada", "Puri", "Rayagada", "Sambalpur", "Sonepur", "Sundargarh"], "PUDUCHERRY": ["Karaikal", "Mahe", "Pondicherry", "Yanam"], "PUNJAB": ["Amritsar", "Barnala", "Bathinda", "Faridkot", "Fatehgarh Sahib", "Fazilka", "Ferozepur", "Gurdaspur", "Hoshiarpur", "Jalandhar", "Kapurthala", "Ludhiana", "Malerkotla", "Mansa", "Moga", "Pathankot", "Patiala", "Rupnagar", "S.A.S Nagar", "Sangrur", "Shahid Bhagat Singh Nagar", "Sri Muktsar Sahib", "Tarn Taran"], "RAJASTHAN": ["Ajmer", "Alwar", "Banswara", "Baran", "Barmer", "Bharatpur", "Bhilwara", "Bikaner", "Bundi", "Chittorgarh", "Churu", "Dausa", "Dholpur", "Dungarpur", "Ganganagar", "Hanumangarh", "Jaipur", "Jaisalmer", "Jalore", "Jhalawar", "Jhunjhunu", "Jodhpur", "Karauli", "Kota", "Nagaur", "Pali", "Pratapgarh", "Rajsamand", "Sawai Madhopur", "Sikar", "Sirohi", "Tonk", "Udaipur"], "SIKKIM": ["Gangtok", "Gyalshing", "Mangan", "Namchi", "Pakyong", "Soreng"], "TAMIL NADU": ["Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri", "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", "Kanniyakumari", "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam", "Namakkal", "Perambalur", "Pudukkottai", "Ramanathapuram", "Ranipet", "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "The Nilgiris", "Theni", "Thiruvallur", "Thiruvarur", "Tiruchirappalli", "Tirunelveli", "Tirupathur", "Tiruppur", "Tiruvannamalai", "Tuticorin", "Vellore", "Villupuram", "Virudhunagar"], "TELANGANA": ["Adilabad", "Bhadradri Kothagudem", "Hanumakonda", "Hyderabad", "Jagitial", "Jangoan", "Jayashankar Bhupalapally", "Jogulamba Gadwal", "Kamareddy", "Karimnagar", "Khammam", "Kumuram Bheem Asifabad", "Mahabubabad", "Mahabubnagar", "Mancherial", "Medak", "Medchal Malkajgiri", "Mulugu", "Nagarkurnool", "Nalgonda", "Narayanpet", "Nirmal", "Nizamabad", "Peddapalli", "Rajanna Sircilla", "Ranga Reddy", "Sangareddy", "Siddipet", "Suryapet", "Vikarabad", "Wanaparthy", "Warangal", "Yadadri Bhuvanagiri"], "TRIPURA": ["Dhalai", "Gomati", "Khowai", "North Tripura", "Sepahijala", "South Tripura", "Unakoti", "West Tripura"], "UTTAR PRADESH": ["Agra", "Aligarh", "Ambedkar Nagar", "Amethi", "Amroha", "Auraiya", "Ayodhya", "Azamgarh", "Baghpat", "Bahraich", "Ballia", "Balrampur", "Banda", "Barabanki", "Bareilly", "Basti", "Bhadohi", "Bijnor", "Budaun", "Bulandshahr", "Chandauli", "Chitrakoot", "Deoria", "Etah", "Etawah", "Farrukhabad", "Fatehpur", "Firozabad", "Gautam Buddha Nagar", "Ghaziabad", "Ghazipur", "Gonda", "Gorakhpur", "Hamirpur", "Hapur", "Hardoi", "Hathras", "Jalaun", "Jaunpur", "Jhansi", "Kannauj", "Kanpur Dehat", "Kanpur Nagar", "Kasganj", "Kaushambi", "Kheri", "Kushi Nagar", "Lalitpur", "Lucknow", "Maharajganj", "Mahoba", "Mainpuri", "Mathura", "Mau", "Meerut", "Mirzapur", "Moradabad", "Muzaffarnagar", "Pilibhit", "Pratapgarh", "Prayagraj", "Rae Bareli", "Rampur", "Saharanpur", "Sambhal", "Sant Kabeer Nagar", "Shahjahanpur", "Shamli", "Shravasti", "Siddharth Nagar", "Sitapur", "Sonbhadra", "Sultanpur", "Unnao", "Varanasi"], "UTTARAKHAND": ["Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar", "Nainital", "Pauri Garhwal", "Pithoragarh", "Rudra Prayag", "Tehri Garhwal", "Udam Singh Nagar", "Uttar Kashi"], "WEST BENGAL": ["24 Paraganas North", "24 Paraganas South", "Alipurduar", "Bankura", "Birbhum", "Coochbehar", "Darjeeling", "Dinajpur Dakshin", "Dinajpur Uttar", "Hooghly", "Howrah", "Jalpaiguri", "Jhargram", "Kalimpong", "Kolkata", "Maldah", "Medinipur East", "Medinipur West", "Murshidabad", "Nadia", "Paschim Bardhaman", "Purba Bardhaman", "Purulia"]};
+
+let _brAllEmps   = [];
+let _brAllRules  = [];
+let _brRuleType  = '';
+
+async function initBufferRules() {
+  // Populate state selects
+  const stateSel = document.getElementById('br-state-sel');
+  BR_STATES.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    stateSel.appendChild(o);
+  });
+
+  // Populate office select
+  const offSel = document.getElementById('br-office-sel');
+  (_allLocations || []).filter(l => [1,2].includes(l.id)).forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.id; o.textContent = l.name;
+    offSel.appendChild(o);
+  });
+
+  await loadAllRules();
+}
+
+async function loadAllRules() {
+  const [empData, ruleData] = await Promise.all([
+    api('GET', '/employees'),
+    api('GET', '/geofence/buffer-rules')
+  ]);
+  _brAllEmps  = empData?.data  || [];
+  _brAllRules = ruleData?.data || [];
+  brRenderTable(_brAllRules);
+}
+
+// ── Employee search dropdown ──────────────────────────────────────
+function brFilterEmps(q) {
+  const dd = document.getElementById('br-emp-dropdown');
+  if (!q || q.length < 1) { dd.style.display = 'none'; return; }
+  const matches = _brAllEmps.filter(e =>
+    `${e.first_name} ${e.last_name}`.toLowerCase().includes(q.toLowerCase()) ||
+    e.employee_code.toLowerCase().includes(q.toLowerCase())
+  ).slice(0, 8);
+  if (!matches.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = matches.map(e => `
+    <div class="br-emp-row" onclick="brSelectEmp(${e.id},'${e.first_name} ${e.last_name} (${e.employee_code})')">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-l);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">
+        ${(e.first_name[0]||(e.last_name||' ')[0]||'?').toUpperCase()}
+      </div>
+      <div>
+        <div style="font-weight:600">${e.first_name} ${e.last_name}</div>
+        <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.role}</div>
+      </div>
+    </div>`).join('');
+  dd.style.display = 'block';
+}
+
+function brSelectEmp(id, label) {
+  document.getElementById('br-emp-id').value = id;
+  document.getElementById('br-emp-search').value = '';
+  document.getElementById('br-emp-dropdown').style.display = 'none';
+  const sel = document.getElementById('br-emp-selected');
+  document.getElementById('br-emp-selected-name').textContent = label;
+  sel.style.display = 'flex';
+
+  // Load existing rule for this employee
+  const existing = _brAllRules.find(r => r.id == id);
+  if (existing && existing.rule_type) {
+    brSetRuleType(existing.rule_type);
+    document.querySelector(`input[name="br-rule"][value="${existing.rule_type}"]`).checked = true;
+    if (existing.state) {
+      document.getElementById('br-state-sel').value = existing.state;
+      brStateChanged();
+    }
+    if (existing.district) {
+      document.getElementById('br-district-sel').value = existing.district;
+    }
+  }
+}
+
+function brClearEmp() {
+  document.getElementById('br-emp-id').value = '';
+  document.getElementById('br-emp-search').value = '';
+  document.getElementById('br-emp-selected').style.display = 'none';
+  brReset();
+}
+
+function brSetRuleType(type) {
+  _brRuleType = type;
+  document.getElementById('br-office-group').style.display   = type === 'office'   ? '' : 'none';
+  document.getElementById('br-state-group').style.display    = (type === 'state' || type === 'district') ? '' : 'none';
+  document.getElementById('br-district-group').style.display = type === 'district' ? '' : 'none';
+}
+
+function brStateChanged() {
+  const state = document.getElementById('br-state-sel').value;
+  const distSel = document.getElementById('br-district-sel');
+  distSel.innerHTML = '<option value="">— select district —</option>';
+  if (!state || !BR_DISTRICTS[state]) return;
+  BR_DISTRICTS[state].forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    distSel.appendChild(o);
+  });
+}
+
+function brReset() {
+  _brRuleType = '';
+  document.querySelectorAll('input[name="br-rule"]').forEach(r => r.checked = false);
+  ['br-office-group','br-state-group','br-district-group'].forEach(id =>
+    document.getElementById(id).style.display = 'none'
+  );
+  document.getElementById('br-state-sel').value = '';
+  document.getElementById('br-district-sel').innerHTML = '<option value="">— select district —</option>';
+  document.getElementById('br-office-sel').value = '';
+  brHideMsg();
+}
+
+async function brSave() {
+  const empId = document.getElementById('br-emp-id').value;
+  if (!empId) return brShowMsg('Select an employee first', 'error');
+  if (!_brRuleType) return brShowMsg('Select a rule type', 'error');
+
+  const body = { employee_id: parseInt(empId), rule_type: _brRuleType };
+
+  if (_brRuleType === 'state') {
+    body.state = document.getElementById('br-state-sel').value;
+    if (!body.state) return brShowMsg('Select a state', 'error');
+  }
+  if (_brRuleType === 'district') {
+    body.state    = document.getElementById('br-state-sel').value;
+    body.district = document.getElementById('br-district-sel').value;
+    if (!body.state)    return brShowMsg('Select a state', 'error');
+    if (!body.district) return brShowMsg('Select a district', 'error');
+  }
+  if (_brRuleType === 'office') {
+    const offId = document.getElementById('br-office-sel').value;
+    if (!offId) return brShowMsg('Select an office location', 'error');
+    // Also update employee_geofence to point to this office
+    await api('POST', '/geofence/assign', {
+      employee_id: parseInt(empId),
+      office_location_id: parseInt(offId),
+      is_universal: false
+    });
+  }
+
+  const r = await api('POST', '/geofence/buffer-rules', body);
+  if (r?.success) {
+    brShowMsg('✅ Rule saved!', 'success');
+    await loadAllRules();
+    setTimeout(brReset, 1200);
+  } else {
+    brShowMsg(r?.message || 'Failed to save', 'error');
+  }
+}
+
+async function brDelete(empId) {
+  if (!confirm('Remove buffer rule for this employee?')) return;
+  const r = await api('DELETE', `/geofence/buffer-rules/${empId}`);
+  if (r?.success) { toast('Rule removed'); await loadAllRules(); }
+  else toast(r?.message || 'Failed', 'error');
+}
+
+function brEditRow(empId, name, ruleType, state, district) {
+  brClearEmp();
+  document.getElementById('br-emp-id').value = empId;
+  document.getElementById('br-emp-selected-name').textContent = name;
+  document.getElementById('br-emp-selected').style.display = 'flex';
+  const radio = document.querySelector(`input[name="br-rule"][value="${ruleType}"]`);
+  if (radio) { radio.checked = true; brSetRuleType(ruleType); }
+  if (state) {
+    document.getElementById('br-state-sel').value = state;
+    brStateChanged();
+  }
+  if (district) {
+    setTimeout(() => { document.getElementById('br-district-sel').value = district; }, 50);
+  }
+  document.getElementById('br-emp-search').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── Table rendering ───────────────────────────────────────────────
+function brRenderTable(rules) {
+  const body = document.getElementById('br-table-body');
+  document.getElementById('br-table-count').textContent = rules.length + ' employees';
+  if (!rules.length) {
+    body.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted)">No rules found</td></tr>';
+    return;
+  }
+  const typeLabel = { office:'Office', district:'District', state:'State', universal:'Universal', null:'—' };
+  const typeCls   = { office:'br-office', district:'br-district', state:'br-state', universal:'br-universal' };
+  const empTypeCls= { onsite:'br-onsite', offsite:'br-offsite', wfh:'br-wfh' };
+
+  body.innerHTML = rules.map(r => {
+    const name    = `${r.first_name} ${r.last_name}`.trim();
+    const rt      = r.rule_type || null;
+    const boundary= rt === 'district' ? `${r.district}, ${r.state}`
+                  : rt === 'state'    ? r.state
+                  : rt === 'office'   ? 'Office radius'
+                  : rt === 'universal'? 'Anywhere'
+                  : '—';
+    const badgeCls = typeCls[rt] || 'br-none';
+    const empBadge = `<span class="br-emp-type ${empTypeCls[r.employee_type]||'br-none'}">${r.employee_type||'—'}</span>`;
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 10px">
+        <div style="font-weight:600;font-size:13px">${name}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.employee_code}</div>
+      </td>
+      <td style="padding:8px 10px">${empBadge}</td>
+      <td style="padding:8px 10px">
+        <span class="br-badge ${badgeCls}">${rt ? typeLabel[rt] : 'Not set'}</span>
+      </td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text2)">${boundary}</td>
+      <td style="padding:8px 10px;text-align:center">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
+          onclick="brEditRow(${r.id},'${name.replace(/'/g,"\'")}','${rt||''}','${r.state||''}','${r.district||''}')">✏️</button>
+        ${rt ? `<button class="btn btn-ghost btn-sm" onclick="brDelete(${r.id})">🗑️</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function brFilterTable(val) {
+  const q    = (document.getElementById('br-table-search')?.value || '').toLowerCase();
+  const type = document.getElementById('br-filter-type')?.value || '';
+  const filtered = _brAllRules.filter(r => {
+    const name = `${r.first_name} ${r.last_name} ${r.employee_code}`.toLowerCase();
+    const matchQ = !q || name.includes(q);
+    const matchT = !type
+      || (type === 'none' && !r.rule_type)
+      || r.rule_type === type;
+    return matchQ && matchT;
+  });
+  brRenderTable(filtered);
+}
+
+function brShowMsg(msg, type) {
+  const el = document.getElementById('br-form-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.color = type === 'error' ? 'var(--red,#dc2626)' : 'var(--green,#16a34a)';
+}
+function brHideMsg() {
+  const el = document.getElementById('br-form-msg');
+  if (el) { el.style.display = 'none'; el.textContent = ''; }
+}
+// ══════════════════════════════════════════════════════════════════
+
+</script>
+</body>
+</html>

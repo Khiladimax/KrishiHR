@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Reshuffle Employees · KrishiHR</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --green: #1a7a4a;
+    --green-light: #e8f5ee;
+    --green-mid: #2ea86b;
+    --accent: #f5a623;
+    --danger: #e53e3e;
+    --bg: #f7f9f7;
+    --card: #ffffff;
+    --border: #d4e8dc;
+    --text: #1a2e22;
+    --muted: #6b8c78;
+    --shadow: 0 2px 12px rgba(26,122,74,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* TOP BAR */
+  .topbar {
+    background: var(--green);
+    color: #fff;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .topbar .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
+  .topbar .sep { opacity: .4; font-size: 20px; }
+  .topbar .page-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 16px; opacity: .9; }
+  .topbar .badge {
+    margin-left: auto;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* MAIN */
+  .main { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 22px;
+    box-shadow: var(--shadow);
+  }
+  .status-bar .dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; flex-shrink: 0; transition: background .3s; }
+  .status-bar .dot.ok { background: var(--green-mid); box-shadow: 0 0 0 3px rgba(46,168,107,0.2); }
+  .status-bar .dot.err { background: var(--danger); }
+  .status-bar .dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+  .status-bar .msg { font-size: 14px; color: var(--muted); flex: 1; }
+  .status-bar .msg strong { color: var(--text); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* SECTION HEADER */
+  .section-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .section-hd h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; }
+  .section-hd .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* PANELS GRID */
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-head {
+    background: var(--green-light);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-head .icon { font-size: 18px; }
+  .panel-head .title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: var(--green); }
+  .panel-head .count {
+    margin-left: auto;
+    background: var(--green);
+    color: #fff;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* EMPLOYEE LIST */
+  .emp-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 380px;
+    padding: 10px 12px;
+  }
+  .emp-list:empty::after {
+    content: 'No employees';
+    display: block;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 30px 0;
+  }
+
+  .emp-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: grab;
+    border: 1.5px solid transparent;
+    transition: background .15s, border-color .15s, transform .1s;
+    margin-bottom: 4px;
+    background: var(--bg);
+    user-select: none;
+  }
+  .emp-chip:hover { background: var(--green-light); border-color: var(--border); }
+  .emp-chip.dragging { opacity: .5; transform: scale(.97); }
+  .emp-chip.over { border-color: var(--green-mid); background: #d4f0e4; }
+  .emp-chip .avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .emp-chip .info { flex: 1; min-width: 0; }
+  .emp-chip .info .name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .emp-chip .info .code { font-size: 11px; color: var(--muted); }
+  .emp-chip .drag-icon { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+
+  /* DROP ZONE PANEL */
+  .drop-zone-panel {
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    transition: border-color .2s, background .2s;
+    padding: 20px;
+    gap: 8px;
+  }
+  .drop-zone-panel.drag-active { border-color: var(--green-mid); background: var(--green-light); color: var(--green); }
+  .drop-zone-panel .dz-icon { font-size: 32px; }
+
+  /* LOCATION SELECTOR */
+  .loc-select-wrap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select.loc-sel {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 9px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+    min-width: 200px;
+    transition: border-color .2s;
+  }
+  select.loc-sel:focus { border-color: var(--green-mid); }
+
+  /* BUTTONS */
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #155e38; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--green-light); border-color: var(--green-mid); }
+  .btn-accent { background: var(--accent); color: #fff; }
+
+  /* PENDING CHANGES TABLE */
+  .changes-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .changes-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--green-light);
+    color: var(--green);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .3px;
+    border-bottom: 1px solid var(--border);
+  }
+  .changes-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--bg);
+    vertical-align: middle;
+  }
+  .changes-table tr:hover td { background: var(--bg); }
+  .arrow { color: var(--green-mid); font-weight: 700; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-from { background: #fde8e8; color: #9b2c2c; }
+  .tag-to { background: #d4f0e4; color: #1a7a4a; }
+  .tag-new { background: #fff3d4; color: #7b4f00; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 460px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    transform: translateY(20px);
+    transition: transform .2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal h3 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; margin-bottom: 10px; }
+  .modal p { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+    background: var(--text); color: #fff;
+    padding: 10px 20px; border-radius: 8px;
+    font-size: 14px; z-index: 2000;
+    transition: transform .25s; pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.success { background: var(--green); }
+  #toast.error { background: var(--danger); }
+
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: var(--muted); font-size: 14px;
+  }
+  .empty-state .big { font-size: 36px; margin-bottom: 8px; }
+
+  .section-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-bottom: 22px;
+  }
+  .section-card-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-card-head h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; }
+  .section-card-body { padding: 18px 20px; }
+
+  .tabs { display: flex; gap: 2px; background: var(--bg); border-radius: 10px; padding: 4px; margin-bottom: 20px; width: fit-content; }
+  .tab-btn {
+    font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px;
+    padding: 7px 18px; border-radius: 7px; border: none; cursor: pointer;
+    background: transparent; color: var(--muted); transition: all .15s;
+  }
+  .tab-btn.active { background: var(--card); color: var(--green); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Search */
+  .search-input {
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    padding: 8px 12px; border: 1.5px solid var(--border);
+    border-radius: 8px; outline: none; width: 100%; max-width: 280px;
+    transition: border-color .2s;
+  }
+  .search-input:focus { border-color: var(--green-mid); }
+
+  .filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🌾 KrishiHR</div>
+  <div class="sep">·</div>
+  <div class="page-title">Reshuffle Office Locations</div>
+  <div class="badge" id="user-badge">Loading…</div>
+</div>
+
+<div class="main">
+
+  <!-- STATUS -->
+  <div class="status-bar">
+    <div class="dot loading" id="status-dot"></div>
+    <div class="msg" id="status-msg">Connecting to server…</div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('drag')">🔀 Drag & Drop</button>
+    <button class="tab-btn" onclick="switchTab('bulk')">📋 Bulk Reassign</button>
+    <button class="tab-btn" onclick="switchTab('pending')">✅ Pending Changes <span id="pending-count-badge"></span></button>
+  </div>
+
+  <!-- TAB: DRAG & DROP -->
+  <div class="tab-panel active" id="tab-drag">
+    <div class="section-card" style="margin-bottom:18px">
+      <div class="section-card-head">
+        <span>📍</span>
+        <h2>Select Locations</h2>
+      </div>
+      <div class="section-card-body">
+        <div class="panels">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">SOURCE LOCATION</label>
+            <div class="loc-select-wrap">
+              <select class="loc-sel" id="loc-from" onchange="loadFromEmployees()">
+                <option value="">— pick a location —</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">DESTINATION LOCATION</label>
+            <div class="loc-select-wrap">
+              <select class="loc-sel" id="loc-to" onchange="loadToEmployees()">
+                <option value="">— pick a location —</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panels" id="drag-panels">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="icon">👥</span>
+          <div class="title" id="from-title">Source Employees</div>
+          <div class="count" id="from-count">0</div>
+        </div>
+        <div style="padding:10px 12px 0">
+          <input type="text" class="search-input" placeholder="Search employee…" style="width:100%;max-width:100%;margin-bottom:0" oninput="filterFrom(this.value)">
+        </div>
+        <div class="emp-list" id="from-list" ondragover="event.preventDefault()" ondrop="handleDrop(event,'from')">
+          <div class="empty-state"><div class="big">🏢</div>Select a source location above</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="icon">🏠</span>
+          <div class="title" id="to-title">Destination Employees</div>
+          <div class="count" id="to-count">0</div>
+        </div>
+        <div style="padding:10px 12px 0">
+          <input type="text" class="search-input" placeholder="Search employee…" style="width:100%;max-width:100%;margin-bottom:0" oninput="filterTo(this.value)">
+        </div>
+        <div class="emp-list" id="to-list" ondragover="event.preventDefault()" ondrop="handleDrop(event,'to')">
+          <div class="empty-state"><div class="big">🎯</div>Drag employees here to move them</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: BULK -->
+  <div class="tab-panel" id="tab-bulk">
+    <div class="section-card">
+      <div class="section-card-head">
+        <span>📋</span>
+        <h2>Bulk Reassign Employees</h2>
+      </div>
+      <div class="section-card-body">
+        <div class="filter-row">
+          <input type="text" class="search-input" placeholder="Search employee name or code…" id="bulk-search" oninput="renderBulkList()">
+          <select class="loc-sel" style="max-width:220px" id="bulk-filter-loc" onchange="renderBulkList()">
+            <option value="">All locations</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <label style="font-size:13px;font-weight:600">Move selected to:</label>
+          <select class="loc-sel" style="max-width:240px" id="bulk-dest">
+            <option value="">— select destination —</option>
+          </select>
+          <button class="btn btn-primary" onclick="applyBulkMove()" id="bulk-move-btn">Move Selected</button>
+          <button class="btn btn-outline" onclick="clearBulkSelection()">Clear</button>
+        </div>
+        <div id="bulk-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PENDING -->
+  <div class="tab-panel" id="tab-pending">
+    <div class="section-card">
+      <div class="section-card-head">
+        <span>✅</span>
+        <h2>Pending Changes</h2>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="clearAllPending()">Clear All</button>
+          <button class="btn btn-primary" onclick="confirmCommit()" id="commit-btn">Apply All Changes</button>
+        </div>
+      </div>
+      <div class="section-card-body" id="pending-body">
+        <div class="empty-state"><div class="big">🎉</div>No pending changes yet.<br>Drag employees between locations to get started.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Confirm Changes</h3>
+    <p id="modal-body"></p>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm-btn" onclick="commitChanges()">Apply Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let allLocations = [];
+let allEmployees = [];
+let fromEmployees = [];  // current employees at source loc
+let toEmployees = [];    // current employees at dest loc
+let pendingChanges = []; // [{employee_id, emp, fromLocId, fromLocName, toLocId, toLocName}]
+let bulkSelected = new Set();
+let dragEmpId = null;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  // Check auth
+  const token = Auth?.getToken?.() || localStorage.getItem('krishihr_token');
+  const user = Auth?.getUser?.() || JSON.parse(localStorage.getItem('krishihr_user') || 'null');
+  if (!token) {
+    setStatus('err', 'Not logged in. Please <a href="index.html">log in</a> first.');
+    return;
+  }
+  document.getElementById('user-badge').textContent = user ? `${user.first_name || user.name || 'Admin'}` : 'Admin';
+
+  setStatus('loading', 'Loading locations and employees…');
+  try {
+    const [locData, empData] = await Promise.all([
+      api('GET', '/geofence/locations'),
+      api('GET', '/employees')
+    ]);
+    allLocations = locData?.data || [];
+    allEmployees = empData?.data || [];
+    populateLocationSelects();
+    renderBulkList();
+    setStatus('ok', `<strong>${allLocations.length}</strong> locations · <strong>${allEmployees.length}</strong> employees loaded`);
+  } catch(e) {
+    setStatus('err', 'Failed to load data: ' + e.message);
+  }
+}
+
+function setStatus(type, msg) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'dot ' + (type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'loading');
+  document.getElementById('status-msg').innerHTML = msg;
+}
+
+function populateLocationSelects() {
+  const opts = allLocations.map(l =>
+    `<option value="${l.id}">${l.name} (${l.employee_count ?? '?'})</option>`
+  ).join('');
+  ['loc-from','loc-to','bulk-filter-loc','bulk-dest'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prefix = id === 'bulk-filter-loc' ? '<option value="">All locations</option>' : '<option value="">— select —</option>';
+    el.innerHTML = prefix + opts;
+  });
+}
+
+// ─── DRAG & DROP ──────────────────────────────────────────────────────────────
+async function loadFromEmployees() {
+  const locId = parseInt(document.getElementById('loc-from').value);
+  if (!locId) return;
+  const loc = allLocations.find(l => l.id === locId);
+  document.getElementById('from-title').textContent = loc?.name || 'Source';
+  const data = await api('GET', `/geofence/locations/${locId}/employees`);
+  fromEmployees = data?.data || [];
+  renderFromList();
+}
+
+async function loadToEmployees() {
+  const locId = parseInt(document.getElementById('loc-to').value);
+  if (!locId) return;
+  const loc = allLocations.find(l => l.id === locId);
+  document.getElementById('to-title').textContent = loc?.name || 'Destination';
+  const data = await api('GET', `/geofence/locations/${locId}/employees`);
+  toEmployees = data?.data || [];
+  renderToList();
+}
+
+function renderFromList(filter='') {
+  const list = document.getElementById('from-list');
+  const emps = fromEmployees.filter(e => matchFilter(e, filter));
+  document.getElementById('from-count').textContent = fromEmployees.length;
+  if (!emps.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px"><div class="big">🤷</div>No employees found</div>';
+    return;
+  }
+  list.innerHTML = emps.map(e => empChipHTML(e, 'from')).join('');
+  bindDragEvents();
+}
+
+function renderToList(filter='') {
+  const list = document.getElementById('to-list');
+  const emps = toEmployees.filter(e => matchFilter(e, filter));
+  document.getElementById('to-count').textContent = toEmployees.length;
+  if (!emps.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px"><div class="big">🎯</div>Drag employees here</div>';
+    return;
+  }
+  list.innerHTML = emps.map(e => empChipHTML(e, 'to')).join('');
+  bindDragEvents();
+}
+
+function filterFrom(v) { renderFromList(v); }
+function filterTo(v) { renderToList(v); }
+
+function matchFilter(e, f) {
+  if (!f) return true;
+  const q = f.toLowerCase();
+  return `${e.first_name} ${e.last_name}`.toLowerCase().includes(q)
+      || (e.employee_code || '').toLowerCase().includes(q);
+}
+
+function empChipHTML(e, side) {
+  const name = `${e.first_name} ${e.last_name || ''}`.trim();
+  const initials = (e.first_name?.[0] || '') + (e.last_name?.[0] || name[1] || '');
+  return `<div class="emp-chip" draggable="true" data-id="${e.id}" data-side="${side}" title="${name}">
+    <div class="avatar">${initials.toUpperCase()}</div>
+    <div class="info">
+      <div class="name">${name}</div>
+      <div class="code">${e.employee_code || ''}</div>
+    </div>
+    <div class="drag-icon">⠿</div>
+  </div>`;
+}
+
+function bindDragEvents() {
+  document.querySelectorAll('.emp-chip[draggable]').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      dragEmpId = parseInt(el.dataset.id);
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+  });
+}
+
+function handleDrop(e, targetSide) {
+  e.preventDefault();
+  if (!dragEmpId) return;
+
+  const fromLocId = parseInt(document.getElementById('loc-from').value);
+  const toLocId = parseInt(document.getElementById('loc-to').value);
+  if (!fromLocId || !toLocId) { toast('Select both locations first', 'error'); return; }
+  if (fromLocId === toLocId) { toast('Source and destination are the same', 'error'); return; }
+
+  const srcSide = document.querySelector(`.emp-chip[data-id="${dragEmpId}"]`)?.dataset.side;
+  if (srcSide === targetSide) return; // same panel
+
+  const fromLoc = allLocations.find(l => l.id === fromLocId);
+  const toLoc = allLocations.find(l => l.id === toLocId);
+
+  if (targetSide === 'to') {
+    // Moving from → to
+    const emp = fromEmployees.find(e => e.id === dragEmpId);
+    if (!emp) return;
+    queueChange(emp, fromLocId, fromLoc?.name, toLocId, toLoc?.name);
+    fromEmployees = fromEmployees.filter(e => e.id !== dragEmpId);
+    toEmployees = [...toEmployees, emp];
+  } else {
+    // Moving to → from (undo)
+    const emp = toEmployees.find(e => e.id === dragEmpId);
+    if (!emp) return;
+    // Check if this was a pending change (undo it) or original from-loc employee
+    const existingIdx = pendingChanges.findIndex(p => p.employee_id === dragEmpId && p.toLocId === toLocId);
+    if (existingIdx > -1) {
+      pendingChanges.splice(existingIdx, 1);
+      updatePendingBadge();
+    }
+    toEmployees = toEmployees.filter(e => e.id !== dragEmpId);
+    fromEmployees = [...fromEmployees, emp];
+  }
+  renderFromList();
+  renderToList();
+  renderPending();
+  dragEmpId = null;
+}
+
+function queueChange(emp, fromLocId, fromLocName, toLocId, toLocName) {
+  // Remove duplicate if re-queued
+  pendingChanges = pendingChanges.filter(p => !(p.employee_id === emp.id && p.toLocId === toLocId));
+  pendingChanges.push({ employee_id: emp.id, emp, fromLocId, fromLocName, toLocId, toLocName });
+  updatePendingBadge();
+  toast(`${emp.first_name} queued for move`, 'success');
+}
+
+// ─── BULK REASSIGN ────────────────────────────────────────────────────────────
+async function renderBulkList() {
+  const search = document.getElementById('bulk-search')?.value.toLowerCase() || '';
+  const filterLoc = parseInt(document.getElementById('bulk-filter-loc')?.value) || 0;
+
+  let emps = allEmployees;
+  if (search) emps = emps.filter(e => matchFilter(e, search));
+
+  // Get primary locations from pending or original
+  const container = document.getElementById('bulk-list');
+
+  if (!emps.length) {
+    container.innerHTML = '<div class="empty-state"><div class="big">🔍</div>No employees match</div>';
+    return;
+  }
+
+  // We need to know each employee's current location(s).
+  // Use the data we have from geofence which includes location per entry.
+  // Group by employee_id from allEmployees (no location in list endpoint).
+  // For bulk we'll load from location if filter is set.
+  let locationMap = {}; // emp id → loc name
+  if (filterLoc) {
+    const data = await api('GET', `/geofence/locations/${filterLoc}/employees`);
+    const locEmps = data?.data || [];
+    const locEmpIds = new Set(locEmps.map(e => e.id));
+    emps = emps.filter(e => locEmpIds.has(e.id));
+    locEmps.forEach(e => locationMap[e.id] = allLocations.find(l => l.id === filterLoc)?.name || '');
+  }
+
+  container.innerHTML = `
+    <table class="changes-table">
+      <thead><tr>
+        <th><input type="checkbox" onchange="toggleAllBulk(this)" id="bulk-all-cb"> All</th>
+        <th>Employee</th>
+        <th>Code</th>
+        <th>Current Location</th>
+      </tr></thead>
+      <tbody>
+        ${emps.map(e => {
+          const name = `${e.first_name} ${e.last_name || ''}`.trim();
+          const pending = pendingChanges.find(p => p.employee_id === e.id);
+          const locName = pending ? `<span class="tag tag-new">${pending.toLocName}</span>` : (locationMap[e.id] ? `<span class="tag" style="background:var(--green-light);color:var(--green)">${locationMap[e.id]}</span>` : '—');
+          return `<tr>
+            <td><input type="checkbox" class="bulk-cb" data-id="${e.id}" ${bulkSelected.has(e.id)?'checked':''} onchange="toggleBulkEmp(${e.id},this.checked)"></td>
+            <td>${name}</td>
+            <td style="color:var(--muted)">${e.employee_code || ''}</td>
+            <td>${locName}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function toggleBulkEmp(id, checked) {
+  checked ? bulkSelected.add(id) : bulkSelected.delete(id);
+}
+function toggleAllBulk(cb) {
+  document.querySelectorAll('.bulk-cb').forEach(el => {
+    el.checked = cb.checked;
+    toggleBulkEmp(parseInt(el.dataset.id), cb.checked);
+  });
+}
+function clearBulkSelection() {
+  bulkSelected.clear();
+  document.querySelectorAll('.bulk-cb').forEach(el => el.checked = false);
+  const allCb = document.getElementById('bulk-all-cb');
+  if (allCb) allCb.checked = false;
+}
+
+async function applyBulkMove() {
+  const destLocId = parseInt(document.getElementById('bulk-dest').value);
+  if (!destLocId) { toast('Select a destination location', 'error'); return; }
+  if (!bulkSelected.size) { toast('Select at least one employee', 'error'); return; }
+  const toLoc = allLocations.find(l => l.id === destLocId);
+  bulkSelected.forEach(empId => {
+    const emp = allEmployees.find(e => e.id === empId);
+    if (!emp) return;
+    queueChange(emp, null, 'Current', destLocId, toLoc?.name);
+  });
+  clearBulkSelection();
+  renderBulkList();
+  switchTab('pending');
+}
+
+// ─── PENDING ──────────────────────────────────────────────────────────────────
+function renderPending() {
+  const body = document.getElementById('pending-body');
+  if (!pendingChanges.length) {
+    body.innerHTML = '<div class="empty-state"><div class="big">🎉</div>No pending changes.<br>Drag employees or use Bulk Reassign.</div>';
+    return;
+  }
+  body.innerHTML = `
+    <table class="changes-table">
+      <thead><tr>
+        <th>Employee</th><th>Code</th><th>From</th><th></th><th>To</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${pendingChanges.map((p,i) => {
+          const name = `${p.emp.first_name} ${p.emp.last_name || ''}`.trim();
+          return `<tr>
+            <td><strong>${name}</strong></td>
+            <td style="color:var(--muted)">${p.emp.employee_code||''}</td>
+            <td><span class="tag tag-from">${p.fromLocName || 'Current'}</span></td>
+            <td class="arrow">→</td>
+            <td><span class="tag tag-to">${p.toLocName}</span></td>
+            <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="removePending(${i})">✕</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function removePending(i) {
+  pendingChanges.splice(i, 1);
+  updatePendingBadge();
+  renderPending();
+}
+
+function clearAllPending() {
+  if (!pendingChanges.length) return;
+  pendingChanges = [];
+  updatePendingBadge();
+  renderPending();
+  toast('Cleared all pending changes');
+}
+
+function updatePendingBadge() {
+  const badge = document.getElementById('pending-count-badge');
+  badge.textContent = pendingChanges.length ? ` (${pendingChanges.length})` : '';
+  badge.style.color = pendingChanges.length ? 'var(--accent)' : '';
+}
+
+// ─── COMMIT ───────────────────────────────────────────────────────────────────
+function confirmCommit() {
+  if (!pendingChanges.length) { toast('No changes to apply', 'error'); return; }
+  document.getElementById('modal-title').textContent = 'Apply Changes';
+  document.getElementById('modal-body').textContent =
+    `You are about to reassign ${pendingChanges.length} employee(s) to new office locations. This will update their geofence assignments. This cannot be undone automatically.`;
+  openModal();
+}
+
+async function commitChanges() {
+  const btn = document.getElementById('modal-confirm-btn');
+  btn.innerHTML = '<span class="spinner"></span>Applying…';
+  btn.disabled = true;
+
+  let success = 0, failed = 0;
+  for (const change of pendingChanges) {
+    try {
+      // First remove from old location if known
+      if (change.fromLocId) {
+        await api('DELETE', `/geofence/${change.employee_id}/${change.fromLocId}`);
+      }
+      // Assign to new location
+      const r = await api('POST', '/geofence/assign', {
+        employee_id: change.employee_id,
+        office_location_id: change.toLocId,
+        is_universal: false
+      });
+      if (r?.success) success++; else failed++;
+    } catch(e) {
+      failed++;
+    }
+  }
+
+  btn.innerHTML = 'Apply Changes';
+  btn.disabled = false;
+  closeModal();
+
+  if (success > 0) {
+    toast(`✅ ${success} employee(s) reassigned successfully${failed ? `, ${failed} failed` : ''}`, failed ? '' : 'success');
+    pendingChanges = [];
+    updatePendingBadge();
+    renderPending();
+    // Refresh location data
+    const locData = await api('GET', '/geofence/locations');
+    allLocations = locData?.data || [];
+    populateLocationSelects();
+    // Reload drag panels if open
+    if (document.getElementById('loc-from').value) loadFromEmployees();
+    if (document.getElementById('loc-to').value) loadToEmployees();
+  } else {
+    toast(`❌ All ${failed} changes failed`, 'error');
+  }
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((btn,i) => {
+    const tabs = ['drag','bulk','pending'];
+    btn.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'pending') renderPending();
+  if (name === 'bulk') renderBulkList();
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3000);
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

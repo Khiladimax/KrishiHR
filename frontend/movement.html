@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR - Movement</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<!-- Google Maps API (replaces Leaflet) -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA&libraries=geometry"></script>
+<style>
+  #mv-route-map { border-radius: 8px; }
+  .gm-style { font-family: 'DM Sans', sans-serif; }
+  /* Map type toggle buttons */
+  .map-type-btns { display: flex; gap: 8px; margin-bottom: 10px; }
+  .map-type-btn {
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    border: 1.5px solid #e5e7eb; background: #fff; cursor: pointer; transition: all .15s;
+  }
+  .map-type-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div><div class="logo-sub">Krishi Care And Management</div></div>
+      <div class="logo-sub">Enterprise Edition</div>
+    </div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">📍 Employee Movement</div>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="section-title" style="margin:0">Employee Movement Tracker</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Employee</label>
+          <select id="mv-emp" class="form-control">
+            <option value="">All Employees</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">From Date</label>
+          <input id="mv-from" type="date" class="form-control">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">To Date</label>
+          <input id="mv-to" type="date" class="form-control">
+        </div>
+        <button class="btn btn-primary" onclick="loadMovementSummary()" style="height:38px;white-space:nowrap">🔍 Search</button>
+      </div>
+    </div>
+
+    <!-- Summary Table -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="section-title" style="margin:0">📊 Movement Summary</div>
+        <button class="btn btn-outline" onclick="exportMovementCSV()" style="font-size:12px;padding:6px 14px">⬇ Export CSV</button>
+      </div>
+      <div id="mv-summary-wrap" style="margin-top:12px">
+        <div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">
+          Select filters and click Search to view movement data
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail map/timeline -->
+    <div class="card" id="mv-detail-card" style="display:none;margin-bottom:16px">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="section-title" id="mv-detail-title" style="margin:0">🗺 Route Detail</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <a id="mv-gmaps-link" href="#" target="_blank" class="btn btn-outline" style="font-size:12px;padding:5px 12px;text-decoration:none">🌐 Google Maps</a>
+          <button onclick="closeMvDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280">✕</button>
+        </div>
+      </div>
+      <div id="mv-stats-bar" style="display:flex;gap:24px;padding:12px 0;flex-wrap:wrap"></div>
+
+      <!-- Map type toggle -->
+      <div class="map-type-btns" id="mv-map-type-btns" style="display:none">
+        <button class="map-type-btn" onclick="setMapType('roadmap')">🗺 Road</button>
+        <button class="map-type-btn" onclick="setMapType('satellite')">🛰 Satellite</button>
+        <button class="map-type-btn active" onclick="setMapType('hybrid')">🌍 Hybrid</button>
+        <button class="map-type-btn" onclick="setMapType('terrain')">⛰ Terrain</button>
+      </div>
+
+      <div id="mv-route-map" style="height:calc(100vh - 320px);min-height:500px;width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0 4px;border-bottom:1px solid #f3f4f6">
+        <span style="font-size:12px;font-weight:600;color:#374151">📋 Point Timeline</span>
+        <span id="mv-pt-count" style="font-size:12px;color:#6b7280"></span>
+      </div>
+      <div id="mv-timeline" style="max-height:300px;overflow-y:auto"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+Auth.guard();
+buildSidebar('movement.html');
+
+const user = Auth.getUser();
+const allowed = ['admin','super_admin','hr','manager','tl'];
+if (!user || !allowed.includes(user.role)) window.location.href = 'attendance.html';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const todayIST = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date());
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  const isKC718 = user && user.employee_code === 'KC718';
+  const seeAll  = isKC718 || ['super_admin','hr'].includes(user.role);
+  const endpoint = seeAll
+    ? '/employees?active=true&limit=500'
+    : `/employees?active=true&reporting_manager_id=${user.id}&limit=500`;
+  const res = await api('GET', endpoint);
+  if (res?.success) {
+    const sel = document.getElementById('mv-emp');
+    (res.data || []).forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id;
+      o.textContent = `${e.first_name} ${e.last_name} (${e.employee_code})`;
+      sel.appendChild(o);
+    });
+  }
+  const today = todayIST();
+  document.getElementById('mv-from').value = today;
+  document.getElementById('mv-to').value   = today;
+  loadMovementSummary();
+})();
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+async function loadMovementSummary() {
+  const empId = document.getElementById('mv-emp').value  || '';
+  const fromD = document.getElementById('mv-from').value || '';
+  const toD   = document.getElementById('mv-to').value   || '';
+  const wrap  = document.getElementById('mv-summary-wrap');
+  if (!fromD || !toD) { toast('Please select date range', 'error'); return; }
+  wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7280">Loading…</div>';
+  let url = `/attendance/movement/summary?from_date=${fromD}&to_date=${toD}`;
+  if (empId) url += `&employee_id=${empId}`;
+  const res = await api('GET', url);
+  if (!res?.success) { wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#ef4444">Failed to load data</div>'; return; }
+  const rows = res.data || [];
+  if (!rows.length) { wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:14px">No movement data found for selected filters</div>'; return; }
+
+  let html = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+      <th style="padding:10px 12px;text-align:left;font-weight:600;color:#374151">Employee</th>
+      <th style="padding:10px 12px;text-align:left;font-weight:600;color:#374151">Code</th>
+      <th style="padding:10px 12px;text-align:left;font-weight:600;color:#374151">Date</th>
+      <th style="padding:10px 12px;text-align:right;font-weight:600;color:#374151">Points</th>
+      <th style="padding:10px 12px;text-align:right;font-weight:600;color:#374151">Total KM</th>
+      <th style="padding:10px 12px;text-align:center;font-weight:600;color:#374151">Action</th>
+    </tr></thead><tbody>`;
+  rows.forEach((r, i) => {
+    const km = r.total_km;
+    const kmColor = km > 50 ? '#16a34a' : km > 20 ? '#d97706' : '#374151';
+    const notTracked = r.point_count === 0;
+    html += `<tr style="border-bottom:1px solid #f3f4f6;${notTracked ? 'background:#fff7ed' : (i%2===0?'':'background:#fafafa')}">
+      <td style="padding:10px 12px;font-weight:500">${r.emp_name}</td>
+      <td style="padding:10px 12px;color:#6b7280;font-size:12px">${r.employee_code}</td>
+      <td style="padding:10px 12px">${String(r.date).split('T')[0]}</td>
+      <td style="padding:10px 12px;text-align:right;${notTracked ? 'color:#f59e0b;font-weight:600' : 'color:#6b7280'}">${notTracked ? '⚠ 0' : r.point_count}</td>
+      <td style="padding:10px 12px;text-align:right;font-weight:700;color:${kmColor}">${km.toFixed(2)} km</td>
+      <td style="padding:10px 12px;text-align:center">
+        ${notTracked
+          ? '<span style="font-size:11px;color:#f59e0b;font-weight:600">Not Tracking</span>'
+          : `<button class="btn btn-outline" style="font-size:11px;padding:4px 10px"
+              onclick="loadMovementDetail(${r.employee_id},'${String(r.date).split('T')[0]}','${r.emp_name}')">
+              🗺 Route
+            </button>`
+        }
+      </td>
+    </tr>`;
+  });
+  const totalKm = rows.reduce((s, r) => s + r.total_km, 0);
+  html += `</tbody></table></div>
+    <div style="padding:10px 12px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb;text-align:right">
+      ${rows.length} record(s) &nbsp;|&nbsp; Total distance: <strong>${totalKm.toFixed(2)} km</strong>
+    </div>`;
+  wrap.innerHTML = html;
+  window._mvSummaryData = rows;
+}
+
+// ── Detail (Google Maps) ───────────────────────────────────────────────────────
+let _mvGoogleMap    = null;
+let _mvPolyline     = null;
+let _mvMarkers      = [];
+let _mvInfoWindow   = null;
+let _mvCurrentType  = 'hybrid';
+
+function setMapType(type) {
+  _mvCurrentType = type;
+  if (_mvGoogleMap) _mvGoogleMap.setMapTypeId(type);
+  document.querySelectorAll('.map-type-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(
+      type === 'roadmap' ? 'road' : type === 'hybrid' ? 'hybrid' : type === 'satellite' ? 'sat' : 'terr'
+    ));
+  });
+}
+
+function closeMvDetail() {
+  document.getElementById('mv-detail-card').style.display = 'none';
+  document.getElementById('mv-map-type-btns').style.display = 'none';
+  if (_mvInfoWindow) { _mvInfoWindow.close(); _mvInfoWindow = null; }
+  if (_mvMarkers.length) { _mvMarkers.forEach(m => m.setMap(null)); _mvMarkers = []; }
+  if (_mvPolyline) { _mvPolyline.setMap(null); _mvPolyline = null; }
+  if (_mvGoogleMap) { _mvGoogleMap = null; }
+}
+
+async function loadMovementDetail(employeeId, date, empName) {
+  date = String(date).split('T')[0];
+
+  // Reset
+  closeMvDetail();
+
+  const card = document.getElementById('mv-detail-card');
+  card.style.display = '';
+  document.getElementById('mv-detail-title').innerHTML = `🗺 ${empName} — ${date}`;
+  document.getElementById('mv-stats-bar').innerHTML = '<span style="color:#6b7280;font-size:13px">Loading…</span>';
+  document.getElementById('mv-timeline').innerHTML = '';
+  document.getElementById('mv-route-map').innerHTML = '';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const res = await api('GET', `/attendance/movement/history?employee_id=${employeeId}&date=${date}`);
+  if (!res?.success || !res.data?.length) {
+    document.getElementById('mv-stats-bar').innerHTML = '';
+    document.getElementById('mv-timeline').innerHTML =
+      '<div style="padding:30px;color:#9ca3af;text-align:center;font-size:14px">⚠️ No GPS points recorded for this day</div>';
+    document.getElementById('mv-gmaps-link').href = '#';
+    return;
+  }
+
+  const pts = res.data.map(p => ({ ...p, lat: parseFloat(p.lat), lng: parseFloat(p.lng) }));
+
+  // ── Haversine ────────────────────────────────────────────────────────────
+  function hav(p1, p2) {
+    const R = 6371,
+      dLat = (p2.lat - p1.lat) * Math.PI / 180,
+      dLon = (p2.lng - p1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+      Math.cos(p1.lat * Math.PI/180) * Math.cos(p2.lat * Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  let totalKm = 0;
+  for (let i = 1; i < pts.length; i++) totalKm += hav(pts[i-1], pts[i]);
+  totalKm = Math.round(totalKm * 100) / 100;
+
+  // Stats bar
+  document.getElementById('mv-stats-bar').innerHTML = `
+    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#2563eb">${totalKm.toFixed(2)}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">Total KM</div></div>
+    <div style="width:1px;background:#e5e7eb;align-self:stretch"></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#7c3aed">${pts.length}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">GPS Points</div></div>
+    <div style="width:1px;background:#e5e7eb;align-self:stretch"></div>
+    <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#059669">${pts[0].time_label}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">First Point</div></div>
+    <div style="width:1px;background:#e5e7eb;align-self:stretch"></div>
+    <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#dc2626">${pts[pts.length-1].time_label}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">Last Point</div></div>`;
+
+  document.getElementById('mv-pt-count').textContent = `${pts.length} point${pts.length !== 1 ? 's' : ''}`;
+
+  // Google Maps navigation link (max 25 waypoints)
+  const gPts = pts.length > 25
+    ? [pts[0], ...pts.filter((_,i) => i > 0 && i < pts.length-1 && i % (Math.ceil(pts.length/23)) === 0).slice(0,23), pts[pts.length-1]]
+    : pts;
+  document.getElementById('mv-gmaps-link').href =
+    `https://www.google.com/maps/dir/${gPts.map(p => `${p.lat},${p.lng}`).join('/')}`;
+
+  // ── Init Google Map ───────────────────────────────────────────────────────
+  const mapDiv = document.getElementById('mv-route-map');
+
+  // FIX: small timeout so the container is fully visible/reflowed before init
+  await new Promise(r => setTimeout(r, 80));
+
+  _mvGoogleMap = new google.maps.Map(mapDiv, {
+    zoom: 15,
+    center: { lat: pts[0].lat, lng: pts[0].lng },
+    mapTypeId: _mvCurrentType,
+    mapTypeControl: false,   // we have our own buttons
+    streetViewControl: false,
+    fullscreenControl: true,
+    zoomControl: true,
+    gestureHandling: 'greedy',
+    styles: [
+      // Slightly cleaner style for field tracking
+      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+    ]
+  });
+
+  // Show map type buttons
+  document.getElementById('mv-map-type-btns').style.display = 'flex';
+
+  // ── Draw route polyline ───────────────────────────────────────────────────
+  // ✅ FIX: Filter points with accuracy > 100m before drawing line to reduce jumps.
+  // Also use ALL points for the path (not thinned gPts) for accurate route.
+  const pathPts = pts.filter(p => !p.accuracy || p.accuracy <= 100);
+  const path = (pathPts.length >= 2 ? pathPts : pts).map(p => ({ lat: p.lat, lng: p.lng }));
+  _mvPolyline = new google.maps.Polyline({
+    path,
+    geodesic: true,
+    strokeColor: '#2563eb',
+    strokeOpacity: 0.9,
+    strokeWeight: 4,
+    map: _mvGoogleMap
+  });
+
+  // ── Shared InfoWindow ─────────────────────────────────────────────────────
+  _mvInfoWindow = new google.maps.InfoWindow();
+
+  // ── Helper: create SVG dot marker ────────────────────────────────────────
+  function makeMarker(pt, label, color, size = 10, isEndpoint = false) {
+    let icon;
+    if (isEndpoint) {
+      icon = {
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5"/>
+            <text x="14" y="19" text-anchor="middle" font-size="13" font-weight="bold"
+                  fill="white" font-family="Arial,sans-serif">${label}</text>
+          </svg>`)}`,
+        scaledSize: new google.maps.Size(28, 28),
+        anchor: new google.maps.Point(14, 14)
+      };
+    } else {
+      icon = {
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+            <circle cx="${size/2}" cy="${size/2}" r="${size/2-1.5}" fill="${color}"
+                    stroke="white" stroke-width="1.5"/>
+          </svg>`)}`,
+        scaledSize: new google.maps.Size(size, size),
+        anchor: new google.maps.Point(size/2, size/2)
+      };
+    }
+
+    const m = new google.maps.Marker({
+      position: { lat: pt.lat, lng: pt.lng },
+      map: _mvGoogleMap,
+      icon,
+      title: pt.time_label,
+      zIndex: isEndpoint ? 10 : 1
+    });
+
+    m.addListener('click', () => {
+      const acc = pt.accuracy ? `±${Math.round(pt.accuracy)}m` : '';
+      _mvInfoWindow.setContent(`
+        <div style="font-family:'DM Sans',sans-serif;padding:4px 2px;min-width:160px">
+          <div style="font-weight:700;font-size:13px;color:#1f2937">${pt.time_label}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:3px">
+            ${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}
+            ${acc ? `<br>Accuracy: ${acc}` : ''}
+          </div>
+          ${isEndpoint ? `<div style="margin-top:4px;font-size:11px;font-weight:600;color:${color}">${label === 'S' ? '🟢 Start' : '🔴 End'}</div>` : ''}
+        </div>`);
+      _mvInfoWindow.open(_mvGoogleMap, m);
+    });
+
+    return m;
+  }
+
+  // Start & End markers
+  _mvMarkers.push(makeMarker(pts[0], 'S', '#16a34a', 28, true));
+  if (pts.length > 1) _mvMarkers.push(makeMarker(pts[pts.length-1], 'E', '#dc2626', 28, true));
+
+  // Intermediate dots
+  for (let i = 1; i < pts.length - 1; i++) {
+    _mvMarkers.push(makeMarker(pts[i], '', '#3b82f6', 10, false));
+  }
+
+  // ── FIT map to route bounds ───────────────────────────────────────────────
+  const bounds = new google.maps.LatLngBounds();
+  pts.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+  _mvGoogleMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+
+  // FIX: after fitBounds, trigger resize in case container size changed
+  google.maps.event.addListenerOnce(_mvGoogleMap, 'idle', () => {
+    google.maps.event.trigger(_mvGoogleMap, 'resize');
+    _mvGoogleMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+  });
+
+  // ── Timeline ──────────────────────────────────────────────────────────────
+  let tlHtml = '', cumKm = 0;
+  pts.forEach((pt, i) => {
+    const segKm = i > 0 ? hav(pts[i-1], pt) : 0;
+    cumKm += segKm;
+    const isFirst = i === 0, isLast = i === pts.length - 1;
+    const dotCol = isFirst ? '#16a34a' : isLast ? '#dc2626' : '#3b82f6';
+    const badge = isFirst
+      ? '<span style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">START</span>'
+      : isLast
+      ? '<span style="background:#fee2e2;color:#dc2626;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">END</span>'
+      : `<span style="color:#9ca3af;font-size:11px">+${segKm < 1 ? (segKm*1000).toFixed(0)+'m' : segKm.toFixed(2)+'km'}</span>`;
+    tlHtml += `<div style="display:flex;align-items:flex-start;padding:8px 0;gap:12px;cursor:pointer;border-bottom:1px solid #f9fafb"
+       onclick="panMapTo(${pt.lat},${pt.lng})">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:3px">
+        <div style="width:11px;height:11px;border-radius:50%;background:${dotCol};border:2px solid #fff;box-shadow:0 0 0 1px ${dotCol}"></div>
+        ${!isLast ? '<div style="width:2px;flex:1;min-height:18px;background:#e5e7eb;margin:2px auto"></div>' : ''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <span style="font-weight:600;font-size:13px">${pt.time_label}</span>${badge}
+        </div>
+        <div style="font-size:11px;color:#6b7280">
+          ${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}
+          ${pt.accuracy ? `&nbsp;·&nbsp; ±${Math.round(pt.accuracy)}m` : ''}
+          &nbsp;·&nbsp; <span style="color:#2563eb">${cumKm.toFixed(2)} km total</span>
+        </div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('mv-timeline').innerHTML = tlHtml;
+}
+
+// Pan map to a point and open its info window
+function panMapTo(lat, lng) {
+  if (!_mvGoogleMap) return;
+  _mvGoogleMap.panTo({ lat, lng });
+  _mvGoogleMap.setZoom(17);
+}
+
+// ── Export CSV ─────────────────────────────────────────────────────────────────
+function exportMovementCSV() {
+  const data = window._mvSummaryData;
+  if (!data || !data.length) { toast('No data to export', 'error'); return; }
+  const csv = ['Employee,Code,Date,Points,Total KM',
+    ...data.map(r => `"${r.emp_name}",${r.employee_code},${r.date},${r.point_count},${r.total_km.toFixed(2)}`)
+  ].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `movement_${document.getElementById('mv-from').value || 'data'}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR - Import Employees</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--green:#1B5E20;--green-m:#2E7D32;--green-l:#43A047;--green-pale:#E8F5E9;--green-border:#C8E6C9;--text:#0f172a;--muted:#64748b;--surface:#fff;--border:#e4e9f0;--bg:#f5f7fa;--red:#ef4444;--sidebar:240px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+.sidebar{width:var(--sidebar);background:var(--green);min-height:100vh;position:fixed;top:0;left:0;z-index:100}
+.sidebar-logo{padding:20px 18px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.12)}
+.sidebar-logo img{width:34px;border-radius:8px}
+.sidebar-logo-text{font-family:'DM Serif Display',serif;font-size:16px;font-weight:800;color:#fff}
+.sidebar-logo-text span{color:#A5D6A7}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;color:rgba(255,255,255,.75);font-size:13px;font-weight:500;cursor:pointer;border-left:3px solid transparent;transition:.15s;text-decoration:none}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.13);color:#fff;border-left-color:#A5D6A7;font-weight:700}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+.nav-section{padding:8px 16px 4px;font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.8px;text-transform:uppercase}
+
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column}
+.topbar{background:#fff;padding:0 28px;height:62px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:90}
+.page-title{font-family:'DM Serif Display',serif;font-size:20px;font-weight:800}
+.btn{padding:9px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--green-m);color:#fff}
+.btn-primary:hover{background:var(--green);transform:translateY(-1px)}
+.btn-outline{background:#fff;color:var(--muted);border:1.5px solid var(--border)}
+.btn-outline:hover{border-color:var(--green-l);color:var(--green)}
+.btn-sm{padding:6px 12px;font-size:12px}
+
+.content{padding:28px;flex:1}
+
+.steps-bar{display:flex;align-items:center;gap:0;margin-bottom:28px}
+.step-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid var(--border);background:#fff;color:var(--muted);transition:.3s;flex-shrink:0}
+.step-dot.active{border-color:var(--green-m);background:var(--green-m);color:#fff}
+.step-dot.done{border-color:#10b981;background:#10b981;color:#fff}
+.step-line{flex:1;height:2px;background:var(--border);transition:.3s}
+.step-line.done{background:#10b981}
+.step-label{font-size:11px;color:var(--muted);margin-top:4px;text-align:center;font-weight:500}
+
+.upload-zone{border:2px dashed var(--green-border);border-radius:16px;padding:40px;text-align:center;background:#fff;transition:.2s;cursor:pointer}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--green-l);background:var(--green-pale)}
+.upload-icon{font-size:40px;margin-bottom:12px}
+.upload-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.upload-sub{font-size:13px;color:var(--muted)}
+
+.card{background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:16px}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.card-body{padding:16px 18px}
+
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px}
+.form-control{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--bg);outline:none;transition:.15s}
+.form-control:focus{border-color:var(--green-l);background:#fff}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.alert{padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:16px}
+.alert-error{background:#fef2f2;border:1px solid rgba(239,68,68,.2);color:var(--red)}
+.alert-success{background:#f0fdf4;border:1px solid rgba(16,185,129,.2);color:#065f46}
+.alert-info{background:#EFF6FF;border:1px solid #BFDBFE;color:#1e40af}
+
+.results-table{width:100%;border-collapse:collapse;font-size:12px}
+.results-table th{background:var(--green-m);color:#fff;padding:10px 12px;text-align:left;font-size:11px;font-weight:700}
+.results-table td{padding:9px 12px;border-bottom:1px solid var(--border)}
+.results-table tr:last-child td{border:none}
+.results-table tr:hover td{background:var(--green-pale)}
+
+.badge{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+.badge-success{background:#dcfce7;color:#166534}
+.badge-error{background:#fee2e2;color:#991b1b}
+.badge-warn{background:#fef9c3;color:#854d0e}
+
+.progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:var(--green-m);transition:width .3s;border-radius:3px}
+
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.summary-item{background:#fff;border-radius:10px;border:1px solid var(--border);padding:14px 16px;text-align:center}
+.summary-num{font-size:24px;font-weight:800;margin-bottom:4px}
+.summary-label{font-size:11px;color:var(--muted);font-weight:600}
+.num-green{color:var(--green-m)} .num-red{color:var(--red)} .num-orange{color:#f97316}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="LOGO.png" alt="KrishiHR">
+    <div class="sidebar-logo-text">Krishi<span>HR</span></div>
+  </div>
+  <nav style="padding:12px 0">
+    <div class="nav-section">Main</div>
+    <a class="nav-item" href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+    <div class="nav-section">HR</div>
+    <a class="nav-item" href="employees.html"><span class="nav-icon">👥</span> Employees</a>
+    <a class="nav-item active" href="import_employees.html"><span class="nav-icon">⬆</span> Import Employees</a>
+    <a class="nav-item" href="attendance.html"><span class="nav-icon">🕐</span> Attendance</a>
+    <a class="nav-item" href="announcements.html"><span class="nav-icon">📢</span> Announcements</a>
+    <a class="nav-item" href="leaves.html"><span class="nav-icon">🌿</span> Leaves</a>
+    <a class="nav-item" href="payroll.html"><span class="nav-icon">💰</span> Payroll</a>
+  </nav>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="page-title">⬆ Import New Employees</div>
+    <div style="display:flex;gap:10px">
+      <a href="/outputs/1_employee_import_template.xlsx" class="btn btn-outline btn-sm" download>⬇ Download Template</a>
+      <a href="employees.html" class="btn btn-outline btn-sm">← Back to Employees</a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Steps bar -->
+    <div style="max-width:600px;margin-bottom:24px">
+      <div class="steps-bar">
+        <div style="text-align:center">
+          <div class="step-dot active" id="s1">1</div>
+          <div class="step-label">Download</div>
+        </div>
+        <div class="step-line" id="l1"></div>
+        <div style="text-align:center">
+          <div class="step-dot" id="s2">2</div>
+          <div class="step-label">Fill Excel</div>
+        </div>
+        <div class="step-line" id="l2"></div>
+        <div style="text-align:center">
+          <div class="step-dot" id="s3">3</div>
+          <div class="step-label">Upload</div>
+        </div>
+        <div class="step-line" id="l3"></div>
+        <div style="text-align:center">
+          <div class="step-dot" id="s4">4</div>
+          <div class="step-label">Review</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📋 Instructions</div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:0">
+          <strong>Step 1:</strong> Download the template above.<br>
+          <strong>Step 2:</strong> Fill employee details. Orange columns are required (*). Use Department IDs from the "Departments" sheet.<br>
+          <strong>Step 3:</strong> Delete the 3 sample rows (rows 4–6) before uploading.<br>
+          <strong>Step 4:</strong> Upload the filled Excel below. HR-defined <strong>employee_code</strong> and <strong>password</strong> are set per row.
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload form -->
+    <div class="card" id="upload-card">
+      <div class="card-header">
+        <div class="card-title">⬆ Upload Filled Template</div>
+      </div>
+      <div class="card-body">
+        <div id="main-alert" style="display:none" class="alert"></div>
+
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+             ondragover="this.classList.add('drag');event.preventDefault()"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="handleDrop(event)">
+          <div class="upload-icon">📊</div>
+          <div class="upload-title" id="drop-title">Click to select Excel file or drag & drop</div>
+          <div class="upload-sub">Supports .xlsx · Max 10MB</div>
+        </div>
+        <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="fileSelected(this)">
+
+        <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between">
+          <div class="form-group" style="margin:0;display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="overwrite" style="width:16px;height:16px">
+            <label for="overwrite" style="font-size:13px;color:var(--muted)">Overwrite existing records if employee_code/email matches</label>
+          </div>
+          <button class="btn btn-primary" onclick="doImport()" id="import-btn" disabled>⬆ Import Employees</button>
+        </div>
+
+        <div id="progress-wrap" style="display:none;margin-top:12px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Importing...</div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-section" style="display:none">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-num num-green" id="r-imported">0</div>
+          <div class="summary-label">✅ Imported</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num num-orange" id="r-skipped">0</div>
+          <div class="summary-label">⚠ Skipped (Duplicates)</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num num-red" id="r-errors">0</div>
+          <div class="summary-label">❌ Errors</div>
+        </div>
+      </div>
+
+      <div class="card" id="imported-card" style="display:none">
+        <div class="card-header">
+          <div class="card-title">✅ Successfully Imported</div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table class="results-table">
+            <thead><tr><th>#</th><th>Emp Code</th><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+            <tbody id="imported-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="errors-card" style="display:none">
+        <div class="card-header">
+          <div class="card-title">⚠ Issues Found</div>
+        </div>
+        <div class="card-body">
+          <div id="errors-list" style="font-size:12px;color:var(--red);line-height:2"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="resetForm()">⬆ Import More</button>
+        <a href="employees.html" class="btn btn-outline">👥 View Employees</a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+const API   = 'https://YOUR_RAILWAY_DOMAIN.up.railway.app/api';
+const token = localStorage.getItem('krishihr_token');
+const user  = JSON.parse(localStorage.getItem('krishihr_user') || '{}');
+if (!token) location.href = 'login.html';
+if (!['admin','super_admin','hr'].includes(user.role)) {
+  alert('Access denied. HR/Admin only.'); location.href = 'dashboard.html';
+}
+
+let selectedFile = null;
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+}
+function fileSelected(input) { if (input.files[0]) setFile(input.files[0]); }
+function setFile(f) {
+  if (!/\.(xlsx|xls)$/i.test(f.name)) { showAlert('main-alert','Only .xlsx files allowed','error'); return; }
+  selectedFile = f;
+  document.getElementById('drop-title').textContent = `📄 ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  document.getElementById('import-btn').disabled = false;
+  setStep(2);
+}
+
+function setStep(n) {
+  for (let i=1;i<=4;i++) {
+    const dot  = document.getElementById('s'+i);
+    const line = document.getElementById('l'+i);
+    if (i < n) { dot.className='step-dot done'; dot.textContent='✓'; if(line) line.classList.add('done'); }
+    else if (i===n) { dot.className='step-dot active'; dot.textContent=i; }
+    else { dot.className='step-dot'; dot.textContent=i; if(line) line.classList.remove('done'); }
+  }
+}
+
+async function doImport() {
+  if (!selectedFile) return;
+  setStep(3);
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('import-btn').disabled = true;
+
+  // Animate progress bar
+  let pct = 10;
+  const prog = document.getElementById('progress-fill');
+  prog.style.width = pct + '%';
+  const interval = setInterval(() => { if (pct < 85) { pct += 5; prog.style.width=pct+'%'; } }, 200);
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  if (document.getElementById('overwrite').checked) fd.append('overwrite', 'true');
+
+  try {
+    const res  = await fetch(`${API}/employees/import`, {
+      method:'POST',
+      headers:{'Authorization':`Bearer ${token}`},
+      body: fd
+    });
+    clearInterval(interval);
+    prog.style.width = '100%';
+
+    const data = await res.json();
+    setTimeout(() => {
+      document.getElementById('progress-wrap').style.display = 'none';
+      setStep(4);
+      showResults(data);
+    }, 400);
+  } catch(e) {
+    clearInterval(interval);
+    showAlert('main-alert','Upload failed: ' + e.message,'error');
+    document.getElementById('import-btn').disabled = false;
+    document.getElementById('progress-wrap').style.display = 'none';
+  }
+}
+
+function showResults(data) {
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('upload-card').style.display = 'none';
+  const s = data.data?.summary || {};
+  document.getElementById('r-imported').textContent = s.imported || 0;
+  document.getElementById('r-skipped').textContent  = s.skipped  || 0;
+  document.getElementById('r-errors').textContent   = s.errors   || 0;
+
+  const imported = data.data?.imported || [];
+  if (imported.length) {
+    document.getElementById('imported-card').style.display = 'block';
+    document.getElementById('imported-tbody').innerHTML = imported.map((e,i) =>
+      `<tr><td>${i+1}</td><td><strong>${e.employee_code}</strong></td><td>${e.name}</td><td>${e.email}</td><td><span class="badge badge-success">Imported ✓</span></td></tr>`
+    ).join('');
+  }
+
+  const allIssues = [...(data.data?.skipped||[]), ...(data.data?.errors||[])];
+  if (allIssues.length) {
+    document.getElementById('errors-card').style.display = 'block';
+    document.getElementById('errors-list').innerHTML = allIssues.map(e => `• ${e}`).join('<br>');
+  }
+}
+
+function resetForm() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-title').textContent = 'Click to select Excel file or drag & drop';
+  document.getElementById('import-btn').disabled = true;
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('upload-card').style.display = 'block';
+  document.getElementById('imported-card').style.display = 'none';
+  document.getElementById('errors-card').style.display = 'none';
+  document.getElementById('main-alert').style.display = 'none';
+  setStep(1);
+}
+
+function showAlert(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>
