@@ -709,6 +709,16 @@ function pingServer() {
   });
 }
 
+// ── Keep-Alive DB Ping (prevents Neon DB from sleeping) ──────────────────────
+setInterval(async () => {
+  try {
+    await db.query("SELECT 1");
+    console.log(`[DB Keep-Alive] ✅ Neon DB pinged at ${new Date().toISOString()}`);
+  } catch (err) {
+    console.log(`[DB Keep-Alive] ⚠️ Neon ping failed: ${err.message}`);
+  }
+}, 4 * 60 * 1000); // every 4 minutes
+
 setTimeout(() => {
   pingServer();
   setInterval(pingServer, 4 * 60 * 1000);
