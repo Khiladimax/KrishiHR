@@ -54,6 +54,7 @@
 </head>
 <body>
 
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark" id="sidebar-logo-mark">
@@ -73,10 +74,14 @@
 
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title">📄 Form 16</div>
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">📄 Form 16</div>
+    </div>
     <div class="topbar-right">
       <button class="btn btn-outline btn-sm no-print" onclick="window.print()" id="print-btn" style="display:none">🖨 Print / Download PDF</button>
-      <div class="notif-btn" onclick="location.href='dashboard.html'">🏠<span id="notif-badge"></span></div>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
   </div>
 
@@ -108,7 +113,9 @@
 <script src="app.js"></script>
 <script>
 Auth.guard();
+loadNotifBadge();
 buildSidebar('form16.html');
+  loadNotifBadge();
 
 const f16User = Auth.getUser();
 const isHR = ['super_admin','admin','hr','accounts'].includes(f16User?.role);
