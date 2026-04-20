@@ -203,6 +203,10 @@ router.get ('/payroll/salary-structure/:employee_id', authenticate,             
 router.post('/payroll/salary-structure',          authenticate, authorize(...HR_ADMIN), payCtrl.upsertSalaryStructure);
 router.post('/payroll/upload',                    authenticate, authorize('accounts'), payCtrl.uploadMiddleware, payCtrl.uploadPayroll);
 
+// ── Form 16 ───────────────────────────────────────────────────────────────────
+router.get('/payroll/form16/years', authenticate, payCtrl.getForm16Years);
+router.get('/payroll/form16',       authenticate, payCtrl.getForm16);
+
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 router.get('/dashboard', authenticate, async (req, res) => {
