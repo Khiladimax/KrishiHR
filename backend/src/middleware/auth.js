@@ -4,11 +4,17 @@ const db  = require('../config/db');
 
 exports.authenticate = async (req, res, next) => {
   try {
+    // Support token in Authorization header OR as ?token= query param (for browser-opened previews)
+    let token = null;
     const header = req.headers.authorization;
-    if (!header || !header.startsWith('Bearer '))
-      return res.status(401).json({ success: false, message: 'No token provided' });
+    if (header && header.startsWith('Bearer ')) {
+      token = header.split(' ')[1];
+    } else if (req.query.token) {
+      token = req.query.token;
+    }
 
-    const token = header.split(' ')[1];
+    if (!token)
+      return res.status(401).json({ success: false, message: 'No token provided' });
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'hrms_secret');
 
     const result = await db.query(
