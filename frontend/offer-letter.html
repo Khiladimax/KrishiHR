@@ -704,6 +704,14 @@ function showToast(msg) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// ── HR-only page guard ────────────────────────────────────────────────────────
+(function() {
+  const user = Auth.getUser();
+  if (!user || user.role !== 'hr') {
+    window.location.href = 'dashboard.html';
+  }
+})();
+
 buildSidebar('offer-letter.html');
 loadNotifBadge();
 </script>
