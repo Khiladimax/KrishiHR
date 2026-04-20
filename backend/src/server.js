@@ -6,8 +6,8 @@ const cron    = require('node-cron');
 const db      = require('./config/db');
 const routes  = require('./routes/index');
 const attCtrl = require('./controllers/attendanceController');
-const itDeclCtrl = require('./controllers/itDeclarationController');
 const emailSvc = require('./config/emailService'); // for startup repair
+const offerCtrl = require('./controllers/offerLetterController');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -592,7 +592,6 @@ async function start() {
   try {
     await db.query('SELECT 1');
     console.log('✅ Database connected');
-    await itDeclCtrl.initTables();
 
     await db.query(`CREATE TABLE IF NOT EXISTS birthday_likes (
       id SERIAL PRIMARY KEY,
@@ -633,6 +632,7 @@ async function start() {
     await attCtrl.fixWrongAbsents();
     await attCtrl.fixMissingPunchOuts(); // mark past present/late with no punch_out as missing_punch_out
     await attCtrl.fixTimezoneShiftedLeaves();
+    await offerCtrl.initTables();        // ensure offer_letters table exists
 
     app.listen(PORT, () => {
       console.log('');
