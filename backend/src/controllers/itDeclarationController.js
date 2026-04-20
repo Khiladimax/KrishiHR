@@ -389,12 +389,13 @@ exports.taxPreview = async (req, res) => {
 
     // Get salary structure
     const salRes = await db.query(
-      `SELECT gross_salary, basic, hra, city FROM employee_salary_structure ess
-       JOIN employees e ON ess.employee_id=e.id
+      `SELECT ess.gross_salary, ess.basic, ess.hra, e.city
+       FROM employee_salary_structure ess
+       JOIN employees e ON ess.employee_id = e.id
        WHERE ess.employee_id=$1`, [empId]
     );
     if (!salRes.rows.length)
-      return res.status(404).json({ success: false, message: 'Salary structure not found' });
+      return res.json({ success: false, message: 'Salary structure not set up yet. Ask HR to configure your salary.' });
 
     const sal        = salRes.rows[0];
     const annualGross= parseFloat(sal.gross_salary || 0) * 12;
