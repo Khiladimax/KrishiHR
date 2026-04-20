@@ -18,7 +18,7 @@ const attImportCtrl  = require('../controllers/attendanceImportController');
 const annCtrl        = require('../controllers/announcementController');
 const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
-const itDeclCtrl     = require('../controllers/itDeclarationController');
+const offerCtrl      = require('../controllers/offerLetterController');
 
 const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
@@ -203,20 +203,6 @@ router.get ('/payroll/salary-structures',         authenticate, authorize(...HR_
 router.get ('/payroll/salary-structure/:employee_id', authenticate,                    payCtrl.getSalaryStructure);
 router.post('/payroll/salary-structure',          authenticate, authorize(...HR_ADMIN), payCtrl.upsertSalaryStructure);
 router.post('/payroll/upload',                    authenticate, authorize('accounts'), payCtrl.uploadMiddleware, payCtrl.uploadPayroll);
-
-// ── Form 16 ───────────────────────────────────────────────────────────────────
-router.get('/payroll/form16/years', authenticate, payCtrl.getForm16Years);
-router.get('/payroll/form16',       authenticate, payCtrl.getForm16);
-
-// ── IT Declaration ────────────────────────────────────────────────────────────
-router.get ('/it-declaration/all',           authenticate, authorize('hr','admin','super_admin','accounts'), itDeclCtrl.getAllDeclarations);
-router.get ('/it-declaration/tax-preview',   authenticate, itDeclCtrl.taxPreview);
-router.get ('/it-declaration',               authenticate, itDeclCtrl.getDeclaration);
-router.post('/it-declaration',               authenticate, itDeclCtrl.saveDeclaration);
-router.post('/it-declaration/proof',         authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
-router.get ('/it-declaration/proof/:id',     authenticate, itDeclCtrl.getProof);
-router.post('/it-declaration/:id/review',    authenticate, authorize('hr','admin','super_admin','accounts'), itDeclCtrl.reviewDeclaration);
-router.post('/it-declaration/proof/:id/review', authenticate, authorize('hr','admin','super_admin','accounts'), itDeclCtrl.reviewProof);
 
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -794,6 +780,15 @@ router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+// ── Offer Letters ─────────────────────────────────────────────────────────────
+router.get   ('/offer-letters',              authenticate, authorize('hr','admin','super_admin'), offerCtrl.getAll);
+router.post  ('/offer-letters',              authenticate, authorize('hr','admin','super_admin'), offerCtrl.create);
+router.get   ('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.getOne);
+router.put   ('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.update);
+router.delete('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.remove);
+router.get   ('/offer-letters/:id/preview',  authenticate, offerCtrl.preview);
+router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr','admin','super_admin'), offerCtrl.sendEmail);
 
 // ── Test Email (debug only) ───────────────────────────────────────────────────
 router.get('/test-email', authenticate, async (req, res) => {
