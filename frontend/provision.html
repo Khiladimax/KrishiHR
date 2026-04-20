@@ -54,6 +54,7 @@
 </head>
 <body>
 
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark" id="sidebar-logo-mark">
@@ -70,9 +71,13 @@
 
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title">⏳ Provision Confirmations</div>
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">⏳ Provision Confirmations</div>
+    </div>
     <div class="topbar-right">
-      <div class="notif-btn" onclick="location.href='dashboard.html'">🏠<span id="notif-badge"></span></div>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
   </div>
 
@@ -149,7 +154,9 @@ let allProvision = [];
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   Auth.guard();
-  buildSidebar('provision.html');
+  loadNotifBadge();
+buildSidebar('provision.html');
+  loadNotifBadge();
   currentUser = Auth.getUser();
 
   const isHR    = ['hr','admin','super_admin'].includes(currentUser.role);
