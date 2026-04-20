@@ -86,66 +86,71 @@ const Role = {
 };
 
 // SVG icons — consistent, clean, professional
+// Emoji icons — consistent size via CSS, clean and recognisable
 const ICONS = {
-  dashboard:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
-  attendance:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>`,
-  announcements:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8s-4 4-10 4S2 8 2 8"/><path d="M2 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8"/><path d="M6 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/></svg>`,
-  form16:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>`,
-  itdecl:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
-  leaves:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`,
-  movement:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>`,
-  separation:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
-  advance:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
-  employees:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  offerletter: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
-  payroll:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`,
-  payslip:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`,
-  provision:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>`,
-  reshuffle:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16,3 21,3 21,8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21,16 21,21 16,21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>`,
-  geofence:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,6 9,3 15,6 21,3 21,18 15,21 9,18 3,21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>`,
+  dashboard:    `🏠`,
+  attendance:   `🕐`,
+  leaves:       `🌿`,
+  movement:     `🚶`,
+  announcements:`📢`,
+  form16:       `📋`,
+  itdecl:       `🧾`,
+  payslip:      `💳`,
+  employees:    `👥`,
+  offerletter:  `✉️`,
+  separation:   `🚪`,
+  reshuffle:    `🔀`,
+  payroll:      `💰`,
+  advance:      `💸`,
+  provision:    `⏳`,
+  geofence:     `📍`,
 };
 
-// NAV grouped: Dashboard first, then Employee section (always), then Management section (roles), then Settings
 const NAV_GROUPS = [
   {
-    label: null, // no section header for dashboard
+    label: null,
     items: [
-      { href:'dashboard.html',      icon: ICONS.dashboard,    label:'Dashboard',       roles:['admin','super_admin','hr','accounts','manager','tl'] },
+      { href:'dashboard.html',      icon: ICONS.dashboard,    label:'Dashboard',        roles:['admin','super_admin','hr','accounts','manager','tl'] },
     ]
   },
   {
-    label: 'Employee',
+    label: 'Workspace',
     items: [
-      { href:'attendance.html',     icon: ICONS.attendance,   label:'Attendance',      always:true },
-      { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',   always:true },
-      { href:'form16.html',         icon: ICONS.form16,       label:'Form 16',         always:true },
-      { href:'it-declaration.html', icon: ICONS.itdecl,       label:'IT Declaration',  always:true },
-      { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',          always:true },
-      { href:'movement.html',       icon: ICONS.movement,     label:'Movement',        roles:['admin','super_admin','hr','manager','tl'] },
-      { href:'separation.html',     icon: ICONS.separation,   label:'Separation',      always:true },
+      { href:'attendance.html',     icon: ICONS.attendance,   label:'Attendance',       always:true },
+      { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
+      { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl'] },
+      { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    always:true },
+    ]
+  },
+  {
+    label: 'Documents',
+    items: [
+      { href:'form16.html',         icon: ICONS.form16,       label:'Form 16',          always:true },
+      { href:'it-declaration.html', icon: ICONS.itdecl,       label:'IT Declaration',   always:true },
+      { href:'payslip.html',        icon: ICONS.payslip,      label:'My Payslip',       always:true },
+    ]
+  },
+  {
+    label: 'Organisation',
+    items: [
+      { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl'] },
+      { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr','admin','super_admin'] },
+      { href:'separation.html',     icon: ICONS.separation,   label:'Separation',       always:true },
+      { href:'reshuffle.html',      icon: ICONS.reshuffle,    label:'Reshuffle',        roles:['admin','super_admin','hr'] },
     ]
   },
   {
     label: 'Finance',
     items: [
-      { href:'advance.html',        icon: ICONS.advance,      label:'Advance Salary',  always:true },
-      { href:'payslip.html',        icon: ICONS.payslip,      label:'My Payslip',      always:true },
-      { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',         roles:['super_admin','hr','accounts'] },
+      { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['super_admin','hr','accounts'] },
+      { href:'advance.html',        icon: ICONS.advance,      label:'Advance Salary',   always:true },
+      { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
     ]
   },
   {
-    label: 'Management',
+    label: 'System',
     items: [
-      { href:'employees.html',      icon: ICONS.employees,    label:'Employees',       roles:['admin','super_admin','hr','accounts','manager','tl'] },
-      { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',    roles:['hr','admin','super_admin'] },
-      { href:'provision.html',      icon: ICONS.provision,    label:'Provision',       roles:['admin','super_admin','hr','manager','tl'] },
-      { href:'reshuffle.html',      icon: ICONS.reshuffle,    label:'Reshuffle',       roles:['admin','super_admin','hr'] },
-    ]
-  },
-  {
-    label: 'Settings',
-    items: [
-      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',        roles:['admin','super_admin','hr'] },
+      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin','hr'] },
     ]
   },
 ];
