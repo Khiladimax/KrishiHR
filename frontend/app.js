@@ -86,18 +86,20 @@ const Role = {
 };
 
 const NAV = [
-  { href:'dashboard.html',  icon:'⊞', label:'Dashboard',       roles:['admin','super_admin','hr','accounts'] },
-  { href:'attendance.html', icon:'◷', label:'Attendance',      always:true },
-  { href:'leaves.html',     icon:'◫', label:'Leaves',          always:true },
-  { href:'payslip.html',    icon:'💰', label:'My Payslip',      always:true },
-  { href:'employees.html',  icon:'◈', label:'Employees',       roles:['admin','super_admin','hr','accounts','manager','tl'] },
+  { href:'dashboard.html',     icon:'⊞', label:'Dashboard',       roles:['admin','super_admin','hr','accounts'] },
+  { href:'attendance.html',    icon:'◷', label:'Attendance',      always:true },
+  { href:'leaves.html',        icon:'◫', label:'Leaves',          always:true },
+  { href:'payslip.html',       icon:'💰', label:'My Payslip',      always:true },
+  { href:'form16.html',        icon:'📋', label:'Form 16',         always:true },
+  { href:'it-declaration.html',icon:'📊', label:'IT Declaration',  always:true },
+  { href:'employees.html',     icon:'◈', label:'Employees',       roles:['admin','super_admin','hr','accounts','manager','tl'] },
   { href:'payroll.html',       icon:'◉', label:'Payroll',         roles:['super_admin','hr','accounts'] },
   { href:'offer-letter.html',  icon:'📄', label:'Offer Letter',    roles:['super_admin','hr','admin'] },
   { href:'separation.html',    icon:'◪', label:'Separation',      always:true },
-  { href:'provision.html',  icon:'⏳', label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
-  { href:'announcements.html',icon:'📢', label:'Announcements', roles:['employee'] },
-  { href:'movement.html', icon:'📍', label:'Movement',     roles:['admin','super_admin','hr','manager','tl'] },
-  { href:'advance.html',    icon:'💸', label:'Advance Salary',  always:true },
+  { href:'provision.html',     icon:'⏳', label:'Provision',       roles:['admin','super_admin','hr','manager','tl'] },
+  { href:'announcements.html', icon:'📢', label:'Announcements',   roles:['employee'] },
+  { href:'movement.html',      icon:'📍', label:'Movement',        roles:['admin','super_admin','hr','manager','tl'] },
+  { href:'advance.html',       icon:'💸', label:'Advance Salary',  always:true },
 ];
 
 function buildSidebar(activePage) {
