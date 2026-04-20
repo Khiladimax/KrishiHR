@@ -203,6 +203,8 @@ router.get ('/payroll/salary-structures',         authenticate, authorize(...HR_
 router.get ('/payroll/salary-structure/:employee_id', authenticate,                    payCtrl.getSalaryStructure);
 router.post('/payroll/salary-structure',          authenticate, authorize(...HR_ADMIN), payCtrl.upsertSalaryStructure);
 router.post('/payroll/upload',                    authenticate, authorize('accounts'), payCtrl.uploadMiddleware, payCtrl.uploadPayroll);
+router.get ('/payroll/form16/years',              authenticate,                        payCtrl.getForm16Years);
+router.get ('/payroll/form16',                    authenticate,                        payCtrl.getForm16);
 
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
