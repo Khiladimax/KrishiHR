@@ -278,6 +278,14 @@
             <textarea id="ol-clauses" rows="3" placeholder="Any additional terms, conditions, or special clauses..."></textarea>
           </div>
 
+          <!-- EMAIL MESSAGE -->
+          <div class="section-label">✉️ Email Cover Message</div>
+          <div class="form-group">
+            <label>Message Body <span style="font-weight:400;color:#888;">(sent in email body — offer letter attached as file)</span></label>
+            <textarea id="ol-email-msg" rows="6" placeholder="Dear [Name],&#10;&#10;Please find attached your offer letter for the position of...&#10;&#10;Kindly review and revert with your acceptance within 7 days.&#10;&#10;Warm regards,&#10;HR Team - Krishi Care"></textarea>
+            <span class="calc-note">Leave blank to use default message. Candidate opens the attached file in browser → Ctrl+P → Save as PDF.</span>
+          </div>
+
           <!-- EMAIL CC / BCC -->
           <div class="section-label">📧 Email Recipients (when sending)</div>
           <div class="form-grid">
@@ -635,7 +643,11 @@ async function sendOL() {
   if (!email) return alert('No candidate email set. Please add email and save first.');
   if (!confirm(`Send offer letter email to ${email}?\n\nCC: ${ccEmails.join(', ') || 'none'}\nBCC: ${bccEmails.join(', ') || 'none'}`)) return;
 
-  const res = await api('POST', `/offer-letters/${id}/send`, { cc: ccEmails, bcc: bccEmails });
+  const res = await api('POST', `/offer-letters/${id}/send`, {
+    cc: ccEmails,
+    bcc: bccEmails,
+    email_message: document.getElementById('ol-email-msg').value.trim() || ''
+  });
   if (res.success) { showToast('📧 Offer letter sent!'); loadList(); }
   else alert(res.message || 'Send failed');
 }
@@ -654,7 +666,7 @@ async function deleteOL() {
 function resetForm() {
   document.getElementById('ol-id').value = '';
   document.getElementById('form-title').textContent = '📝 Create Offer Letter';
-  ['ol-name','ol-email','ol-mobile','ol-address','ol-designation','ol-joining-date','ol-clauses',
+  ['ol-name','ol-email','ol-mobile','ol-address','ol-designation','ol-joining-date','ol-clauses','ol-email-msg',
    'ol-ctc','ol-basic','ol-hra','ol-other','ol-gratuity','ol-pf-emp','ol-pf-er','ol-pf-admin'].forEach(id => {
     document.getElementById(id).value = '';
   });
