@@ -682,7 +682,7 @@
       <div class="map-status loading" id="map-status">📡 Getting your location…</div>
       <div id="punch-map" style="width:100%;height:320px;border-radius:12px;border:1.5px solid var(--border);margin-bottom:12px"></div>
       <div class="map-acc" id="map-acc"></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">🟢 Green circle = office geofence buffer zone &nbsp;|&nbsp; 🔵 Blue dot = your location</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">🟢 Green circle = assigned office zone &nbsp;|&nbsp; 🔵 Blue circle = universal (punch from anywhere) &nbsp;|&nbsp; 🔵 Blue dot = your location</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('map-punch-backdrop').classList.remove('open')">Cancel</button>
@@ -1260,16 +1260,16 @@ async function loadOfficeBuffers() {
   _mapCircles.forEach(c => { c.setMap(null); });
   _mapCircles = [];
   data.data.forEach(loc => {
-    // ✅ FIX: Skip universal — no boundary circle to draw (punch allowed from anywhere)
-    if (loc.is_universal) return;
     const lat = +loc.latitude, lng = +loc.longitude;
+    // For universal employees: show circle in blue (informational only, not enforced)
+    const isUniversal = loc.is_universal;
+    const circleColor = isUniversal ? '#3b82f6' : '#10b981';
     const circle = new google.maps.Circle({
       map: _map,
       center: { lat, lng },
       radius: loc.radius_meters,
-      strokeColor: '#10b981', strokeOpacity: 0.7, strokeWeight: 2,
-      fillColor: '#10b981', fillOpacity: 0.08,
-      strokePattern: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 }, offset: '0', repeat: '12px' }]
+      strokeColor: circleColor, strokeOpacity: 0.7, strokeWeight: 2,
+      fillColor: circleColor, fillOpacity: 0.08
     });
     const labelMarker = new google.maps.Marker({
       position: { lat, lng },
@@ -2179,15 +2179,14 @@ async function loadLocationMap() {
   const offData = await api('GET', '/geofence/my-locations');
   if (offData?.success) {
     offData.data.forEach(loc => {
-      // ✅ FIX: Skip universal — no circle boundary for universal employees
-      if (loc.is_universal) return;
       const lat = +loc.latitude, lng = +loc.longitude;
+      const locCircleColor = loc.is_universal ? '#3b82f6' : '#4a8c1c';
       new google.maps.Circle({
         map: _locMap,
         center: { lat, lng },
         radius: loc.radius_meters,
-        strokeColor: '#4a8c1c', strokeOpacity: 0.7, strokeWeight: 2,
-        fillColor: '#4a8c1c', fillOpacity: 0.08
+        strokeColor: locCircleColor, strokeOpacity: 0.7, strokeWeight: 2,
+        fillColor: locCircleColor, fillOpacity: 0.08
       });
       const offMarker = new google.maps.Marker({
         position: { lat, lng }, map: _locMap,
