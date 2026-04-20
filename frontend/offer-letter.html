@@ -260,13 +260,13 @@
             <div class="form-group full">
               <label>CC (press Enter or comma to add)</label>
               <div class="chip-box" id="cc-box" onclick="document.getElementById('cc-input').focus()">
-                <input type="text" class="chip-input" id="cc-input" placeholder="cc@email.com" onkeydown="addChip(event,'cc')">
+                <input type="text" class="chip-input" id="cc-input" placeholder="cc@email.com" onkeydown="addChip(event,'cc')" onblur="addChipOnBlur('cc')" onpaste="setTimeout(()=>addChipOnBlur('cc'),50)">
               </div>
             </div>
             <div class="form-group full">
               <label>BCC (press Enter or comma to add)</label>
               <div class="chip-box" id="bcc-box" onclick="document.getElementById('bcc-input').focus()">
-                <input type="text" class="chip-input" id="bcc-input" placeholder="bcc@email.com" onkeydown="addChip(event,'bcc')">
+                <input type="text" class="chip-input" id="bcc-input" placeholder="bcc@email.com" onkeydown="addChip(event,'bcc')" onblur="addChipOnBlur('bcc')" onpaste="setTimeout(()=>addChipOnBlur('bcc'),50)">
               </div>
             </div>
           </div>
@@ -324,6 +324,23 @@ function addChip(e, type) {
   chip.className = 'chip';
   chip.innerHTML = `${val}<button onclick="removeChip(this,'${type}','${val}')" title="Remove">×</button>`;
   box.insertBefore(chip, input);
+  input.value = '';
+}
+
+function addChipOnBlur(type) {
+  const input = document.getElementById(`${type}-input`);
+  const raw = (input.value || '').trim();
+  if (!raw) return;
+  raw.split(/[\s,;]+/).map(v => v.trim()).filter(v => v.includes('@')).forEach(val => {
+    const arr = type === 'cc' ? ccEmails : bccEmails;
+    if (arr.includes(val)) return;
+    arr.push(val);
+    const box = document.getElementById(`${type}-box`);
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = `${val}<button onclick="removeChip(this,'${type}','${val}')" title="Remove">×</button>`;
+    box.insertBefore(chip, input);
+  });
   input.value = '';
 }
 function removeChip(btn, type, val) {
@@ -523,7 +540,31 @@ async function previewOL() {
 }
 
 // ── Send Email ────────────────────────────────────────────────────────────────
+// ── Flush any typed-but-not-chipped emails from inputs ───────────────────────
+function flushChipInputs() {
+  ['cc', 'bcc'].forEach(type => {
+    const input = document.getElementById(`${type}-input`);
+    const val = (input.value || '').trim().replace(/,+$/, '');
+    if (!val) return;
+    const arr = type === 'cc' ? ccEmails : bccEmails;
+    // Add each comma-separated email
+    val.split(',').map(v => v.trim()).filter(v => v.includes('@')).forEach(email => {
+      if (!arr.includes(email)) {
+        arr.push(email);
+        const box = document.getElementById(`${type}-box`);
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.innerHTML = `${email}<button onclick="removeChip(this,'${type}','${email}')" title="Remove">×</button>`;
+        box.insertBefore(chip, input);
+      }
+    });
+    input.value = '';
+  });
+}
+
 async function sendOL() {
+  // Flush any text typed directly (not chip-confirmed) before sending
+  flushChipInputs();
   // Auto-save first
   await saveOL();
   const id = document.getElementById('ol-id').value;
