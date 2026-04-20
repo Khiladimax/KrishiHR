@@ -90,6 +90,7 @@ const NAV = [
   { href:'attendance.html', icon:'◷', label:'Attendance',      always:true },
   { href:'leaves.html',     icon:'◫', label:'Leaves',          always:true },
   { href:'payslip.html',    icon:'💰', label:'My Payslip',      always:true },
+  { href:'form16.html',     icon:'📄', label:'Form 16',          always:true },
   { href:'employees.html',  icon:'◈', label:'Employees',       roles:['admin','super_admin','hr','accounts','manager','tl'] },
   { href:'payroll.html',    icon:'◉', label:'Payroll',         roles:['super_admin','hr','accounts'] },
   { href:'separation.html', icon:'◪', label:'Separation',      always:true },
