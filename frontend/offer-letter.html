@@ -249,8 +249,8 @@
           <!-- ACTIONS -->
           <div class="btn-row">
             <button class="btn btn-primary" onclick="saveOL()">💾 Save</button>
-            <button class="btn btn-preview" id="btn-preview" onclick="previewOL()" disabled>👁 Preview</button>
-            <button class="btn btn-send"    id="btn-send"    onclick="sendOL()"    disabled>📤 Send Email</button>
+            <button class="btn btn-preview" id="btn-preview" onclick="previewOL()">👁 Preview</button>
+            <button class="btn btn-send"    id="btn-send"    onclick="sendOL()">📤 Send Email</button>
             <button class="btn btn-secondary" onclick="resetForm()">✕ Clear</button>
             <button class="btn btn-danger"   id="btn-delete"  onclick="deleteOL()"   style="display:none;">🗑 Delete</button>
           </div>
@@ -481,15 +481,25 @@ async function saveOL() {
 }
 
 // ── Preview ───────────────────────────────────────────────────────────────────
-function previewOL() {
+async function previewOL() {
+  // Auto-save first so latest changes are reflected
   const id = document.getElementById('ol-id').value;
-  if (!id) return;
+  if (!id) {
+    // Need to save first
+    await saveOL();
+  } else {
+    await saveOL();
+  }
+  const savedId = document.getElementById('ol-id').value;
+  if (!savedId) return;
   const token = localStorage.getItem('token');
-  window.open(`${BASE_URL}/offer-letters/${id}/preview?token=${token}`, '_blank');
+  window.open(`${API_BASE}/offer-letters/${savedId}/preview?token=${token}`, '_blank');
 }
 
 // ── Send Email ────────────────────────────────────────────────────────────────
 async function sendOL() {
+  // Auto-save first
+  await saveOL();
   const id = document.getElementById('ol-id').value;
   if (!id) return;
   const email = document.getElementById('ol-email').value.trim();
