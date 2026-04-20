@@ -553,3 +553,204 @@ exports.getAllSalaryStructures = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ── Form 16 — Generate Part A + Part B ───────────────────────────────────────
+// Financial Year: April to March (e.g. FY 2024-25 = Apr 2024 to Mar 2025)
+exports.getForm16 = async (req, res) => {
+  try {
+    const reqUser = req.user;
+    const empId   = req.query.employee_id ? parseInt(req.query.employee_id) : reqUser.id;
+    const fy      = req.query.fy; // e.g. "2024-25"
+
+    // Only admin/hr/accounts can view others; employees can only view their own
+    if (!['super_admin','admin','hr','accounts'].includes(reqUser.role) && empId !== reqUser.id)
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    if (!fy || !/^\d{4}-\d{2}$/.test(fy))
+      return res.status(400).json({ success: false, message: 'fy required (e.g. 2024-25)' });
+
+    const startYear = parseInt(fy.split('-')[0]);
+    const endYear   = startYear + 1;
+
+    // Months: Apr(4)–Dec(12) of startYear, Jan(1)–Mar(3) of endYear
+    const payrollRows = await db.query(
+      `SELECT p.*,
+              e.first_name, e.last_name, e.employee_code, e.pan_number, e.uan_number,
+              e.pf_number, e.date_of_birth, e.joining_date, e.city, e.aadhar_number,
+              d.name AS department_name, des.title AS designation_title
+       FROM payroll p
+       JOIN employees e ON p.employee_id = e.id
+       LEFT JOIN departments d  ON e.department_id  = d.id
+       LEFT JOIN designations des ON e.designation_id = des.id
+       WHERE p.employee_id = $1
+         AND p.status = 'processed'
+         AND (
+           (p.year = $2 AND p.month >= 4) OR
+           (p.year = $3 AND p.month <= 3)
+         )
+       ORDER BY p.year, p.month`,
+      [empId, startYear, endYear]
+    );
+
+    if (!payrollRows.rows.length)
+      return res.status(404).json({ success: false, message: `No payroll data found for FY ${fy}` });
+
+    // Aggregate annual figures
+    let grossTotal = 0, basicTotal = 0, hraTotal = 0, convTotal = 0,
+        specialTotal = 0, pfEmpTotal = 0, pfEmprTotal = 0, esiEmpTotal = 0,
+        ptTotal = 0, lwfTotal = 0, tdsTotal = 0, loanTotal = 0, netTotal = 0;
+
+    const monthlyBreakdown = payrollRows.rows.map(p => {
+      const gross   = parseFloat(p.gross_salary       || 0);
+      const basic   = parseFloat(p.basic              || 0);
+      const hra     = parseFloat(p.hra                || 0);
+      const conv    = parseFloat(p.conveyance         || 0);
+      const special = parseFloat(p.special_allowance  || 0);
+      const pfEmp   = parseFloat(p.pf_employee        || 0);
+      const pfEmpr  = parseFloat(p.pf_employer        || 0);
+      const esiEmp  = parseFloat(p.esi_employee       || 0);
+      const pt      = parseFloat(p.professional_tax   || 0);
+      const lwf     = parseFloat(p.lwf                || 0);
+      const tds     = parseFloat(p.tds                || 0);
+      const loan    = parseFloat(p.loan_emi_recovery  || 0);
+      const net     = parseFloat(p.net_salary         || 0);
+
+      grossTotal   += gross;  basicTotal  += basic;   hraTotal    += hra;
+      convTotal    += conv;   specialTotal+= special; pfEmpTotal  += pfEmp;
+      pfEmprTotal  += pfEmpr; esiEmpTotal += esiEmp;  ptTotal     += pt;
+      lwfTotal     += lwf;    tdsTotal    += tds;     loanTotal   += loan;
+      netTotal     += net;
+
+      return {
+        month: MONTH_NAMES[p.month - 1], year: p.year,
+        gross, basic, hra, conv, special,
+        pf_employee: pfEmp, pf_employer: pfEmpr, esi_employee: esiEmp,
+        professional_tax: pt, lwf, tds, loan_emi_recovery: loan, net_salary: net
+      };
+    });
+
+    const emp = payrollRows.rows[0];
+
+    // ── Part A — TDS details ───────────────────────────────────────────────
+    const partA = {
+      employer_name:    'Krishi Care And Management Services Pvt Ltd',
+      employer_tan:     process.env.EMPLOYER_TAN || 'PUNE12345A',
+      employer_address: process.env.EMPLOYER_ADDRESS || 'India',
+      employee_name:    `${emp.first_name} ${emp.last_name}`,
+      employee_pan:     emp.pan_number   || 'NOT PROVIDED',
+      employee_code:    emp.employee_code,
+      financial_year:   fy,
+      assessment_year:  `${endYear}-${String(endYear + 1).slice(2)}`,
+      total_tds_deducted:   Math.round(tdsTotal),
+      total_tds_deposited:  Math.round(tdsTotal),
+      quarter_summary: [
+        { quarter: 'Q1 (Apr–Jun)', months: ['April','May','June'] },
+        { quarter: 'Q2 (Jul–Sep)', months: ['July','August','September'] },
+        { quarter: 'Q3 (Oct–Dec)', months: ['October','November','December'] },
+        { quarter: 'Q4 (Jan–Mar)', months: ['January','February','March'] }
+      ].map(q => {
+        const qRows = monthlyBreakdown.filter(m => q.months.includes(m.month));
+        return {
+          quarter: q.quarter,
+          tds_deducted:  Math.round(qRows.reduce((s, r) => s + r.tds, 0)),
+          tds_deposited: Math.round(qRows.reduce((s, r) => s + r.tds, 0))
+        };
+      })
+    };
+
+    // ── Part B — Salary & deduction details ───────────────────────────────
+    // Standard deduction u/s 16 = ₹50,000 (FY 2023-24 onwards)
+    const stdDeduction    = 50000;
+    const grossIncome     = Math.round(grossTotal);
+    const taxableIncome   = Math.max(0, grossIncome - stdDeduction);
+
+    // 80C: PF employee contribution (capped at ₹1.5L)
+    const sec80C          = Math.min(Math.round(pfEmpTotal), 150000);
+    const totalExemptions = sec80C;
+    const netTaxableIncome= Math.max(0, taxableIncome - totalExemptions);
+
+    const partB = {
+      financial_year: fy,
+      assessment_year: `${endYear}-${String(endYear + 1).slice(2)}`,
+      // Gross salary breakdown
+      basic:             Math.round(basicTotal),
+      hra:               Math.round(hraTotal),
+      conveyance:        Math.round(convTotal),
+      special_allowance: Math.round(specialTotal),
+      gross_salary:      grossIncome,
+      // Deductions
+      standard_deduction: stdDeduction,
+      income_chargeable:  taxableIncome,
+      // Chapter VI-A
+      sec_80c_pf:         sec80C,
+      total_deductions_vi_a: totalExemptions,
+      net_taxable_income: netTaxableIncome,
+      // Tax
+      total_tds:          Math.round(tdsTotal),
+      // Statutory deductions (not tax deductions, but shown for reference)
+      pf_employee_total:  Math.round(pfEmpTotal),
+      pf_employer_total:  Math.round(pfEmprTotal),
+      esi_employee_total: Math.round(esiEmpTotal),
+      professional_tax_total: Math.round(ptTotal),
+      lwf_total:          Math.round(lwfTotal),
+      net_salary_total:   Math.round(netTotal)
+    };
+
+    res.json({
+      success: true,
+      data: {
+        employee: {
+          name:        `${emp.first_name} ${emp.last_name}`,
+          code:        emp.employee_code,
+          pan:         emp.pan_number   || 'NOT PROVIDED',
+          uan:         emp.uan_number   || '',
+          pf_number:   emp.pf_number    || '',
+          department:  emp.department_name   || '',
+          designation: emp.designation_title || '',
+          dob:         emp.date_of_birth     || ''
+        },
+        financial_year:     fy,
+        assessment_year:    partA.assessment_year,
+        part_a:             partA,
+        part_b:             partB,
+        monthly_breakdown:  monthlyBreakdown
+      }
+    });
+  } catch (err) {
+    console.error('[getForm16 Error]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── Form 16 — List available financial years for an employee ────────────────
+exports.getForm16Years = async (req, res) => {
+  try {
+    const reqUser = req.user;
+    const empId   = req.query.employee_id ? parseInt(req.query.employee_id) : reqUser.id;
+
+    if (!['super_admin','admin','hr','accounts'].includes(reqUser.role) && empId !== reqUser.id)
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const rows = await db.query(
+      `SELECT DISTINCT year, month FROM payroll
+       WHERE employee_id=$1 AND status='processed'
+       ORDER BY year, month`,
+      [empId]
+    );
+
+    // Build financial years
+    const fySet = new Set();
+    rows.rows.forEach(r => {
+      const fy = r.month >= 4
+        ? `${r.year}-${String(r.year + 1).slice(2)}`
+        : `${r.year - 1}-${String(r.year).slice(2)}`;
+      fySet.add(fy);
+    });
+
+    // Only include FYs where we have at least some payroll data
+    const fys = Array.from(fySet).sort().reverse();
+    res.json({ success: true, data: fys });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
