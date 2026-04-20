@@ -140,12 +140,12 @@
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
       <div class="topbar-title" id="page-greeting">Good morning 👋</div>
     </div>
     <div class="topbar-right">
-      <div class="topbar-icon-btn notif-btn" onclick="openNotifications()" title="Notifications">
-        🔔<span id="notif-badge"></span>
-      </div>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
   </div>
 
