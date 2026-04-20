@@ -480,10 +480,6 @@ exports.update = async (req, res) => {
       'ctc_annual','basic_monthly','hra_monthly','conveyance_monthly','other_allowance_monthly',
       'gratuity_monthly','pf_employee_monthly','pf_employer_monthly','pf_admin_monthly',
       'probation_months','notice_period_months','custom_clauses','sig1_image','sig2_image'];
-      'designation','location','joining_date','offer_date','offer_valid_days',
-      'ctc_annual','basic_monthly','hra_monthly','conveyance_monthly','other_allowance_monthly',
-      'gratuity_monthly','pf_employee_monthly','pf_employer_monthly','pf_admin_monthly',
-      'probation_months','notice_period_months','custom_clauses'];
     const sets = [], params = [];
     fields.forEach(f => {
       if (req.body[f] !== undefined) {
