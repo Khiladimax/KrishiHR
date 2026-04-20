@@ -1215,7 +1215,14 @@ function openMapPunch(type) {
     });
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
-    loadOfficeBuffers();
+    loadOfficeBuffers().then(() => {
+      // Auto-fit map to show all office circles if GPS not yet ready
+      if (_mapCircles.length > 0 && !_pLat) {
+        const bounds = new google.maps.LatLngBounds();
+        _mapCircles.forEach(c => { if (c.getBounds) bounds.union(c.getBounds()); });
+        if (!bounds.isEmpty()) _map.fitBounds(bounds);
+      }
+    });
 
     if (!navigator.geolocation) {
       setMapStatus('fail', '⚠ GPS not supported. You can still punch manually.');
@@ -1253,23 +1260,27 @@ function openMapPunch(type) {
 }
 
 async function loadOfficeBuffers() {
-  // ✅ FIX: Use /geofence/my-locations (employee's own assigned locations)
-  //         instead of /geofence/locations (admin-only, returned no data for employees)
-  const data = await api('GET', '/geofence/my-locations');
-  if (!data?.success) return;
+  // Try employee's own assigned locations first, fall back to all locations
+  let data = await api('GET', '/geofence/my-locations');
+  // If no locations returned (universal employee with no specific assignment),
+  // fetch all geofence locations so we can still show them on the map
+  if (!data?.success || !data.data?.length) {
+    data = await api('GET', '/geofence/locations');
+  }
+  if (!data?.success || !data.data?.length) return;
   _mapCircles.forEach(c => { c.setMap(null); });
   _mapCircles = [];
   data.data.forEach(loc => {
     const lat = +loc.latitude, lng = +loc.longitude;
-    // For universal employees: show circle in blue (informational only, not enforced)
+    if (!lat || !lng) return;
     const isUniversal = loc.is_universal;
     const circleColor = isUniversal ? '#3b82f6' : '#10b981';
     const circle = new google.maps.Circle({
       map: _map,
       center: { lat, lng },
-      radius: loc.radius_meters,
-      strokeColor: circleColor, strokeOpacity: 0.7, strokeWeight: 2,
-      fillColor: circleColor, fillOpacity: 0.08
+      radius: loc.radius_meters || 200,
+      strokeColor: circleColor, strokeOpacity: 0.85, strokeWeight: 2.5,
+      fillColor: circleColor, fillOpacity: 0.12
     });
     const labelMarker = new google.maps.Marker({
       position: { lat, lng },
