@@ -18,6 +18,7 @@ const attImportCtrl  = require('../controllers/attendanceImportController');
 const annCtrl        = require('../controllers/announcementController');
 const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
+const itDeclCtrl     = require('../controllers/itDeclarationController');
 
 const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
@@ -206,6 +207,16 @@ router.post('/payroll/upload',                    authenticate, authorize('accou
 // ── Form 16 ───────────────────────────────────────────────────────────────────
 router.get('/payroll/form16/years', authenticate, payCtrl.getForm16Years);
 router.get('/payroll/form16',       authenticate, payCtrl.getForm16);
+
+// ── IT Declaration ────────────────────────────────────────────────────────────
+router.get ('/it-declaration/all',           authenticate, authorize('hr','admin','super_admin','accounts'), itDeclCtrl.getAllDeclarations);
+router.get ('/it-declaration/tax-preview',   authenticate, itDeclCtrl.taxPreview);
+router.get ('/it-declaration',               authenticate, itDeclCtrl.getDeclaration);
+router.post('/it-declaration',               authenticate, itDeclCtrl.saveDeclaration);
+router.post('/it-declaration/proof',         authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
+router.get ('/it-declaration/proof/:id',     authenticate, itDeclCtrl.getProof);
+router.post('/it-declaration/:id/review',    authenticate, authorize('hr','admin','super_admin','accounts'), itDeclCtrl.reviewDeclaration);
+router.post('/it-declaration/proof/:id/review', authenticate, authorize('hr','admin','super_admin','accounts'), itDeclCtrl.reviewProof);
 
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
