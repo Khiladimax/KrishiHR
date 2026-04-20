@@ -197,6 +197,17 @@ body {
   color: rgba(255,255,255,.95);
 }
 
+/* Nav section group labels */
+.nav-section-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.28);
+  padding: 12px 12px 4px;
+  margin-top: 4px;
+}
+
 .nav-link.active {
   background: rgba(141,198,63,.2);
   color: #c5e88a;
@@ -211,15 +222,17 @@ body {
 }
 
 .nav-icon {
-  width: 30px; height: 30px;
+  width: 32px; height: 32px;
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
+  font-size: 18px;
+  line-height: 1;
   background: rgba(255,255,255,.07);
   transition: all .15s;
   flex-shrink: 0;
   color: rgba(255,255,255,.5);
 }
+.nav-icon svg { stroke: currentColor; }
 
 .nav-link:hover .nav-icon {
   background: rgba(255,255,255,.14);
