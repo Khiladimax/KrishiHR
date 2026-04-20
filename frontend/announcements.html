@@ -157,6 +157,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <body>
 
 <!-- Sidebar -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark" id="sidebar-logo-mark">
@@ -180,12 +181,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <!-- Main -->
 <main class="main">
   <div class="topbar">
-    <div class="page-title">📢 Announcements</div>
-    <div class="topbar-actions">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">📢 Announcements</div>
+    </div>
+    <div class="topbar-right">
       <div id="hr-actions" style="display:none;gap:8px">
         <button class="btn btn-outline" onclick="openImportModal()">⬆ Import Thoughts/GK</button>
         <button class="btn btn-primary" onclick="openCreateModal()">+ New Announcement</button>
       </div>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
   </div>
 
@@ -443,7 +449,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <script src="app.js"></script>
 <script>
 Auth.guard();
+loadNotifBadge();
 buildSidebar('announcements.html');
+  loadNotifBadge();
 
 const API = 'https://krishihr-zuui.onrender.com/api'; // FIX: use correct Render API URL
 const token = localStorage.getItem('krishihr_token');
