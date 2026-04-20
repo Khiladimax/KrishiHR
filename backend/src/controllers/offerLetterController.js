@@ -516,24 +516,47 @@ exports.preview = async (req, res) => {
 // ── POST /offer-letters/:id/send — email offer letter ───────────────────────
 exports.sendEmail = async (req, res) => {
   try {
-    const { cc = [], bcc = [] } = req.body;
+    const { cc = [], bcc = [], email_message = '' } = req.body;
     const result = await db.query('SELECT * FROM offer_letters WHERE id=$1', [req.params.id]);
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
 
     const ol = result.rows[0];
     if (!ol.candidate_email) return res.status(400).json({ success: false, message: 'No email on this offer letter' });
 
-    const html = buildOfferLetterHTML(ol);
+    // ── Build the offer letter HTML ─────────────────────────────────────────
+    const offerHTML = buildOfferLetterHTML(ol);
 
-    // Build email payload
+    // ── Cover email body ────────────────────────────────────────────────────
+    const defaultMsg = `Dear ${ol.candidate_name.split(' ')[0] || ol.candidate_name},\n\nPlease find attached your offer letter for the position of "${ol.designation}" at Krishi Care & Management Services Private Limited.\n\nKindly review the letter and revert back with your acceptance within ${ol.offer_valid_days || 7} days.\n\nFor any queries, feel free to reach out to us.\n\nWarm regards,\nHuman Resource Team\nKrishi Care & Management Services Pvt. Ltd.`;
+
+    const coverText = (email_message || defaultMsg).replace(/\n/g, '<br>');
+
+    const coverHtml = `
+      <div style="font-family:Arial,sans-serif;font-size:13px;color:#222;line-height:1.7;max-width:600px;">
+        <div style="background:#1B5E20;padding:16px 24px;border-radius:8px 8px 0 0;">
+          <span style="color:#fff;font-size:16px;font-weight:700;">KrishiHR</span>
+          <span style="color:#A5D6A7;font-size:12px;margin-left:8px;">Krishi Care &amp; Management Services</span>
+        </div>
+        <div style="border:1px solid #e0e0e0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+          <p>${coverText}</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
+          <p style="font-size:11px;color:#999;">The offer letter is attached to this email as an HTML file. Open it in any browser and use <strong>Ctrl+P → Save as PDF</strong> to get a PDF copy.</p>
+        </div>
+      </div>`;
+
+    // ── Brevo payload with attachment ────────────────────────────────────────
     const payload = {
-      sender:   { name: 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
-      to:       [{ email: ol.candidate_email, name: ol.candidate_name }],
-      subject:  `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
-      htmlContent: html,
+      sender:      { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+      to:          [{ email: ol.candidate_email, name: ol.candidate_name }],
+      subject:     `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
+      htmlContent: coverHtml,
+      attachment: [{
+        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
+        content: Buffer.from(offerHTML).toString('base64'),
+      }],
     };
 
-    if (cc.length)  payload.cc  = cc.map(e  => ({ email: e }));
+    if (cc.length)  payload.cc  = cc.map(e => ({ email: e }));
     if (bcc.length) payload.bcc = bcc.map(e => ({ email: e }));
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
