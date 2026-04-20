@@ -95,16 +95,41 @@
   </style>
 </head>
 <body>
-<div class="app-container">
-  <!-- Sidebar injected by app.js -->
-  <div id="sidebar-placeholder"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div><div class="logo-sub">Krishi Care And Management</div></div>
+      <div class="logo-sub">Enterprise Edition</div>
+    </div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
 
-  <main class="main-content">
-    <div class="page-header">
-      <h1 class="page-title">📄 Offer Letters</h1>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-secondary" onclick="resetForm()">＋ New Letter</button>
-      </div>
+  <div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">📄 Offer Letters</div>
+    </div>
+    <div class="topbar-right">
+      <button id="notif-bell-btn" class="topbar-icon-btn" title="Notifications" style="position:relative;background:none;border:none;cursor:pointer;font-size:20px">🔔<span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div></div>
+      <button class="btn btn-secondary" onclick="resetForm()" style="padding:8px 16px;border-radius:8px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-size:.88rem;font-weight:600;">＋ New Letter</button>
     </div>
 
     <div class="ol-layout">
@@ -267,7 +292,8 @@
         </div>
       </div>
     </div>
-  </main>
+  </div><!-- /content -->
+</div><!-- /main -->
 </div>
 
 <script src="app.js"></script>
@@ -492,7 +518,7 @@ async function previewOL() {
   }
   const savedId = document.getElementById('ol-id').value;
   if (!savedId) return;
-  const token = localStorage.getItem('token');
+  const token = Auth.getToken();
   window.open(`${API_BASE}/offer-letters/${savedId}/preview?token=${token}`, '_blank');
 }
 
@@ -559,6 +585,10 @@ function showToast(msg) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3000);
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildSidebar('offer-letter.html');
+loadNotifBadge();
 </script>
 </body>
 </html>
