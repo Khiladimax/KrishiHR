@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offer Letter | KrishiHR</title>
+  <link rel="icon" type="image/x-icon" href="Logo.ico">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ── page layout ── */
+    .ol-layout { display:flex; gap:24px; align-items:flex-start; }
+    .ol-form-panel { flex:1; min-width:0; }
+    .ol-list-panel { width:340px; flex-shrink:0; }
+
+    /* ── form card ── */
+    .form-card { background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:24px; }
+    .form-card h3 { margin:0 0 20px; font-size:1.1rem; color:#1B5E20; display:flex; align-items:center; gap:8px; }
+
+    /* ── section headers ── */
+    .section-label {
+      font-size:.78rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.08em; color:#2E7D32; margin:20px 0 10px;
+      padding-bottom:6px; border-bottom:2px solid #E8F5E9;
+    }
+
+    /* ── grid ── */
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .form-grid .full { grid-column:1/-1; }
+    .form-group { display:flex; flex-direction:column; gap:4px; }
+    .form-group label { font-size:.8rem; font-weight:600; color:#555; }
+    .form-group input, .form-group select, .form-group textarea {
+      padding:8px 10px; border:1px solid #ddd; border-radius:8px;
+      font-size:.88rem; transition:border-color .2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline:none; border-color:#2E7D32; box-shadow:0 0 0 3px rgba(46,125,50,.1);
+    }
+
+    /* ── salary auto-calc note ── */
+    .calc-note { font-size:.75rem; color:#888; margin-top:4px; }
+    .auto-tag { font-size:.7rem; background:#E8F5E9; color:#2E7D32; padding:1px 6px; border-radius:4px; font-weight:600; }
+
+    /* ── email chips ── */
+    .chip-box {
+      display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+      border:1px solid #ddd; border-radius:8px; padding:6px 10px; min-height:38px;
+      cursor:text;
+    }
+    .chip-box:focus-within { border-color:#2E7D32; box-shadow:0 0 0 3px rgba(46,125,50,.1); }
+    .chip {
+      display:inline-flex; align-items:center; gap:4px;
+      background:#E8F5E9; border:1px solid #A5D6A7; border-radius:20px;
+      padding:2px 10px; font-size:.8rem; color:#1B5E20;
+    }
+    .chip button { background:none; border:none; cursor:pointer; color:#666; padding:0 2px; font-size:1rem; line-height:1; }
+    .chip-input { flex:1; min-width:140px; border:none; outline:none; font-size:.85rem; padding:2px 0; }
+
+    /* ── action buttons ── */
+    .btn-row { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+    .btn { padding:10px 20px; border-radius:8px; border:none; cursor:pointer; font-size:.88rem; font-weight:600; transition:all .2s; }
+    .btn-primary { background:#2E7D32; color:#fff; }
+    .btn-primary:hover { background:#1B5E20; }
+    .btn-secondary { background:#f5f5f5; color:#333; border:1px solid #ddd; }
+    .btn-secondary:hover { background:#e8e8e8; }
+    .btn-preview { background:#1565C0; color:#fff; }
+    .btn-preview:hover { background:#0D47A1; }
+    .btn-send { background:#E65100; color:#fff; }
+    .btn-send:hover { background:#BF360C; }
+    .btn-danger { background:#fff; color:#c62828; border:1px solid #ef9a9a; }
+    .btn-danger:hover { background:#ffebee; }
+
+    /* ── offer list ── */
+    .offer-list { display:flex; flex-direction:column; gap:8px; max-height:75vh; overflow-y:auto; }
+    .offer-card {
+      background:#fff; border:1px solid #eee; border-radius:10px; padding:14px;
+      cursor:pointer; transition:all .2s;
+    }
+    .offer-card:hover { border-color:#2E7D32; box-shadow:0 2px 8px rgba(46,125,50,.1); }
+    .offer-card.active { border-color:#2E7D32; background:#f1f8e9; }
+    .offer-card .oc-name { font-weight:700; font-size:.9rem; color:#222; }
+    .offer-card .oc-desig { font-size:.8rem; color:#666; margin-top:2px; }
+    .offer-card .oc-meta { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; align-items:center; }
+    .badge { padding:2px 8px; border-radius:12px; font-size:.7rem; font-weight:700; }
+    .badge-draft   { background:#FFF3E0; color:#E65100; }
+    .badge-sent    { background:#E3F2FD; color:#1565C0; }
+    .badge-accepted{ background:#E8F5E9; color:#2E7D32; }
+    .badge-rejected{ background:#FFEBEE; color:#C62828; }
+
+    /* ── responsive ── */
+    @media(max-width:900px) {
+      .ol-layout { flex-direction:column; }
+      .ol-list-panel { width:100%; }
+      .form-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <!-- Sidebar injected by app.js -->
+  <div id="sidebar-placeholder"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title">📄 Offer Letters</h1>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="resetForm()">＋ New Letter</button>
+      </div>
+    </div>
+
+    <div class="ol-layout">
+      <!-- ── LEFT: FORM ──────────────────────────────────────────── -->
+      <div class="ol-form-panel">
+        <div class="form-card">
+          <h3 id="form-title">📝 Create Offer Letter</h3>
+          <input type="hidden" id="ol-id">
+
+          <!-- CANDIDATE INFO -->
+          <div class="section-label">👤 Candidate Information</div>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Full Name *</label>
+              <input type="text" id="ol-name" placeholder="e.g. Mr. Akshay Rai">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="ol-email" placeholder="candidate@email.com">
+            </div>
+            <div class="form-group">
+              <label>Mobile</label>
+              <input type="text" id="ol-mobile" placeholder="9876543210">
+            </div>
+            <div class="form-group full">
+              <label>Address</label>
+              <input type="text" id="ol-address" placeholder="City, PIN">
+            </div>
+          </div>
+
+          <!-- POSITION -->
+          <div class="section-label">💼 Position Details</div>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Designation *</label>
+              <input type="text" id="ol-designation" placeholder='e.g. Manager-Remote Sensing and GIS'>
+            </div>
+            <div class="form-group">
+              <label>Location</label>
+              <input type="text" id="ol-location" value="Mumbai" placeholder="Mumbai">
+            </div>
+            <div class="form-group">
+              <label>Offer Date</label>
+              <input type="date" id="ol-offer-date">
+            </div>
+            <div class="form-group">
+              <label>Joining Date</label>
+              <input type="date" id="ol-joining-date">
+            </div>
+            <div class="form-group">
+              <label>Offer Valid (days)</label>
+              <input type="number" id="ol-valid-days" value="7" min="1">
+            </div>
+            <div class="form-group">
+              <label>Probation (months)</label>
+              <input type="number" id="ol-probation" value="6" min="0">
+            </div>
+            <div class="form-group">
+              <label>Notice Period (months)</label>
+              <input type="number" id="ol-notice" value="3" min="0">
+            </div>
+          </div>
+
+          <!-- SALARY STRUCTURE -->
+          <div class="section-label">💰 Salary Structure</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Annual CTC (₹) *</label>
+              <input type="number" id="ol-ctc" placeholder="1250004" oninput="autoCalcSalary()">
+            </div>
+            <div class="form-group">
+              <label>Basic (monthly) ₹</label>
+              <input type="number" id="ol-basic" placeholder="25000" oninput="calcGross()">
+            </div>
+            <div class="form-group">
+              <label>HRA (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <input type="number" id="ol-hra" placeholder="12500" oninput="calcGross()">
+              <span class="calc-note">Auto = 50% of Basic</span>
+            </div>
+            <div class="form-group">
+              <label>Conveyance (monthly) ₹</label>
+              <input type="number" id="ol-conv" value="0" oninput="calcGross()">
+            </div>
+            <div class="form-group">
+              <label>Other Allowance (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <input type="number" id="ol-other" placeholder="63515" oninput="calcGross()">
+              <span class="calc-note">Auto = CTC monthly − Basic − HRA − Conv − Gratuity − PF</span>
+            </div>
+            <div class="form-group">
+              <label>Gratuity (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <input type="number" id="ol-gratuity" placeholder="1202" oninput="calcGross()">
+              <span class="calc-note">Auto = Basic × 4.81%</span>
+            </div>
+            <div class="form-group">
+              <label>PF Employee (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <input type="number" id="ol-pf-emp" placeholder="1800" oninput="calcGross()">
+              <span class="calc-note">Auto = 12% of Basic (max 1800)</span>
+            </div>
+            <div class="form-group">
+              <label>PF Employer (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <input type="number" id="ol-pf-er" placeholder="1800" oninput="calcGross()">
+            </div>
+            <div class="form-group">
+              <label>PF Admin Charges (monthly) ₹</label>
+              <input type="number" id="ol-pf-admin" placeholder="150" oninput="calcGross()">
+            </div>
+          </div>
+
+          <!-- CTC Summary -->
+          <div id="ctc-summary" style="background:#F1F8E9;border-radius:8px;padding:12px;margin-top:12px;font-size:.83rem;display:none;">
+            <div style="font-weight:700;color:#1B5E20;margin-bottom:6px;">📊 Calculated Summary</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div><div style="color:#666;font-size:.75rem;">Gross Monthly</div><div id="s-gross" style="font-weight:700;">—</div></div>
+              <div><div style="color:#666;font-size:.75rem;">Net Monthly</div><div id="s-net" style="font-weight:700;color:#1565C0;">—</div></div>
+              <div><div style="color:#666;font-size:.75rem;">CTC Monthly</div><div id="s-ctc" style="font-weight:700;color:#E65100;">—</div></div>
+            </div>
+          </div>
+
+          <!-- CUSTOM CLAUSES -->
+          <div class="section-label">📋 Additional Terms (optional)</div>
+          <div class="form-group">
+            <textarea id="ol-clauses" rows="3" placeholder="Any additional terms, conditions, or special clauses..."></textarea>
+          </div>
+
+          <!-- EMAIL CC / BCC -->
+          <div class="section-label">📧 Email Recipients (when sending)</div>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>CC (press Enter or comma to add)</label>
+              <div class="chip-box" id="cc-box" onclick="document.getElementById('cc-input').focus()">
+                <input type="text" class="chip-input" id="cc-input" placeholder="cc@email.com" onkeydown="addChip(event,'cc')">
+              </div>
+            </div>
+            <div class="form-group full">
+              <label>BCC (press Enter or comma to add)</label>
+              <div class="chip-box" id="bcc-box" onclick="document.getElementById('bcc-input').focus()">
+                <input type="text" class="chip-input" id="bcc-input" placeholder="bcc@email.com" onkeydown="addChip(event,'bcc')">
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTIONS -->
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveOL()">💾 Save</button>
+            <button class="btn btn-preview" id="btn-preview" onclick="previewOL()" disabled>👁 Preview</button>
+            <button class="btn btn-send"    id="btn-send"    onclick="sendOL()"    disabled>📤 Send Email</button>
+            <button class="btn btn-secondary" onclick="resetForm()">✕ Clear</button>
+            <button class="btn btn-danger"   id="btn-delete"  onclick="deleteOL()"   style="display:none;">🗑 Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RIGHT: LIST ─────────────────────────────────────────── -->
+      <div class="ol-list-panel">
+        <div class="form-card">
+          <h3>📋 All Offer Letters</h3>
+          <div class="offer-list" id="offer-list">
+            <div style="text-align:center;padding:30px;color:#aaa;">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+const ccEmails  = [];
+const bccEmails = [];
+
+// ── On load ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Set today as default offer date
+  document.getElementById('ol-offer-date').value = new Date().toISOString().split('T')[0];
+  loadList();
+});
+
+// ── Chip helpers ──────────────────────────────────────────────────────────────
+function addChip(e, type) {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();
+  const input = document.getElementById(`${type}-input`);
+  const val = input.value.trim().replace(/,+$/, '');
+  if (!val || !val.includes('@')) return;
+  const arr = type === 'cc' ? ccEmails : bccEmails;
+  if (arr.includes(val)) { input.value=''; return; }
+  arr.push(val);
+  const box = document.getElementById(`${type}-box`);
+  const chip = document.createElement('span');
+  chip.className = 'chip';
+  chip.innerHTML = `${val}<button onclick="removeChip(this,'${type}','${val}')" title="Remove">×</button>`;
+  box.insertBefore(chip, input);
+  input.value = '';
+}
+function removeChip(btn, type, val) {
+  const arr = type === 'cc' ? ccEmails : bccEmails;
+  const i = arr.indexOf(val);
+  if (i > -1) arr.splice(i, 1);
+  btn.parentElement.remove();
+}
+
+// ── Auto salary calc ──────────────────────────────────────────────────────────
+function autoCalcSalary() {
+  const ctc = parseFloat(document.getElementById('ol-ctc').value) || 0;
+  if (!ctc) return;
+  // From actual offer letter: basic=25000 from ctc=1250004
+  // Ratio: basic ~ 24% of CTC annually
+  const ctcM = ctc / 12;
+  const basic = Math.round(ctc * 0.24 / 12);
+  const hra   = Math.round(basic * 0.5);
+  const pfEmp = Math.min(Math.round(basic * 0.12), 1800);
+  const pfEr  = pfEmp;
+  const pfAdm = Math.round(pfEr * 0.083) || 150;
+  const grat  = Math.round(basic * 0.0481);
+  const gross = ctcM - pfEr - pfAdm;
+  const other = Math.round(gross - basic - hra - grat);
+
+  document.getElementById('ol-basic').value   = basic;
+  document.getElementById('ol-hra').value     = hra;
+  document.getElementById('ol-gratuity').value = grat;
+  document.getElementById('ol-pf-emp').value  = pfEmp;
+  document.getElementById('ol-pf-er').value   = pfEr;
+  document.getElementById('ol-pf-admin').value = pfAdm;
+  document.getElementById('ol-other').value   = Math.max(0, other);
+  calcGross();
+}
+
+function calcGross() {
+  const n = id => parseFloat(document.getElementById(id).value) || 0;
+  const basic = n('ol-basic'), hra = n('ol-hra'), conv = n('ol-conv'),
+        other = n('ol-other'), grat = n('ol-gratuity'), pfEmp = n('ol-pf-emp'),
+        pfEr  = n('ol-pf-er'), pfAdm = n('ol-pf-admin');
+
+  // Auto-fill HRA if empty and basic exists
+  if (!document.getElementById('ol-hra').value && basic) {
+    document.getElementById('ol-hra').value = Math.round(basic * 0.5);
+  }
+  // Auto-fill gratuity
+  if (!document.getElementById('ol-gratuity').value && basic) {
+    document.getElementById('ol-gratuity').value = Math.round(basic * 0.0481);
+  }
+  // Auto-fill PF
+  if (!document.getElementById('ol-pf-emp').value && basic) {
+    const pf = Math.min(Math.round(basic * 0.12), 1800);
+    document.getElementById('ol-pf-emp').value = pf;
+    document.getElementById('ol-pf-er').value  = pf;
+    document.getElementById('ol-pf-admin').value = Math.round(pf * 0.083);
+  }
+
+  const gross = basic + hra + conv + other + grat;
+  const net   = gross - pfEmp;
+  const ctcM  = gross + pfEr + pfAdm;
+
+  const fmt = v => '₹' + Math.round(v).toLocaleString('en-IN');
+  document.getElementById('s-gross').textContent = fmt(gross);
+  document.getElementById('s-net').textContent   = fmt(net);
+  document.getElementById('s-ctc').textContent   = fmt(ctcM);
+  document.getElementById('ctc-summary').style.display = gross > 0 ? 'block' : 'none';
+}
+
+// ── Load list ─────────────────────────────────────────────────────────────────
+async function loadList() {
+  try {
+    const data = await api('GET', '/offer-letters');
+    const list = document.getElementById('offer-list');
+    if (!data.success || !data.data.length) {
+      list.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;">No offer letters yet.<br>Create one!</div>';
+      return;
+    }
+    list.innerHTML = data.data.map(ol => `
+      <div class="offer-card" id="card-${ol.id}" onclick="loadForm(${ol.id})">
+        <div class="oc-name">${ol.candidate_name}</div>
+        <div class="oc-desig">${ol.designation}</div>
+        <div class="oc-meta">
+          <span class="badge badge-${ol.status}">${ol.status.toUpperCase()}</span>
+          <span style="font-size:.75rem;color:#999;">${new Date(ol.created_at).toLocaleDateString('en-IN')}</span>
+          ${ol.ctc_annual ? `<span style="font-size:.75rem;color:#2E7D32;font-weight:600;">₹${Number(ol.ctc_annual).toLocaleString('en-IN')}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch(err) {
+    document.getElementById('offer-list').innerHTML = '<div style="color:red;padding:20px">Failed to load</div>';
+  }
+}
+
+// ── Load form from existing offer letter ──────────────────────────────────────
+async function loadForm(id) {
+  document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('active'));
+  document.getElementById(`card-${id}`)?.classList.add('active');
+
+  const data = await api('GET', `/offer-letters/${id}`);
+  if (!data.success) return;
+  const ol = data.data;
+
+  document.getElementById('ol-id').value          = ol.id;
+  document.getElementById('form-title').textContent = `✏️ Edit — ${ol.candidate_name}`;
+  document.getElementById('ol-name').value         = ol.candidate_name;
+  document.getElementById('ol-email').value        = ol.candidate_email || '';
+  document.getElementById('ol-mobile').value       = ol.candidate_mobile || '';
+  document.getElementById('ol-address').value      = ol.candidate_address || '';
+  document.getElementById('ol-designation').value  = ol.designation;
+  document.getElementById('ol-location').value     = ol.location || 'Mumbai';
+  document.getElementById('ol-offer-date').value   = ol.offer_date?.split('T')[0] || '';
+  document.getElementById('ol-joining-date').value = ol.joining_date?.split('T')[0] || '';
+  document.getElementById('ol-valid-days').value   = ol.offer_valid_days || 7;
+  document.getElementById('ol-probation').value    = ol.probation_months || 6;
+  document.getElementById('ol-notice').value       = ol.notice_period_months || 3;
+  document.getElementById('ol-ctc').value          = ol.ctc_annual || '';
+  document.getElementById('ol-basic').value        = ol.basic_monthly || '';
+  document.getElementById('ol-hra').value          = ol.hra_monthly || '';
+  document.getElementById('ol-conv').value         = ol.conveyance_monthly || 0;
+  document.getElementById('ol-other').value        = ol.other_allowance_monthly || '';
+  document.getElementById('ol-gratuity').value     = ol.gratuity_monthly || '';
+  document.getElementById('ol-pf-emp').value       = ol.pf_employee_monthly || '';
+  document.getElementById('ol-pf-er').value        = ol.pf_employer_monthly || '';
+  document.getElementById('ol-pf-admin').value     = ol.pf_admin_monthly || '';
+  document.getElementById('ol-clauses').value      = ol.custom_clauses || '';
+
+  calcGross();
+
+  document.getElementById('btn-preview').disabled = false;
+  document.getElementById('btn-send').disabled    = !ol.candidate_email;
+  document.getElementById('btn-delete').style.display = '';
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+async function saveOL() {
+  const id   = document.getElementById('ol-id').value;
+  const name = document.getElementById('ol-name').value.trim();
+  const desig = document.getElementById('ol-designation').value.trim();
+  if (!name || !desig) return alert('Name and Designation are required.');
+
+  const body = {
+    candidate_name:           name,
+    candidate_email:          document.getElementById('ol-email').value.trim() || null,
+    candidate_mobile:         document.getElementById('ol-mobile').value.trim() || null,
+    candidate_address:        document.getElementById('ol-address').value.trim() || null,
+    designation:              desig,
+    location:                 document.getElementById('ol-location').value.trim() || 'Mumbai',
+    offer_date:               document.getElementById('ol-offer-date').value || null,
+    joining_date:             document.getElementById('ol-joining-date').value || null,
+    offer_valid_days:         parseInt(document.getElementById('ol-valid-days').value) || 7,
+    probation_months:         parseInt(document.getElementById('ol-probation').value) || 6,
+    notice_period_months:     parseInt(document.getElementById('ol-notice').value) || 3,
+    ctc_annual:               parseFloat(document.getElementById('ol-ctc').value) || 0,
+    basic_monthly:            parseFloat(document.getElementById('ol-basic').value) || 0,
+    hra_monthly:              parseFloat(document.getElementById('ol-hra').value) || 0,
+    conveyance_monthly:       parseFloat(document.getElementById('ol-conv').value) || 0,
+    other_allowance_monthly:  parseFloat(document.getElementById('ol-other').value) || 0,
+    gratuity_monthly:         parseFloat(document.getElementById('ol-gratuity').value) || 0,
+    pf_employee_monthly:      parseFloat(document.getElementById('ol-pf-emp').value) || 0,
+    pf_employer_monthly:      parseFloat(document.getElementById('ol-pf-er').value) || 0,
+    pf_admin_monthly:         parseFloat(document.getElementById('ol-pf-admin').value) || 0,
+    custom_clauses:           document.getElementById('ol-clauses').value.trim() || null,
+  };
+
+  const method = id ? 'PUT' : 'POST';
+  const url    = id ? `/offer-letters/${id}` : '/offer-letters';
+  const res    = await api(method, url, body);
+  if (!res.success) return alert(res.message || 'Save failed');
+
+  // If new, load the created record
+  if (!id && res.data?.id) {
+    document.getElementById('ol-id').value = res.data.id;
+    document.getElementById('btn-preview').disabled = false;
+    document.getElementById('btn-send').disabled    = !body.candidate_email;
+    document.getElementById('btn-delete').style.display = '';
+    document.getElementById('form-title').textContent = `✏️ Edit — ${name}`;
+  }
+
+  showToast('✅ Offer letter saved!');
+  loadList();
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+function previewOL() {
+  const id = document.getElementById('ol-id').value;
+  if (!id) return;
+  const token = localStorage.getItem('token');
+  window.open(`${BASE_URL}/offer-letters/${id}/preview?token=${token}`, '_blank');
+}
+
+// ── Send Email ────────────────────────────────────────────────────────────────
+async function sendOL() {
+  const id = document.getElementById('ol-id').value;
+  if (!id) return;
+  const email = document.getElementById('ol-email').value.trim();
+  if (!email) return alert('No candidate email set. Please add email and save first.');
+  if (!confirm(`Send offer letter email to ${email}?\n\nCC: ${ccEmails.join(', ') || 'none'}\nBCC: ${bccEmails.join(', ') || 'none'}`)) return;
+
+  const res = await api('POST', `/offer-letters/${id}/send`, { cc: ccEmails, bcc: bccEmails });
+  if (res.success) { showToast('📧 Offer letter sent!'); loadList(); }
+  else alert(res.message || 'Send failed');
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function deleteOL() {
+  const id = document.getElementById('ol-id').value;
+  if (!id) return;
+  if (!confirm('Delete this offer letter? This cannot be undone.')) return;
+  const res = await api('DELETE', `/offer-letters/${id}`);
+  if (res.success) { showToast('🗑 Deleted'); resetForm(); loadList(); }
+  else alert(res.message || 'Delete failed');
+}
+
+// ── Reset form ────────────────────────────────────────────────────────────────
+function resetForm() {
+  document.getElementById('ol-id').value = '';
+  document.getElementById('form-title').textContent = '📝 Create Offer Letter';
+  ['ol-name','ol-email','ol-mobile','ol-address','ol-designation','ol-joining-date','ol-clauses',
+   'ol-ctc','ol-basic','ol-hra','ol-other','ol-gratuity','ol-pf-emp','ol-pf-er','ol-pf-admin'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('ol-location').value = 'Mumbai';
+  document.getElementById('ol-offer-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ol-valid-days').value = 7;
+  document.getElementById('ol-probation').value  = 6;
+  document.getElementById('ol-notice').value     = 3;
+  document.getElementById('ol-conv').value       = 0;
+  document.getElementById('ctc-summary').style.display = 'none';
+  document.getElementById('btn-preview').disabled = true;
+  document.getElementById('btn-send').disabled    = true;
+  document.getElementById('btn-delete').style.display = 'none';
+
+  // Clear chips
+  ['cc','bcc'].forEach(type => {
+    const arr = type === 'cc' ? ccEmails : bccEmails;
+    arr.length = 0;
+    const box = document.getElementById(`${type}-box`);
+    box.querySelectorAll('.chip').forEach(c => c.remove());
+  });
+
+  document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('active'));
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1B5E20;color:#fff;padding:12px 20px;border-radius:10px;z-index:9999;font-size:.9rem;box-shadow:0 4px 16px rgba(0,0,0,.2);animation:fadeIn .3s ease';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+</body>
+</html>
