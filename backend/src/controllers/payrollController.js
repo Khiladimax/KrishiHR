@@ -583,7 +583,7 @@ exports.getForm16 = async (req, res) => {
        LEFT JOIN departments d  ON e.department_id  = d.id
        LEFT JOIN designations des ON e.designation_id = des.id
        WHERE p.employee_id = $1
-         AND p.status = 'processed'
+         AND p.status IN ('processed','paid')
          AND (
            (p.year = $2 AND p.month >= 4) OR
            (p.year = $3 AND p.month <= 3)
@@ -733,7 +733,7 @@ exports.getForm16Years = async (req, res) => {
 
     const rows = await db.query(
       `SELECT DISTINCT year, month FROM payroll
-       WHERE employee_id=$1 AND status='processed'
+       WHERE employee_id=$1 AND status IN ('processed','paid')
        ORDER BY year, month`,
       [empId]
     );
