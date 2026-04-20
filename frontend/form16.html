@@ -134,7 +134,7 @@ const isHR = ['super_admin','admin','hr','accounts'].includes(f16User?.role);
       // Add self first
       const me = document.createElement('option');
       me.value = f16User?.id;
-      me.textContent = `${f16User?.name || 'Me'} (${f16User?.employee_code || 'Self'})`;
+      me.textContent = `${f16User?.first_name || 'Me'} ${f16User?.last_name || ''} (${f16User?.employee_code || 'Self'})`.trim();
       sel.appendChild(me);
       (empRes.data || []).filter(e => e.id !== f16User?.id).forEach(e => {
         const o = document.createElement('option');
@@ -142,6 +142,7 @@ const isHR = ['super_admin','admin','hr','accounts'].includes(f16User?.role);
         o.textContent = `${e.first_name} ${e.last_name} (${e.employee_code})`;
         sel.appendChild(o);
       });
+      sel.value = f16User?.id; // ensure self is selected by default
       // When employee changes, reload FY list
       sel.addEventListener('change', loadFYList);
     }
