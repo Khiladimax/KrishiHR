@@ -1669,6 +1669,9 @@ exports.logMovement = async (req, res) => {
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
     }
 
+    // ── Auto-cleanup: delete movement logs older than 3 days ─────────────
+    await db.query(`DELETE FROM employee_movement_log WHERE logged_at < NOW() - INTERVAL '3 days'`);
+
     // ── Save the point ────────────────────────────────────────────────────
     await db.query(
       `INSERT INTO employee_movement_log(employee_id, lat, lng, accuracy, logged_at)
