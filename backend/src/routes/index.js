@@ -782,13 +782,13 @@ router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
 });
 
 // ── Offer Letters ─────────────────────────────────────────────────────────────
-router.get   ('/offer-letters',              authenticate, authorize('hr','admin','super_admin'), offerCtrl.getAll);
-router.post  ('/offer-letters',              authenticate, authorize('hr','admin','super_admin'), offerCtrl.create);
-router.get   ('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.getOne);
-router.put   ('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.update);
-router.delete('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.remove);
-router.get   ('/offer-letters/:id/preview',  authenticate, offerCtrl.preview);
-router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr','admin','super_admin'), offerCtrl.sendEmail);
+router.get   ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.getAll);
+router.post  ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.create);
+router.get   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.getOne);
+router.put   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.update);
+router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.remove);
+router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr'), offerCtrl.preview);
+router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
 
 // ── Test Email (debug only) ───────────────────────────────────────────────────
 router.get('/test-email', authenticate, async (req, res) => {
