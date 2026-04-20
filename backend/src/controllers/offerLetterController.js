@@ -48,6 +48,8 @@ exports.initTables = async () => {
         custom_clauses    TEXT,
         -- Status
         status            VARCHAR(20) DEFAULT 'draft', -- draft/sent/accepted/rejected
+        sig1_image        TEXT,   -- base64 authorized signatory signature
+        sig2_image        TEXT,   -- base64 HR signatory signature
         sent_at           TIMESTAMP,
         created_by        INTEGER REFERENCES employees(id),
         created_at        TIMESTAMP DEFAULT NOW(),
@@ -55,6 +57,11 @@ exports.initTables = async () => {
       );
     `);
     console.log('✅ Offer letter table ready');
+
+    // Migration: add signature columns if not exist
+    await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS sig1_image TEXT`);
+    await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS sig2_image TEXT`);
+    console.log('✅ Offer letter signature columns ready');
   } catch (err) {
     console.error('❌ Offer letter table init error:', err.message);
   }
@@ -375,10 +382,12 @@ function buildOfferLetterHTML(ol) {
     <!-- SIGNATURES -->
     <div class="sig-section">
       <div class="sig-col">
+        ${ol.sig1_image ? `<img src="${ol.sig1_image}" style="height:48px;max-width:180px;object-fit:contain;display:block;margin-bottom:4px;">` : '<div style="height:48px;"></div>'}
         <div class="sig-line">Authorized Signatory</div>
       </div>
-      <div class="sig-col" style="text-align:right;">
-        <div class="sig-line" style="text-align:left;">Human Resource<br>(Authorized Signatory)</div>
+      <div class="sig-col">
+        ${ol.sig2_image ? `<img src="${ol.sig2_image}" style="height:48px;max-width:180px;object-fit:contain;display:block;margin-bottom:4px;">` : '<div style="height:48px;"></div>'}
+        <div class="sig-line">Human Resource<br>(Authorized Signatory)</div>
       </div>
     </div>
 
@@ -432,7 +441,8 @@ exports.create = async (req, res) => {
       ctc_annual, basic_monthly, hra_monthly, conveyance_monthly = 0,
       other_allowance_monthly, gratuity_monthly = 0,
       pf_employee_monthly = 0, pf_employer_monthly = 0, pf_admin_monthly = 0,
-      probation_months = 6, notice_period_months = 3, custom_clauses, employee_id
+      probation_months = 6, notice_period_months = 3, custom_clauses, employee_id,
+      sig1_image, sig2_image
     } = req.body;
 
     if (!candidate_name || !designation)
@@ -444,14 +454,16 @@ exports.create = async (req, res) => {
         designation, location, joining_date, offer_date, offer_valid_days,
         ctc_annual, basic_monthly, hra_monthly, conveyance_monthly, other_allowance_monthly,
         gratuity_monthly, pf_employee_monthly, pf_employer_monthly, pf_admin_monthly,
-        probation_months, notice_period_months, custom_clauses, created_by, updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW())
+        probation_months, notice_period_months, custom_clauses, sig1_image, sig2_image,
+        created_by, updated_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
       RETURNING *`,
       [employee_id||null, candidate_name, candidate_email||null, candidate_address||null, candidate_mobile||null,
        designation, location, joining_date||null, offer_date||null, offer_valid_days,
        ctc_annual||0, basic_monthly||0, hra_monthly||0, conveyance_monthly, other_allowance_monthly||0,
        gratuity_monthly, pf_employee_monthly, pf_employer_monthly, pf_admin_monthly,
-       probation_months, notice_period_months, custom_clauses||null, req.user.id]
+       probation_months, notice_period_months, custom_clauses||null, sig1_image||null, sig2_image||null,
+       req.user.id]
     );
     res.json({ success: true, data: result.rows[0], message: 'Offer letter created!' });
   } catch (err) {
@@ -464,6 +476,10 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const fields = ['candidate_name','candidate_email','candidate_address','candidate_mobile',
+      'designation','location','joining_date','offer_date','offer_valid_days',
+      'ctc_annual','basic_monthly','hra_monthly','conveyance_monthly','other_allowance_monthly',
+      'gratuity_monthly','pf_employee_monthly','pf_employer_monthly','pf_admin_monthly',
+      'probation_months','notice_period_months','custom_clauses','sig1_image','sig2_image'];
       'designation','location','joining_date','offer_date','offer_valid_days',
       'ctc_annual','basic_monthly','hra_monthly','conveyance_monthly','other_allowance_monthly',
       'gratuity_monthly','pf_employee_monthly','pf_employer_monthly','pf_admin_monthly',
