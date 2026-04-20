@@ -8,6 +8,7 @@
 </head>
 <body>
 
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
     <div class="sidebar-logo">
     <div class="logo-mark" id="sidebar-logo-mark">
@@ -31,11 +32,13 @@
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
       <div class="topbar-title">Leave Management</div>
     </div>
     <div class="topbar-right">
       <button class="btn btn-primary btn-sm" onclick="openModal('apply-modal')">+ Apply Leave</button>
-      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠<span id="notif-badge"></span></a>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
   </div>
 
