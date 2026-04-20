@@ -94,7 +94,7 @@ const NAV = [
   { href:'it-declaration.html',icon:'📊', label:'IT Declaration',  always:true },
   { href:'employees.html',     icon:'◈', label:'Employees',       roles:['admin','super_admin','hr','accounts','manager','tl'] },
   { href:'payroll.html',       icon:'◉', label:'Payroll',         roles:['super_admin','hr','accounts'] },
-  { href:'offer-letter.html',  icon:'📄', label:'Offer Letter',    roles:['super_admin','hr','admin'] },
+  { href:'offer-letter.html',  icon:'📄', label:'Offer Letter',    roles:['hr'] },
   { href:'separation.html',    icon:'◪', label:'Separation',      always:true },
   { href:'provision.html',     icon:'⏳', label:'Provision',       roles:['admin','super_admin','hr','manager','tl'] },
   { href:'announcements.html', icon:'📢', label:'Announcements',   roles:['employee'] },
