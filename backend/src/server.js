@@ -6,6 +6,7 @@ const cron    = require('node-cron');
 const db      = require('./config/db');
 const routes  = require('./routes/index');
 const attCtrl = require('./controllers/attendanceController');
+const itDeclCtrl = require('./controllers/itDeclarationController');
 const emailSvc = require('./config/emailService'); // for startup repair
 
 const app  = express();
@@ -591,6 +592,7 @@ async function start() {
   try {
     await db.query('SELECT 1');
     console.log('✅ Database connected');
+    await itDeclCtrl.initTables();
 
     await db.query(`CREATE TABLE IF NOT EXISTS birthday_likes (
       id SERIAL PRIMARY KEY,
