@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR - Form 16</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+@media print {
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .main { margin-left: 0 !important; }
+  .content { padding: 0 !important; }
+  @page { size: A4 portrait; margin: 10mm 8mm; }
+  #form16-area > div { max-width: 100% !important; }
+  .form16-card { break-inside: avoid; }
+}
+.form16-header {
+  background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+  color: #fff; padding: 24px 28px; border-radius: 10px 10px 0 0;
+}
+.form16-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.form16-table th {
+  background: #f1f8e9; color: #2E7D32; font-weight: 700;
+  padding: 9px 12px; text-align: left; border: 1px solid #c8e6c9;
+}
+.form16-table td { padding: 8px 12px; border: 1px solid #e8f5e9; }
+.form16-table tr:nth-child(even) td { background: #f9fbe7; }
+.form16-section {
+  border: 1px solid #c8e6c9; border-radius: 8px;
+  overflow: hidden; margin-bottom: 18px;
+}
+.form16-section-title {
+  background: #e8f5e9; color: #1B5E20; font-weight: 700;
+  font-size: 13px; padding: 8px 14px; border-bottom: 1px solid #c8e6c9;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.f16-row { display: flex; justify-content: space-between; padding: 7px 14px; border-bottom: 1px solid #f1f8e9; font-size: 13px; }
+.f16-row:last-child { border-bottom: none; }
+.f16-row .f16-label { color: #555; }
+.f16-row .f16-value { font-weight: 600; color: #1a1a1a; }
+.f16-row.total { background: #e8f5e9; font-weight: 700; }
+.f16-row.total .f16-label, .f16-row.total .f16-value { color: #1B5E20; font-size: 14px; }
+.badge-fy {
+  display: inline-block; background: rgba(255,255,255,0.2);
+  color: #fff; padding: 3px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; margin-left: 10px;
+}
+.quarter-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; padding: 12px; }
+.quarter-box { background: #f9fbe7; border: 1px solid #c8e6c9; border-radius: 6px; padding: 10px 14px; }
+.quarter-box .q-title { font-size: 12px; font-weight: 700; color: #2E7D32; margin-bottom: 6px; }
+.quarter-box .q-row { display: flex; justify-content: space-between; font-size: 12px; color: #555; padding: 2px 0; }
+.quarter-box .q-row span:last-child { font-weight: 600; color: #1a1a1a; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <img src="LOGO.png" alt="KC" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+    </div>
+    <div class="logo-text-wrap">
+      <div class="logo-text">Krishi<span>HR</span></div>
+      <div class="logo-sub">Krishi Care & Management Services Pvt Ltd.</div>
+    </div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">↩ Sign Out</button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">📄 Form 16</div>
+    <div class="topbar-right">
+      <button class="btn btn-outline btn-sm no-print" onclick="window.print()" id="print-btn" style="display:none">🖨 Print / Download PDF</button>
+      <div class="notif-btn" onclick="location.href='dashboard.html'">🏠<span id="notif-badge"></span></div>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+
+    <!-- Selector -->
+    <div class="card no-print" style="padding:16px 22px;margin-bottom:20px">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div id="emp-selector-wrap" style="display:none">
+          <div class="form-label">Employee</div>
+          <select id="f16-emp" class="form-control" style="width:220px"></select>
+        </div>
+        <div>
+          <div class="form-label">Financial Year</div>
+          <select id="f16-fy" class="form-control" style="width:160px">
+            <option value="">-- Select FY --</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="loadForm16()">Load Form 16</button>
+      </div>
+    </div>
+
+    <!-- Form 16 Output -->
+    <div id="form16-area"></div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+Auth.guard();
+buildSidebar('form16.html');
+
+const user = Auth.getUser();
+const isHR = ['super_admin','admin','hr','accounts'].includes(user?.role);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  // Show employee selector for HR/Admin
+  if (isHR) {
+    document.getElementById('emp-selector-wrap').style.display = '';
+    const empRes = await api('GET', '/employees?active=true&limit=500');
+    if (empRes?.success) {
+      const sel = document.getElementById('f16-emp');
+      // Add self first
+      const me = document.createElement('option');
+      me.value = user.id;
+      me.textContent = `${user.name || 'Me'} (${user.employee_code || 'Self'})`;
+      sel.appendChild(me);
+      (empRes.data || []).filter(e => e.id !== user.id).forEach(e => {
+        const o = document.createElement('option');
+        o.value = e.id;
+        o.textContent = `${e.first_name} ${e.last_name} (${e.employee_code})`;
+        sel.appendChild(o);
+      });
+      // When employee changes, reload FY list
+      sel.addEventListener('change', loadFYList);
+    }
+  }
+  await loadFYList();
+})();
+
+async function loadFYList() {
+  const empId = isHR ? document.getElementById('f16-emp').value : '';
+  const url   = empId ? `/payroll/form16/years?employee_id=${empId}` : '/payroll/form16/years';
+  const res   = await api('GET', url);
+  const sel   = document.getElementById('f16-fy');
+  sel.innerHTML = '<option value="">-- Select FY --</option>';
+  if (res?.success && res.data?.length) {
+    res.data.forEach(fy => {
+      const o = document.createElement('option');
+      o.value = fy;
+      o.textContent = `FY ${fy} (AY ${getAY(fy)})`;
+      sel.appendChild(o);
+    });
+    sel.value = res.data[0]; // default to latest
+  } else {
+    sel.innerHTML = '<option value="">No payroll data found</option>';
+  }
+}
+
+function getAY(fy) {
+  const [start] = fy.split('-');
+  const endFull = parseInt(start) + 1;
+  return `${endFull}-${String(endFull + 1).slice(2)}`;
+}
+
+async function loadForm16() {
+  const fy    = document.getElementById('f16-fy').value;
+  const empId = isHR ? document.getElementById('f16-emp').value : '';
+  const area  = document.getElementById('form16-area');
+
+  if (!fy) { toast('Please select a Financial Year', 'error'); return; }
+
+  area.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280">Loading Form 16…</div>';
+
+  let url = `/payroll/form16?fy=${fy}`;
+  if (empId) url += `&employee_id=${empId}`;
+
+  const res = await api('GET', url);
+  if (!res?.success) {
+    area.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">${res?.message || 'Failed to load Form 16'}</div>`;
+    return;
+  }
+
+  document.getElementById('print-btn').style.display = '';
+  renderForm16(res.data);
+}
+
+function fmt(n) {
+  return '₹' + Number(n || 0).toLocaleString('en-IN');
+}
+
+function renderForm16(d) {
+  const area = document.getElementById('form16-area');
+  const { employee: emp, part_a: A, part_b: B, monthly_breakdown: months, financial_year: fy, assessment_year: ay } = d;
+
+  area.innerHTML = `
+  <div id="form16-area-inner" style="max-width:860px;margin:0 auto">
+
+    <!-- Header -->
+    <div class="form16-section form16-card">
+      <div class="form16-header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:20px;font-weight:800;letter-spacing:0.5px">
+              FORM 16 <span class="badge-fy">FY ${fy}</span>
+            </div>
+            <div style="font-size:12px;opacity:0.85;margin-top:4px">
+              Certificate of Tax Deducted at Source on Salary — Assessment Year ${ay}
+            </div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px">[As per Section 203 of Income Tax Act, 1961]</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:14px;font-weight:700">${A.employer_name}</div>
+            <div style="font-size:11px;opacity:0.8;margin-top:2px">TAN: ${A.employer_tan}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee + Employer Info -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #c8e6c9">
+        <div style="padding:14px 18px;border-right:1px solid #c8e6c9">
+          <div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:8px;text-transform:uppercase">Employee Details</div>
+          <table style="font-size:12px;width:100%;border-collapse:collapse">
+            <tr><td style="color:#777;padding:3px 0;width:120px">Name</td><td style="font-weight:600">${emp.name}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Employee Code</td><td style="font-weight:600">${emp.code}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">PAN</td><td style="font-weight:600;color:${emp.pan === 'NOT PROVIDED' ? '#ef4444' : '#1a1a1a'}">${emp.pan}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">UAN</td><td>${emp.uan || '—'}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">PF Number</td><td>${emp.pf_number || '—'}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Department</td><td>${emp.department}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Designation</td><td>${emp.designation}</td></tr>
+          </table>
+        </div>
+        <div style="padding:14px 18px">
+          <div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:8px;text-transform:uppercase">Employer Details</div>
+          <table style="font-size:12px;width:100%;border-collapse:collapse">
+            <tr><td style="color:#777;padding:3px 0;width:120px">Name</td><td style="font-weight:600">${A.employer_name}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">TAN</td><td style="font-weight:600">${A.employer_tan}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Address</td><td>${A.employer_address}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Financial Year</td><td style="font-weight:600">FY ${fy}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Assessment Year</td><td style="font-weight:600">${ay}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PART A -->
+    <div class="form16-section form16-card">
+      <div class="form16-section-title">📋 Part A — Details of Tax Deducted and Deposited in Central Government Account</div>
+      <div style="padding:14px 16px">
+        <div class="quarter-grid">
+          ${A.quarter_summary.map(q => `
+            <div class="quarter-box">
+              <div class="q-title">${q.quarter}</div>
+              <div class="q-row"><span>TDS Deducted</span><span>${fmt(q.tds_deducted)}</span></div>
+              <div class="q-row"><span>TDS Deposited</span><span>${fmt(q.tds_deposited)}</span></div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#e8f5e9;border-radius:6px;padding:10px 16px;margin-top:4px">
+          <span style="font-weight:700;color:#1B5E20;font-size:14px">Total TDS Deducted & Deposited</span>
+          <span style="font-weight:800;color:#1B5E20;font-size:16px">${fmt(A.total_tds_deducted)}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PART B -->
+    <div class="form16-section form16-card">
+      <div class="form16-section-title">📑 Part B — Details of Salary Paid and Any Other Income and Tax Deducted</div>
+
+      <!-- Gross Salary -->
+      <div class="form16-section-title" style="background:#f9fbe7;color:#555;font-size:12px;border-top:none">1. Gross Salary</div>
+      <div class="f16-row"><span class="f16-label">(a) Basic Salary</span><span class="f16-value">${fmt(B.basic)}</span></div>
+      <div class="f16-row"><span class="f16-label">(b) House Rent Allowance (HRA)</span><span class="f16-value">${fmt(B.hra)}</span></div>
+      <div class="f16-row"><span class="f16-label">(c) Conveyance Allowance</span><span class="f16-value">${fmt(B.conveyance)}</span></div>
+      <div class="f16-row"><span class="f16-label">(d) Special Allowance</span><span class="f16-value">${fmt(B.special_allowance)}</span></div>
+      <div class="f16-row total"><span class="f16-label">Total Gross Salary</span><span class="f16-value">${fmt(B.gross_salary)}</span></div>
+
+      <!-- Deduction u/s 16 -->
+      <div class="form16-section-title" style="background:#f9fbe7;color:#555;font-size:12px;border-top:1px solid #c8e6c9">2. Less: Deduction u/s 16</div>
+      <div class="f16-row"><span class="f16-label">Standard Deduction u/s 16(ia)</span><span class="f16-value">- ${fmt(B.standard_deduction)}</span></div>
+      <div class="f16-row total"><span class="f16-label">Income Chargeable under Head "Salaries"</span><span class="f16-value">${fmt(B.income_chargeable)}</span></div>
+
+      <!-- Chapter VI-A -->
+      <div class="form16-section-title" style="background:#f9fbe7;color:#555;font-size:12px;border-top:1px solid #c8e6c9">3. Deductions under Chapter VI-A</div>
+      <div class="f16-row"><span class="f16-label">Section 80C — PF Employee Contribution</span><span class="f16-value">- ${fmt(B.sec_80c_pf)}</span></div>
+      <div class="f16-row total"><span class="f16-label">Total Deductions (Chapter VI-A)</span><span class="f16-value">- ${fmt(B.total_deductions_vi_a)}</span></div>
+
+      <!-- Net Taxable -->
+      <div class="f16-row" style="background:#fff8e1;border-top:2px solid #ffd54f">
+        <span class="f16-label" style="font-weight:700;color:#e65100;font-size:14px">Net Taxable Income</span>
+        <span class="f16-value" style="color:#e65100;font-size:16px">${fmt(B.net_taxable_income)}</span>
+      </div>
+
+      <!-- Tax -->
+      <div class="form16-section-title" style="background:#f9fbe7;color:#555;font-size:12px;border-top:1px solid #c8e6c9">4. Tax Deducted at Source (TDS)</div>
+      <div class="f16-row total"><span class="f16-label">Total TDS Deducted on Salary</span><span class="f16-value">${fmt(B.total_tds)}</span></div>
+
+      <!-- Statutory Deductions Reference -->
+      <div class="form16-section-title" style="background:#f9fbe7;color:#555;font-size:12px;border-top:1px solid #c8e6c9">5. Statutory Deductions (For Reference)</div>
+      <div class="f16-row"><span class="f16-label">PF Employee Contribution</span><span class="f16-value">${fmt(B.pf_employee_total)}</span></div>
+      <div class="f16-row"><span class="f16-label">PF Employer Contribution</span><span class="f16-value">${fmt(B.pf_employer_total)}</span></div>
+      <div class="f16-row"><span class="f16-label">ESI Employee Contribution</span><span class="f16-value">${fmt(B.esi_employee_total)}</span></div>
+      <div class="f16-row"><span class="f16-label">Professional Tax</span><span class="f16-value">${fmt(B.professional_tax_total)}</span></div>
+      <div class="f16-row"><span class="f16-label">Labour Welfare Fund (LWF)</span><span class="f16-value">${fmt(B.lwf_total)}</span></div>
+      <div class="f16-row total"><span class="f16-label">Net Salary Paid (Annual)</span><span class="f16-value">${fmt(B.net_salary_total)}</span></div>
+    </div>
+
+    <!-- Monthly Breakdown -->
+    <div class="form16-section form16-card">
+      <div class="form16-section-title">📅 Monthly Salary Breakdown — FY ${fy}</div>
+      <div style="overflow-x:auto">
+        <table class="form16-table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th style="text-align:right">Basic</th>
+              <th style="text-align:right">HRA</th>
+              <th style="text-align:right">Gross</th>
+              <th style="text-align:right">PF (Emp)</th>
+              <th style="text-align:right">ESI</th>
+              <th style="text-align:right">PT</th>
+              <th style="text-align:right">TDS</th>
+              <th style="text-align:right">Net Salary</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${months.map(m => `
+              <tr>
+                <td>${m.month} ${m.year}</td>
+                <td style="text-align:right">${fmt(m.basic)}</td>
+                <td style="text-align:right">${fmt(m.hra)}</td>
+                <td style="text-align:right;font-weight:600">${fmt(m.gross)}</td>
+                <td style="text-align:right">${fmt(m.pf_employee)}</td>
+                <td style="text-align:right">${fmt(m.esi_employee)}</td>
+                <td style="text-align:right">${fmt(m.professional_tax)}</td>
+                <td style="text-align:right;color:#d32f2f">${fmt(m.tds)}</td>
+                <td style="text-align:right;font-weight:700;color:#1B5E20">${fmt(m.net_salary)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:#e8f5e9;font-weight:700">
+              <td>TOTAL</td>
+              <td style="text-align:right">${fmt(months.reduce((s,m)=>s+m.basic,0))}</td>
+              <td style="text-align:right">${fmt(months.reduce((s,m)=>s+m.hra,0))}</td>
+              <td style="text-align:right">${fmt(months.reduce((s,m)=>s+m.gross,0))}</td>
+              <td style="text-align:right">${fmt(months.reduce((s,m)=>s+m.pf_employee,0))}</td>
+              <td style="text-align:right">${fmt(months.reduce((s,m)=>s+m.esi_employee,0))}</td>
+              <td style="text-align:right">${fmt(months.reduce((s,m)=>s+m.professional_tax,0))}</td>
+              <td style="text-align:right;color:#d32f2f">${fmt(months.reduce((s,m)=>s+m.tds,0))}</td>
+              <td style="text-align:right;color:#1B5E20">${fmt(months.reduce((s,m)=>s+m.net_salary,0))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Declaration -->
+    <div class="form16-section form16-card no-print" style="margin-bottom:30px">
+      <div class="form16-section-title">✅ Declaration</div>
+      <div style="padding:14px 18px;font-size:12px;color:#555;line-height:1.7">
+        I, the employer, hereby certify that a sum of <strong>${fmt(A.total_tds_deducted)}</strong> has been deducted
+        at source and paid to the credit of the Central Government. This certificate is issued in accordance
+        with the provisions of Section 203 of the Income Tax Act, 1961, read with Rule 31 of the Income Tax
+        Rules, 1962 for the Financial Year <strong>${fy}</strong> (Assessment Year <strong>${ay}</strong>).
+      </div>
+    </div>
+
+  </div>`;
+}
+</script>
+</body>
+</html>
