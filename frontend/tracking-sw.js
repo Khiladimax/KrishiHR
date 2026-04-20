@@ -1,6 +1,6 @@
 /**
  * KrishiHR Movement Tracking Service Worker
- * Keeps GPS pinging every 30 seconds across ALL pages — survives navigation,
+ * Keeps GPS pinging every 10 minutes across ALL pages — survives navigation,
  * tab switching, and page reloads.
  *
  * Android keep-alive fixes:
@@ -12,8 +12,8 @@
  */
 
 const API_BASE    = 'https://krishihr-zuui.onrender.com/api';
-const INTERVAL    = 30 * 1000;   // 30 seconds
-const MAX_GPS_WAIT = 10000;      // 10 second GPS timeout per tick
+const INTERVAL    = 10 * 60 * 1000; // 10 minutes
+const MAX_GPS_WAIT = 10000;          // 10 second GPS timeout per tick
 
 let _token    = null;
 let _timerId  = null;
@@ -41,8 +41,8 @@ self.addEventListener('message', async (event) => {
   }
 
   if (type === 'PING') {
-    // Watchdog: if we have a token but loop died (no tick in >70s), restart it
-    if (_token && _lastTick > 0 && (Date.now() - _lastTick) > 70000 && !_timerId) {
+    // Watchdog: if we have a token but loop died (no tick in >650s), restart it
+    if (_token && _lastTick > 0 && (Date.now() - _lastTick) > 650000 && !_timerId) {
       console.warn('[SW] Watchdog restarting dead loop');
       startLoop();
     }
