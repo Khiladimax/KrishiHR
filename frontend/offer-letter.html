@@ -248,6 +248,30 @@
             </div>
           </div>
 
+          <!-- SIGNATURES -->
+          <div class="section-label">✍️ Signatures</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Authorized Signatory Image</label>
+              <input type="file" id="sig1-file" accept="image/*" onchange="loadSigPreview(this,'sig1')" style="padding:4px;">
+              <div id="sig1-preview" style="margin-top:6px;min-height:50px;border:1px dashed #ccc;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:4px;background:#fafafa;">
+                <span style="font-size:.75rem;color:#aaa;">No signature uploaded</span>
+              </div>
+              <input type="hidden" id="ol-sig1">
+              <button type="button" onclick="clearSig('sig1')" style="margin-top:4px;font-size:.75rem;color:#c62828;background:none;border:none;cursor:pointer;text-align:left;display:none;" id="sig1-clear">✕ Remove</button>
+            </div>
+            <div class="form-group">
+              <label>HR Signatory Image</label>
+              <input type="file" id="sig2-file" accept="image/*" onchange="loadSigPreview(this,'sig2')" style="padding:4px;">
+              <div id="sig2-preview" style="margin-top:6px;min-height:50px;border:1px dashed #ccc;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:4px;background:#fafafa;">
+                <span style="font-size:.75rem;color:#aaa;">No signature uploaded</span>
+              </div>
+              <input type="hidden" id="ol-sig2">
+              <button type="button" onclick="clearSig('sig2')" style="margin-top:4px;font-size:.75rem;color:#c62828;background:none;border:none;cursor:pointer;text-align:left;display:none;" id="sig2-clear">✕ Remove</button>
+            </div>
+          </div>
+          <p style="font-size:.75rem;color:#888;margin-top:4px;">Upload PNG/JPG with transparent or white background. Will appear above signature lines in the letter.</p>
+
           <!-- CUSTOM CLAUSES -->
           <div class="section-label">📋 Additional Terms (optional)</div>
           <div class="form-group">
@@ -467,6 +491,12 @@ async function loadForm(id) {
   document.getElementById('ol-pf-admin').value     = ol.pf_admin_monthly || '';
   document.getElementById('ol-clauses').value      = ol.custom_clauses || '';
 
+  // Load signatures if saved
+  if (ol.sig1_image) setSigPreview('sig1', ol.sig1_image);
+  else clearSig('sig1');
+  if (ol.sig2_image) setSigPreview('sig2', ol.sig2_image);
+  else clearSig('sig2');
+
   calcGross();
 
   document.getElementById('btn-preview').disabled = false;
@@ -503,6 +533,8 @@ async function saveOL() {
     pf_employer_monthly:      parseFloat(document.getElementById('ol-pf-er').value) || 0,
     pf_admin_monthly:         parseFloat(document.getElementById('ol-pf-admin').value) || 0,
     custom_clauses:           document.getElementById('ol-clauses').value.trim() || null,
+    sig1_image:               document.getElementById('ol-sig1').value || null,
+    sig2_image:               document.getElementById('ol-sig2').value || null,
   };
 
   const method = id ? 'PUT' : 'POST';
@@ -540,6 +572,36 @@ async function previewOL() {
 }
 
 // ── Send Email ────────────────────────────────────────────────────────────────
+// ── Signature helpers ─────────────────────────────────────────────────────────
+function loadSigPreview(input, key) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result;
+    document.getElementById(`ol-${key}`).value = b64;
+    const preview = document.getElementById(`${key}-preview`);
+    preview.innerHTML = `<img src="${b64}" style="max-height:60px;max-width:100%;object-fit:contain;">`;
+    document.getElementById(`${key}-clear`).style.display = 'inline';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSig(key) {
+  document.getElementById(`ol-${key}`).value = '';
+  document.getElementById(`${key}-file`).value = '';
+  document.getElementById(`${key}-preview`).innerHTML = '<span style="font-size:.75rem;color:#aaa;">No signature uploaded</span>';
+  document.getElementById(`${key}-clear`).style.display = 'none';
+}
+
+function setSigPreview(key, b64) {
+  if (!b64) return;
+  document.getElementById(`ol-${key}`).value = b64;
+  const preview = document.getElementById(`${key}-preview`);
+  preview.innerHTML = `<img src="${b64}" style="max-height:60px;max-width:100%;object-fit:contain;">`;
+  document.getElementById(`${key}-clear`).style.display = 'inline';
+}
+
 // ── Flush any typed-but-not-chipped emails from inputs ───────────────────────
 function flushChipInputs() {
   ['cc', 'bcc'].forEach(type => {
@@ -603,6 +665,8 @@ function resetForm() {
   document.getElementById('ol-notice').value     = 3;
   document.getElementById('ol-conv').value       = 0;
   document.getElementById('ctc-summary').style.display = 'none';
+  clearSig('sig1');
+  clearSig('sig2');
   document.getElementById('btn-preview').disabled = true;
   document.getElementById('btn-send').disabled    = true;
   document.getElementById('btn-delete').style.display = 'none';
