@@ -1,9 +1,10 @@
 // src/controllers/offerLetterController.js
 // Generate, preview, and email offer letters
 
-const db       = require('../config/db');
-const emailSvc = require('../config/emailService');
-const puppeteer = require('puppeteer');
+const db         = require('../config/db');
+const emailSvc   = require('../config/emailService');
+const chromium   = require('@sparticuz/chromium');
+const puppeteer  = require('puppeteer-core');
 
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
@@ -566,12 +567,14 @@ exports.sendEmail = async (req, res) => {
         </div>
       </div>`;
 
-    // ── Generate PDF attachment using Puppeteer ──────────────────────────────
+    // ── Generate PDF attachment using Puppeteer + Sparticuz Chromium ─────────
     let attachmentBase64, attachmentName;
     try {
       const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
       });
       const page = await browser.newPage();
       await page.setContent(offerHTML, { waitUntil: 'networkidle0' });
