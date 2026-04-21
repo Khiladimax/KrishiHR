@@ -180,16 +180,8 @@ exports.apply = async (req, res) => {
             );
           }
         }
-        // Also notify HR
-        const hrRows = await db.query(
-          `SELECT id FROM employees WHERE role='hr' AND is_active=true AND id != $1`, [empId]
-        );
-        for (const r of hrRows.rows) {
-          await db.query(
-            `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'📋 Leave Request',$2,'leave')`,
-            [r.id, notifMsg]
-          );
-        }
+        // HR is NOT notified when leave is applied — only reporting manager is notified
+        // HR will be notified only after leave is approved (FYI notification)
       } catch (notifErr) {
         console.error('Leave notification error:', notifErr.message);
       }
@@ -395,9 +387,11 @@ exports.action = async (req, res) => {
     await client.query('COMMIT');
     emailSvc.notifyLeaveFullyApproved(id).catch(console.error);
 
-    // Notify HR — they should be informed but cannot approve
+    // Notify HR as FYI ONLY after leave is approved — HR cannot approve leaves
+    // HR only gets this if they are NOT the reporting manager (to avoid duplicate notification)
     const hrList = await db.query(
-      `SELECT id FROM employees WHERE role='hr' AND is_active=TRUE`
+      `SELECT id FROM employees WHERE role='hr' AND is_active=TRUE AND id != $1`,
+      [req.user.id]
     );
     const empName = await db.query(
       `SELECT first_name, last_name, employee_code FROM employees WHERE id=$1`,
