@@ -8,7 +8,8 @@ const db = require('../config/db');
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function getNoticePeriod(role) {
   if (['super_admin','admin','hr','accounts'].includes(role)) return 90;
-  if (['manager','tl'].includes(role)) return 45;
+  if (['manager'].includes(role)) return 45;
+  if (['tl'].includes(role)) return 30;   // TL = 30 days same as employee
   return 30;
 }
 
