@@ -169,23 +169,62 @@ function buildSidebar(activePage) {
 
   const nav = document.getElementById('sidebar-nav'); if (!nav) return;
 
-  // Build grouped nav HTML
+  // Build grouped nav HTML with collapsible sections
+  // Load saved collapse states from localStorage
+  let collapseState = {};
+  try { collapseState = JSON.parse(localStorage.getItem('navCollapse') || '{}'); } catch(e) {}
+
   let html = '';
   for (const group of NAV_GROUPS) {
     const visibleItems = group.items.filter(l => l.always || (l.roles && l.roles.includes(user.role)));
     if (visibleItems.length === 0) continue;
 
     if (group.label) {
-      html += `<div class="nav-section-label">${group.label}</div>`;
-    }
-    for (const l of visibleItems) {
-      html += `<a href="${l.href}" class="nav-link ${activePage === l.href ? 'active' : ''}"><span class="nav-icon">${l.icon}</span><span>${l.label}</span></a>`;
+      const groupId = 'navgroup-' + group.label.replace(/\s+/g, '-').toLowerCase();
+      // A section is open if: never set before (default open), or explicitly set to open
+      const isOpen = collapseState[groupId] !== false;
+      const hasActive = visibleItems.some(l => l.href === activePage);
+      const open = isOpen || hasActive; // always open the group containing active page
+      html += `
+        <div class="nav-section-header" data-group="${groupId}" onclick="toggleNavGroup('${groupId}')">
+          <span class="nav-section-label-text">${group.label}</span>
+          <span class="nav-section-chevron ${open ? 'open' : ''}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+        <div class="nav-section-items ${open ? 'open' : ''}" id="${groupId}">
+      `;
+      for (const l of visibleItems) {
+        html += `<a href="${l.href}" class="nav-link ${activePage === l.href ? 'active' : ''}"><span class="nav-icon">${l.icon}</span><span>${l.label}</span></a>`;
+      }
+      html += `</div>`;
+    } else {
+      // No label group (Dashboard) — always visible
+      for (const l of visibleItems) {
+        html += `<a href="${l.href}" class="nav-link ${activePage === l.href ? 'active' : ''}"><span class="nav-icon">${l.icon}</span><span>${l.label}</span></a>`;
+      }
     }
   }
   nav.innerHTML = html;
 
   const u = document.getElementById('sidebar-user');
   if (u) u.innerHTML = `<div class="user-avatar">${(user.first_name?.[0]||'')}${(user.last_name?.[0]||'')}</div><div class="user-info" style="flex:1;min-width:0"><div class="user-name">${user.first_name} ${user.last_name}</div><div class="user-role" style="background:${Role.badge(user.role)}">${user.role.toUpperCase()}</div></div>`;
+}
+
+function toggleNavGroup(groupId) {
+  const items = document.getElementById(groupId);
+  const header = document.querySelector(`[data-group="${groupId}"]`);
+  if (!items || !header) return;
+  const chevron = header.querySelector(".nav-section-chevron");
+  const isOpen = items.classList.contains("open");
+  items.classList.toggle("open", !isOpen);
+  if (chevron) chevron.classList.toggle("open", !isOpen);
+  let collapseState = {};
+  try { collapseState = JSON.parse(localStorage.getItem("navCollapse") || "{}"); } catch(e) {}
+  collapseState[groupId] = !isOpen;
+  localStorage.setItem("navCollapse", JSON.stringify(collapseState));
 }
 
 function getNotifDeepLink(n) {
