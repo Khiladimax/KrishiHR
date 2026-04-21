@@ -1546,36 +1546,34 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 14px;
+  padding: 12px 14px;
   margin: 5px 8px 3px 8px;
   cursor: pointer;
   user-select: none;
   border-radius: 10px;
   transition: all .2s ease;
-  background: rgba(255,255,255,.11);
-  border: 1px solid rgba(255,255,255,.13);
-  border-left: 3px solid #8dc63f;
-  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  background: #3a6b14;
+  border: 1px solid #4d8a1c;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
 }
 .nav-section-header:hover {
-  background: rgba(255,255,255,.18);
-  border-left-color: #c5e88a;
-  transform: translateX(2px);
-  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  background: #4a8520;
+  border-color: #6aac28;
+  box-shadow: 0 3px 10px rgba(0,0,0,.35);
 }
 .nav-section-label-text {
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: .6px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .7px;
   text-transform: uppercase;
   color: #fff;
   transition: color .15s;
 }
 .nav-section-header:hover .nav-section-label-text {
-  color: #c5e88a;
+  color: #d4f5a0;
 }
 .nav-section-chevron {
-  color: rgba(255,255,255,.7);
+  color: #a3d96a;
   display: flex;
   align-items: center;
   transition: transform .25s cubic-bezier(.4,0,.2,1), color .15s;
@@ -1585,7 +1583,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   transform: rotate(0deg);
 }
 .nav-section-header:hover .nav-section-chevron {
-  color: #a3d96a;
+  color: #c5e88a;
 }
 .nav-section-items {
   display: none;
