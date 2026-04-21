@@ -9,8 +9,15 @@ const COO_CODE      = 'KC718';  // Gurudatt
 const MD_CODE       = 'KC01';   // Sunil
 const ACCOUNTS_CODE = 'KC7708'; // Anshu
 
-// Employees who skip manager and go directly to COO first
-const DIRECT_TO_COO = new Set(['KC8989','KC4432','KC1041','KC9040','KC7708']);
+// ── Dynamic advance chain — no hardcoded employee codes ──────────────────────
+// Chain is determined by employee's role:
+//   admin role      → skip_manager = true → goes directly to COO → MD → Accounts
+//   hr role         → skip_manager = true → goes directly to COO → MD → Accounts
+//   accounts role   → COO → MD (no self-loop)
+//   super_admin/MD  → Accounts only
+//   COO             → MD → Accounts
+//   everyone else   → Reporting Manager → COO → MD → Accounts
+// HR can update employee role via employees.html to control the chain
 
 async function getAdvanceChain(employeeId) {
   const emp = await db.query(
@@ -32,10 +39,12 @@ async function getAdvanceChain(employeeId) {
   // Accounts applies → COO → MD (no self-loop)
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
 
-  // Direct-to-COO employees (admins + hr + accounts): COO → MD → Accounts
-  if (DIRECT_TO_COO.has(employee_code)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+  // admin / hr roles → skip reporting manager, go directly to COO → MD → Accounts
+  // This replaces the old hardcoded DIRECT_TO_COO set
+  // HR can assign admin/hr role to any employee in employees.html to give them this chain
+  if (['admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 
-  // Everyone else (managers, TL, employees): Manager → COO → MD → Accounts
+  // Everyone else (manager, TL, employee): Reporting Manager → COO → MD → Accounts
   const hasMgr = manager_code &&
     manager_code !== COO_CODE &&
     manager_code !== MD_CODE &&
@@ -173,20 +182,21 @@ exports.action = async (req, res) => {
       [id, currentLevel, currentCode, req.user.id, action, remarks || null]
     );
 
-    // Self-correct chain for DIRECT_TO_COO employees whose old records had 4 levels
+    // Self-correct chain for admin/hr employees whose old records had 4 levels
     const empCheck = await client.query(
-      'SELECT employee_code FROM employees WHERE id=$1', [advance.employee_id]
+      `SELECT e.employee_code, e.role FROM employees e WHERE e.id=$1`, [advance.employee_id]
     );
     const empCode = empCheck.rows[0]?.employee_code;
-    const DIRECT_CODES = new Set(['KC8989','KC4432','KC1041','KC9040','KC7708']);
-    if (DIRECT_CODES.has(empCode) && chain.length === 4) {
+    const empRole = empCheck.rows[0]?.role;
+    // admin/hr roles should have 3-level chain (COO→MD→Accounts), not 4
+    if (['admin','hr'].includes(empRole) && chain.length === 4) {
       const correctedChain = [COO_CODE, MD_CODE, ACCOUNTS_CODE];
       await client.query(
         `UPDATE advance_salary SET approval_chain=$1, current_approver_code=$2, current_level=1 WHERE id=$3`,
         [JSON.stringify(correctedChain), COO_CODE, id]
       );
       chain.splice(0, chain.length, ...correctedChain);
-      console.log(`[AUTO-FIX] Corrected chain for ${empCode} advance #${id}: 4→3 levels`);
+      console.log(`[AUTO-FIX] Corrected chain for ${empCode} (${empRole}) advance #${id}: 4→3 levels`);
     }
 
     if (req.body.recover_from_month) {
