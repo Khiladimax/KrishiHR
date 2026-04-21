@@ -653,10 +653,9 @@ exports.requestRegularization = async (req, res) => {
       const mdRows = await client.query(`SELECT id FROM employees WHERE role = 'super_admin' AND is_active=true`);
       mdRows.rows.forEach(r => notifyIds.add(r.id));
     } else {
-      // Everyone else → notify reporting manager + HR only (NOT super_admin)
+      // Only notify the reporting manager
+      // HR gets notified ONLY if HR is the reporting manager of this employee
       if (manager.rows.length) notifyIds.add(manager.rows[0].id);
-      const hrUsers = await client.query(`SELECT id FROM employees WHERE role='hr' AND is_active=true`);
-      hrUsers.rows.forEach(r => notifyIds.add(r.id));
     }
 
     const notifMsg = `${req.user.first_name} ${req.user.last_name} has requested attendance regularization for ${date}. Reason: ${reason}`;
@@ -1028,9 +1027,10 @@ exports.applyOD = async (req, res) => {
     const notifyRows = isKC718od
       ? await client.query(`SELECT id FROM employees WHERE role = 'super_admin' AND is_active=true`)
       : await client.query(
+          // Only notify reporting manager (HR notified only if HR is the reporting manager)
           `SELECT DISTINCT m.id FROM employees e
-           LEFT JOIN employees m ON e.reporting_manager_id = m.id WHERE e.id=$1 AND m.id IS NOT NULL
-           UNION SELECT id FROM employees WHERE role = 'hr' AND is_active=true`, [empId]
+           LEFT JOIN employees m ON e.reporting_manager_id = m.id
+           WHERE e.id=$1 AND m.id IS NOT NULL`, [empId]
         );
     for (const r of notifyRows.rows) {
       await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,'🚗 OD Request',$2,'od')`,
@@ -1251,9 +1251,10 @@ exports.applyWFH = async (req, res) => {
     const notifyRows = isKC718
       ? await client.query(`SELECT id FROM employees WHERE role='super_admin' AND is_active=true`)
       : await client.query(
+          // Only notify reporting manager (HR notified only if HR is the reporting manager)
           `SELECT DISTINCT m.id FROM employees e
-           LEFT JOIN employees m ON e.reporting_manager_id=m.id WHERE e.id=$1 AND m.id IS NOT NULL
-           UNION SELECT id FROM employees WHERE role = 'hr' AND is_active=true`, [empId]);
+           LEFT JOIN employees m ON e.reporting_manager_id=m.id
+           WHERE e.id=$1 AND m.id IS NOT NULL`, [empId]);
     for (const r of notifyRows.rows) {
       await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,'🏠 WFH Request',$2,'wfh')`,
         [r.id, notifMsg]);
