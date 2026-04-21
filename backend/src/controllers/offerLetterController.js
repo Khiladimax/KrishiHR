@@ -3,8 +3,6 @@
 
 const db         = require('../config/db');
 const emailSvc   = require('../config/emailService');
-const chromium   = require('@sparticuz/chromium');
-const puppeteer  = require('puppeteer-core');
 
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
@@ -567,19 +565,25 @@ exports.sendEmail = async (req, res) => {
         </div>
       </div>`;
 
-    // ── Generate PDF attachment using Puppeteer + Sparticuz Chromium ─────────
+    // ── Generate PDF via external API (no Chrome needed) ─────────────────────
     let attachmentBase64, attachmentName;
     try {
-      const browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
+      const pdfResp = await fetch('https://html2pdf.app/f/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html: offerHTML,
+          apiKey: process.env.HTML2PDF_KEY || 'guest',
+          media: 'print',
+          format: 'A4',
+          marginTop: 10,
+          marginBottom: 10,
+          marginLeft: 10,
+          marginRight: 10,
+        })
       });
-      const page = await browser.newPage();
-      await page.setContent(offerHTML, { waitUntil: 'networkidle0' });
-      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' } });
-      await browser.close();
+      if (!pdfResp.ok) throw new Error(`html2pdf API error: ${pdfResp.status}`);
+      const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
       attachmentBase64 = pdfBuffer.toString('base64');
       attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`;
     } catch (pdfErr) {
