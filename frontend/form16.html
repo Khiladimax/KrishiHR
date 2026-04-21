@@ -55,7 +55,7 @@
 <body>
 
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
-<aside class="sidebar" style="display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+<aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark" id="sidebar-logo-mark">
       <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -65,8 +65,8 @@
       <div class="logo-sub">Enterprise Edition</div>
     </div>
   </div>
-  <nav id="sidebar-nav" style="flex:1;min-height:0;height:0;overflow-y:auto;overflow-x:hidden;padding:12px 10px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.3) transparent;"></nav>
-  <div class="sidebar-footer" style="flex-shrink:0;">
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
     <div id="sidebar-user"></div>
     <button class="logout-btn" onclick="Auth.logout()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
