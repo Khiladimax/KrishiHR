@@ -120,15 +120,16 @@ body {
 .sidebar {
   width: var(--sidebar-w);
   background: linear-gradient(180deg, #1e3d0a 0%, #2d5a0e 50%, #1a3508 100%);
-  position: fixed;
-  top: 0; left: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: fixed;
+  top: 0; left: 0;
   z-index: 100;
   box-shadow: 4px 0 24px rgba(26,46,10,.25);
   transition: transform 0.3s ease;
-  overflow: hidden;
 }
 
 .sidebar-logo {
@@ -1490,15 +1491,16 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .sidebar {
   width: var(--sidebar-w);
   background: linear-gradient(180deg, #1e3d0a 0%, #2d5a0e 50%, #1a3508 100%);
-  position: fixed;
-  top: 0; left: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: fixed;
+  top: 0; left: 0;
   z-index: 100;
   box-shadow: 4px 0 24px rgba(26,46,10,.25);
   transition: transform 0.3s ease;
-  overflow: hidden;
 }
   .main {
   margin-left: var(--sidebar-w);
@@ -1561,14 +1563,10 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   color: rgba(255,255,255,.6);
 }
 .nav-section-items {
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height .3s cubic-bezier(.4,0,.2,1), opacity .2s;
-  opacity: 0;
+  display: none;
 }
 .nav-section-items.open {
-  max-height: 500px;
-  opacity: 1;
+  display: block;
 }
 
 /* ── Sidebar scrollbar ── */
@@ -1628,16 +1626,10 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   color: rgba(255,255,255,.6);
 }
 .nav-section-items {
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s;
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 .nav-section-items.open {
-  max-height: 2000px;
-  opacity: 1;
-  pointer-events: auto;
+  display: block;
 }
 
 /* ── Sidebar scrollbar styling ── */
