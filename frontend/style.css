@@ -121,6 +121,7 @@ body {
   z-index: 100;
   box-shadow: 4px 0 24px rgba(26,46,10,.25);
   transition: transform 0.3s ease;
+  overflow: hidden;
 }
 
 .sidebar-logo {
@@ -170,12 +171,7 @@ body {
 }
 
 #sidebar-nav {
-  flex: 1;
-  padding: 12px 10px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  /* controlled at bottom of file */
 }
 
 .nav-link {
@@ -1481,12 +1477,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .card { padding: 16px; }
 }
 
+
 /* ── Collapsible Nav Sections ── */
 .nav-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 12px 4px;
+  padding: 14px 12px 5px;
   margin-top: 4px;
   cursor: pointer;
   user-select: none;
@@ -1497,62 +1494,63 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   background: rgba(255,255,255,.05);
 }
 .nav-section-label-text {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: .8px;
+  letter-spacing: .5px;
   text-transform: uppercase;
-  color: rgba(255,255,255,.28);
+  color: rgba(255,255,255,.5);
   transition: color .15s;
 }
 .nav-section-header:hover .nav-section-label-text {
-  color: rgba(255,255,255,.5);
+  color: rgba(255,255,255,.75);
 }
 .nav-section-chevron {
-  color: rgba(255,255,255,.25);
+  color: rgba(255,255,255,.35);
   display: flex;
   align-items: center;
   transition: transform .25s cubic-bezier(.4,0,.2,1), color .15s;
+  transform: rotate(-90deg);
 }
 .nav-section-chevron.open {
   transform: rotate(0deg);
 }
-.nav-section-chevron:not(.open) {
-  transform: rotate(-90deg);
-}
 .nav-section-header:hover .nav-section-chevron {
-  color: rgba(255,255,255,.5);
+  color: rgba(255,255,255,.6);
 }
 .nav-section-items {
   overflow: hidden;
   max-height: 0;
-  transition: max-height .3s cubic-bezier(.4,0,.2,1), opacity .25s;
+  transition: max-height .3s cubic-bezier(.4,0,.2,1), opacity .2s;
   opacity: 0;
 }
 .nav-section-items.open {
-  max-height: 400px;
+  max-height: 500px;
   opacity: 1;
 }
 
-/* ── Sidebar scroll fix ── */
-.sidebar {
-  overflow: hidden;
-}
+/* ── Sidebar scrollbar ── */
 #sidebar-nav {
-  overflow-y: auto;
+  flex: 1;
+  padding: 12px 10px;
+  overflow-y: scroll !important;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,.2) transparent;
+  scrollbar-color: rgba(255,255,255,.25) rgba(255,255,255,.05);
 }
 #sidebar-nav::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 #sidebar-nav::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255,255,255,.05);
+  border-radius: 4px;
 }
 #sidebar-nav::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,.2);
+  background: rgba(255,255,255,.25);
   border-radius: 4px;
 }
 #sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.45);
 }
