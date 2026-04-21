@@ -184,7 +184,7 @@ function buildSidebar(activePage) {
       const savedOpen = collapseState[groupId]; // true/false/undefined
       const open = hasActive || savedOpen === true;
       html += `
-        <div class="nav-section-header" data-group="${groupId}" onclick="toggleNavGroup('${groupId}')">
+        <div class="nav-section-header" data-group="${groupId}" onclick="toggleNavGroup('${groupId}')" style="${open ? 'border-radius:10px 10px 0 0;border-bottom:none;margin-bottom:0' : 'border-radius:10px'}">
           <span class="nav-section-label-text">${group.label}</span>
           <span class="nav-section-chevron ${open ? 'open' : ''}">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -253,6 +253,10 @@ function toggleNavGroup(groupId) {
   }
 
   if (chevron) chevron.classList.toggle("open", !isOpen);
+  // Toggle rounded corners on header based on open state
+  header.style.borderRadius = !isOpen ? '10px 10px 0 0' : '10px';
+  header.style.borderBottom = !isOpen ? 'none' : '';
+  header.style.marginBottom = !isOpen ? '0' : '0';
   let collapseState = {};
   try { collapseState = JSON.parse(localStorage.getItem("navCollapse") || "{}"); } catch(e) {}
   collapseState[groupId] = !isOpen;
