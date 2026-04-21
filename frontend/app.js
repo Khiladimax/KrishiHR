@@ -99,7 +99,6 @@ const ICONS = {
   employees:    `👥`,
   offerletter:  `✉️`,
   separation:   `🚪`,
-  reshuffle:    `🔀`,
   payroll:      `💰`,
   advance:      `💸`,
   provision:    `⏳`,
@@ -136,7 +135,6 @@ const NAV_GROUPS = [
       { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl'] },
       { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr','admin','super_admin'] },
       { href:'separation.html',     icon: ICONS.separation,   label:'Separation',       always:true },
-      { href:'reshuffle.html',      icon: ICONS.reshuffle,    label:'Reshuffle',        roles:['admin','super_admin','hr'] },
     ]
   },
   {
