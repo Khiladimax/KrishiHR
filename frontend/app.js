@@ -215,11 +215,45 @@ function buildSidebar(activePage) {
 
 function toggleNavGroup(groupId) {
   const items = document.getElementById(groupId);
-  const header = document.querySelector(`[data-group="${groupId}"]`);
+  const header = document.querySelector('[data-group="' + groupId + '"]');
   if (!items || !header) return;
   const chevron = header.querySelector(".nav-section-chevron");
   const isOpen = items.classList.contains("open");
-  items.classList.toggle("open", !isOpen);
+
+  if (isOpen) {
+    // Collapse with animation
+    items.style.height = items.scrollHeight + "px";
+    items.style.overflow = "hidden";
+    items.style.transition = "height 0.25s ease";
+    requestAnimationFrame(() => {
+      items.style.height = "0px";
+    });
+    setTimeout(() => {
+      items.classList.remove("open");
+      items.style.height = "";
+      items.style.overflow = "";
+      items.style.transition = "";
+    }, 260);
+  } else {
+    // Expand with animation
+    items.classList.add("open");
+    const h = items.scrollHeight;
+    items.style.height = "0px";
+    items.style.overflow = "hidden";
+    items.style.transition = "height 0.25s ease";
+    requestAnimationFrame(() => {
+      items.style.height = h + "px";
+    });
+    setTimeout(() => {
+      items.style.height = "";
+      items.style.overflow = "";
+      items.style.transition = "";
+      // Force sidebar-nav to recalculate scroll
+      const nav = document.getElementById("sidebar-nav");
+      if (nav) { nav.style.overflow = "hidden"; requestAnimationFrame(() => { nav.style.overflow = "auto"; }); }
+    }, 260);
+  }
+
   if (chevron) chevron.classList.toggle("open", !isOpen);
   let collapseState = {};
   try { collapseState = JSON.parse(localStorage.getItem("navCollapse") || "{}"); } catch(e) {}
