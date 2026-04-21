@@ -707,11 +707,11 @@ function pingServer() {
     console.log(`[Keep-Alive] ✅ ping OK — ${res.statusCode} at ${new Date().toISOString()}`);
   }).on('error', (err) => {
     console.log(`[Keep-Alive] ⚠️ ping failed: ${err.message} — retrying in 30s`);
-    setTimeout(pingServer, 30 * 1000);
+    setTimeout(pingServer, 5 * 60 * 1000);
   });
 }
 
 setTimeout(() => {
   pingServer();
-  setInterval(pingServer, 4 * 60 * 1000);
+  setInterval(pingServer, 10 * 60 * 1000);
 }, 60 * 1000);
