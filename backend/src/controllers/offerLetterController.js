@@ -4,14 +4,15 @@
 const db       = require('../config/db');
 const emailSvc = require('../config/emailService');
 
+// ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
-  name:       'Krishi Care & Management Services Private Limited',
-  cin:        'U01403MH2015PTC261465',
-  officeAddr: '617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi Jogeshwari (East), Mumbai - 400060',
-  corpAddr:   'H-12, Green Park Extension, New Delhi - 110016',
-  email:      'dipti.wadhaval@krishicare.in',
-  website:    'www.krishicare.in',
-  tel:        '+912268284109',
+  name:       process.env.COMPANY_NAME       || 'Krishi Care & Management Services Private Limited',
+  cin:        process.env.COMPANY_CIN        || 'U01403MH2015PTC261465',
+  officeAddr: process.env.COMPANY_OFFICE_ADDR|| '617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi Jogeshwari (East), Mumbai - 400060',
+  corpAddr:   process.env.COMPANY_CORP_ADDR  || 'H-12, Green Park Extension, New Delhi - 110016',
+  email:      process.env.COMPANY_EMAIL      || 'hr@krishicare.in',
+  website:    process.env.COMPANY_WEBSITE    || 'www.krishicare.in',
+  tel:        process.env.COMPANY_TEL        || '+912268284109',
 };
 
 // ── DB Init ────────────────────────────────────────────────────────────────────
@@ -257,7 +258,7 @@ function buildOfferLetterHTML(ol) {
     <div class="candidate">
       <strong>${ol.candidate_name}</strong><br>
       ${ol.candidate_address || ''}<br>
-      ${ol.candidate_mobile ? `<br>Employee Code – &nbsp;&nbsp; Mob – ${ol.candidate_mobile}` : ''}
+      ${ol.candidate_mobile ? `<br>Mob – ${ol.candidate_mobile}` : ''}
       ${ol.candidate_email ? `<br>Email – ${ol.candidate_email}` : ''}
     </div>
 
@@ -564,24 +565,9 @@ exports.sendEmail = async (req, res) => {
         </div>
       </div>`;
 
-    // ── Generate PDF attachment ──────────────────────────────────────────────
-    let attachmentContent, attachmentName, attachmentBase64;
-    if (htmlPdf) {
-      try {
-        const file = { content: offerHTML };
-        const options = { format: 'A4', printBackground: true, margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' } };
-        const pdfBuffer = await htmlPdf.generatePdf(file, options);
-        attachmentBase64 = pdfBuffer.toString('base64');
-        attachmentName = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`;
-      } catch(pdfErr) {
-        console.error('PDF generation failed, falling back to HTML:', pdfErr.message);
-        attachmentBase64 = Buffer.from(offerHTML).toString('base64');
-        attachmentName = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`;
-      }
-    } else {
-      attachmentBase64 = Buffer.from(offerHTML).toString('base64');
-      attachmentName = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`;
-    }
+    // ── Generate attachment (HTML file — candidate opens in browser → Ctrl+P → Save as PDF) ──
+    const attachmentBase64 = Buffer.from(offerHTML).toString('base64');
+    const attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`;
 
     // ── Brevo payload with attachment ────────────────────────────────────────
     const payload = {
