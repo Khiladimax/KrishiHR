@@ -148,7 +148,7 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin','hr'] },
+      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin'] },
     ]
   },
 ];
