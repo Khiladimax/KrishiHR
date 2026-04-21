@@ -1547,7 +1547,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  margin: 5px 8px 3px 8px;
+  margin: 5px 8px 0 8px;
   cursor: pointer;
   user-select: none;
   border-radius: 10px;
@@ -1555,6 +1555,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   background: #3a6b14;
   border: 1px solid #4d8a1c;
   box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+.nav-section-header[data-open="true"],
+.nav-section-items.open ~ .nav-section-header,
+.nav-section-header:has(+ .nav-section-items.open) {
+  border-radius: 10px 10px 0 0;
+  border-bottom-color: transparent;
+  margin-bottom: 0;
 }
 .nav-section-header:hover {
   background: #4a8520;
@@ -1591,6 +1598,17 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .nav-section-items.open {
   display: block;
   animation: slideDown .2s ease;
+  background: rgba(0,0,0,.15);
+  margin: 0 8px 6px 8px;
+  border-radius: 0 0 10px 10px;
+  border: 1px solid #4d8a1c;
+  border-top: none;
+  padding: 4px 4px 6px 4px;
+}
+.nav-section-items.open .nav-link {
+  margin: 2px 0;
+  border-radius: 7px;
+  padding-left: 14px;
 }
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-5px); }
