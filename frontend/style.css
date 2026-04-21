@@ -1528,29 +1528,32 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px 8px 10px;
-  margin: 6px 8px 2px 8px;
+  padding: 10px 12px;
+  margin: 5px 8px 2px 8px;
   cursor: pointer;
   user-select: none;
-  border-radius: 8px;
-  transition: background .15s;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 10px;
+  transition: all .2s;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.12);
+  border-left: 3px solid rgba(163,217,106,.5);
 }
 .nav-section-header:hover {
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.16);
+  border-color: rgba(255,255,255,.2);
+  border-left-color: rgba(163,217,106,.9);
+  transform: translateX(2px);
 }
 .nav-section-label-text {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: .4px;
+  letter-spacing: .6px;
   text-transform: uppercase;
-  color: rgba(255,255,255,.85);
+  color: rgba(255,255,255,.9);
   transition: color .15s;
 }
 .nav-section-header:hover .nav-section-label-text {
-  color: rgba(255,255,255,1);
+  color: #fff;
 }
 .nav-section-chevron {
   color: rgba(255,255,255,.6);
@@ -1563,13 +1566,18 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   transform: rotate(0deg);
 }
 .nav-section-header:hover .nav-section-chevron {
-  color: rgba(255,255,255,.9);
+  color: #a3d96a;
 }
 .nav-section-items {
   display: none;
 }
 .nav-section-items.open {
   display: block;
+  animation: slideDown .2s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Sidebar scrollbar ── */
@@ -1594,29 +1602,32 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px 8px 10px;
-  margin: 6px 8px 2px 8px;
+  padding: 10px 12px;
+  margin: 5px 8px 2px 8px;
   cursor: pointer;
   user-select: none;
-  border-radius: 8px;
-  transition: background .15s;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 10px;
+  transition: all .2s;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.12);
+  border-left: 3px solid rgba(163,217,106,.5);
 }
 .nav-section-header:hover {
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.16);
+  border-color: rgba(255,255,255,.2);
+  border-left-color: rgba(163,217,106,.9);
+  transform: translateX(2px);
 }
 .nav-section-label-text {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: .4px;
+  letter-spacing: .6px;
   text-transform: uppercase;
-  color: rgba(255,255,255,.85);
+  color: rgba(255,255,255,.9);
   transition: color .15s;
 }
 .nav-section-header:hover .nav-section-label-text {
-  color: rgba(255,255,255,1);
+  color: #fff;
 }
 .nav-section-chevron {
   color: rgba(255,255,255,.6);
@@ -1629,13 +1640,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   transform: rotate(0deg);
 }
 .nav-section-header:hover .nav-section-chevron {
-  color: rgba(255,255,255,.9);
+  color: #a3d96a;
 }
 .nav-section-items {
   display: none;
 }
 .nav-section-items.open {
   display: block;
+  animation: slideDown .2s ease;
 }
 
 /* ── Sidebar scrollbar styling ── */
