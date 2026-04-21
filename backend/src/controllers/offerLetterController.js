@@ -3,6 +3,10 @@
 
 const db         = require('../config/db');
 const emailSvc   = require('../config/emailService');
+const { execFile } = require('child_process');
+const fs           = require('fs');
+const path         = require('path');
+const os           = require('os');
 
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
@@ -565,25 +569,35 @@ exports.sendEmail = async (req, res) => {
         </div>
       </div>`;
 
-    // ── Generate PDF via external API (no Chrome needed) ─────────────────────
+    // ── Generate PDF via wkhtmltopdf (available on Render/Linux) ─────────────
     let attachmentBase64, attachmentName;
     try {
-      const pdfResp = await fetch('https://html2pdf.app/f/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          html: offerHTML,
-          apiKey: process.env.HTML2PDF_KEY || 'guest',
-          media: 'print',
-          format: 'A4',
-          marginTop: 10,
-          marginBottom: 10,
-          marginLeft: 10,
-          marginRight: 10,
-        })
+      const tmpDir     = os.tmpdir();
+      const tmpHtml    = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
+      const tmpPdf     = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
+      fs.writeFileSync(tmpHtml, offerHTML);
+
+      await new Promise((resolve, reject) => {
+        execFile('wkhtmltopdf', [
+          '--quiet',
+          '--page-size', 'A4',
+          '--margin-top', '10mm',
+          '--margin-bottom', '10mm',
+          '--margin-left', '10mm',
+          '--margin-right', '10mm',
+          '--print-media-type',
+          '--enable-local-file-access',
+          tmpHtml, tmpPdf
+        ], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
       });
-      if (!pdfResp.ok) throw new Error(`html2pdf API error: ${pdfResp.status}`);
-      const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
+
+      const pdfBuffer = fs.readFileSync(tmpPdf);
+      // cleanup
+      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
+
       attachmentBase64 = pdfBuffer.toString('base64');
       attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`;
     } catch (pdfErr) {
