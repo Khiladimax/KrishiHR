@@ -552,7 +552,7 @@ exports.sendEmail = async (req, res) => {
     const offerHTML = buildOfferLetterHTML(ol);
 
     // ── Cover email body ────────────────────────────────────────────────────
-    const defaultMsg = `Dear ${ol.candidate_name.split(' ')[0] || ol.candidate_name},\n\nPlease find attached your offer letter for the position of "${ol.designation}" at Krishi Care & Management Services Private Limited.\n\nKindly review the letter and revert back with your acceptance within ${ol.offer_valid_days || 7} days.\n\nFor any queries, feel free to reach out to us.\n\nWarm regards,\nHuman Resource Team\nKrishi Care & Management Services Pvt. Ltd.`;
+    const defaultMsg = `Dear ${ol.candidate_name.split(' ')[0] || ol.candidate_name},\n\nPlease find attached your offer letter for the position of "${ol.designation}" at Krishi Care & Management Services Private Limited.\n\nKindly review the letter and revert back with your acceptance within ${ol.offer_valid_days || 7} days.\n\nPlease also find attached the Joining Form. Kindly fill it and submit upon joining.\n\nFor any queries, feel free to reach out to us.\n\nWarm regards,\nHuman Resource Team\nKrishi Care & Management Services Pvt. Ltd.`;
 
     const coverText = (email_message || defaultMsg).replace(/\n/g, '<br>');
 
@@ -565,16 +565,22 @@ exports.sendEmail = async (req, res) => {
         <div style="border:1px solid #e0e0e0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
           <p>${coverText}</p>
           <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
-          <p style="font-size:11px;color:#999;">The offer letter is attached to this email as an HTML file. Open it in any browser and use <strong>Ctrl+P → Save as PDF</strong> to get a PDF copy.</p>
+          <p style="font-size:11px;color:#999;"><strong>Attachments:</strong><br>
+            &#128196; Offer Letter (PDF)<br>
+            &#128203; Joining Form (DOCX &amp; PDF) — Please fill and submit on joining day
+          </p>
+          <p style="font-size:11px;color:#999;">To save the offer letter as PDF: open in browser &rarr; Ctrl+P &rarr; Save as PDF.</p>
         </div>
       </div>`;
 
-    // ── Generate PDF via wkhtmltopdf (available on Render/Linux) ─────────────
-    let attachmentBase64, attachmentName;
+    // ── Build attachments array ──────────────────────────────────────────────
+    const attachments = [];
+
+    // 1. Offer Letter as PDF (via wkhtmltopdf) or fallback to HTML
     try {
-      const tmpDir     = os.tmpdir();
-      const tmpHtml    = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
-      const tmpPdf     = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
+      const tmpDir  = os.tmpdir();
+      const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
+      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
       fs.writeFileSync(tmpHtml, offerHTML);
 
       await new Promise((resolve, reject) => {
@@ -588,34 +594,72 @@ exports.sendEmail = async (req, res) => {
           '--print-media-type',
           '--enable-local-file-access',
           tmpHtml, tmpPdf
-        ], (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
+        ], (err) => { if (err) return reject(err); resolve(); });
       });
 
       const pdfBuffer = fs.readFileSync(tmpPdf);
-      // cleanup
       try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
-
-      attachmentBase64 = pdfBuffer.toString('base64');
-      attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`;
+      attachments.push({
+        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`,
+        content: pdfBuffer.toString('base64'),
+      });
     } catch (pdfErr) {
-      console.error('PDF generation failed, falling back to HTML:', pdfErr.message);
-      attachmentBase64 = Buffer.from(offerHTML).toString('base64');
-      attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`;
+      console.error('Offer letter PDF generation failed, falling back to HTML:', pdfErr.message);
+      attachments.push({
+        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
+        content: Buffer.from(offerHTML).toString('base64'),
+      });
     }
 
-    // ── Brevo payload with attachment ────────────────────────────────────────
+    // 2. Joining Form DOCX — always attach if file exists
+    const joiningFormPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.docx');
+    if (fs.existsSync(joiningFormPath)) {
+      const docxBuffer = fs.readFileSync(joiningFormPath);
+      attachments.push({
+        name:    'Joining_Form_Krishi_Care.docx',
+        content: docxBuffer.toString('base64'),
+      });
+
+      // 3. Joining Form as PDF — best-effort via LibreOffice
+      try {
+        const tmpDocx = path.join(os.tmpdir(), `joining_form_${Date.now()}.docx`);
+        fs.writeFileSync(tmpDocx, docxBuffer);
+
+        await new Promise((resolve, reject) => {
+          execFile('libreoffice', [
+            '--headless', '--convert-to', 'pdf',
+            '--outdir', os.tmpdir(),
+            tmpDocx
+          ], (err) => { if (err) return reject(err); resolve(); });
+        });
+
+        const libreOutPdf = tmpDocx.replace(/\.docx$/, '.pdf');
+        if (fs.existsSync(libreOutPdf)) {
+          const pdfJoiningBuffer = fs.readFileSync(libreOutPdf);
+          try { fs.unlinkSync(tmpDocx); fs.unlinkSync(libreOutPdf); } catch(_) {}
+          attachments.push({
+            name:    'Joining_Form_Krishi_Care.pdf',
+            content: pdfJoiningBuffer.toString('base64'),
+          });
+          console.log('[offerLetter.sendEmail] Joining form PDF attached successfully');
+        } else {
+          try { fs.unlinkSync(tmpDocx); } catch(_) {}
+        }
+      } catch (joiningPdfErr) {
+        console.warn('[offerLetter.sendEmail] Joining form PDF skipped (LibreOffice not available):', joiningPdfErr.message);
+        // DOCX is already attached — PDF is best-effort only
+      }
+    } else {
+      console.warn('[offerLetter.sendEmail] Joining form not found at:', joiningFormPath);
+    }
+
+    // ── Brevo payload with all attachments ───────────────────────────────────
     const payload = {
       sender:      { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
       to:          [{ email: ol.candidate_email, name: ol.candidate_name }],
       subject:     `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
       htmlContent: coverHtml,
-      attachment: [{
-        name:    attachmentName,
-        content: attachmentBase64,
-      }],
+      attachment:  attachments,
     };
 
     if (cc.length)  payload.cc  = cc.map(e => ({ email: e }));
@@ -624,7 +668,10 @@ exports.sendEmail = async (req, res) => {
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (!BREVO_KEY || process.env.EMAIL_ENABLED !== 'true') {
       await db.query(`UPDATE offer_letters SET status='sent', sent_at=NOW() WHERE id=$1`, [ol.id]);
-      return res.json({ success: true, message: `[Simulated] Offer letter sent to ${ol.candidate_email}` });
+      return res.json({
+        success: true,
+        message: `[Simulated] Offer letter sent to ${ol.candidate_email} with ${attachments.length} attachment(s): ${attachments.map(a => a.name).join(', ')}`
+      });
     }
 
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -639,7 +686,7 @@ exports.sendEmail = async (req, res) => {
     }
 
     await db.query(`UPDATE offer_letters SET status='sent', sent_at=NOW() WHERE id=$1`, [ol.id]);
-    res.json({ success: true, message: `Offer letter sent to ${ol.candidate_email}` });
+    res.json({ success: true, message: `Offer letter sent to ${ol.candidate_email} with ${attachments.length} attachment(s)` });
   } catch (err) {
     console.error('[offerLetter.sendEmail]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
