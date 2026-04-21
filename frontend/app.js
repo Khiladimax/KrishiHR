@@ -181,10 +181,10 @@ function buildSidebar(activePage) {
 
     if (group.label) {
       const groupId = 'navgroup-' + group.label.replace(/\s+/g, '-').toLowerCase();
-      // A section is open if: never set before (default open), or explicitly set to open
-      const isOpen = collapseState[groupId] !== false;
       const hasActive = visibleItems.some(l => l.href === activePage);
-      const open = isOpen || hasActive; // always open the group containing active page
+      // Default closed; open if user expanded it before OR if it contains the active page
+      const savedOpen = collapseState[groupId]; // true/false/undefined
+      const open = hasActive || savedOpen === true;
       html += `
         <div class="nav-section-header" data-group="${groupId}" onclick="toggleNavGroup('${groupId}')">
           <span class="nav-section-label-text">${group.label}</span>
