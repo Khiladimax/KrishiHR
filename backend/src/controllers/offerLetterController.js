@@ -3,6 +3,7 @@
 
 const db       = require('../config/db');
 const emailSvc = require('../config/emailService');
+const puppeteer = require('puppeteer');
 
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
@@ -565,9 +566,24 @@ exports.sendEmail = async (req, res) => {
         </div>
       </div>`;
 
-    // ── Generate attachment (HTML file — candidate opens in browser → Ctrl+P → Save as PDF) ──
-    const attachmentBase64 = Buffer.from(offerHTML).toString('base64');
-    const attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`;
+    // ── Generate PDF attachment using Puppeteer ──────────────────────────────
+    let attachmentBase64, attachmentName;
+    try {
+      const browser = await puppeteer.launch({
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      const page = await browser.newPage();
+      await page.setContent(offerHTML, { waitUntil: 'networkidle0' });
+      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' } });
+      await browser.close();
+      attachmentBase64 = pdfBuffer.toString('base64');
+      attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`;
+    } catch (pdfErr) {
+      console.error('PDF generation failed, falling back to HTML:', pdfErr.message);
+      attachmentBase64 = Buffer.from(offerHTML).toString('base64');
+      attachmentName   = `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`;
+    }
 
     // ── Brevo payload with attachment ────────────────────────────────────────
     const payload = {
