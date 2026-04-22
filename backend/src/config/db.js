@@ -2,14 +2,15 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const isProduction = process.env.NODE_ENV === 'production';
-
 // Use DATABASE_URL if set (Neon), otherwise fall back to individual params
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },        // Neon requires SSL
-      max: 5,                                    // Neon free tier max
+      // ✅ FIX: Only force SSL if DB_SSL=true is explicitly set in .env
+      // Neon needs SSL → set DB_SSL=true in Render env vars
+      // Local/on-prem PG → leave DB_SSL unset or false
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     }
@@ -22,7 +23,7 @@ const poolConfig = process.env.DATABASE_URL
       max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-      ssl: isProduction ? { rejectUnauthorized: false } : false,
+      ssl: false, // ✅ FIX: Local/non-Neon PG never needs SSL
     };
 
 const pool = new Pool(poolConfig);
