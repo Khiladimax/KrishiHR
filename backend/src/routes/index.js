@@ -40,7 +40,8 @@ router.post('/auth/update-photo',     authenticate, authCtrl.updatePhoto);
 // ── Employees ─────────────────────────────────────────────────────────────────
 router.get   ('/employees',               authenticate,                          empCtrl.getAll);
 router.get   ('/employees/export',        authenticate, authorize(...EMP_MGMT), empCtrl.exportExcel || ((req,res) => res.status(501).json({success:false,message:'Not implemented'})));
-router.get   ('/employees/export-master', authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
+router.get   ('/employees/export-master',        authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
+router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin'), empCtrl.exportAttendanceRegister);
 router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
 router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
 router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
