@@ -24,7 +24,7 @@ const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
-const EMP_MGMT   = ['hr','accounts','admin','super_admin'];
+const EMP_MGMT   = ['hr','accounts'];
 const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ router.post('/attendance/punch-out',        authenticate, attCtrl.punchOut);
 
 // ── Attendance Bulk Import — must be BEFORE generic GET /attendance ───────────
 router.post('/attendance/import',
-  authenticate, authorize(...['hr','admin','super_admin']),
+  authenticate, authorize(...['hr']),
   (req, res, next) => {
     attImportCtrl.uploadMiddleware(req, res, (err) => {
       if (err) return res.status(400).json({ success: false, message: err.message || 'File upload error' });
@@ -94,7 +94,7 @@ router.post('/attendance/regularize/action',authenticate, attCtrl.actionRegulari
 
 // ── Attendance Bulk Import (Excel) — kept here for reference (defined above) ──
 
-router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts','admin','super_admin'), attImportCtrl.downloadAttendanceReport);
+router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
 
 // ── OD / WFH apply (all employees) ───────────────────────────────────────────
 router.post('/attendance/od',              authenticate, attCtrl.applyOD);
@@ -104,7 +104,7 @@ router.post('/attendance/od/:id/action',   authenticate, authorize('hr','super_a
 router.post('/attendance/wfh',             authenticate, attCtrl.applyWFH);
 router.get ('/attendance/wfh',             authenticate, attCtrl.getWFHRequests);
 router.post('/attendance/wfh/:id/action',  authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionWFH);
-router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts','admin','super_admin'), attImportCtrl.downloadAttendanceReport);
+router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
 // KC718 / super_admin: mark own attendance for a date range without punch in/out
 router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
 
@@ -785,13 +785,13 @@ router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
 });
 
 // ── Offer Letters ─────────────────────────────────────────────────────────────
-router.get   ('/offer-letters',              authenticate, authorize('hr','admin','super_admin'), offerCtrl.getAll);
-router.post  ('/offer-letters',              authenticate, authorize('hr','admin','super_admin'), offerCtrl.create);
-router.get   ('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.getOne);
-router.put   ('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.update);
-router.delete('/offer-letters/:id',          authenticate, authorize('hr','admin','super_admin'), offerCtrl.remove);
-router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr','admin','super_admin'), offerCtrl.preview);
-router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr','admin','super_admin'), offerCtrl.sendEmail);
+router.get   ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.getAll);
+router.post  ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.create);
+router.get   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.getOne);
+router.put   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.update);
+router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.remove);
+router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr'), offerCtrl.preview);
+router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
 
 // ── Test Email (debug only) ───────────────────────────────────────────────────
 router.get('/test-email', authenticate, async (req, res) => {
