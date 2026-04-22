@@ -470,6 +470,12 @@
             <select id="dl-year" class="form-control"></select>
           </div>
           <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase">Department</div>
+            <select id="dl-department" class="form-control">
+              <option value="">All Departments</option>
+            </select>
+          </div>
+          <div>
             <button class="btn btn-primary" id="dl-btn" onclick="downloadAttendanceExcel()" style="width:100%;padding:12px;font-size:14px;font-weight:700">
               ⬇ Download Attendance
             </button>
@@ -755,6 +761,11 @@ if (Role.is('hr','accounts','super_admin')) {
     if (dlYear && !dlYear.options.length)
       for (let y = NOW.getFullYear(); y >= 2020; y--)
         dlYear.innerHTML += `<option value="${y}" ${y===NOW.getFullYear()?'selected':''}>${y}</option>`;
+    api('GET','/departments').then(resp => {
+      if (!resp?.success) return;
+      const deptSel = document.getElementById('dl-department');
+      if (deptSel) resp.data.forEach(d => deptSel.innerHTML += `<option value="${d.id}">${d.name}</option>`);
+    });
   })();
 }
 // Only HR can import attendance
@@ -1961,14 +1972,17 @@ async function actionReg(action) {
 // download tab init moved to isAdminOrHR block above
 
 async function downloadAttendanceExcel() {
-  const month = document.getElementById('dl-month').value;
-  const year  = document.getElementById('dl-year').value;
-  const btn   = document.getElementById('dl-btn');
+  const month  = document.getElementById('dl-month').value;
+  const year   = document.getElementById('dl-year').value;
+  const deptId = document.getElementById('dl-department')?.value || '';
+  const btn    = document.getElementById('dl-btn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Generating…';
   try {
     const token = Auth.getToken();
-    const res = await fetch(`${API_BASE}/attendance/export-register?month=${month}&year=${year}`, {
+    let url = `${API_BASE}/attendance/export-register?month=${month}&year=${year}`;
+    if (deptId) url += `&department_id=${deptId}`;
+    const res = await fetch(url, {
       headers: { Authorization: 'Bearer ' + token }
     });
     if (!res.ok) {
