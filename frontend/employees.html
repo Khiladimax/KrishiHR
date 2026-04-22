@@ -480,7 +480,7 @@
       <div class="modal-title" id="emp-detail-title">Employee Detail</div>
       <button class="modal-close" onclick="closeModal('emp-detail-modal')">✕</button>
     </div>
-    <div class="modal-body" id="emp-detail-content" style="padding:0;overflow-y:auto;max-height:75vh"></div>
+    <div class="modal-body" id="emp-detail-content" style="display:block;padding:0;overflow-y:auto;max-height:75vh;background:var(--bg)"></div>
     <div class="modal-footer" id="emp-detail-footer">
       <button class="btn btn-outline" onclick="closeModal('emp-detail-modal')">Close</button>
     </div>
@@ -1067,14 +1067,14 @@ async function showEmpDetail(id) {
   ]);
   document.getElementById('emp-detail-title').textContent = `${e.first_name} ${e.last_name}`;
   document.getElementById('emp-detail-content').innerHTML = `
-    <div style="display:block;padding:20px">
+    <div style="display:block;padding:20px;background:var(--bg)">
 
       <!-- Header: Avatar + Name/Badges -->
-      <div style="display:flex;flex-direction:row;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #e5e7eb">
+      <div style="display:flex;flex-direction:row;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
         <div style="width:56px;height:56px;min-width:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff">${e.first_name?.[0]}${e.last_name?.[0] || ''}</div>
         <div style="display:block;flex:1">
           <div style="font-family:'DM Serif Display',serif;font-size:18px;font-weight:800;line-height:1.3">${e.first_name} ${e.last_name}</div>
-          <div style="font-size:13px;color:#6b7280;margin-top:3px">${e.designation_title || '—'} · ${e.department_name || '—'}</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:3px">${e.designation_title || '—'} · ${e.department_name || '—'}</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
             <span class="badge badge-${e.role}">${e.role}</span>
             ${(() => {
@@ -1095,32 +1095,32 @@ async function showEmpDetail(id) {
 
       <!-- Info Grid -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Code</div><span style="font-family:monospace;font-size:13px">${e.employee_code}</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Email</div><span style="font-size:13px;word-break:break-all">${e.email}</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Phone</div><span style="font-size:13px">${e.phone || '—'}</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Joining Date</div><span style="font-size:13px">${fmt.date(e.joining_date)}</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Reporting To</div><span style="font-size:13px">${e.manager_name || '—'}</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Location</div><span style="font-size:13px">${e.city || '—'}</span></div>
+        <div><div class="form-label">Code</div><span class="font-mono">${e.employee_code}</span></div>
+        <div><div class="form-label">Email</div><span style="word-break:break-all">${e.email}</span></div>
+        <div><div class="form-label">Phone</div>${e.phone || '—'}</div>
+        <div><div class="form-label">Joining Date</div>${fmt.date(e.joining_date)}</div>
+        <div><div class="form-label">Reporting To</div>${e.manager_name || '—'}</div>
+        <div><div class="form-label">Location</div>${e.city || '—'}</div>
         ${e.employee_category === 'provision' ? `
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Category</div><span style="color:#92400e;font-weight:600;font-size:13px">⏳ Provision</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Provision Ends</div><span style="color:#c2410c;font-weight:600;font-size:13px">${fmt.date(e.provision_end_date)||'—'}</span></div>
-        <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Confirmation</div>${e.confirmation_status?`<span style="color:#6d28d9;font-weight:600;font-size:13px">${e.confirmation_status}</span>`:'<span style="color:#9ca3af;font-size:13px">Not initiated</span>'}</div>
-        ` : `<div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Category</div>${e.employee_category==='contractual'?'<span style="color:#6d28d9;font-weight:600;font-size:13px">📋 Contractual</span>':'<span style="color:#15803d;font-weight:600;font-size:13px">✅ Permanent</span>'}</div>`}
+        <div><div class="form-label">Category</div><span style="color:#92400e;font-weight:600">⏳ Provision</span></div>
+        <div><div class="form-label">Provision Ends</div><span style="color:#c2410c;font-weight:600">${fmt.date(e.provision_end_date)||'—'}</span></div>
+        <div><div class="form-label">Confirmation</div>${e.confirmation_status?`<span style="color:#6d28d9;font-weight:600">${e.confirmation_status}</span>`:'<span style="color:var(--muted)">Not initiated</span>'}</div>
+        ` : `<div><div class="form-label">Category</div>${e.employee_category==='contractual'?'<span style="color:#6d28d9;font-weight:600">📋 Contractual</span>':'<span style="color:#15803d;font-weight:600">✅ Permanent</span>'}</div>`}
       </div>
 
       <!-- Compensation -->
       ${Role.isAdminOrHR() ? `
-      <div style="background:#f8faf8;border-radius:8px;padding:14px;margin-bottom:16px;border:1px solid #d1fae5">
-        <div style="font-size:11px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Compensation</div>
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;border:1px solid var(--border)">
+        <div class="section-title" style="margin-bottom:10px">Compensation</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-          <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Basic Salary</div><b style="color:var(--green);font-size:14px">${fmt.money(e.basic_salary)}</b></div>
-          <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">CTC</div><b style="font-size:14px">${fmt.money(e.ctc)}</b></div>
-          <div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Bank</div><span style="font-size:13px">${e.bank_name || '—'}</span></div>
+          <div><div class="form-label">Basic Salary</div><b style="color:var(--green)">${fmt.money(e.basic_salary)}</b></div>
+          <div><div class="form-label">CTC</div><b>${fmt.money(e.ctc)}</b></div>
+          <div><div class="form-label">Bank</div>${e.bank_name || '—'}</div>
         </div>
       </div>` : ''}
 
       <!-- Leave Balance -->
-      <div style="font-size:11px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Leave Balance — ${new Date().getFullYear()}</div>
+      <div class="section-title">Leave Balance — ${new Date().getFullYear()}</div>
       <div style="display:flex;flex-direction:row;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         ${(() => {
           const isProvisional = e.employee_category === 'provision';
@@ -1128,29 +1128,29 @@ async function showEmpDetail(id) {
           const isContractualProvisional = contractualSixMonthMark && new Date() < contractualSixMonthMark;
           const allowedCodes = (isProvisional || isContractualProvisional) ? ['PL'] : ['EL','SL','CL'];
           const filtered = (bal?.data || []).filter(b => allowedCodes.includes(b.code || b.leave_type_code || ''));
-          if (!filtered.length) return '<div style="color:#9ca3af;font-size:13px">No leave data</div>';
+          if (!filtered.length) return '<div class="text-muted">No leave data</div>';
           return filtered.map(b => {
             const code = b.code || b.leave_type_code || '?';
             const avail = b.available ?? (parseFloat(b.allocated||0) - parseFloat(b.used||0));
             const accentColor = code==='PL' ? 'var(--yellow)' : 'var(--accent)';
-            return `<div style="text-align:center;background:#f8faf8;border-radius:8px;padding:13px 16px;border:1px solid #e5e7eb;min-width:80px">
+            return `<div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:13px 16px;border:1px solid var(--border);min-width:80px">
               <div style="font-size:10px;font-weight:800;color:${accentColor};letter-spacing:1px">${code}</div>
               <div style="font-family:'DM Serif Display',serif;font-size:24px;font-weight:800;margin:4px 0">${fmt.num(avail)}</div>
-              <div style="font-size:10px;color:#9ca3af">Used: ${fmt.num(b.used||0)} / ${fmt.num(b.allocated||0)}</div>
-              ${(isProvisional||isContractualProvisional)?'<div style="font-size:9px;color:#9ca3af;margin-top:2px">Provision Leave</div>':''}
+              <div class="text-muted" style="font-size:10px">Used: ${fmt.num(b.used||0)} / ${fmt.num(b.allocated||0)}</div>
+              ${(isProvisional||isContractualProvisional)?'<div class="text-muted" style="font-size:9px;margin-top:2px">Provision Leave</div>':''}
             </div>`;
           }).join('');
         })()}
       </div>
 
       <!-- Attendance -->
-      <div style="font-size:11px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">This Month's Attendance</div>
+      <div class="section-title">This Month's Attendance</div>
       <div style="display:flex;flex-direction:row;gap:10px;flex-wrap:wrap">
         ${att?.success ? [['Present',att.data.present,'var(--green)'],['Absent',att.data.absent,'var(--red)'],['Late',att.data.late,'var(--yellow)'],['Leave',att.data.on_leave,'var(--accent)']].map(([l,v,c]) =>
-          `<div style="text-align:center;background:#f8faf8;border-radius:8px;padding:11px 14px;border:1px solid #e5e7eb;min-width:70px">
+          `<div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:11px 14px;border:1px solid var(--border);min-width:70px">
             <div style="font-family:'DM Serif Display',serif;font-size:22px;font-weight:800;color:${c}">${v||0}</div>
-            <div style="font-size:10px;color:#9ca3af;margin-top:2px">${l}</div>
-          </div>`).join('') : '<div style="color:#9ca3af;font-size:13px">No data</div>'}
+            <div class="text-muted" style="font-size:10px;margin-top:2px">${l}</div>
+          </div>`).join('') : '<div class="text-muted">No data</div>'}
       </div>
 
     </div>`;
