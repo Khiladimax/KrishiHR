@@ -1053,3 +1053,258 @@ exports.exportMasterExcel = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ════════════════════════════════════════════════════════════════════════════
+// ATTENDANCE REGISTER ONLY — called from Attendance page "Download Attendance"
+// Generates ONLY Sheet 1 (Attendance Register) — no salary or directory data
+// ════════════════════════════════════════════════════════════════════════════
+exports.exportAttendanceRegister = async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { month, year } = req.query;
+    const m = parseInt(month) || new Date().getMonth() + 1;
+    const y = parseInt(year)  || new Date().getFullYear();
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    // ── Employees (basic info only — no salary data needed) ─────────────────
+    const empResult = await db.query(`
+      SELECT e.id, e.employee_code, e.first_name, e.last_name,
+             d.name AS department, des.title AS designation,
+             e.employee_category,
+             COALESCE(e.saturday_policy, '2nd_4th_off') AS saturday_policy,
+             e.city, e.state
+      FROM employees e
+      LEFT JOIN departments  d   ON e.department_id  = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      WHERE (
+        e.is_active = true
+        OR (
+          e.separation_date IS NOT NULL
+          AND e.separation_date >= MAKE_DATE($1::int, $2::int, 1)
+        )
+        OR (
+          EXISTS (
+            SELECT 1 FROM separations sep
+            WHERE sep.employee_id = e.id AND sep.status = 'completed'
+            AND sep.last_working_date >= MAKE_DATE($1::int, $2::int, 1)
+          )
+        )
+      )
+      ORDER BY d.name, e.first_name`, [y, m]);
+    const employees = empResult.rows;
+
+    // ── Attendance for the month ─────────────────────────────────────────────
+    const attResult = await db.query(`
+      SELECT employee_id, TO_CHAR(date, 'YYYY-MM-DD') AS date_str, status
+      FROM attendance
+      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2`,
+      [m, y]);
+    const attMap = {};
+    for (const row of attResult.rows) {
+      if (!attMap[row.employee_id]) attMap[row.employee_id] = {};
+      attMap[row.employee_id][row.date_str] = row.status;
+    }
+
+    const daysInMonth = new Date(y, m, 0).getDate();
+
+    // ── Holidays ─────────────────────────────────────────────────────────────
+    const holResult = await db.query(`
+      SELECT TO_CHAR(date,'YYYY-MM-DD') AS date_str, region
+      FROM holidays
+      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2`,
+      [m, y]);
+    const holidaysByRegion = { all: new Set(), north: new Set(), south_west: new Set() };
+    for (const h of holResult.rows) {
+      if (h.region === 'all') { holidaysByRegion.all.add(h.date_str); holidaysByRegion.north.add(h.date_str); holidaysByRegion.south_west.add(h.date_str); }
+      else if (h.region === 'north') holidaysByRegion.north.add(h.date_str);
+      else if (h.region === 'south_west') holidaysByRegion.south_west.add(h.date_str);
+    }
+
+    const STATUS_STYLE = {
+      'present':     { label: 'P',    bg: '00C853', fg: 'FFFFFF' },
+      'late':        { label: 'L',    bg: 'FFD600', fg: '000000' },
+      'absent':      { label: 'A',    bg: 'D50000', fg: 'FFFFFF' },
+      'missing_punch_out': { label: 'MPO', bg: 'FF6F00', fg: 'FFFFFF' },
+      'on-leave':    { label: 'EL',   bg: '2962FF', fg: 'FFFFFF' },
+      'lwp':         { label: 'LWP',  bg: 'FF6D00', fg: 'FFFFFF' },
+      'half-day':    { label: 'H',    bg: 'AA00FF', fg: 'FFFFFF' },
+      'h-el':        { label: 'H-EL', bg: '7B1FA2', fg: 'FFFFFF' },
+      'h-cl':        { label: 'H-CL', bg: '880E4F', fg: 'FFFFFF' },
+      'h-sl':        { label: 'H-SL', bg: 'AD1457', fg: 'FFFFFF' },
+      'h-lwp':       { label: 'H-LWP',bg: 'BF360C', fg: 'FFFFFF' },
+      'h-wfh':       { label: 'H-WFH',bg: '00897B', fg: 'FFFFFF' },
+      'od':          { label: 'OD',   bg: '00BCD4', fg: 'FFFFFF' },
+      'wfh':         { label: 'WFH',  bg: '80CBC4', fg: '000000' },
+      'regularized': { label: 'R',    bg: '558B2F', fg: 'FFFFFF' },
+      'holiday':     { label: 'HOL',  bg: 'CFD8DC', fg: '37474F' },
+      'weekend':     { label: 'WO',   bg: 'ECEFF1', fg: '90A4AE' },
+    };
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'KrishiHR';
+    wb.created = new Date();
+
+    // ── Sheet 1 — Attendance Register (identical to exportMasterExcel Sheet 1) ─
+    const ws1 = wb.addWorksheet(`Attendance ${MONTH_NAMES[m-1]} ${y}`, {
+      views: [{ state: 'frozen', xSplit: 5, ySplit: 2 }]
+    });
+
+    const totalCols = 5 + daysInMonth + 9;
+    ws1.mergeCells(1, 1, 1, totalCols);
+    const titleCell = ws1.getCell(1, 1);
+    titleCell.value = `KrishiHR — Attendance Register | ${MONTH_NAMES[m-1]} ${y}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws1.getRow(1).height = 28;
+
+    const infoHeaders = ['Emp Code', 'Name', 'Department', 'Designation', 'Category'];
+    const headerFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } };
+    const headerFont  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    const headerAlign = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+    infoHeaders.forEach((h, i) => {
+      const cell = ws1.getCell(2, i + 1);
+      cell.value = h; cell.font = headerFont; cell.fill = headerFill;
+      cell.alignment = headerAlign;
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+    });
+
+    const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+    let satCountHdr = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(y, m - 1, d).getDay();
+      if (dow === 6) satCountHdr++;
+      const isWeekOff = dow === 0 || (dow === 6 && (satCountHdr === 2 || satCountHdr === 4));
+      const cell = ws1.getCell(2, 5 + d);
+      cell.value = `${d}\n${dayNames[dow]}`;
+      cell.font = { bold: true, size: 9, color: { argb: isWeekOff ? 'FFFF1744' : 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isWeekOff ? 'FF880E4F' : 'FF2E7D32' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+    }
+
+    [
+      { h: 'Paid Leave',      bg: 'FF2E7D32' },
+      { h: 'Unpaid Leave',    bg: 'FFC62828' },
+      { h: 'Paid Half Day',   bg: 'FF6A1B9A' },
+      { h: 'Unpaid Half Day', bg: 'FFE65100' },
+      { h: 'Total Paid',      bg: 'FF1565C0' },
+      { h: 'Total Unpaid',    bg: 'FF880E4F' },
+      { h: 'Total Absent',    bg: 'FFD50000' },
+      { h: 'Late',            bg: 'FFF57F17' },
+      { h: 'Total Present',   bg: 'FF00695C' },
+    ].forEach(({ h, bg }, i) => {
+      const cell = ws1.getCell(2, 5 + daysInMonth + 1 + i);
+      cell.value = h;
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    });
+    ws1.getRow(2).height = 30;
+
+    employees.forEach((e, ri) => {
+      const row   = ri + 3;
+      const isAlt = ri % 2 === 1;
+
+      [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(),
+       e.department||'', e.designation||'', e.employee_category||''].forEach((v, ci) => {
+        const cell = ws1.getCell(row, ci + 1);
+        cell.value = v; cell.font = { size: 9 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFE8F5E9' : 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle' };
+        cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+      });
+
+      let attPaidLeave = 0, attUnpaidLeave = 0, attPaidHalfDay = 0, attUnpaidHalfDay = 0;
+      let attLate = 0, attAbsent = 0, attPresent = 0;
+      let satCountRow = 0;
+      const empIsOffsite = e.saturday_policy === 'all_working';
+      const empReg = getEmployeeRegion(e.city || '', e.state || '');
+      const empHolSet = empReg === 'north' ? holidaysByRegion.north : holidaysByRegion.south_west;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dow = new Date(y, m - 1, d).getDay();
+        if (dow === 6) satCountRow++;
+        const is2nd4thSat = !empIsOffsite && dow === 6 && (satCountRow === 2 || satCountRow === 4);
+        const isWeekOff   = dow === 0 || is2nd4thSat;
+
+        let status;
+        if (isWeekOff) {
+          status = 'weekend';
+        } else if (empHolSet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) {
+          status = 'holiday';
+        } else {
+          status = (attMap[e.id] || {})[dateStr] || '';
+        }
+
+        const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'F1F8E9' : 'FFFFFF', fg: '000000' };
+        const cell  = ws1.getCell(row, 5 + d);
+        cell.value = style.label;
+        cell.font  = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+
+        if (!isWeekOff) {
+          if (['present','regularized','od','wfh','holiday'].includes(status)) attPresent++;
+          else if (status === 'late')     { attPresent++; attLate++; }
+          else if (status === 'on-leave') { attPaidLeave++;  attPresent++; }
+          else if (['half-day','h-el','h-cl','h-sl','h-wfh'].includes(status)) { attPaidHalfDay++;   attPresent++; }
+          else if (status === 'h-lwp')   attUnpaidHalfDay++;
+          else if (status === 'lwp')     attUnpaidLeave++;
+          else if (status === 'absent')  attAbsent++;
+        }
+      }
+
+      const attTotalPaid   = attPresent;
+      const attTotalUnpaid = attUnpaidLeave + attUnpaidHalfDay;
+
+      [
+        [attPaidLeave,     'FF2E7D32'],
+        [attUnpaidLeave,   'FFC62828'],
+        [attPaidHalfDay,   'FF6A1B9A'],
+        [attUnpaidHalfDay, 'FFE65100'],
+        [attTotalPaid,     'FF1565C0'],
+        [attTotalUnpaid,   'FF880E4F'],
+        [attAbsent,        'FFD50000'],
+        [attLate,          'FFF57F17'],
+        [attPresent,       'FF00695C'],
+      ].forEach(([v, color], i) => {
+        const cell = ws1.getCell(row, 5 + daysInMonth + 1 + i);
+        cell.value = v;
+        cell.font  = { bold: true, size: 9, color: { argb: color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFE3F2FD' : 'FFFFFFFF' } };
+        cell.border = { right: { style: 'thin' }, bottom: { style: 'hair' } };
+      });
+
+      ws1.getRow(row).height = 18;
+    });
+
+    ws1.getColumn(1).width = 10; ws1.getColumn(2).width = 20;
+    ws1.getColumn(3).width = 14; ws1.getColumn(4).width = 20; ws1.getColumn(5).width = 12;
+    for (let d = 1; d <= daysInMonth; d++) ws1.getColumn(5 + d).width = 5;
+    for (let i = 1; i <= 9; i++) ws1.getColumn(5 + daysInMonth + i).width = 10;
+
+    const legendRow = employees.length + 4;
+    ws1.mergeCells(legendRow, 1, legendRow, totalCols);
+    const legendCell = ws1.getCell(legendRow, 1);
+    legendCell.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Paid Leave  LWP=Unpaid Leave  H=Half Day  H-EL=Half EL  H-CL=Half CL  H-SL=Half SL  H-LWP=Half LWP (Unpaid)  H-WFH=Half WFH  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off  HOL=Holiday';
+    legendCell.font  = { italic: true, size: 8, color: { argb: 'FF37474F' } };
+    legendCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECEFF1' } };
+    legendCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws1.getRow(legendRow).height = 16;
+
+    // ── Send ─────────────────────────────────────────────────────────────────
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_Attendance_${MONTH_NAMES[m-1]}${y}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+
+  } catch (err) {
+    console.error('[exportAttendanceRegister]', err.message, err.stack);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
