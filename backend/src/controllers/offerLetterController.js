@@ -690,8 +690,10 @@ exports.sendEmail = async (req, res) => {
       attachment:  attachments,
     };
 
-    if (cc.length)  payload.cc  = cc.map(e => ({ email: e }));
-    if (bcc.length) payload.bcc = bcc.map(e => ({ email: e }));
+    const cleanCc  = (Array.isArray(cc)  ? cc  : []).map(e => (e||'').trim()).filter(e => e && e.includes('@'));
+    const cleanBcc = (Array.isArray(bcc) ? bcc : []).map(e => (e||'').trim()).filter(e => e && e.includes('@'));
+    if (cleanCc.length)  payload.cc  = cleanCc.map(e => ({ email: e }));
+    if (cleanBcc.length) payload.bcc = cleanBcc.map(e => ({ email: e }));
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (!BREVO_KEY || process.env.EMAIL_ENABLED !== 'true') {
