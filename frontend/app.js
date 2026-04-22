@@ -75,7 +75,7 @@ const fmt = {
 
 const Role = {
   is:            (...r) => r.includes(Auth.getUser()?.role),
-  isAdminOrHR:   ()     => Role.is('admin','hr','accounts'),          // super_admin EXCLUDED — view only
+  isAdminOrHR:   ()     => Role.is('admin','super_admin','hr','accounts'),
   isAdminOnly:   ()     => Role.is('admin','super_admin'),
   isManagerUp:   ()     => Role.is('admin','super_admin','hr','accounts','manager'),
   isDashboard:   ()     => Role.is('admin','super_admin','hr','accounts','manager','tl'),
@@ -133,14 +133,14 @@ const NAV_GROUPS = [
     label: 'Organisation',
     items: [
       { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl'] },
-      { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr'] },
+      { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['admin','super_admin','hr'] },
       { href:'separation.html',     icon: ICONS.separation,   label:'Separation',       always:true },
     ]
   },
   {
     label: 'Finance',
     items: [
-      { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['super_admin','hr','accounts'] },
+      { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['admin','super_admin','hr','accounts'] },
       { href:'advance.html',        icon: ICONS.advance,      label:'Advance Salary',   always:true },
       { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
     ]
@@ -174,7 +174,7 @@ function buildSidebar(activePage) {
 
   let html = '';
   for (const group of NAV_GROUPS) {
-    const visibleItems = group.items.filter(l => l.always || (l.roles && l.roles.includes(user.role)));
+    const visibleItems = group.items.filter(l => l.always || user.role === 'super_admin' || (l.roles && l.roles.includes(user.role)));
     if (visibleItems.length === 0) continue;
 
     if (group.label) {
