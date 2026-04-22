@@ -1061,10 +1061,9 @@ exports.exportMasterExcel = async (req, res) => {
 exports.exportAttendanceRegister = async (req, res) => {
   try {
     const ExcelJS = require('exceljs');
-    const { month, year, department_id } = req.query;
+    const { month, year } = req.query;
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year)  || new Date().getFullYear();
-    const deptId = department_id ? parseInt(department_id) : null;
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
     // ── Employees (basic info only — no salary data needed) ─────────────────
@@ -1091,8 +1090,7 @@ exports.exportAttendanceRegister = async (req, res) => {
           )
         )
       )
-      ${deptId ? 'AND e.department_id = $3' : ''}
-      ORDER BY d.name, e.first_name`, deptId ? [y, m, deptId] : [y, m]);
+      ORDER BY d.name, e.first_name`, [y, m]);
     const employees = empResult.rows;
 
     // ── Attendance for the month ─────────────────────────────────────────────
