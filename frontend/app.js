@@ -75,7 +75,7 @@ const fmt = {
 
 const Role = {
   is:            (...r) => r.includes(Auth.getUser()?.role),
-  isAdminOrHR:   ()     => Role.is('admin','hr','accounts'),          // super_admin EXCLUDED — view only
+  isAdminOrHR: () => Role.is('admin','super_admin','hr','accounts'),          // super_admin EXCLUDED — view only
   isAdminOnly:   ()     => Role.is('admin','super_admin'),
   isManagerUp:   ()     => Role.is('admin','super_admin','hr','accounts','manager'),
   isDashboard:   ()     => Role.is('admin','super_admin','hr','accounts','manager','tl'),
