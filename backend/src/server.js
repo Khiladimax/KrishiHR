@@ -213,22 +213,22 @@ cron.schedule('30 9 * * 1-6', async () => {
     if (await isNonWorkingDay(today)) { console.log('Non-working day — skipping WFH punch-in'); return; }
 
     const wfhEmps = await db.query(
-      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin')`
+      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
     );
     if (!wfhEmps.rows.length) { console.log('No permanent WFH/auto-present employees'); return; }
 
     let marked = 0;
     for (const emp of wfhEmps.rows) {
-      // super_admin → auto present (office), permanent WFH employees → wfh
-      const isSuperAdmin = emp.role === 'super_admin';
+      // super_admin / KC718 → auto present (office), permanent WFH employees → wfh
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
       await db.query(
         `INSERT INTO attendance(employee_id, date, status, punch_in, punch_in_location, remarks, wfh_approved)
          VALUES($1, $2, 'present', '09:30:00', $3, $4, $5)
          ON CONFLICT(employee_id, date) DO NOTHING`,
         [emp.id, today,
-          isSuperAdmin ? 'Office' : 'Work from Home',
-          isSuperAdmin ? 'Auto Present' : 'Auto WFH',
-          isSuperAdmin ? false : true]
+          isOfficeUser ? 'Office' : 'Work from Home',
+          isOfficeUser ? 'Auto Present' : 'Auto WFH',
+          isOfficeUser ? false : true]
       );
       marked++;
     }
@@ -249,12 +249,12 @@ cron.schedule('30 18 * * 1-6', async () => {
     if (await isNonWorkingDay(today)) { console.log('Non-working day — skipping WFH punch-out'); return; }
 
     const wfhEmps = await db.query(
-      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin')`
+      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
     );
     if (!wfhEmps.rows.length) return;
 
     for (const emp of wfhEmps.rows) {
-      const isSuperAdmin = emp.role === 'super_admin';
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
       // Only fill punch-out if punch-in exists and punch-out is missing
       await db.query(
         `UPDATE attendance
@@ -262,7 +262,7 @@ cron.schedule('30 18 * * 1-6', async () => {
              working_hours=9.0, status='present'
          WHERE employee_id=$1 AND date=$2
            AND punch_in IS NOT NULL AND punch_out IS NULL`,
-        [emp.id, today, isSuperAdmin ? 'Office' : 'Work from Home']
+        [emp.id, today, isOfficeUser ? 'Office' : 'Work from Home']
       );
     }
     console.log(`✅ Auto punch-OUT done`);
@@ -287,7 +287,7 @@ cron.schedule('30 18 * * 1-6', async () => {
     if (await isNonWorkingDay(today)) return;
 
     const wfhEmps = await db.query(
-      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin')`
+      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
     );
     if (!wfhEmps.rows.length) return;
 
@@ -295,16 +295,16 @@ cron.schedule('30 18 * * 1-6', async () => {
     const afterPunchOut = istHour > 18 || (istHour === 18 && istMin >= 30);
 
     for (const emp of wfhEmps.rows) {
-      const isSuperAdmin = emp.role === 'super_admin';
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
       if (afterPunchIn) {
         await db.query(
           `INSERT INTO attendance(employee_id, date, status, punch_in, punch_in_location, remarks, wfh_approved)
            VALUES($1, $2, 'present', '09:30:00', $3, $4, $5)
            ON CONFLICT(employee_id, date) DO NOTHING`,
           [emp.id, today,
-            isSuperAdmin ? 'Office' : 'Work from Home',
-            isSuperAdmin ? 'Auto Present' : 'Auto WFH',
-            isSuperAdmin ? false : true]
+            isOfficeUser ? 'Office' : 'Work from Home',
+            isOfficeUser ? 'Auto Present' : 'Auto WFH',
+            isOfficeUser ? false : true]
         );
       }
       if (afterPunchOut) {
@@ -314,7 +314,7 @@ cron.schedule('30 18 * * 1-6', async () => {
                working_hours=9.0, status='present'
            WHERE employee_id=$1 AND date=$2
              AND punch_in IS NOT NULL AND punch_out IS NULL`,
-          [emp.id, today, isSuperAdmin ? 'Office' : 'Work from Home']
+          [emp.id, today, isOfficeUser ? 'Office' : 'Work from Home']
         );
       }
     }
