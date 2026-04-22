@@ -1067,12 +1067,12 @@ async function showEmpDetail(id) {
   ]);
   document.getElementById('emp-detail-title').textContent = `${e.first_name} ${e.last_name}`;
   document.getElementById('emp-detail-content').innerHTML = `
-    <div class="flex gap-3" style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--border)">
       <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0">${e.first_name?.[0]}${e.last_name?.[0] || ''}</div>
-      <div>
+      <div style="flex:1;min-width:0">
         <div style="font-family:'DM Serif Display',serif;font-size:18px;font-weight:800">${e.first_name} ${e.last_name}</div>
         <div class="text-muted" style="margin-top:3px">${e.designation_title || '—'} · ${e.department_name || '—'}</div>
-        <div class="flex gap-2" style="margin-top:8px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
           <span class="badge badge-${e.role}">${e.role}</span>
           ${(() => {
             const cat = e.employee_category || 'permanent';
