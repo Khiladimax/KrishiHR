@@ -702,16 +702,20 @@ start();
 // ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
 const https = require('https');
 
+const PING_URL = 'https://krishihr-zuui.onrender.com/health';
+const INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
+const INITIAL_DELAY_MS = 30 * 1000; // 1 minute
+
 function pingServer() {
-  https.get('https://krishihr-zuui.onrender.com/health', (res) => {
+  https.get(PING_URL, (res) => {
     console.log(`[Keep-Alive] ✅ ping OK — ${res.statusCode} at ${new Date().toISOString()}`);
   }).on('error', (err) => {
-    console.log(`[Keep-Alive] ⚠️ ping failed: ${err.message} — retrying in 30s`);
-    setTimeout(pingServer, 5 * 60 * 1000);
+    console.error(`[Keep-Alive] ⚠️ ping failed: ${err.message}`);
+    // No extra retry — the setInterval will naturally retry in ≤4 min
   });
 }
 
 setTimeout(() => {
-  pingServer();
-  setInterval(pingServer, 5 * 60 * 1000);
-}, 60 * 1000);
+  pingServer();                        // fire once immediately after delay
+  setInterval(pingServer, INTERVAL_MS); // then on a regular cadence
+}, INITIAL_DELAY_MS);
