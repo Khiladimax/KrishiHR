@@ -256,7 +256,7 @@
       <button class="tab-btn" id="loc-tab"  style="display:none" onclick="switchTab('locations')">🗺 Location Map</button>
       <button class="tab-btn" id="reg-tab"  style="display:none" onclick="switchTab('regularize')">🔄 Regularizations</button>
       <button class="tab-btn" id="odwfh-tab" onclick="switchTab('odwfh')">🚗 My OD/WFH</button>
-      <button class="tab-btn" id="download-tab" style="display:none" onclick="switchTab('download')">⬇ Download Report</button>
+      <button class="tab-btn" id="download-tab" style="display:none" onclick="switchTab('download')">📊 Master Excel</button>
       <button class="tab-btn" id="import-tab" style="display:none" onclick="switchTab('import')">⬆ Import Attendance</button>
       <button class="tab-btn" id="mark-tab"   style="display:none" onclick="switchTab('mark')">✏️ Mark Attendance</button>
     </div>
@@ -449,14 +449,14 @@
     <div id="tab-download" style="display:none">
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="card-title-icon">⬇</span>Download Attendance Report</div>
+          <div class="card-title"><span class="card-title-icon">📊</span>Download Master Excel</div>
         </div>
         <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:16px;margin-bottom:24px">
           <div style="font-weight:700;color:#1b5e20;margin-bottom:10px;font-size:14px">📊 What You Get</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;font-size:13px;color:#2d5a0e">
-            <div>📋 <b>Sheet 1 — Summary:</b> P/A/H/LWP/EL/OD/WFH counts + Effective & Salary Days</div>
-            <div>📅 <b>Sheet 2 — Daily:</b> Day-by-day breakdown with P/A/H/WO/HO codes</div>
-            <div>🏢 <b>Filter by Dept:</b> One department or entire company</div>
+            <div>📋 <b>Sheet 1 — Attendance Register:</b> Color-coded day-by-day register (P/A/H/WO/HOL) with salary days</div>
+            <div>💰 <b>Sheet 2 — Salary Breakup:</b> Basic, HRA, PF, ESI, Net Pay per employee</div>
+            <div>👥 <b>Sheet 3 — Employee Directory:</b> Full employee master with bank &amp; document details</div>
             <div>💾 <b>Format:</b> .xlsx ready for payroll calculation</div>
           </div>
         </div>
@@ -470,14 +470,8 @@
             <select id="dl-year" class="form-control"></select>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase">Department</div>
-            <select id="dl-department" class="form-control">
-              <option value="">All Departments</option>
-            </select>
-          </div>
-          <div>
             <button class="btn btn-primary" id="dl-btn" onclick="downloadAttendanceExcel()" style="width:100%;padding:12px;font-size:14px;font-weight:700">
-              ⬇ Download Excel
+              📊 Download Master Excel
             </button>
           </div>
         </div>
@@ -761,11 +755,6 @@ if (Role.is('hr','accounts','super_admin')) {
     if (dlYear && !dlYear.options.length)
       for (let y = NOW.getFullYear(); y >= 2020; y--)
         dlYear.innerHTML += `<option value="${y}" ${y===NOW.getFullYear()?'selected':''}>${y}</option>`;
-    api('GET','/departments').then(resp => {
-      if (!resp?.success) return;
-      const deptSel = document.getElementById('dl-department');
-      if (deptSel) resp.data.forEach(d => deptSel.innerHTML += `<option value="${d.id}">${d.name}</option>`);
-    });
   })();
 }
 // Only HR can import attendance
@@ -1972,37 +1961,36 @@ async function actionReg(action) {
 // download tab init moved to isAdminOrHR block above
 
 async function downloadAttendanceExcel() {
-  const month  = document.getElementById('dl-month').value;
-  const year   = document.getElementById('dl-year').value;
-  const deptId = document.getElementById('dl-department').value;
-  const btn    = document.getElementById('dl-btn');
+  const month = document.getElementById('dl-month').value;
+  const year  = document.getElementById('dl-year').value;
+  const btn   = document.getElementById('dl-btn');
   btn.disabled = true;
-  btn.innerHTML = '⏳ Generating…';
+  btn.innerHTML = '⏳ Generating Master Excel…';
   try {
-    const token = localStorage.getItem('krishihr_token');
-    let url = `${API_BASE}/attendance/report/download?month=${month}&year=${year}`;
-    if (deptId) url += `&department_id=${deptId}`;
-    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    const token = Auth.getToken();
+    const res = await fetch(`${API_BASE}/employees/export-master?month=${month}&year=${year}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: 'Download failed' }));
       toast(err.message || 'Download failed', 'error'); return;
     }
-    const blob  = await res.blob();
-    const dlUrl = URL.createObjectURL(blob);
-    const a     = document.createElement('a');
-    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    a.href     = dlUrl;
-    a.download = `Attendance_${MONTHS[parseInt(month)-1]}_${year}${deptId?'_Dept'+deptId:''}.xlsx`;
+    const blob = await res.blob();
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `KrishiHR_Master_${MONTHS[parseInt(month)-1]}${year}.xlsx`
+    });
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(dlUrl);
-    toast('Attendance report downloaded! 📊', 'success');
+    URL.revokeObjectURL(a.href);
+    toast('✅ Master Excel downloaded!', 'success');
   } catch (err) {
     toast('Download failed: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '⬇ Download Excel';
+    btn.innerHTML = '📊 Download Master Excel';
   }
 }
 
