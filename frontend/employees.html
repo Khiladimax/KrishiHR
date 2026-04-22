@@ -489,164 +489,262 @@
 
 <!-- Edit Employee Modal -->
 <div class="modal-backdrop" id="edit-emp-modal">
-  <div class="modal" style="width:680px;max-height:94vh">
-    <div class="modal-header">
-      <div class="modal-title" id="edit-emp-title">Edit Employee</div>
-      <button class="modal-close" onclick="closeModal('edit-emp-modal')">✕</button>
-    </div>
-    <div class="modal-body" style="max-height:76vh;overflow-y:auto;padding:0;display:block;overflow-x:hidden">
+  <div class="modal" style="width:700px;max-height:94vh;border-radius:20px;overflow:hidden;border:none;box-shadow:0 24px 60px rgba(0,0,0,.18)">
 
-      <!-- Tab bar -->
-      <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface2);position:sticky;top:0;z-index:10">
-        <button class="edit-tab-btn active" id="etab-btn-info"    onclick="switchEditTab('info')"    style="flex:1;padding:12px 8px;border:none;background:none;font-weight:600;font-size:13px;cursor:pointer;border-bottom:2px solid transparent">👤 Info</button>
-        <button class="edit-tab-btn"        id="etab-btn-salary"  onclick="switchEditTab('salary')"  style="flex:1;padding:12px 8px;border:none;background:none;font-weight:600;font-size:13px;cursor:pointer;border-bottom:2px solid transparent">💰 Salary Structure</button>
-        <button class="edit-tab-btn"        id="etab-btn-bank"    onclick="switchEditTab('bank')"    style="flex:1;padding:12px 8px;border:none;background:none;font-weight:600;font-size:13px;cursor:pointer;border-bottom:2px solid transparent">🏦 Bank & Docs</button>
+    <!-- Colored header -->
+    <div style="background:linear-gradient(135deg,#2e7d32,#4a8c1c);padding:20px 24px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px">✏️</div>
+        <div>
+          <div id="edit-emp-title" style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.2px">Edit Employee</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:1px">Update employee information</div>
+        </div>
       </div>
+      <button onclick="closeModal('edit-emp-modal')" style="width:32px;height:32px;background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">✕</button>
+    </div>
 
-      <!-- Tab: Info -->
-      <div id="etab-info" style="padding:20px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group"><label class="form-label">First Name *</label><input id="edit-fname" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Last Name</label><input id="edit-lname" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Email *</label><input id="edit-email" class="form-control" type="email"></div>
-          <div class="form-group"><label class="form-label">Phone</label><input id="edit-phone" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Alt Phone</label><input id="edit-altphone" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Gender</label>
-            <select id="edit-gender" class="form-control">
-              <option value="">Select…</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
+    <!-- Tab bar -->
+    <div style="display:flex;background:#fff;border-bottom:2px solid #e8f5e9;position:sticky;top:0;z-index:10">
+      <button class="edit-tab-btn active" id="etab-btn-info" onclick="switchEditTab('info')"
+        style="flex:1;padding:13px 8px;border:none;background:none;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:#94a3b8;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px">
+        <span style="font-size:15px">👤</span> Info
+      </button>
+      <button class="edit-tab-btn" id="etab-btn-salary" onclick="switchEditTab('salary')"
+        style="flex:1;padding:13px 8px;border:none;background:none;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:#94a3b8;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px">
+        <span style="font-size:15px">💰</span> Salary Structure
+      </button>
+      <button class="edit-tab-btn" id="etab-btn-bank" onclick="switchEditTab('bank')"
+        style="flex:1;padding:13px 8px;border:none;background:none;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:#94a3b8;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px">
+        <span style="font-size:15px">🏦</span> Bank &amp; Docs
+      </button>
+    </div>
+
+    <div class="modal-body" style="max-height:72vh;overflow-y:auto;padding:0;display:block;overflow-x:hidden;background:#f7faf3">
+
+      <!-- ── Tab: Info ── -->
+      <div id="etab-info" style="padding:20px 24px">
+
+        <!-- Personal Info Section -->
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#eaf3d8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">👤</div>
+            <span style="font-size:12px;font-weight:800;color:#2e7d32;letter-spacing:.5px;text-transform:uppercase">Personal Information</span>
           </div>
-          <div class="form-group"><label class="form-label">Date of Birth</label><input id="edit-dob" class="form-control" type="date"></div>
-          <div class="form-group"><label class="form-label">Blood Group</label>
-            <select id="edit-blood" class="form-control">
-              <option value="">Select…</option>
-              <option value="A+">A+</option><option value="A-">A-</option>
-              <option value="B+">B+</option><option value="B-">B-</option>
-              <option value="O+">O+</option><option value="O-">O-</option>
-              <option value="AB+">AB+</option><option value="AB-">AB-</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Marital Status</label>
-            <select id="edit-marital" class="form-control">
-              <option value="">Select…</option>
-              <option value="Single">Single</option>
-              <option value="Married">Married</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">City</label><input id="edit-city" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">State</label><input id="edit-state" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Pincode</label><input id="edit-pincode" class="form-control" type="text"></div>
-          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Address</label><input id="edit-address" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Joining Date</label><input id="edit-joining" class="form-control" type="date"></div>
-          <div class="form-group"><label class="form-label">Employment Type</label>
-            <select id="edit-emptype" class="form-control">
-              <option value="Full-Time">Full-Time</option>
-              <option value="Part-Time">Part-Time</option>
-              <option value="Contract">Contract</option>
-              <option value="Intern">Intern</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Category</label>
-            <select id="edit-category" class="form-control">
-              <option value="permanent">Permanent</option>
-              <option value="provision">Provision</option>
-              <option value="contractual">Contractual</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Work Location Type</label>
-            <select id="edit-saturday-policy" class="form-control">
-              <option value="2nd_4th_off">🏢 Onsite (2nd &amp; 4th Sat off)</option>
-              <option value="all_working">🌾 Field / Offsite (All Sat working)</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Role</label>
-            <select id="edit-role" class="form-control" onchange="onRoleChange()">
-              <option value="employee">Employee</option>
-              <option value="tl">Team Leader</option>
-              <option value="manager">Manager</option>
-              <option value="hr">HR</option>
-              <option value="accounts">Accounts</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div class="form-group" id="advance-chain-info" style="grid-column:1/-1;display:none">
-            <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px;font-size:12px;color:#92400e">
-              ⚡ <b>Advance Chain:</b> <span id="advance-chain-label"></span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group" style="margin:0"><label class="form-label">First Name *</label><input id="edit-fname" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Last Name</label><input id="edit-lname" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Email *</label><input id="edit-email" class="form-control" type="email"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Phone</label><input id="edit-phone" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Alt Phone</label><input id="edit-altphone" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Gender</label>
+              <select id="edit-gender" class="form-control">
+                <option value="">Select…</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Date of Birth</label><input id="edit-dob" class="form-control" type="date"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Blood Group</label>
+              <select id="edit-blood" class="form-control">
+                <option value="">Select…</option>
+                <option value="A+">A+</option><option value="A-">A-</option>
+                <option value="B+">B+</option><option value="B-">B-</option>
+                <option value="O+">O+</option><option value="O-">O-</option>
+                <option value="AB+">AB+</option><option value="AB-">AB-</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Marital Status</label>
+              <select id="edit-marital" class="form-control">
+                <option value="">Select…</option>
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">City</label><input id="edit-city" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">State</label><input id="edit-state" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Pincode</label><input id="edit-pincode" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0;grid-column:1/-1"><label class="form-label">Address</label><input id="edit-address" class="form-control" type="text"></div>
           </div>
-          <div class="form-group"><label class="form-label">Level</label><input id="edit-level" class="form-control" type="text" placeholder="L4, L5…"></div>
-          <div class="form-group"><label class="form-label">Probation End Date</label><input id="edit-probation" class="form-control" type="date"></div>
-          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Notes</label><input id="edit-notes" class="form-control" type="text" placeholder="Optional notes…"></div>
+        </div>
+
+        <!-- Employment Section -->
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#eaf3d8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">💼</div>
+            <span style="font-size:12px;font-weight:800;color:#2e7d32;letter-spacing:.5px;text-transform:uppercase">Employment Details</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group" style="margin:0"><label class="form-label">Joining Date</label><input id="edit-joining" class="form-control" type="date"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Employment Type</label>
+              <select id="edit-emptype" class="form-control">
+                <option value="Full-Time">Full-Time</option>
+                <option value="Part-Time">Part-Time</option>
+                <option value="Contract">Contract</option>
+                <option value="Intern">Intern</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Category</label>
+              <select id="edit-category" class="form-control">
+                <option value="permanent">Permanent</option>
+                <option value="provision">Provision</option>
+                <option value="contractual">Contractual</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Work Location Type</label>
+              <select id="edit-saturday-policy" class="form-control">
+                <option value="2nd_4th_off">🏢 Onsite (2nd &amp; 4th Sat off)</option>
+                <option value="all_working">🌾 Field / Offsite (All Sat working)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Role</label>
+              <select id="edit-role" class="form-control" onchange="onRoleChange()">
+                <option value="employee">Employee</option>
+                <option value="tl">Team Leader</option>
+                <option value="manager">Manager</option>
+                <option value="hr">HR</option>
+                <option value="accounts">Accounts</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Level</label><input id="edit-level" class="form-control" type="text" placeholder="L4, L5…"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Probation End Date</label><input id="edit-probation" class="form-control" type="date"></div>
+            <div class="form-group" style="margin:0;grid-column:1/-1" id="advance-chain-info" style="display:none">
+              <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
+                ⚡ <b>Advance Chain:</b> <span id="advance-chain-label"></span>
+              </div>
+            </div>
+            <div class="form-group" style="margin:0;grid-column:1/-1"><label class="form-label">Notes</label><input id="edit-notes" class="form-control" type="text" placeholder="Optional notes…"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Tab: Salary Structure -->
-      <div id="etab-salary" style="padding:20px;display:none">
-        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;border:1px solid var(--border);font-size:12px;color:var(--muted)">
+      <!-- ── Tab: Salary Structure ── -->
+      <div id="etab-salary" style="padding:20px 24px;display:none">
+
+        <div style="background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#1b5e20;display:flex;align-items:center;gap:8px">
           💡 Statutory amounts (PF, ESI, PT, LWF) are <b>auto-calculated</b> when you save. Just fill in the earnings below.
         </div>
-        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:var(--accent)">EARNINGS (₹/month)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
-          <div class="form-group"><label class="form-label">Basic Salary *</label><input id="edit-basic" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
-          <div class="form-group"><label class="form-label">HRA</label><input id="edit-hra" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
-          <div class="form-group"><label class="form-label">Conveyance Allowance</label><input id="edit-conveyance" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
-          <div class="form-group"><label class="form-label">Special Allowance</label><input id="edit-special" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
-          <div class="form-group"><label class="form-label">Gratuity</label><input id="edit-gratuity" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
-        </div>
 
-        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:var(--accent)">STATUTORY APPLICABILITY</div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="edit-pf"  checked onchange="recalcSalaryPreview()"> PF</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="edit-esi" checked onchange="recalcSalaryPreview()"> ESI</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="edit-pt"  checked onchange="recalcSalaryPreview()"> PT</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="edit-lwf" checked onchange="recalcSalaryPreview()"> LWF</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="edit-tds" onchange="recalcSalaryPreview()"> TDS</label>
-        </div>
-
-        <!-- Live preview -->
-        <div id="salary-preview" style="background:linear-gradient(135deg,var(--accent)15,var(--purple)10);border:1px solid var(--accent)40;border-radius:var(--radius-sm);padding:14px;display:none">
-          <div style="font-weight:700;font-size:12px;margin-bottom:10px;letter-spacing:0.5px">LIVE PREVIEW</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
-            <div><div style="color:var(--muted)">Gross</div><b id="prev-gross">₹0</b></div>
-            <div><div style="color:var(--muted)">Total Deductions</div><b id="prev-ded" style="color:var(--red)">₹0</b></div>
-            <div><div style="color:var(--muted)">Net Salary</div><b id="prev-net" style="color:var(--green);font-size:15px">₹0</b></div>
-            <div><div style="color:var(--muted)">PF (Emp)</div><b id="prev-pf-emp">₹0</b></div>
-            <div><div style="color:var(--muted)">ESI (Emp)</div><b id="prev-esi-emp">₹0</b></div>
-            <div><div style="color:var(--muted)">CTC</div><b id="prev-ctc" style="color:var(--accent)">₹0</b></div>
+        <!-- Earnings -->
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#eaf3d8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">💵</div>
+            <span style="font-size:12px;font-weight:800;color:#2e7d32;letter-spacing:.5px;text-transform:uppercase">Earnings (₹/month)</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group" style="margin:0"><label class="form-label">Basic Salary *</label><input id="edit-basic" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">HRA</label><input id="edit-hra" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Conveyance Allowance</label><input id="edit-conveyance" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Special Allowance</label><input id="edit-special" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Gratuity</label><input id="edit-gratuity" class="form-control" type="number" placeholder="0" oninput="recalcSalaryPreview()"></div>
           </div>
         </div>
-        <div class="form-group" style="margin-top:14px"><label class="form-label">Notes</label><input id="edit-sal-notes" class="form-control" type="text" placeholder="Optional notes…"></div>
+
+        <!-- Statutory -->
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#eaf3d8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">📋</div>
+            <span style="font-size:12px;font-weight:800;color:#2e7d32;letter-spacing:.5px;text-transform:uppercase">Statutory Applicability</span>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:7px;padding:8px 14px;background:#f7faf3;border:1.5px solid #d4e5be;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#2e7d32">
+              <input type="checkbox" id="edit-pf" checked onchange="recalcSalaryPreview()" style="accent-color:#4a8c1c;width:15px;height:15px"> PF
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;padding:8px 14px;background:#f7faf3;border:1.5px solid #d4e5be;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#2e7d32">
+              <input type="checkbox" id="edit-esi" checked onchange="recalcSalaryPreview()" style="accent-color:#4a8c1c;width:15px;height:15px"> ESI
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;padding:8px 14px;background:#f7faf3;border:1.5px solid #d4e5be;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#2e7d32">
+              <input type="checkbox" id="edit-pt" checked onchange="recalcSalaryPreview()" style="accent-color:#4a8c1c;width:15px;height:15px"> PT
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;padding:8px 14px;background:#f7faf3;border:1.5px solid #d4e5be;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#2e7d32">
+              <input type="checkbox" id="edit-lwf" checked onchange="recalcSalaryPreview()" style="accent-color:#4a8c1c;width:15px;height:15px"> LWF
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;padding:8px 14px;background:#f7faf3;border:1.5px solid #d4e5be;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#2e7d32">
+              <input type="checkbox" id="edit-tds" onchange="recalcSalaryPreview()" style="accent-color:#4a8c1c;width:15px;height:15px"> TDS
+            </label>
+          </div>
+        </div>
+
+        <!-- Live Preview -->
+        <div id="salary-preview" style="display:none;background:#fff;border:2px solid #4a8c1c;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#eaf3d8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">📊</div>
+            <span style="font-size:12px;font-weight:800;color:#2e7d32;letter-spacing:.5px;text-transform:uppercase">Live Preview</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+            <div style="background:#f7faf3;border-radius:10px;padding:12px;text-align:center">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">GROSS</div>
+              <b id="prev-gross" style="font-size:16px;color:#1e293b">₹0</b>
+            </div>
+            <div style="background:#fef2f2;border-radius:10px;padding:12px;text-align:center">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">DEDUCTIONS</div>
+              <b id="prev-ded" style="font-size:16px;color:#dc2626">₹0</b>
+            </div>
+            <div style="background:#f0fdf4;border-radius:10px;padding:12px;text-align:center;border:1.5px solid #86efac">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">NET SALARY</div>
+              <b id="prev-net" style="font-size:18px;color:#16a34a">₹0</b>
+            </div>
+            <div style="background:#f7faf3;border-radius:10px;padding:12px;text-align:center">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">PF (EMP)</div>
+              <b id="prev-pf-emp" style="font-size:15px;color:#1e293b">₹0</b>
+            </div>
+            <div style="background:#f7faf3;border-radius:10px;padding:12px;text-align:center">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">ESI (EMP)</div>
+              <b id="prev-esi-emp" style="font-size:15px;color:#1e293b">₹0</b>
+            </div>
+            <div style="background:#eaf3d8;border-radius:10px;padding:12px;text-align:center;border:1.5px solid #4a8c1c">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">CTC</div>
+              <b id="prev-ctc" style="font-size:15px;color:#4a8c1c">₹0</b>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px">
+          <div class="form-group" style="margin:0"><label class="form-label">Notes</label><input id="edit-sal-notes" class="form-control" type="text" placeholder="Optional notes…"></div>
+        </div>
       </div>
 
-      <!-- Tab: Bank & Docs -->
-      <div id="etab-bank" style="padding:20px;display:none">
-        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:var(--accent)">BANK DETAILS</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
-          <div class="form-group"><label class="form-label">Bank Name</label><input id="edit-bank-name" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Account Number</label><input id="edit-bank-acc" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">IFSC Code</label><input id="edit-bank-ifsc" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">Branch</label><input id="edit-bank-branch" class="form-control" type="text"></div>
+      <!-- ── Tab: Bank & Docs ── -->
+      <div id="etab-bank" style="padding:20px 24px;display:none">
+
+        <!-- Bank Details -->
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#eaf3d8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">🏦</div>
+            <span style="font-size:12px;font-weight:800;color:#2e7d32;letter-spacing:.5px;text-transform:uppercase">Bank Details</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group" style="margin:0"><label class="form-label">Bank Name</label><input id="edit-bank-name" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Account Number</label><input id="edit-bank-acc" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">IFSC Code</label><input id="edit-bank-ifsc" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Branch</label><input id="edit-bank-branch" class="form-control" type="text"></div>
+          </div>
         </div>
-        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:var(--accent)">STATUTORY DOCS</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group"><label class="form-label">PAN Number</label><input id="edit-pan" class="form-control" type="text" style="text-transform:uppercase"></div>
-          <div class="form-group"><label class="form-label">Aadhar Number</label><input id="edit-aadhar" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">UAN Number</label><input id="edit-uan" class="form-control" type="text"></div>
-          <div class="form-group"><label class="form-label">PF Number</label><input id="edit-pf-num" class="form-control" type="text"></div>
+
+        <!-- Statutory Docs -->
+        <div style="background:#fff;border:1.5px solid #d4e5be;border-radius:14px;padding:18px 20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #eef5e6">
+            <div style="width:28px;height:28px;background:#fff3e0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">📄</div>
+            <span style="font-size:12px;font-weight:800;color:#e65100;letter-spacing:.5px;text-transform:uppercase">Statutory Documents</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group" style="margin:0"><label class="form-label">PAN Number</label><input id="edit-pan" class="form-control" type="text" style="text-transform:uppercase"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Aadhar Number</label><input id="edit-aadhar" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">UAN Number</label><input id="edit-uan" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">PF Number</label><input id="edit-pf-num" class="form-control" type="text"></div>
+          </div>
         </div>
       </div>
 
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('edit-emp-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEmployeeEdit()" id="edit-save-btn">💾 Save Changes</button>
+
+    <!-- Footer -->
+    <div style="padding:16px 24px;border-top:1.5px solid #d4e5be;display:flex;gap:10px;justify-content:flex-end;background:#fff;border-radius:0 0 20px 20px">
+      <button class="btn btn-outline" onclick="closeModal('edit-emp-modal')" style="min-width:90px">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEmployeeEdit()" id="edit-save-btn" style="min-width:140px;background:linear-gradient(135deg,#2e7d32,#4a8c1c);border:none">💾 Save Changes</button>
     </div>
-  </div>
-</div>
 
 <!-- Add Employee Modal -->
 <div class="modal-backdrop" id="add-emp-modal">
@@ -1808,10 +1906,13 @@ let _editEmpId = null;
 
 function switchEditTab(tab) {
   ['info','salary','bank'].forEach(t => {
-    document.getElementById(`etab-${t}`).style.display      = t === tab ? '' : 'none';
+    document.getElementById(`etab-${t}`).style.display = t === tab ? '' : 'none';
     const btn = document.getElementById(`etab-btn-${t}`);
-    btn.style.borderBottomColor = t === tab ? 'var(--accent)' : 'transparent';
-    btn.style.color             = t === tab ? 'var(--accent)' : '';
+    const isActive = t === tab;
+    btn.style.borderBottomColor = isActive ? '#2e7d32' : 'transparent';
+    btn.style.color             = isActive ? '#2e7d32' : '#94a3b8';
+    btn.style.background        = isActive ? '#f0fdf4' : 'none';
+    btn.style.fontWeight        = isActive ? '800' : '700';
   });
 }
 
