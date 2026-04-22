@@ -256,7 +256,7 @@
       <button class="tab-btn" id="loc-tab"  style="display:none" onclick="switchTab('locations')">🗺 Location Map</button>
       <button class="tab-btn" id="reg-tab"  style="display:none" onclick="switchTab('regularize')">🔄 Regularizations</button>
       <button class="tab-btn" id="odwfh-tab" onclick="switchTab('odwfh')">🚗 My OD/WFH</button>
-      <button class="tab-btn" id="download-tab" style="display:none" onclick="switchTab('download')">📊 Master Excel</button>
+      <button class="tab-btn" id="download-tab" style="display:none" onclick="switchTab('download')">⬇ Download Attendance</button>
       <button class="tab-btn" id="import-tab" style="display:none" onclick="switchTab('import')">⬆ Import Attendance</button>
       <button class="tab-btn" id="mark-tab"   style="display:none" onclick="switchTab('mark')">✏️ Mark Attendance</button>
     </div>
@@ -449,15 +449,15 @@
     <div id="tab-download" style="display:none">
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="card-title-icon">📊</span>Download Master Excel</div>
+          <div class="card-title"><span class="card-title-icon">⬇</span>Download Attendance</div>
         </div>
         <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:16px;margin-bottom:24px">
           <div style="font-weight:700;color:#1b5e20;margin-bottom:10px;font-size:14px">📊 What You Get</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;font-size:13px;color:#2d5a0e">
-            <div>📋 <b>Sheet 1 — Attendance Register:</b> Color-coded day-by-day register (P/A/H/WO/HOL) with salary days</div>
-            <div>💰 <b>Sheet 2 — Salary Breakup:</b> Basic, HRA, PF, ESI, Net Pay per employee</div>
-            <div>👥 <b>Sheet 3 — Employee Directory:</b> Full employee master with bank &amp; document details</div>
-            <div>💾 <b>Format:</b> .xlsx ready for payroll calculation</div>
+            <div>📋 <b>Attendance Register:</b> Color-coded day-by-day register (P/A/H/WO/HOL) for all employees</div>
+            <div>🎨 <b>Color Coded:</b> Green=Present, Red=Absent, Blue=Leave, Purple=Half Day, Grey=Week Off</div>
+            <div>📊 <b>Summary Columns:</b> Paid Leave, Unpaid Leave, Total Present, Absent, Late counts per employee</div>
+            <div>💾 <b>Format:</b> .xlsx — Attendance Register only (no salary/personal data)</div>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;align-items:end;margin-bottom:24px">
@@ -471,7 +471,7 @@
           </div>
           <div>
             <button class="btn btn-primary" id="dl-btn" onclick="downloadAttendanceExcel()" style="width:100%;padding:12px;font-size:14px;font-weight:700">
-              📊 Download Master Excel
+              ⬇ Download Attendance
             </button>
           </div>
         </div>
@@ -1965,10 +1965,10 @@ async function downloadAttendanceExcel() {
   const year  = document.getElementById('dl-year').value;
   const btn   = document.getElementById('dl-btn');
   btn.disabled = true;
-  btn.innerHTML = '⏳ Generating Master Excel…';
+  btn.innerHTML = '⏳ Generating…';
   try {
     const token = Auth.getToken();
-    const res = await fetch(`${API_BASE}/employees/export-master?month=${month}&year=${year}`, {
+    const res = await fetch(`${API_BASE}/attendance/export-register?month=${month}&year=${year}`, {
       headers: { Authorization: 'Bearer ' + token }
     });
     if (!res.ok) {
@@ -1976,21 +1976,21 @@ async function downloadAttendanceExcel() {
       toast(err.message || 'Download failed', 'error'); return;
     }
     const blob = await res.blob();
-    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(blob),
-      download: `KrishiHR_Master_${MONTHS[parseInt(month)-1]}${year}.xlsx`
+      download: `KrishiHR_Attendance_${MONTHS[parseInt(month)-1]}_${year}.xlsx`
     });
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
-    toast('✅ Master Excel downloaded!', 'success');
+    toast('✅ Attendance register downloaded!', 'success');
   } catch (err) {
     toast('Download failed: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '📊 Download Master Excel';
+    btn.innerHTML = '⬇ Download Attendance';
   }
 }
 
