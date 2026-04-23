@@ -12,15 +12,22 @@
   /* ── Page Layout ─────────────────────────────────────────── */
   .geo-grid {
     display: grid;
-    grid-template-columns: 340px 1fr 400px;
+    grid-template-columns: 300px 1fr;
     gap: 18px;
     align-items: start;
   }
-  @media (max-width: 1200px) { .geo-grid { grid-template-columns: 300px 1fr 360px; } }
-  @media (max-width: 900px)  { .geo-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .geo-grid { grid-template-columns: 1fr; } }
 
-  /* ── Buffer Rules Column (sticky) ────────────────────────── */
-  .geo-buffer-col { position: sticky; top: 20px; }
+  /* ── Buffer Rules inner layout ───────────────────────────── */
+  .geo-buffer-col { width: 100%; }
+  .br-inner-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    padding: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .br-inner-grid { grid-template-columns: 1fr; } }
 
   /* ── Location Cards ───────────────────────────────────────── */
   .loc-card {
@@ -225,11 +232,10 @@
           <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">Select a location</div>
           <div style="font-size:13px">Click any location from the list to view details, edit buffer, and manage employee assignments</div>
         </div>
-      </div>
 
-      <!-- ══ COL 3: Employee Buffer Rules (sticky) ══ -->
-      <div class="geo-buffer-col">
-    <div class="card" style="margin-top:0">
+    <!-- Employee Buffer Rules — below map, full width of right col -->
+    <div class="geo-buffer-col">
+    <div class="card" style="margin-top:18px">
       <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <div>
           <div class="card-title">🛡️ Employee Buffer Rules</div>
@@ -239,7 +245,7 @@
       </div>
 
       <!-- Layout: left = form, right = table -->
-      <div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+      <div class="br-inner-grid">
 
         <!-- ── FORM ── -->
         <div style="background:var(--surface2);border-radius:var(--radius);padding:16px">
@@ -357,9 +363,9 @@
       </div>
     </div>
       </div>
+      </div>
     </div>
   </div>
-</div>
 
   <style>
     .br-radio-label {
@@ -522,6 +528,7 @@
   </div>
 </div>
 
+</div>
 <!-- NOTIFICATIONS PANEL -->
 <div id="notif-overlay" style="display:none;position:fixed;inset:0;z-index:190" onclick="closeNotifications()"></div>
 <div id="notif-panel">
