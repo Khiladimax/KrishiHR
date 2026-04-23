@@ -19,6 +19,7 @@ const annCtrl        = require('../controllers/announcementController');
 const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
 const offerCtrl      = require('../controllers/offerLetterController');
+const itDeclCtrl     = require('../controllers/itDeclarationController');
 
 const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
@@ -828,5 +829,15 @@ router.get('/test-email', authenticate, async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// ── IT Declaration & Tax ──────────────────────────────────────────────────────
+router.get   ('/it-declaration',              authenticate,                     itDeclCtrl.getDeclaration);
+router.get   ('/it-declaration/all',          authenticate, authorize(...HR_ADMIN), itDeclCtrl.getAllDeclarations);
+router.get   ('/it-declaration/tax-preview',  authenticate,                     itDeclCtrl.taxPreview);
+router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
+router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
+router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
+router.post  ('/it-declaration/:id/review',   authenticate, authorize(...HR_ADMIN), itDeclCtrl.reviewDeclaration);
+router.post  ('/it-declaration/proof/:id/review', authenticate, authorize(...HR_ADMIN), itDeclCtrl.reviewProof);
 
 module.exports = router;
