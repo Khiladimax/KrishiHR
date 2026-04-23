@@ -189,39 +189,46 @@ async function loadForm16() {
 
   const res = await api('GET', url);
   if (!res?.success) {
-    area.innerHTML = `
-  <div id="form16-area-inner" style="max-width:860px;margin:0 auto;font-family:'DM Sans',sans-serif">
+    area.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">${res?.message || 'Failed to load Form 16'}</div>`;
+    return;
+  }
 
-    <!-- ══ HEADER CARD ══ -->
-    <div class="form16-card" style="border-radius:10px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.10)">
+  document.getElementById('print-btn').style.display = '';
+  renderForm16(res.data);
+}
 
-      <!-- Green header band -->
-      <div style="background:linear-gradient(135deg,#1B5E20 0%,#2E7D32 100%);padding:20px 24px">
+function f16fmt(n) {
+  return '₹' + Number(n || 0).toLocaleString('en-IN');
+}
 
-        <!-- Top row: Logo+Company LEFT | FORM16 title RIGHT -->
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+function renderForm16(d) {
+  const area = document.getElementById('form16-area');
+  const { employee: emp, part_a: A, part_b: B, monthly_breakdown: months, financial_year: fy, assessment_year: ay } = d;
 
-          <!-- Company block -->
+  area.innerHTML = `
+  <div id="form16-area-inner" style="max-width:860px;margin:0 auto">
+
+    <!-- Header -->
+    <div class="form16-section form16-card">
+      <div class="form16-header" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+
+          <!-- LEFT: Logo + Company info -->
           <div style="display:flex;align-items:center;gap:14px">
             <img src="data:image/jpeg;base64,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"
                  alt="KCMS Logo"
-                 style="width:68px;height:68px;object-fit:contain;border-radius:10px;flex-shrink:0">
-            <div style="color:#fff">
+                 style="width:66px;height:66px;object-fit:contain;border-radius:8px;flex-shrink:0;">
+            <div>
               <div style="font-size:15px;font-weight:800;line-height:1.3">${A.employer_name}</div>
-              <div style="font-size:11px;opacity:0.85;margin-top:3px">TAN: ${A.employer_tan}</div>
-              <div style="font-size:10px;opacity:0.78;margin-top:2px;max-width:380px">Office No. 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai, Maharashtra — 400060</div>
-              <div style="font-size:10px;opacity:0.78;margin-top:2px;display:flex;gap:12px">
-                <span>📧 hr@krishicare.in</span>
-                <span>🌐 www.krishicare.in</span>
-              </div>
+              <div style="font-size:11px;opacity:0.82;margin-top:3px">TAN: ${A.employer_tan}</div>
+              <div style="font-size:10px;opacity:0.76;margin-top:2px">Office No. 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai — 400060</div>
+              <div style="font-size:10px;opacity:0.76;margin-top:2px">📧 hr@krishicare.in &nbsp;|&nbsp; 🌐 www.krishicare.in</div>
             </div>
           </div>
 
-          <!-- Form title block -->
-          <div style="text-align:right;color:#fff;flex-shrink:0">
-            <div style="font-size:26px;font-weight:900;letter-spacing:1px;line-height:1">
-              FORM 16 &nbsp;<span class="badge-fy" style="font-size:13px;vertical-align:middle">FY ${fy}</span>
-            </div>
+          <!-- RIGHT: Form title -->
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:26px;font-weight:900;letter-spacing:1px">FORM 16 &nbsp;<span class="badge-fy">FY ${fy}</span></div>
             <div style="font-size:11px;opacity:0.85;margin-top:6px">Certificate of Tax Deducted at Source on Salary</div>
             <div style="font-size:11px;opacity:0.85;margin-top:2px">Assessment Year ${ay}</div>
             <div style="font-size:10px;opacity:0.65;margin-top:2px">[As per Section 203 of Income Tax Act, 1961]</div>
@@ -230,35 +237,30 @@ async function loadForm16() {
         </div>
       </div>
 
-      <!-- Employee + Employer info grid (white) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;background:#fff">
-
-        <!-- Employee Details -->
-        <div style="padding:18px 22px;border-right:1px solid #c8e6c9;border-bottom:1px solid #c8e6c9">
-          <div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Employee Details</div>
-          <table style="font-size:12.5px;width:100%;border-collapse:collapse">
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0;width:130px">Name</td><td style="font-weight:600;padding:5px 0">${emp.name}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">Employee Code</td><td style="font-weight:600;padding:5px 0">${emp.code}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">PAN</td><td style="font-weight:700;padding:5px 0;color:${emp.pan === 'NOT PROVIDED' ? '#ef4444' : '#1a1a1a'}">${emp.pan}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">UAN</td><td style="padding:5px 0">${emp.uan || '—'}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">PF Number</td><td style="padding:5px 0">${emp.pf_number || '—'}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">Department</td><td style="padding:5px 0">${emp.department}</td></tr>
-            <tr><td style="color:#888;padding:5px 0">Designation</td><td style="padding:5px 0">${emp.designation}</td></tr>
+      <!-- Employee + Employer Info -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #c8e6c9">
+        <div style="padding:14px 18px;border-right:1px solid #c8e6c9">
+          <div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:8px;text-transform:uppercase">Employee Details</div>
+          <table style="font-size:12px;width:100%;border-collapse:collapse">
+            <tr><td style="color:#777;padding:3px 0;width:120px">Name</td><td style="font-weight:600">${emp.name}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Employee Code</td><td style="font-weight:600">${emp.code}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">PAN</td><td style="font-weight:600;color:${emp.pan === 'NOT PROVIDED' ? '#ef4444' : '#1a1a1a'}">${emp.pan}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">UAN</td><td>${emp.uan || '—'}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">PF Number</td><td>${emp.pf_number || '—'}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Department</td><td>${emp.department}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Designation</td><td>${emp.designation}</td></tr>
           </table>
         </div>
-
-        <!-- Employer Details -->
-        <div style="padding:18px 22px;border-bottom:1px solid #c8e6c9">
-          <div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Employer Details</div>
-          <table style="font-size:12.5px;width:100%;border-collapse:collapse">
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0;width:130px">Name</td><td style="font-weight:600;padding:5px 0">${A.employer_name}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">TAN</td><td style="font-weight:600;padding:5px 0">${A.employer_tan}</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">Address</td><td style="padding:5px 0;font-size:11px">Office No. 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai, Maharashtra — 400060</td></tr>
-            <tr style="border-bottom:1px solid #f0f0f0"><td style="color:#888;padding:5px 0">Financial Year</td><td style="font-weight:600;padding:5px 0">FY ${fy}</td></tr>
-            <tr><td style="color:#888;padding:5px 0">Assessment Year</td><td style="font-weight:600;padding:5px 0">${ay}</td></tr>
+        <div style="padding:14px 18px">
+          <div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:8px;text-transform:uppercase">Employer Details</div>
+          <table style="font-size:12px;width:100%;border-collapse:collapse">
+            <tr><td style="color:#777;padding:3px 0;width:120px">Name</td><td style="font-weight:600">${A.employer_name}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">TAN</td><td style="font-weight:600">${A.employer_tan}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Address</td><td style="font-size:11px">Office No. 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai — 400060</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Financial Year</td><td style="font-weight:600">FY ${fy}</td></tr>
+            <tr><td style="color:#777;padding:3px 0">Assessment Year</td><td style="font-weight:600">${ay}</td></tr>
           </table>
         </div>
-
       </div>
     </div>
 
@@ -384,7 +386,6 @@ async function loadForm16() {
         Rules, 1962 for the Financial Year <strong>${fy}</strong> (Assessment Year <strong>${ay}</strong>).
       </div>
     </div>
-
 
   </div>`;
 }
