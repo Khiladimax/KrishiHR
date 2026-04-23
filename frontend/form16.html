@@ -29,20 +29,27 @@
 
 /* ── Print: real A4 ── */
 @media print {
-  body { margin: 0; background: #fff; }
-  .sidebar, .topbar, .no-print, #form16-area { background: none !important; padding: 0 !important; }
-  .main { margin-left: 0 !important; }
-  .content { padding: 0 !important; }
-  @page { size: A4 portrait; margin: 10mm 12mm; }
-  body, .f16-page { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .f16-page {
-    width: 100% !important; min-height: unset !important;
-    margin: 0 !important; padding: 0 !important;
-    box-shadow: none !important; border-radius: 0 !important;
-  }
+  /* Hide EVERYTHING except the form content */
+  body > *                          { display: none !important; }
+  #form16-print-wrap                { display: block !important; }
+  @page { size: A4 portrait; margin: 10mm 10mm; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .page-break { page-break-before: always; }
-  .no-break { page-break-inside: avoid; }
-  tr { page-break-inside: avoid; }
+  .no-break   { page-break-inside: avoid; }
+  tr          { page-break-inside: avoid; }
+  .f16-page {
+    width: 100% !important;
+    min-height: unset !important;
+    margin: 0 !important;
+    padding: 14px 16px !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+}
+
+/* Print wrapper — hidden on screen, shown on print */
+#form16-print-wrap {
+  display: none;
 }
 
 /* ── Form 16 component styles ── */
@@ -94,6 +101,9 @@
 </head>
 <body>
 
+<!-- Hidden print wrapper — only shown during print -->
+<div id="form16-print-wrap"></div>
+
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
   <div class="sidebar-logo">
@@ -122,7 +132,7 @@
       <div class="topbar-title">📄 Form 16</div>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-outline btn-sm no-print" onclick="window.print()" id="print-btn" style="display:none">🖨 Print / Download PDF</button>
+      <button class="btn btn-outline btn-sm no-print" onclick="printForm16()" id="print-btn" style="display:none">🖨 Print / Download PDF</button>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
       <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
@@ -242,13 +252,23 @@ function f16fmt(n) {
 }
 
 
+function printForm16() {
+  const inner = document.getElementById('form16-area-inner');
+  if (!inner) { alert('Please load Form 16 first'); return; }
+  // Copy form content into the print wrapper, print, then restore
+  const wrap = document.getElementById('form16-print-wrap');
+  wrap.innerHTML = inner.outerHTML;
+  window.print();
+  wrap.innerHTML = '';
+}
+
 function renderForm16(d) {
   const area = document.getElementById('form16-area');
   const { employee: emp, part_a: A, part_b: B, monthly_breakdown: months, financial_year: fy, assessment_year: ay } = d;
   const fmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
 
   area.innerHTML = `
-  <div class="f16-page">
+  <div class="f16-page" id="form16-area-inner">
 
     <!-- ══════════ HEADER ══════════ -->
     <div class="no-break" style="border:1.5px solid #c8e6c9;border-radius:10px;overflow:hidden;margin-bottom:18px">
