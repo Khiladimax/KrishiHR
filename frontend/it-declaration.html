@@ -330,8 +330,24 @@
 
 <!-- HR Review Modal -->
 <div id="review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:24px;width:420px;max-width:95vw">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:680px;max-width:96vw;max-height:90vh;overflow-y:auto">
     <div style="font-weight:700;font-size:16px;margin-bottom:14px" id="review-modal-title">Review Declaration</div>
+
+    <!-- Inline Proof Documents -->
+    <div id="review-proofs-wrap" style="margin-bottom:14px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--muted)">📎 Proof Documents</div>
+      <div id="review-proofs-list" style="font-size:12px;color:var(--muted2)">Loading…</div>
+    </div>
+
+    <!-- Inline Document Viewer -->
+    <div id="review-doc-viewer" style="display:none;margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:var(--bg2);padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
+        <span id="review-doc-name" style="font-size:12px;font-weight:600;color:var(--muted)"></span>
+        <button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="document.getElementById('review-doc-viewer').style.display='none'">✕ Close</button>
+      </div>
+      <div id="review-doc-content" style="min-height:200px;max-height:420px;overflow:auto;display:flex;align-items:center;justify-content:center;background:#f9f9f9"></div>
+    </div>
+
     <textarea id="review-comment" rows="3" class="form-control" placeholder="Comment (optional for approve, required for reject)…" style="width:100%;margin-bottom:12px"></textarea>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-outline" onclick="closeReviewModal()">Cancel</button>
@@ -349,7 +365,7 @@ buildSidebar('it-declaration.html');
   loadNotifBadge();
 
 const itUser = Auth.getUser();
-const itIsHR = ['super_admin','admin','hr','accounts'].includes(itUser?.role);
+const itIsHR = ['hr','accounts'].includes(itUser?.role);
 
 if (itIsHR) document.getElementById('tab-hr').style.display = '';
 
@@ -508,7 +524,7 @@ async function renderProofSections() {
       ? `<span class="proof-status status-${existing.status}" style="background:${existing.status==='approved'?'var(--green-l)':existing.status==='rejected'?'var(--red-l)':'var(--yellow-l)'};color:${existing.status==='approved'?'var(--green-d)':existing.status==='rejected'?'var(--red-d)':'var(--yellow-d)'}">${existing.status.toUpperCase()}</span>`
       : '';
     const viewBtn = existing
-      ? `<a href="${API_BASE}/it-declaration/proof/${existing.id}" target="_blank" class="btn btn-outline" style="font-size:11px;padding:4px 10px;text-decoration:none">👁 View</a>`
+      ? `<button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="viewProofBlob(${existing.id})">👁 View</button>`
       : '';
     const hrComment = existing?.hr_comment ? `<div style="font-size:11px;color:var(--red-d);margin-top:3px">HR: ${existing.hr_comment}</div>` : '';
     return `
@@ -529,6 +545,24 @@ async function renderProofSections() {
         </div>
       </div>`;
   }).join('');
+}
+
+// ── Authenticated Proof Viewer ────────────────────────────────────────────────
+async function viewProofBlob(proofId) {
+  try {
+    const token = Auth.getToken();
+    const res = await fetch(`${API_BASE}/it-declaration/proof/${proofId}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) { toast('Could not load proof document', 'error'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    // Revoke object URL after window loads to free memory
+    if (win) win.addEventListener('load', () => setTimeout(() => URL.revokeObjectURL(url), 60000));
+  } catch (e) {
+    toast('Failed to open proof document', 'error');
+  }
 }
 
 async function uploadProof(input, section, label) {
@@ -680,7 +714,63 @@ function openReviewModal(declId, empName) {
   reviewingDeclId = declId;
   document.getElementById('review-modal-title').textContent = `Review — ${empName}`;
   document.getElementById('review-comment').value = '';
+  document.getElementById('review-doc-viewer').style.display = 'none';
   document.getElementById('review-modal').style.display = 'flex';
+  loadReviewProofs(declId);
+}
+
+async function loadReviewProofs(declId) {
+  const listEl = document.getElementById('review-proofs-list');
+  listEl.innerHTML = '<span style="color:var(--muted2)">Loading proofs…</span>';
+  try {
+    const res = await api('GET', `/it-declaration/proofs?declaration_id=${declId}`);
+    const proofs = res?.data || [];
+    if (!proofs.length) {
+      listEl.innerHTML = '<span style="color:var(--muted2)">No proof documents uploaded.</span>';
+      return;
+    }
+    listEl.innerHTML = proofs.map(p => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg2)">
+        <span style="font-size:18px">${p.mime_type?.startsWith('image/') ? '🖼️' : '📄'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.section_label || p.section}</div>
+          <div style="font-size:11px;color:var(--muted)">${p.original_name}</div>
+        </div>
+        <span class="status-badge status-${p.status}" style="flex-shrink:0;font-size:10px">${p.status}</span>
+        <button class="btn btn-outline" style="font-size:11px;padding:3px 10px;flex-shrink:0" onclick="viewReviewDoc(${p.id},'${p.original_name.replace(/'/g,"\\'")}','${p.mime_type}')">👁 View</button>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<span style="color:var(--red)">Failed to load proofs.</span>';
+  }
+}
+
+async function viewReviewDoc(proofId, name, mimeType) {
+  const viewer  = document.getElementById('review-doc-viewer');
+  const content = document.getElementById('review-doc-content');
+  const nameEl  = document.getElementById('review-doc-name');
+  content.innerHTML = '<span style="color:var(--muted2);padding:20px">Loading…</span>';
+  viewer.style.display = '';
+  nameEl.textContent = name;
+  try {
+    const token = Auth.getToken();
+    const res = await fetch(`${API_BASE}/it-declaration/proof/${proofId}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) { content.innerHTML = '<span style="color:var(--red);padding:20px">Could not load document.</span>'; return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    if (mimeType?.startsWith('image/')) {
+      content.innerHTML = `<img src="${url}" style="max-width:100%;max-height:400px;object-fit:contain;display:block;margin:auto;padding:8px">`;
+    } else if (mimeType === 'application/pdf') {
+      content.innerHTML = `<iframe src="${url}" style="width:100%;height:420px;border:none"></iframe>`;
+    } else {
+      content.innerHTML = `<a href="${url}" download="${name}" class="btn btn-primary" style="margin:20px">⬇ Download ${name}</a>`;
+    }
+    // Revoke after a while
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (e) {
+    content.innerHTML = '<span style="color:var(--red);padding:20px">Failed to load document.</span>';
+  }
 }
 
 function closeReviewModal() {
