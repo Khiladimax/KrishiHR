@@ -7,7 +7,8 @@ const db      = require('./config/db');
 const routes  = require('./routes/index');
 const attCtrl = require('./controllers/attendanceController');
 const emailSvc = require('./config/emailService'); // for startup repair
-const offerCtrl = require('./controllers/offerLetterController');
+const offerCtrl  = require('./controllers/offerLetterController');
+const itDeclCtrl = require('./controllers/itDeclarationController');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -633,6 +634,7 @@ async function start() {
     await attCtrl.fixMissingPunchOuts(); // mark past present/late with no punch_out as missing_punch_out
     await attCtrl.fixTimezoneShiftedLeaves();
     await offerCtrl.initTables();        // ensure offer_letters table exists
+    await itDeclCtrl.initTables();       // ensure it_declarations tables exist
 
     app.listen(PORT, () => {
       console.log('');
