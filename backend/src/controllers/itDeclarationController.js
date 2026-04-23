@@ -138,7 +138,6 @@ exports.getDeclaration = async (req, res) => {
       return res.json({ success: true, data: null });
 
     const decl = result.rows[0];
-    // Fetch proof docs
     const docs = await db.query(
       `SELECT id, section, section_label, original_name, mime_type, file_size, status, hr_comment, uploaded_at
        FROM it_proof_documents WHERE declaration_id=$1 ORDER BY section`,
@@ -152,7 +151,7 @@ exports.getDeclaration = async (req, res) => {
   }
 };
 
-// ── GET /it-declaration/all — HR sees all employees ───────────────────────────
+// ── GET /it-declaration/all — HR/Accounts sees all employees ──────────────────
 exports.getAllDeclarations = async (req, res) => {
   try {
     const { fy, status } = req.query;
@@ -176,6 +175,45 @@ exports.getAllDeclarations = async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error('[getAllDeclarations]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── GET /it-declaration/:id — get a specific declaration by ID (HR/Accounts/Admin) ──
+// FIX: This route was missing — caused "Could not load declaration details" error
+exports.getDeclarationById = async (req, res) => {
+  try {
+    const reqUser = req.user;
+    const declId  = parseInt(req.params.id);
+
+    if (isNaN(declId))
+      return res.status(400).json({ success: false, message: 'Invalid declaration id' });
+
+    const result = await db.query(
+      `SELECT d.*, CONCAT(e.first_name,' ',e.last_name) AS employee_name, e.employee_code
+       FROM it_declarations d
+       JOIN employees e ON d.employee_id = e.id
+       WHERE d.id=$1`,
+      [declId]
+    );
+    if (!result.rows.length)
+      return res.status(404).json({ success: false, message: 'Declaration not found' });
+
+    const decl = result.rows[0];
+
+    // Employees can only view their own; HR, Accounts, Admin, Super-Admin can view all
+    if (!['super_admin','admin','hr','accounts'].includes(reqUser.role) && decl.employee_id !== reqUser.id)
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const docs = await db.query(
+      `SELECT id, section, section_label, original_name, mime_type, file_size, status, hr_comment, uploaded_at
+       FROM it_proof_documents WHERE declaration_id=$1 ORDER BY section`,
+      [decl.id]
+    );
+    decl.proof_documents = docs.rows;
+    res.json({ success: true, data: decl });
+  } catch (err) {
+    console.error('[getDeclarationById]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -308,6 +346,7 @@ exports.getProofsByDeclaration = async (req, res) => {
 };
 
 // ── GET /it-declaration/proof/:id — download/view proof ──────────────────────
+// FIX: Expanded access to also allow admin/super_admin (for completeness in HR Review)
 exports.getProof = async (req, res) => {
   try {
     const reqUser = req.user;
@@ -323,8 +362,9 @@ exports.getProof = async (req, res) => {
 
     const proof = result.rows[0];
 
-    // Only HR/accounts or the employee themselves can view
-    if (!['hr','accounts'].includes(reqUser.role) && proof.employee_id !== reqUser.id)
+    // HR, Accounts, Admin, Super-Admin can view all proofs; employees can only view their own
+    const isPrivileged = ['hr','accounts','admin','super_admin'].includes(reqUser.role);
+    if (!isPrivileged && proof.employee_id !== reqUser.id)
       return res.status(403).json({ success: false, message: 'Access denied' });
 
     const buffer = Buffer.from(proof.file_data, 'base64');
