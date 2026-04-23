@@ -290,6 +290,23 @@ exports.uploadProof = async (req, res) => {
   }
 };
 
+// ── GET /it-declaration/proofs?declaration_id=X — list proofs for HR modal ───
+exports.getProofsByDeclaration = async (req, res) => {
+  try {
+    const declId = parseInt(req.query.declaration_id);
+    if (!declId) return res.status(400).json({ success: false, message: 'declaration_id required' });
+    const result = await db.query(
+      `SELECT id, section, section_label, original_name, mime_type, status, hr_comment, uploaded_at
+       FROM it_proof_documents WHERE declaration_id = $1 ORDER BY uploaded_at ASC`,
+      [declId]
+    );
+    return res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('[getProofsByDeclaration]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── GET /it-declaration/proof/:id — download/view proof ──────────────────────
 exports.getProof = async (req, res) => {
   try {
@@ -306,8 +323,8 @@ exports.getProof = async (req, res) => {
 
     const proof = result.rows[0];
 
-    // Only HR/admin or the employee themselves can view
-    if (!['super_admin','admin','hr','accounts'].includes(reqUser.role) && proof.employee_id !== reqUser.id)
+    // Only HR/accounts or the employee themselves can view
+    if (!['hr','accounts'].includes(reqUser.role) && proof.employee_id !== reqUser.id)
       return res.status(403).json({ success: false, message: 'Access denied' });
 
     const buffer = Buffer.from(proof.file_data, 'base64');
