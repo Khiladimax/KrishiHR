@@ -12,7 +12,7 @@
  */
 
 const API_BASE    = 'https://krishihr-zuui.onrender.com/api';
-const INTERVAL    = 50 * 60 * 1000; // 10 minutes
+const INTERVAL    = 30 * 1000; // 10 minutes
 const MAX_GPS_WAIT = 10000;          // 10 second GPS timeout per tick
 
 let _token    = null;
