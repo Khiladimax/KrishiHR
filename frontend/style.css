@@ -770,11 +770,10 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 .modal-body {
   font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
-  display: flex;
-  height: 100%;
-  overflow: hidden;
+  display: block;
+  padding: 24px;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
