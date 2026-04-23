@@ -838,6 +838,7 @@ router.get   ('/it-declaration/proofs',       authenticate, authorize('hr','acco
 router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
 router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
 router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
+router.get   ('/it-declaration/:id',           authenticate, authorize('hr','accounts','admin','super_admin'), itDeclCtrl.getDeclarationById);
 router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
 router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
 
