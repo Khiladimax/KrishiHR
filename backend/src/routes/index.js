@@ -22,7 +22,7 @@ const offerCtrl      = require('../controllers/offerLetterController');
 const itDeclCtrl     = require('../controllers/itDeclarationController');
 
 const ADMIN      = ['admin','super_admin'];
-const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
+const HR_ADMIN   = ['hr','admin','super_admin'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
 const EMP_MGMT   = ['hr','accounts'];
@@ -832,12 +832,13 @@ router.get('/test-email', authenticate, async (req, res) => {
 
 // ── IT Declaration & Tax ──────────────────────────────────────────────────────
 router.get   ('/it-declaration',              authenticate,                     itDeclCtrl.getDeclaration);
-router.get   ('/it-declaration/all',          authenticate, authorize(...HR_ADMIN), itDeclCtrl.getAllDeclarations);
+router.get   ('/it-declaration/all',          authenticate, authorize('hr','accounts'), itDeclCtrl.getAllDeclarations);
 router.get   ('/it-declaration/tax-preview',  authenticate,                     itDeclCtrl.taxPreview);
+router.get   ('/it-declaration/proofs',       authenticate, authorize('hr','accounts'), itDeclCtrl.getProofsByDeclaration);
 router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
 router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
 router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
-router.post  ('/it-declaration/:id/review',   authenticate, authorize(...HR_ADMIN), itDeclCtrl.reviewDeclaration);
-router.post  ('/it-declaration/proof/:id/review', authenticate, authorize(...HR_ADMIN), itDeclCtrl.reviewProof);
+router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
+router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
 
 module.exports = router;
