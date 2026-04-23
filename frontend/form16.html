@@ -6,18 +6,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-@media print {
-  .sidebar, .topbar, .no-print, .card { display: none !important; }
-  .main { margin-left: 0 !important; }
-  .content { padding: 0 !important; }
-  @page { size: A4 portrait; margin: 12mm 10mm; }
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  #form16-area { background: none !important; padding: 0 !important; }
-  #form16-area-inner { max-width: 100% !important; }
-  .form16-section { break-inside: auto !important; page-break-inside: auto !important; }
-  .form16-section-title { page-break-after: avoid; }
-  tr { page-break-inside: avoid; }
-}
+/* print handled by printF16() */
 .form16-header {
   background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
   color: #fff; padding: 24px 28px; border-radius: 10px 10px 0 0;
@@ -213,23 +202,19 @@ function renderForm16(d) {
   <div id="form16-area-inner" style="max-width:860px;margin:0 auto">
 
     <!-- Header -->
-    <div class="form16-section form16-card">
-      <!-- Top band -->
+    <div class="form16-section">
       <div style="display:flex;align-items:stretch;background:#f3f8f0;position:relative;overflow:hidden">
         <div style="position:absolute;bottom:-16px;left:0;width:160px;height:80px;background:rgba(144,199,107,0.15);border-radius:0 50px 0 0"></div>
-        <!-- Logo -->
-        <div style="display:flex;align-items:center;justify-content:center;padding:18px 14px 18px 18px;flex-shrink:0;z-index:1">
+        <div style="display:flex;align-items:center;padding:18px 14px 18px 18px;flex-shrink:0;z-index:1">
           <img src="data:image/jpeg;base64,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" style="width:80px;height:80px;object-fit:contain;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
         </div>
         <div style="width:1.5px;background:#c8e6c9;margin:16px 0;flex-shrink:0"></div>
-        <!-- Company info -->
         <div style="flex:1;padding:16px 18px;display:flex;flex-direction:column;justify-content:center;z-index:1">
-          <div style="font-size:16px;font-weight:800;color:#1B5E20;line-height:1.25;margin-bottom:8px">${A.employer_name}</div>
-          <div style="font-size:11.5px;color:#444;margin-bottom:5px">🪩 TAN: <strong style="color:#2E7D32">${A.employer_tan}</strong></div>
-          <div style="font-size:11px;color:#555;line-height:1.5;margin-bottom:5px">📍 Office No. 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai – 400060</div>
-          <div style="font-size:11px;color:#555">✉️ hr@krishicare.in &nbsp;|&nbsp; 🌐 www.krishicare.in</div>
+          <div style="font-size:16px;font-weight:800;color:#1B5E20;margin-bottom:8px">${A.employer_name}</div>
+          <div style="font-size:11.5px;color:#444;margin-bottom:5px">TAN: <strong style="color:#2E7D32">${A.employer_tan}</strong></div>
+          <div style="font-size:11px;color:#555;line-height:1.5;margin-bottom:5px">Office No. 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai – 400060</div>
+          <div style="font-size:11px;color:#555">hr@krishicare.in | www.krishicare.in</div>
         </div>
-        <!-- FORM 16 dark box -->
         <div style="background:linear-gradient(145deg,#1B5E20,#2E7D32);width:175px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px 20px;clip-path:polygon(15% 0%,100% 0%,100% 100%,0% 100%);position:relative">
           <div style="position:absolute;bottom:0;left:0;right:0;height:28%;background:rgba(144,199,107,0.18);border-radius:40% 0 0 0"></div>
           <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:1px;z-index:1">FORM 16</div>
@@ -238,12 +223,11 @@ function renderForm16(d) {
           </div>
         </div>
       </div>
-      <!-- Certificate subtitle -->
       <div style="background:#fff;border-top:1.5px solid #e8f5e9;display:flex;align-items:center;padding:10px 18px;gap:14px">
         <div style="width:44px;height:44px;background:#f3f8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid #c8e6c9;font-size:20px">📋</div>
         <div>
           <div style="font-size:13px;font-weight:700;color:#1B5E20">Certificate of Tax Deducted at Source on Salary</div>
-          <div style="font-size:11.5px;color:#555;margin-top:2px">Assessment Year ${ay} &nbsp;|&nbsp; <span style="color:#888">[As per Section 203 of Income Tax Act, 1961]</span></div>
+          <div style="font-size:11.5px;color:#555;margin-top:2px">Assessment Year ${ay} | [As per Section 203 of Income Tax Act, 1961]</div>
         </div>
       </div>
 
@@ -387,7 +371,7 @@ function renderForm16(d) {
     </div>
 
     <!-- Declaration -->
-    <div class="form16-section form16-card" style="margin-bottom:30px">
+    <div class="form16-section" style="margin-bottom:30px">
       <div class="form16-section-title">✅ Declaration</div>
       <div style="padding:14px 18px;font-size:12px;color:#555;line-height:1.7">
         I, the employer, hereby certify that a sum of <strong>${f16fmt(A.total_tds_deducted)}</strong> has been deducted
@@ -401,36 +385,28 @@ function renderForm16(d) {
 }
 
 function printF16() {
-  const el = document.getElementById('form16-area-inner');
+  var el = document.getElementById('form16-area-inner');
   if (!el) { alert('Please load Form 16 first'); return; }
 
-  // Collect all inline styles from the current page
-  const styles = Array.from(document.styleSheets).map(ss => {
-    try { return Array.from(ss.cssRules).map(r => r.cssText).join('\n'); }
-    catch(e) { return ''; }
-  }).join('\n');
+  var w = window.open('', '_blank', 'width=900,height=700');
+  var css = '\n  @page { size: A4 portrait; margin: 10mm 10mm; }\n  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }\n  body { margin: 0; padding: 10px; font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; }\n  /* Form sections */\n  .form16-section { border: 1px solid #c8e6c9; border-radius: 8px; overflow: visible; margin-bottom: 14px; page-break-inside: auto; }\n  .form16-section-title { background: #e8f5e9; color: #1B5E20; font-weight: 700; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid #c8e6c9; text-transform: uppercase; letter-spacing: 0.5px; page-break-after: avoid; }\n  /* f16 rows */\n  .f16-row { display: flex; justify-content: space-between; padding: 5px 12px; border-bottom: 1px solid #f1f8e9; font-size: 12px; }\n  .f16-row .f16-label { color: #555; }\n  .f16-row .f16-value { font-weight: 600; }\n  .f16-row.total { background: #e8f5e9; font-weight: 700; color: #1B5E20; }\n  .f16-row.total .f16-label, .f16-row.total .f16-value { color: #1B5E20; font-size: 13px; }\n  /* table */\n  .form16-table { width: 100%; border-collapse: collapse; font-size: 11px; }\n  .form16-table th { background: #f1f8e9; color: #2E7D32; font-weight: 700; padding: 6px 8px; border: 1px solid #c8e6c9; text-align: left; }\n  .form16-table td { padding: 5px 8px; border: 1px solid #e8f5e9; }\n  .form16-table tr:nth-child(even) td { background: #f9fbe7; }\n  .form16-table tfoot tr td { background: #e8f5e9; font-weight: 700; color: #1B5E20; }\n  tr { page-break-inside: avoid; }\n  /* quarter grid */\n  .quarter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }\n  .quarter-box { background: #f9fbe7; border: 1px solid #c8e6c9; border-radius: 6px; padding: 8px 12px; }\n  .quarter-box .q-title { font-size: 11px; font-weight: 700; color: #2E7D32; margin-bottom: 4px; }\n  .quarter-box .q-row { display: flex; justify-content: space-between; font-size: 11px; color: #555; }\n  .quarter-box .q-row span:last-child { font-weight: 600; color: #1a1a1a; }\n  /* badge */\n  .badge-fy { display: inline-block; background: rgba(255,255,255,0.15); color: #fff; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid rgba(255,255,255,0.4); }\n  /* header image area */\n  img { max-width: 100%; }\n  /* no-print hidden */\n  .no-print { display: none !important; }\n';
+  var html = '<!DOCTYPE html><html><head>' +
+    '<meta charset="UTF-8"><title>Form 16</title>' +
+    '<style>' + css + '</style>' +
+    '</head><body>' + el.innerHTML + '</body></html>';
 
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="UTF-8">
-    <title>Form 16</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-      @page { size: A4 portrait; margin: 12mm 10mm; }
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; font-family: 'DM Sans', Arial, sans-serif; }
-      body { margin: 0; padding: 8px; background: #fff; font-size: 12.5px; color: #1a1a1a; }
-      ${styles}
-      /* Overrides for print window */
-      .sidebar, .topbar, .no-print { display: none !important; }
-      #form16-area-inner { max-width: 100% !important; margin: 0 !important; }
-      .form16-section { break-inside: auto; page-break-inside: auto; border: 1px solid #c8e6c9; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
-      .form16-section-title { page-break-after: avoid; }
-      tr { page-break-inside: avoid; }
-    </style>
-  </head><body>${el.outerHTML}</body></html>`);
+  w.document.open();
+  w.document.write(html);
   w.document.close();
-  setTimeout(() => { w.focus(); w.print(); }, 1200);
+
+  // Wait for images (logo base64) to render then print
+  w.onload = function() { w.focus(); w.print(); };
+  // Fallback if onload already fired
+  setTimeout(function() {
+    if (w && !w.closed) { w.focus(); w.print(); }
+  }, 1500);
 }
+
 </script>
 </body>
 </html>
