@@ -578,6 +578,8 @@ async function loadAll() {
   renderLocList();
   renderMapMarkers();
   updateStats();
+  // Keep office dropdown in sync whenever locations reload
+  if (typeof brPopulateOffices === 'function') brPopulateOffices();
 }
 
 function updateStats() {
@@ -1232,15 +1234,39 @@ async function initBufferRules() {
     stateSel.appendChild(o);
   });
 
-  // Populate office select
-  const offSel = document.getElementById('br-office-sel');
-  (_allLocations || []).filter(l => [1,2].includes(l.id)).forEach(l => {
-    const o = document.createElement('option');
-    o.value = l.id; o.textContent = l.name;
-    offSel.appendChild(o);
-  });
+  // Populate office select — show all strict office locations (radius < 10000m)
+  brPopulateOffices();
 
   await loadAllRules();
+}
+
+function brPopulateOffices() {
+  const offSel = document.getElementById('br-office-sel');
+  const prevVal = offSel.value;
+  // Keep only the default placeholder option
+  offSel.innerHTML = '<option value="">— select office —</option>';
+  // Show all active strict-office locations (radius < 10000m, not WFH)
+  const offices = (_allLocations || []).filter(l =>
+    l.is_active &&
+    l.radius_meters < 10000 &&
+    !l.name.toLowerCase().includes('work from home') &&
+    !l.name.toLowerCase().includes('wfh')
+  );
+  if (offices.length === 0) {
+    const o = document.createElement('option');
+    o.disabled = true;
+    o.textContent = 'No office locations found';
+    offSel.appendChild(o);
+  } else {
+    offices.forEach(l => {
+      const o = document.createElement('option');
+      o.value = l.id;
+      o.textContent = l.name;
+      offSel.appendChild(o);
+    });
+    // Restore previous selection if still valid
+    if (prevVal) offSel.value = prevVal;
+  }
 }
 
 async function loadAllRules() {
