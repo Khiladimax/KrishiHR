@@ -40,8 +40,6 @@ exports.listProvisionEmployees = async (req, res) => {
     const params = [];
 
     // Manager / TL only sees their direct reports
-    // HR who is also a reporting manager sees all (they need full list for HR tab)
-    // but we also return reporting_manager_id so frontend can detect HR-as-manager scenario
     if (role === 'manager' || role === 'tl') {
       whereExtra = `AND e.reporting_manager_id = $1`;
       params.push(userId);
@@ -195,13 +193,13 @@ exports.approveConfirmation = async (req, res) => {
       return res.status(400).json({ success: false, message: `Confirmation already ${pc.overall_status}` });
 
     // ── MANAGER approval (step 1) ─────────────────────────────────────────────
-    // Also handles the case where HR is the reporting manager
+    // Handles: manager, tl, and admin/super_admin who is the actual reporting manager
     const isManagerRole = actor.role === 'manager' || actor.role === 'tl';
-    const isHRRole      = actor.role === 'hr' || actor.role === 'admin' || actor.role === 'super_admin';
-    const isHRAsManager = isHRRole && actor.id === pc.reporting_manager_id && pc.overall_status === 'pending';
+    const isAdminAsManager = (actor.role === 'admin' || actor.role === 'super_admin')
+                              && actor.id === pc.reporting_manager_id
+                              && pc.overall_status === 'pending';
 
-    if (isManagerRole || isHRAsManager) {
-      // Verify this manager is the reporting manager (admins/super_admins can bypass)
+    if (isManagerRole || isAdminAsManager) {
       if (actor.id !== pc.reporting_manager_id && actor.role !== 'admin' && actor.role !== 'super_admin')
         return res.status(403).json({ success: false, message: 'Only the reporting manager can approve at this step' });
 
@@ -250,7 +248,7 @@ exports.approveConfirmation = async (req, res) => {
     }
 
     // ── HR approval (step 2) — auto-confirms employee ─────────────────────────
-    if (isHRRole && !isHRAsManager) {
+    if ((actor.role === 'hr' || actor.role === 'admin' || actor.role === 'super_admin') && !isAdminAsManager) {
       if (pc.overall_status !== 'manager_approved')
         return res.status(400).json({
           success: false,
