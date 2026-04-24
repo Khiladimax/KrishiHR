@@ -479,9 +479,9 @@ cron.schedule('0 9 * * *', async () => {
         // In-app notification to manager
         if (emp.reporting_manager_id) {
           await db.query(
-            `INSERT INTO notifications (employee_id, type, title, message, link, is_read, expires_at)
+            `INSERT INTO notifications (employee_id, type, title, message, is_read)
              VALUES ($1, 'provision_confirm', '⏳ Provision Confirmation Required',
-                     $2, '/provision', FALSE, NOW() + INTERVAL '72 hours')`,
+                     $2, FALSE)`,
             [
               emp.reporting_manager_id,
               `${emp.first_name} ${emp.last_name} (${emp.employee_code}) has completed their provision period. Please review and approve their permanent confirmation.`
@@ -495,9 +495,9 @@ cron.schedule('0 9 * * *', async () => {
         );
         for (const hr of hrList.rows) {
           await db.query(
-            `INSERT INTO notifications (employee_id, type, title, message, link, is_read, expires_at)
+            `INSERT INTO notifications (employee_id, type, title, message, is_read)
              VALUES ($1, 'provision_confirm', '⏳ Provision Period Ended — Confirmation Initiated',
-                     $2, '/provision', FALSE, NOW() + INTERVAL '72 hours')`,
+                     $2, FALSE)`,
             [
               hr.id,
               `Auto-initiated confirmation for ${emp.first_name} ${emp.last_name} (${emp.employee_code}). Provision ended ${emp.provision_end_date}. Awaiting manager approval.`
