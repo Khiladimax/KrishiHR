@@ -1377,23 +1377,56 @@ async function loadOfficeBuffers() {
     document.getElementById('confirm-punch-btn').disabled = false;
     if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
   } else {
-    // office rule — draw green circles + fitBounds including user
+    // office rule — blue border + pink fill + dotted line to nearest circle edge
     const locData = await api('GET', '/geofence/my-locations');
     const officeBounds = new google.maps.LatLngBounds();
+    let closestOfficeDist = Infinity;
+    let closestOfficeEdgePt = null;
+
     (locData?.data || []).forEach(loc => {
       if (!loc.latitude || loc.radius_meters >= 10000) return;
-      const lat = +loc.latitude, lng = +loc.longitude;
+      const lat = +loc.latitude, lng = +loc.longitude, r = loc.radius_meters;
       const circle = new google.maps.Circle({
-        map: _map, center: { lat, lng }, radius: loc.radius_meters,
-        strokeColor: '#10b981', strokeOpacity: 0.8, strokeWeight: 2,
-        fillColor: '#10b981', fillOpacity: 0.1
+        map: _map, center: { lat, lng }, radius: r,
+        strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 3,
+        fillColor: '#ec4899', fillOpacity: 0.15
       });
       _mapCircles.push(circle);
       officeBounds.union(circle.getBounds());
+
+      // Track nearest circle edge for dotted line
+      if (_pLat && _pLng) {
+        const userPt   = new google.maps.LatLng(_pLat, _pLng);
+        const centerPt = new google.maps.LatLng(lat, lng);
+        const distToCenter = google.maps.geometry.spherical.computeDistanceBetween(userPt, centerPt);
+        const distToEdge   = Math.abs(distToCenter - r);
+        if (distToEdge < closestOfficeDist) {
+          closestOfficeDist = distToEdge;
+          const heading = google.maps.geometry.spherical.computeHeading(centerPt, userPt);
+          closestOfficeEdgePt = google.maps.geometry.spherical.computeOffset(centerPt, r, heading);
+        }
+      }
     });
+
     if (_pLat && _pLng) officeBounds.extend({ lat: _pLat, lng: _pLng });
     if (!officeBounds.isEmpty()) _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
     else if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
+
+    // Draw dotted line from user to nearest circle edge
+    if (_pLat && _pLng && closestOfficeEdgePt) {
+      const dottedLine = new google.maps.Polyline({
+        path: [new google.maps.LatLng(_pLat, _pLng), closestOfficeEdgePt],
+        map: _map,
+        strokeColor: '#1d4ed8', strokeOpacity: 0, strokeWeight: 2,
+        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, strokeColor: '#1d4ed8', strokeWeight: 2, scale: 3 }, offset: '0', repeat: '12px' }]
+      });
+      _mapCircles.push(dottedLine);
+      const dTxt = closestOfficeDist < 1000
+        ? `${Math.round(closestOfficeDist)} m from boundary`
+        : `${(closestOfficeDist/1000).toFixed(1)} km from boundary`;
+      const el = document.getElementById('map-status');
+      if (el) el.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${dTxt}</b>`;
+    }
   }
 }
 
