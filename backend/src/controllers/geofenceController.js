@@ -45,7 +45,12 @@ exports.getLocations = async (req, res) => {
     }
 
     const r = await db.query(q, params);
-    res.json({ success: true, data: r.rows });
+    // Also count universal-rule employees (they are assigned everywhere but have no location row)
+    const univRes = await db.query(
+      `SELECT COUNT(*) AS cnt FROM employee_buffer_rules WHERE rule_type = 'universal'`
+    );
+    const universalCount = parseInt(univRes.rows[0]?.cnt || 0);
+    res.json({ success: true, data: r.rows, universal_employee_count: universalCount });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
