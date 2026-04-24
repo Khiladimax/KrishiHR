@@ -433,7 +433,7 @@
           </div>
         </div>
 
-        <div class="form-group" style="margin-bottom:14px">
+        <div id="loc-radius-row" class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px">
             Buffer Radius (Meters) — <span id="radius-lbl">500</span>M
           </label>
@@ -1016,8 +1016,13 @@ function openEditLocation(id) {
 
 function onLocTypeChange() {
   const type = document.getElementById('loc-type-sel').value;
-  const showLatLng = type === 'office' || type === 'state';
+  // For office: show lat/lng + radius, hide global note
+  // For state: show lat/lng but hide radius slider (it's set to max automatically), show global note
+  // For wfh: hide lat/lng and radius, show global note
   document.getElementById('lat-lng-fields').style.display = type === 'wfh' ? 'none' : '';
+  // Hide the buffer radius slider row for non-office types (radius is irrelevant for global zones)
+  const radiusRow = document.getElementById('loc-radius-row');
+  if (radiusRow) radiusRow.style.display = type === 'office' ? '' : 'none';
   document.getElementById('loc-global-note').style.display = type !== 'office' ? '' : 'none';
 }
 
