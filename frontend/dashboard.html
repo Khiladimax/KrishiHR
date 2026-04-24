@@ -1318,13 +1318,10 @@ function openMapPunch(type) {
   setTimeout(() => {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
-    // zoom:1 so no India-flash before fitBounds fires
+    // zoom:5 India center — fitBounds overrides once GPS + boundary both ready
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 1,
-      center: { lat: 20.5937, lng: 78.9629 },
-      mapTypeId: 'roadmap',
-      streetViewControl: false,
-      mapTypeControl: true,
+      zoom: 5, center: { lat: 22.5, lng: 80.0 },
+      mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: true,
       mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
       gestureHandling: 'greedy'
     });
@@ -1340,24 +1337,17 @@ function openMapPunch(type) {
 
     navigator.geolocation.getCurrentPosition(async pos => {
       _pLat = pos.coords.latitude; _pLng = pos.coords.longitude;
-      const acc = Math.round(pos.coords.accuracy);
-      document.getElementById('map-acc').textContent = `GPS accuracy: ±${acc}m`;
+      document.getElementById('map-acc').textContent = `GPS accuracy: ±${Math.round(pos.coords.accuracy)}m`;
       if (_mapMarker) _mapMarker.setMap(null);
       _mapMarker = new google.maps.Marker({
-        position: { lat: _pLat, lng: _pLng },
-        map: _map,
-        title: 'Your Location',
+        position: { lat: _pLat, lng: _pLng }, map: _map, title: 'Your Location',
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#4361ee" stroke="white" stroke-width="2.5"/></svg>'),
-          scaledSize: new google.maps.Size(18, 18),
-          anchor: new google.maps.Point(9, 9)
+          scaledSize: new google.maps.Size(18, 18), anchor: new google.maps.Point(9, 9)
         }
       });
-      _mapMarker.addListener('click', () => {
-        _mapInfoWindow.setContent('<b>Your Location</b>');
-        _mapInfoWindow.open(_map, _mapMarker);
-      });
-      // Load buffers AFTER GPS — fitBounds inside will cover both user + boundary
+      _mapMarker.addListener('click', () => { _mapInfoWindow.setContent('<b>Your Location</b>'); _mapInfoWindow.open(_map, _mapMarker); });
+      // Load boundary AFTER GPS — single fitBounds call, no jump
       await loadOfficeBuffers();
       validateGeo(_pLat, _pLng);
     }, () => {
@@ -1372,31 +1362,25 @@ function openMapPunch(type) {
 async function loadOfficeBuffers() {
   _mapCircles.forEach(c => { if (c.setMap) c.setMap(null); });
   _mapCircles = [];
-
   const user = Auth.getUser();
   if (!user) return;
-
   const ruleData = await api('GET', `/geofence/buffer-rules/${user.id}`);
   const rule = ruleData?.data;
   if (!rule) return;
 
   if (rule.rule_type === 'district' && rule.state && rule.district) {
     await drawDistrictPolygon(rule.state, rule.district);
-
   } else if (rule.rule_type === 'state' && rule.state) {
     await drawStatePolygon(rule.state);
-
   } else if (rule.rule_type === 'universal') {
     setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
     document.getElementById('confirm-punch-btn').disabled = false;
     if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
-
   } else {
-    // office rule — draw circles
+    // office rule — draw green circles + fitBounds including user
     const locData = await api('GET', '/geofence/my-locations');
-    const locs = locData?.data || [];
     const officeBounds = new google.maps.LatLngBounds();
-    locs.forEach(loc => {
+    (locData?.data || []).forEach(loc => {
       if (!loc.latitude || loc.radius_meters >= 10000) return;
       const lat = +loc.latitude, lng = +loc.longitude;
       const circle = new google.maps.Circle({
@@ -1408,11 +1392,8 @@ async function loadOfficeBuffers() {
       officeBounds.union(circle.getBounds());
     });
     if (_pLat && _pLng) officeBounds.extend({ lat: _pLat, lng: _pLng });
-    if (!officeBounds.isEmpty()) {
-      _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
-    } else if (_pLat && _pLng) {
-      _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14);
-    }
+    if (!officeBounds.isEmpty()) _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
+    else if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
   }
 }
 
@@ -1420,54 +1401,30 @@ async function drawDistrictPolygon(state, district) {
   try {
     const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}`);
     if (!res?.data?.coordinates) return;
-    const coords = res.data.coordinates;
-    const ring = coords[0].map(([lng, lat]) => ({ lat, lng }));
-    const poly = new google.maps.Polygon({
+    const ring = res.data.coordinates[0].map(([lng, lat]) => ({ lat, lng }));
+    new google.maps.Polygon({
       paths: ring, map: _map,
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
-    _mapCircles.push(poly);
-
-    // fitBounds includes BOTH district polygon AND user blue dot
+    // Fit to district boundary ONLY — don't include user (could be 1000km away)
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(p => bounds.extend(p));
-    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
-    _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
-
-    // Distance from user to nearest polygon edge
+    _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    // Distance in status bar only (no popup)
     if (_pLat && _pLng) {
-      const userLatLng = new google.maps.LatLng(_pLat, _pLng);
-      let minDistM = Infinity;
+      const u = new google.maps.LatLng(_pLat, _pLng);
+      let minDist = Infinity;
       for (let i = 0; i < ring.length; i++) {
         const a = new google.maps.LatLng(ring[i].lat, ring[i].lng);
-        const b = new google.maps.LatLng(ring[(i + 1) % ring.length].lat, ring[(i + 1) % ring.length].lng);
-        const t = Math.max(0, Math.min(1,
-          ((userLatLng.lat() - a.lat()) * (b.lat() - a.lat()) +
-           (userLatLng.lng() - a.lng()) * (b.lng() - a.lng())) /
-          ((b.lat() - a.lat()) ** 2 + (b.lng() - a.lng()) ** 2)
-        ));
-        const nearPt = new google.maps.LatLng(
-          a.lat() + t * (b.lat() - a.lat()),
-          a.lng() + t * (b.lng() - a.lng())
-        );
-        const d = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, nearPt);
-        if (d < minDistM) minDistM = d;
+        const b = new google.maps.LatLng(ring[(i+1)%ring.length].lat, ring[(i+1)%ring.length].lng);
+        const t = Math.max(0, Math.min(1, ((u.lat()-a.lat())*(b.lat()-a.lat())+(u.lng()-a.lng())*(b.lng()-a.lng()))/((b.lat()-a.lat())**2+(b.lng()-a.lng())**2)));
+        const near = new google.maps.LatLng(a.lat()+t*(b.lat()-a.lat()), a.lng()+t*(b.lng()-a.lng()));
+        const d = google.maps.geometry.spherical.computeDistanceBetween(u, near);
+        if (d < minDist) minDist = d;
       }
-      const distText = minDistM < 1000
-        ? `${Math.round(minDistM)} m from boundary`
-        : `${(minDistM / 1000).toFixed(1)} km from boundary`;
-      const statusEl = document.getElementById('map-status');
-      if (statusEl) statusEl.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${distText}</b>`;
-      // Distance label on map — auto-closes after 6s
-      if (_mapInfoWindow) _mapInfoWindow.close();
-      _mapInfoWindow = new google.maps.InfoWindow({
-        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8;white-space:nowrap">📏 ${distText}</div>`,
-        position: userLatLng,
-        disableAutoPan: true
-      });
-      _mapInfoWindow.open(_map);
-      setTimeout(() => _mapInfoWindow && _mapInfoWindow.close(), 6000);
+      const dTxt = minDist < 1000 ? `${Math.round(minDist)} m from boundary` : `${(minDist/1000).toFixed(1)} km from boundary`;
+      document.getElementById('map-status').dataset.distText = `&nbsp;|&nbsp; 📏 <b>${dTxt}</b>`;
     }
   } catch(e) { console.error('drawDistrictPolygon error', e); }
 }
@@ -1481,40 +1438,30 @@ async function drawStatePolygon(state) {
     districts.forEach(d => {
       if (!d.coordinates) return;
       const ring = d.coordinates[0].map(([lng, lat]) => ({ lat, lng }));
-      const poly = new google.maps.Polygon({
+      new google.maps.Polygon({
         paths: ring, map: _map,
         strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2,
         fillColor: '#ec4899', fillOpacity: 0.08
       });
-      _mapCircles.push(poly);
       ring.forEach(p => bounds.extend(p));
     });
-    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    // Fit to state only
     if (!bounds.isEmpty()) _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
   } catch(e) { console.error('drawStatePolygon error', e); }
 }
 
 async function validateGeo(lat, lng) {
   const data = await api('POST', '/geofence/validate-buffer', { latitude: lat, longitude: lng });
-  if (!data) {
-    setMapStatus('loading', '⚠ Could not validate — proceeding anyway');
-    document.getElementById('confirm-punch-btn').disabled = false;
-    return;
-  }
-  if (data.valid) {
-    setMapStatus('ok', '✓ ' + data.message);
-    document.getElementById('confirm-punch-btn').disabled = false;
-  } else {
-    setMapStatus('fail', '✗ ' + data.message);
-    document.getElementById('confirm-punch-btn').disabled = true;
-  }
+  if (!data) { setMapStatus('loading', '⚠ Could not validate — proceeding anyway'); document.getElementById('confirm-punch-btn').disabled = false; return; }
+  if (data.valid) { setMapStatus('ok', '✓ ' + data.message); document.getElementById('confirm-punch-btn').disabled = false; }
+  else            { setMapStatus('fail', '✗ ' + data.message); document.getElementById('confirm-punch-btn').disabled = true; }
 }
 
 function setMapStatus(type, msg) {
   const el = document.getElementById('map-status');
   el.className = 'map-status ' + type;
-  const distText = el.dataset.distText || '';
-  el.innerHTML = msg + (distText ? ' ' + distText : '');
+  const dist = el.dataset.distText || '';
+  el.innerHTML = msg + (dist ? ' ' + dist : '');
 }
 
 async function confirmPunch() {
