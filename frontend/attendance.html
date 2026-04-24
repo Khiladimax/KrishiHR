@@ -1245,20 +1245,11 @@ function openMapPunch(type) {
         _mapInfoWindow.open(_map, _mapMarker);
       });
       // Wrap in async IIFE — geolocation callback is not async
+      // FIX: Always call loadOfficeBuffers() after GPS is available.
+      // loadOfficeBuffers() handles district/state/office/universal internally
+      // and always includes _pLat/_pLng in fitBounds (no double zoom, no jump).
       (async () => {
-        const _ruleCheck = await api('GET', '/auth/me').catch(()=>null);
-        const _empIdCheck = _ruleCheck?.data?.id || _ruleCheck?.id;
-        let _ruleType = null;
-        if (_empIdCheck) {
-          const _rd = await api('GET', `/geofence/buffer-rules/${_empIdCheck}`).catch(()=>null);
-          _ruleType = _rd?.data?.rule_type || null;
-        }
-        if (_ruleType === 'district' || _ruleType === 'state') {
-          await loadOfficeBuffers();
-        } else {
-          _map.panTo({ lat: _pLat, lng: _pLng });
-          _map.setZoom(15);
-        }
+        await loadOfficeBuffers();
         validateGeo(_pLat, _pLng);
       })();
     }, () => {
@@ -1313,6 +1304,8 @@ async function loadOfficeBuffers() {
   if (!data?.success || !data.data?.length) data = await api('GET', '/geofence/locations');
   if (!data?.success || !data.data?.length) return;
 
+  // FIX: fitBounds after drawing office circles to show user + all circles
+  const officeBounds = new google.maps.LatLngBounds();
   data.data.forEach(loc => {
     const lat = +loc.latitude, lng = +loc.longitude;
     if (!lat || !lng || loc.radius_meters >= 10000) return;
@@ -1324,7 +1317,17 @@ async function loadOfficeBuffers() {
     const infoW = new google.maps.InfoWindow({ content: `<b>${loc.name}</b><br>📏 ${loc.radius_meters}m buffer` });
     circle.addListener('click', () => infoW.open(_map));
     _mapCircles.push(circle);
+    // Extend bounds by the circle's bounding box
+    officeBounds.union(circle.getBounds());
   });
+  // Include user location in bounds if available
+  if (_pLat && _pLng) officeBounds.extend({ lat: _pLat, lng: _pLng });
+  if (!officeBounds.isEmpty()) {
+    _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
+  } else if (_pLat && _pLng) {
+    _map.panTo({ lat: _pLat, lng: _pLng });
+    _map.setZoom(14);
+  }
 }
 
 // ── Draw district polygon from backend boundary API ────────────────────────
