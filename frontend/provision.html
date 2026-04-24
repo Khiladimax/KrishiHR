@@ -214,7 +214,7 @@ function updateSummary(list) {
 }
 
 function renderProvisionList(list) {
-  const isHR  = ['hr','admin','super_admin'].includes(currentUser.role);
+  const isHR  = currentUser.role === 'hr'; // Only actual HR can do HR approval step
   const el    = document.getElementById('provision-list');
   if (!list.length) {
     el.innerHTML = '<div class="empty-state">🎉 No provision employees found</div>';
@@ -239,9 +239,7 @@ function renderProvisionList(list) {
     if (isHR && status === 'not_initiated') {
       actions += `<button class="btn btn-primary btn-sm" onclick="openInitiate(${emp.id},'${emp.first_name} ${emp.last_name}')">🚀 Initiate</button>`;
     }
-    // Show HR final approve/reject only if this user is NOT the manager who already approved
-    const alreadyApprovedAsManager = emp.reporting_manager_id === currentUser.id;
-    if (isHR && status === 'manager_approved' && !alreadyApprovedAsManager) {
+    if (isHR && status === 'manager_approved') {
       actions += `<button class="btn btn-success btn-sm" onclick="openApprove(${emp.id},'${emp.first_name} ${emp.last_name}','hr')">✅ HR Approve</button>`;
       actions += `<button class="btn btn-danger btn-sm" onclick="openApprove(${emp.id},'${emp.first_name} ${emp.last_name}','hr_reject')">✗ Reject</button>`;
     }
@@ -290,17 +288,18 @@ async function loadApprovals() {
 
     // Manager/TL sees: employees where status is 'pending' (their direct reports)
     // Admin/super_admin who is the actual reporting_manager_id also sees 'pending' to approve as manager
-    // HR sees: 'manager_approved' (needs HR final approval) — but NOT if they were the reporting manager who already approved
+    // HR sees: 'manager_approved' (needs HR final approval)
     let mine = data.data.filter(e => {
       if (isMgr && !isHR) return e.overall_status === 'pending';
-      if (isHR) {
-        const adminIsReportingMgr = (currentUser.role === 'admin' || currentUser.role === 'super_admin')
-                                    && e.reporting_manager_id === currentUser.id
+      if (currentUser.role === 'hr') {
+        // HR sees items awaiting their approval
+        return e.overall_status === 'manager_approved';
+      }
+      if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
+        // Admin/super_admin can only approve as MANAGER if they are the reporting manager
+        const adminIsReportingMgr = e.reporting_manager_id === currentUser.id
                                     && e.overall_status === 'pending';
-        // Don't show HR approve button if this admin was the manager who already approved
-        const alreadyApprovedAsManager = e.reporting_manager_id === currentUser.id;
-        const needsHRApproval = e.overall_status === 'manager_approved' && !alreadyApprovedAsManager;
-        return adminIsReportingMgr || needsHRApproval;
+        return adminIsReportingMgr; // They CANNOT approve at HR step
       }
       return false;
     });
@@ -326,7 +325,7 @@ async function loadApprovals() {
       const adminIsReportingMgr = (currentUser.role === 'admin' || currentUser.role === 'super_admin')
                                    && emp.reporting_manager_id === currentUser.id
                                    && emp.overall_status === 'pending';
-      const role = (isMgr && !isHR) || adminIsReportingMgr ? 'manager' : 'hr';
+      const role = adminIsReportingMgr ? 'manager' : (currentUser.role === 'hr' ? 'hr' : 'manager');
       return `
       <div class="prov-card pending">
         <div style="display:flex;align-items:flex-start;gap:14px">
