@@ -653,17 +653,43 @@ function empSubRow(locId) {
     const loc = _allLocations.find(l => l.id == locId);
     const isGlobalLoc = loc && loc.radius_meters >= 10000;
 
-    // Per-employee buffer (only meaningful for office-type locations)
-    const bufferCell = !isGlobalLoc
-      ? `<div style="display:flex;align-items:center;gap:6px">
+    // Zone / buffer cell — show per-employee boundary if global loc, slider if office loc
+    const locName = loc?.name || '';
+    const isWFHLoc = locName.toLowerCase().includes('work from home') || locName.toLowerCase().includes('wfh');
+    let bufferCell;
+    if (!isGlobalLoc) {
+      // Office location → show individual buffer radius slider
+      bufferCell = `<div style="display:flex;align-items:center;gap:6px">
           <input type="range" class="buf-slider" id="esl-${e.id}-${locId}"
             min="50" max="5000" step="50" value="${e.custom_radius || loc?.radius_meters || 300}"
             oninput="onEmpSliderInput(${e.id},${locId},this)"
             style="width:120px">
           <span class="buf-val" id="esv-${e.id}-${locId}">${e.custom_radius || loc?.radius_meters || 300}m</span>
           <button class="save-mini" onclick="saveEmpRadius(${e.id},${locId})">Save</button>
-         </div>`
-      : `<span style="font-size:11px;color:var(--muted)">Global zone</span>`;
+         </div>`;
+    } else if (isWFHLoc || rt === 'universal') {
+      // WFH / Universal → anywhere
+      bufferCell = `<span style="font-size:11px;color:#8b5cf6;font-weight:600">🌍 Anywhere</span>`;
+    } else if (rt === 'district' && rule?.district && rule?.state) {
+      // District boundary
+      bufferCell = `<div>
+        <span style="font-size:11px;font-weight:700;color:#166534">📍 ${rule.district}</span>
+        <div style="font-size:10px;color:var(--muted)">${rule.state}</div>
+      </div>`;
+    } else if (rt === 'state' && rule?.state) {
+      // State boundary
+      bufferCell = `<div>
+        <span style="font-size:11px;font-weight:700;color:#854d0e">🗺️ ${rule.state}</span>
+        <div style="font-size:10px;color:var(--muted)">State boundary</div>
+      </div>`;
+    } else {
+      // Global zone with no specific rule yet — derive from location name
+      const locStateName = locName.replace(/^state\s*[-–]\s*/i,'').replace(/^district\s*[-–]\s*/i,'').split(',')[0].trim();
+      bufferCell = `<div>
+        <span style="font-size:11px;font-weight:700;color:var(--accent)">🗺️ ${locStateName}</span>
+        <div style="font-size:10px;color:var(--muted)">State boundary</div>
+      </div>`;
+    }
 
     return `<tr>
       <td></td>
@@ -728,7 +754,7 @@ function empSubRow(locId) {
             <th style="width:30px"></th>
             <th>Employee</th>
             <th>Type</th>
-            <th>${isGlobalLoc ? 'Zone' : 'Buffer Radius'}</th>
+            <th>${isGlobalLoc ? 'Boundary' : 'Buffer Radius'}</th>
             <th>Rule / Change</th>
             <th>Actions</th>
             <th></th>
