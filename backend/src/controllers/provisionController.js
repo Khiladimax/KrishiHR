@@ -39,8 +39,10 @@ exports.listProvisionEmployees = async (req, res) => {
     let whereExtra = '';
     const params = [];
 
-    // Manager only sees their direct reports
-    if (role === 'manager') {
+    // Manager / TL only sees their direct reports
+    // HR who is also a reporting manager sees all (they need full list for HR tab)
+    // but we also return reporting_manager_id so frontend can detect HR-as-manager scenario
+    if (role === 'manager' || role === 'tl') {
       whereExtra = `AND e.reporting_manager_id = $1`;
       params.push(userId);
     }
@@ -50,6 +52,7 @@ exports.listProvisionEmployees = async (req, res) => {
          e.id, e.employee_code, e.first_name, e.last_name, e.email,
          e.joining_date, e.provision_end_date, e.confirmed_date,
          e.employee_category, e.department_id, e.designation_id,
+         e.reporting_manager_id,
          d.name  AS department_name,
          des.title AS designation_title,
          CONCAT(m.first_name,' ',m.last_name) AS manager_name,
@@ -192,8 +195,13 @@ exports.approveConfirmation = async (req, res) => {
       return res.status(400).json({ success: false, message: `Confirmation already ${pc.overall_status}` });
 
     // ── MANAGER approval (step 1) ─────────────────────────────────────────────
-    if (actor.role === 'manager' || actor.role === 'tl') {
-      // Verify this manager is the reporting manager
+    // Also handles the case where HR is the reporting manager
+    const isManagerRole = actor.role === 'manager' || actor.role === 'tl';
+    const isHRRole      = actor.role === 'hr' || actor.role === 'admin' || actor.role === 'super_admin';
+    const isHRAsManager = isHRRole && actor.id === pc.reporting_manager_id && pc.overall_status === 'pending';
+
+    if (isManagerRole || isHRAsManager) {
+      // Verify this manager is the reporting manager (admins/super_admins can bypass)
       if (actor.id !== pc.reporting_manager_id && actor.role !== 'admin' && actor.role !== 'super_admin')
         return res.status(403).json({ success: false, message: 'Only the reporting manager can approve at this step' });
 
@@ -242,7 +250,7 @@ exports.approveConfirmation = async (req, res) => {
     }
 
     // ── HR approval (step 2) — auto-confirms employee ─────────────────────────
-    if (actor.role === 'hr' || actor.role === 'admin' || actor.role === 'super_admin') {
+    if (isHRRole && !isHRAsManager) {
       if (pc.overall_status !== 'manager_approved')
         return res.status(400).json({
           success: false,
