@@ -45,15 +45,10 @@ exports.getLocations = async (req, res) => {
     }
 
     const r = await db.query(q, params);
-    // Count universal-rule employees who have NO employee_geofence row
-    // (those with employee_geofence rows are already counted in per-location assigned_count)
+    res.json({ success: true, data: r.rows });
+    // Also count universal-rule employees (they are assigned everywhere but have no location row)
     const univRes = await db.query(
-      `SELECT COUNT(*) AS cnt
-       FROM employee_buffer_rules ebr
-       WHERE ebr.rule_type = 'universal'
-         AND NOT EXISTS (
-           SELECT 1 FROM employee_geofence eg WHERE eg.employee_id = ebr.employee_id
-         )`
+      `SELECT COUNT(*) AS cnt FROM employee_buffer_rules WHERE rule_type = 'universal'`
     );
     const universalCount = parseInt(univRes.rows[0]?.cnt || 0);
     res.json({ success: true, data: r.rows, universal_employee_count: universalCount });
