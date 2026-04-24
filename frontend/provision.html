@@ -288,9 +288,15 @@ async function loadApprovals() {
 
     // Manager sees: pending (needs their approval)
     // HR sees: manager_approved (needs HR approval)
+    // HR who is also the reporting manager sees: pending (acts as manager first)
     let mine = data.data.filter(e => {
       if (isMgr && !isHR) return e.overall_status === 'pending';
-      if (isHR)            return e.overall_status === 'manager_approved';
+      if (isHR) {
+        // If HR is the reporting manager for this employee and status is pending → show as manager
+        const hrIsManager = e.reporting_manager_id === currentUser.id && e.overall_status === 'pending';
+        const needsHRApproval = e.overall_status === 'manager_approved';
+        return hrIsManager || needsHRApproval;
+      }
       return false;
     });
 
@@ -312,7 +318,9 @@ async function loadApprovals() {
         if (dr > 0) daysHtml = `<span class="days-chip warn">⚠ ${dr}d left</span>`;
         else        daysHtml = `<span class="days-chip overdue">🔴 ${Math.abs(dr)}d overdue</span>`;
       }
-      const role = isMgr && !isHR ? 'manager' : 'hr';
+      // Determine action role: HR acting as manager if they are the reporting manager and status is pending
+      const hrIsActingAsManager = isHR && emp.reporting_manager_id === currentUser.id && emp.overall_status === 'pending';
+      const role = (isMgr && !isHR) || hrIsActingAsManager ? 'manager' : 'hr';
       return `
       <div class="prov-card pending">
         <div style="display:flex;align-items:flex-start;gap:14px">
