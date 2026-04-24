@@ -512,6 +512,19 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
+     LOCATION DETAIL MODAL
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="loc-detail-modal">
+  <div class="modal modal-lg" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div class="modal-title" id="loc-detail-modal-title">Location Details</div>
+      <button class="modal-close" onclick="closeModal('loc-detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="loc-detail-modal-body" style="overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
      DELETE CONFIRM MODAL (no employees assigned)
      ═══════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="delete-confirm-modal">
@@ -735,9 +748,6 @@ async function selectLocation(id) {
 }
 
 async function renderDetailPanel(loc) {
-  document.getElementById('no-selection').style.display = 'none';
-  document.getElementById('detail-panel').style.display = '';
-
   const isGlobal = loc.radius_meters >= 10000;
   const isWFH    = loc.name.toLowerCase().includes('work from home');
   const typeLabel = isWFH ? '🏠 Work From Home' : isGlobal ? '🌍 State Zone (Global)' : '🏢 Office (Strict Geofence)';
@@ -746,7 +756,8 @@ async function renderDetailPanel(loc) {
   // Fetch assigned employees for this location
   const assigned = await fetchAssignedEmployees(loc.id);
 
-  document.getElementById('detail-content').innerHTML = `
+  document.getElementById('loc-detail-modal-title').textContent = loc.name;
+  document.getElementById('loc-detail-modal-body').innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
       <div>
         <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">${loc.name}</div>
@@ -837,6 +848,7 @@ async function renderDetailPanel(loc) {
     </div>
   `;
 
+  openModal('loc-detail-modal');
   updateSliderBg(document.getElementById('live-radius-slider'));
 }
 
@@ -894,6 +906,7 @@ async function toggleLocActive(locId, activate) {
 let _deleteLocId = null;
 
 async function openDeleteLocation(locId, locName) {
+  closeModal('loc-detail-modal');
   _deleteLocId = locId;
 
   // Check assigned employees first
@@ -993,6 +1006,7 @@ function openAddLocation() {
 }
 
 function openEditLocation(id) {
+  closeModal('loc-detail-modal');
   const loc = _allLocations.find(l => l.id === id);
   if (!loc) return;
   const isGlobal = loc.radius_meters >= 10000;
@@ -1074,6 +1088,7 @@ async function saveLocation() {
 let _assignLocName = '';
 
 async function openAssignModal(locId) {
+  closeModal('loc-detail-modal');
   _assignLocId = locId;
   const loc = _allLocations.find(l => l.id === locId);
   _assignLocName = loc?.name || '';
