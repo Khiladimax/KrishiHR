@@ -1389,7 +1389,7 @@ async function drawDistrictBoundary(state, district) {
         const distCenter = google.maps.geometry.spherical.computeDistanceBetween(
           new google.maps.LatLng(_pLat, _pLng), bounds.getCenter()
         );
-        if (distCenter < 30000)       minZoom = 11; // <30km  → street level
+        if (distCenter < 30000)       minZoom = 10; // <30km  → street level
         else if (distCenter < 100000) minZoom = 9;  // <100km → regional
         else if (distCenter < 500000) minZoom = 6;  // <500km → state level
         else                          minZoom = 5;  // far    → India level
