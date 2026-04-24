@@ -1417,20 +1417,54 @@ async function drawDistrictPolygon(state, district) {
     ring.forEach(p => bounds.extend(p));
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
     _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
-    // Distance in status bar only (no popup)
+    // Distance calculation + dotted line from user to nearest boundary point
     if (_pLat && _pLng) {
       const u = new google.maps.LatLng(_pLat, _pLng);
       let minDist = Infinity;
+      let nearestPt = null;
       for (let i = 0; i < ring.length; i++) {
         const a = new google.maps.LatLng(ring[i].lat, ring[i].lng);
-        const b = new google.maps.LatLng(ring[(i+1)%ring.length].lat, ring[(i+1)%ring.length].lng);
-        const t = Math.max(0, Math.min(1, ((u.lat()-a.lat())*(b.lat()-a.lat())+(u.lng()-a.lng())*(b.lng()-a.lng()))/((b.lat()-a.lat())**2+(b.lng()-a.lng())**2)));
-        const near = new google.maps.LatLng(a.lat()+t*(b.lat()-a.lat()), a.lng()+t*(b.lng()-a.lng()));
+        const b2 = new google.maps.LatLng(ring[(i+1)%ring.length].lat, ring[(i+1)%ring.length].lng);
+        const t = Math.max(0, Math.min(1,
+          ((u.lat()-a.lat())*(b2.lat()-a.lat()) + (u.lng()-a.lng())*(b2.lng()-a.lng())) /
+          ((b2.lat()-a.lat())**2 + (b2.lng()-a.lng())**2)
+        ));
+        const near = new google.maps.LatLng(
+          a.lat() + t*(b2.lat()-a.lat()),
+          a.lng() + t*(b2.lng()-a.lng())
+        );
         const d = google.maps.geometry.spherical.computeDistanceBetween(u, near);
-        if (d < minDist) minDist = d;
+        if (d < minDist) { minDist = d; nearestPt = near; }
       }
-      const dTxt = minDist < 1000 ? `${Math.round(minDist)} m from boundary` : `${(minDist/1000).toFixed(1)} km from boundary`;
-      document.getElementById('map-status').dataset.distText = `&nbsp;|&nbsp; 📏 <b>${dTxt}</b>`;
+      // Distance in status bar
+      const dTxt = minDist < 1000
+        ? `${Math.round(minDist)} m from boundary`
+        : `${(minDist/1000).toFixed(1)} km from boundary`;
+      const el = document.getElementById('map-status');
+      if (el) el.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${dTxt}</b>`;
+
+      // Draw dotted line: user → nearest boundary point
+      if (nearestPt) {
+        const dottedLine = new google.maps.Polyline({
+          path: [u, nearestPt],
+          map: _map,
+          strokeColor: '#1d4ed8',
+          strokeOpacity: 0,        // must be 0 for icons/dash to show
+          strokeWeight: 2,
+          icons: [{
+            icon: {
+              path: 'M 0,-1 0,1',  // vertical tick = dash segment
+              strokeOpacity: 0.8,
+              strokeColor: '#1d4ed8',
+              strokeWeight: 2,
+              scale: 3
+            },
+            offset: '0',
+            repeat: '12px'
+          }]
+        });
+        _mapCircles.push(dottedLine);
+      }
     }
   } catch(e) { console.error('drawDistrictPolygon error', e); }
 }
