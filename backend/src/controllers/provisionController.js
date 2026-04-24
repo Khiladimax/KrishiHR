@@ -134,9 +134,9 @@ exports.initiateConfirmation = async (req, res) => {
 
     // Create notification for manager
     await client.query(
-      `INSERT INTO notifications (employee_id, type, title, message, link, is_read)
+      `INSERT INTO notifications (employee_id, type, title, message, is_read)
        VALUES ($1, 'provision_confirm', 'Provision Confirmation Request',
-               $2, '/provision', FALSE)`,
+               $2, FALSE)`,
       [
         emp.reporting_manager_id,
         `Please review and approve the permanent confirmation for ${emp.first_name} ${emp.last_name} (${emp.employee_code}).`
@@ -233,9 +233,9 @@ exports.approveConfirmation = async (req, res) => {
       );
       for (const hr of hrList.rows) {
         await client.query(
-          `INSERT INTO notifications (employee_id, type, title, message, link, is_read, expires_at)
+          `INSERT INTO notifications (employee_id, type, title, message, is_read)
            VALUES ($1, 'provision_confirm', 'Manager Approved — Your HR Approval Needed',
-                   $2, '/provision', FALSE, NOW() + INTERVAL '48 hours')`,
+                   $2, FALSE)`,
           [
             hr.id,
             `Manager has approved permanent confirmation for ${pc.first_name} ${pc.last_name} (${pc.employee_code}). Awaiting your approval.`
@@ -338,9 +338,9 @@ exports.approveConfirmation = async (req, res) => {
 
       // Notify the employee
       await client.query(
-        `INSERT INTO notifications (employee_id, type, title, message, link, is_read, expires_at)
+        `INSERT INTO notifications (employee_id, type, title, message, is_read)
          VALUES ($1, 'provision_confirm', '🎉 Congratulations! You are now a Permanent Employee',
-                 $2, '/leave/balance', FALSE, NOW() + INTERVAL '48 hours')`,
+                 $2, FALSE)`,
         [
           empId,
           `Your provision period is complete. You have been confirmed as a permanent employee from ${confirmDate.toLocaleDateString('en-IN')}. EL: ${prorata.el}, SL: ${prorata.sl}, CL: ${prorata.cl} credited for this month.`
