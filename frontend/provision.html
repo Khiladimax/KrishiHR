@@ -286,16 +286,16 @@ async function loadApprovals() {
     const isMgr = ['manager','tl'].includes(currentUser.role);
     const isHR  = ['hr','admin','super_admin'].includes(currentUser.role);
 
-    // Manager sees: pending (needs their approval)
-    // HR sees: manager_approved (needs HR approval)
-    // HR who is also the reporting manager sees: pending (acts as manager first)
+    // Manager/TL sees: employees where status is 'pending' (their direct reports)
+    // Admin/super_admin who is the actual reporting_manager_id also sees 'pending' to approve as manager
+    // HR sees: 'manager_approved' (needs HR final approval)
     let mine = data.data.filter(e => {
       if (isMgr && !isHR) return e.overall_status === 'pending';
       if (isHR) {
-        // If HR is the reporting manager for this employee and status is pending → show as manager
-        const hrIsManager = e.reporting_manager_id === currentUser.id && e.overall_status === 'pending';
-        const needsHRApproval = e.overall_status === 'manager_approved';
-        return hrIsManager || needsHRApproval;
+        const adminIsReportingMgr = (currentUser.role === 'admin' || currentUser.role === 'super_admin')
+                                    && e.reporting_manager_id === currentUser.id
+                                    && e.overall_status === 'pending';
+        return adminIsReportingMgr || e.overall_status === 'manager_approved';
       }
       return false;
     });
@@ -318,9 +318,10 @@ async function loadApprovals() {
         if (dr > 0) daysHtml = `<span class="days-chip warn">⚠ ${dr}d left</span>`;
         else        daysHtml = `<span class="days-chip overdue">🔴 ${Math.abs(dr)}d overdue</span>`;
       }
-      // Determine action role: HR acting as manager if they are the reporting manager and status is pending
-      const hrIsActingAsManager = isHR && emp.reporting_manager_id === currentUser.id && emp.overall_status === 'pending';
-      const role = (isMgr && !isHR) || hrIsActingAsManager ? 'manager' : 'hr';
+      const adminIsReportingMgr = (currentUser.role === 'admin' || currentUser.role === 'super_admin')
+                                   && emp.reporting_manager_id === currentUser.id
+                                   && emp.overall_status === 'pending';
+      const role = (isMgr && !isHR) || adminIsReportingMgr ? 'manager' : 'hr';
       return `
       <div class="prov-card pending">
         <div style="display:flex;align-items:flex-start;gap:14px">
