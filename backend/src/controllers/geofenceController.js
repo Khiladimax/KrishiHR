@@ -271,94 +271,14 @@ exports.getUnassignedEmployees = async (req, res) => {
 };
 
 // ── Validate Punch (called before punch-in/out) ───────────────────────────────
-// Priority: employee_buffer_rules.rule_type ALWAYS wins over raw office radius check.
-// Flow:
-//   1. Load employee's buffer rule (rule_type: office | district | state | universal)
-//   2. If rule_type = universal  → always allow
-//   3. If rule_type = state      → resolve GPS to state polygon, compare
-//   4. If rule_type = district   → resolve GPS to district polygon, compare
-//   5. If rule_type = office     → check distance against assigned office radius
-//   6. If no rule set            → fall back to legacy office radius check
 exports.validatePunch = async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
     const empId = req.user.id;
-    const punchType = req.body.punch_type || 'in';
 
     if (!latitude || !longitude)
       return res.json({ success: true, data: { valid: true, message: 'No GPS provided — punch allowed', distance: 0 } });
 
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-
-    // ── 1. Load buffer rule ───────────────────────────────────────────────────
-    const ruleRes = await db.query(
-      `SELECT ebr.rule_type, ebr.state, ebr.district
-       FROM employee_buffer_rules ebr
-       WHERE ebr.employee_id = $1`,
-      [empId]
-    );
-    const rule = ruleRes.rows[0] || null;
-
-    // Helper to log punch attempt
-    const logPunch = (locId, dist, valid) =>
-      db.query(
-        `INSERT INTO attendance_geofence_logs
-           (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [empId, locId || null, lat, lng, Math.round(dist || 0), valid, punchType]
-      ).catch(() => {});
-
-    // ── 2. UNIVERSAL — punch from anywhere ───────────────────────────────────
-    if (rule?.rule_type === 'universal') {
-      await logPunch(null, 0, true);
-      return res.json({ success: true, data: { valid: true, message: 'Universal access — punch allowed from anywhere', distance: 0 } });
-    }
-
-    // ── 3. STATE — must be inside assigned state polygon ────────────────────
-    if (rule?.rule_type === 'state') {
-      const resolved = resolveLocation(lat, lng);
-      if (!resolved) {
-        await logPunch(null, 0, false);
-        return res.json({ success: true, data: { valid: false, message: 'Your location could not be matched to any region in India.' } });
-      }
-      const match = resolved.state.toUpperCase() === (rule.state || '').toUpperCase();
-      await logPunch(null, 0, match);
-      return res.json({
-        success: true,
-        data: {
-          valid: match,
-          message: match
-            ? `✓ Verified in ${resolved.state}`
-            : `You are in ${resolved.state}. Must be in ${rule.state} to punch in.`
-        }
-      });
-    }
-
-    // ── 4. DISTRICT — must be inside assigned district polygon ──────────────
-    if (rule?.rule_type === 'district') {
-      const resolved = resolveLocation(lat, lng);
-      if (!resolved) {
-        await logPunch(null, 0, false);
-        return res.json({ success: true, data: { valid: false, message: 'Your location could not be matched to any region in India.' } });
-      }
-      const stateOk    = resolved.state.toUpperCase()    === (rule.state    || '').toUpperCase();
-      const districtOk = resolved.district.toLowerCase() === (rule.district || '').toLowerCase();
-      const match = stateOk && districtOk;
-      await logPunch(null, 0, match);
-      return res.json({
-        success: true,
-        data: {
-          valid: match,
-          message: match
-            ? `✓ Verified in ${rule.district}, ${rule.state}`
-            : `You are in ${resolved.district}, ${resolved.state}. Must be in ${rule.district}, ${rule.state} to punch in.`
-        }
-      });
-    }
-
-    // ── 5. OFFICE — check distance against assigned office radius ────────────
-    // (also used as fallback when rule_type = 'office' or no rule set)
     const buffers = await db.query(
       `SELECT ol.*, eg.is_universal
        FROM employee_geofence eg
@@ -367,30 +287,48 @@ exports.validatePunch = async (req, res) => {
       [empId]
     );
 
-    if (!buffers.rows.length) {
-      return res.json({ success: true, data: { valid: true, message: 'No office assigned — punch allowed', distance: 0 } });
-    }
+    if (!buffers.rows.length)
+      return res.json({ success: true, data: { valid: true, message: 'No buffer assigned — punch allowed from anywhere', distance: 0 } });
 
-    // If no rule set at all and employee has universal geofence flag → allow
-    if (!rule && buffers.rows.some(b => b.is_universal)) {
-      await logPunch(buffers.rows[0].id, 0, true);
-      return res.json({ success: true, data: { valid: true, message: 'Universal access — punch allowed from any location', distance: 0 } });
+    // If employee has ANY universal assignment → always allow
+    const hasUniversal = buffers.rows.some(b => b.is_universal);
+    if (hasUniversal) {
+      // ── Log the punch ────────────────────────────────────────────────────────
+      await db.query(
+        `INSERT INTO attendance_geofence_logs
+           (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [empId, buffers.rows[0].office_location_id || null,
+         latitude, longitude, 0, true, req.body.punch_type || 'in']
+      ).catch(() => {}); // non-fatal if log fails
+      return res.json({
+        success: true,
+        data: {
+          valid: true,
+          message: 'Universal access — punch allowed from any location',
+          distance: 0
+        }
+      });
     }
 
     let minDist = Infinity, closestBuf = null;
     for (const buf of buffers.rows) {
-      // Skip global zones (radius >= 10000) when doing office distance check
-      if (buf.radius_meters >= 10000) continue;
-      const dist = haversine(lat, lng, parseFloat(buf.latitude), parseFloat(buf.longitude));
+      const dist = haversine(latitude, longitude, parseFloat(buf.latitude), parseFloat(buf.longitude));
       if (dist < minDist) { minDist = dist; closestBuf = buf; }
       if (dist <= buf.radius_meters) {
-        await logPunch(buf.id, dist, true);
+        // ── Log valid punch ───────────────────────────────────────────────────
+        await db.query(
+          `INSERT INTO attendance_geofence_logs
+             (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [empId, buf.id, latitude, longitude, Math.round(dist), true, req.body.punch_type || 'in']
+        ).catch(() => {});
         return res.json({
           success: true,
           data: {
             valid: true,
-            message: `✓ Within ${buf.name} (${Math.round(dist)}m from center)`,
-            distance: Math.round(dist),
+            message: `Within ${buf.name} buffer (${dist}m from center)`,
+            distance: dist,
             location_id: buf.id,
             location_name: buf.name
           }
@@ -398,25 +336,25 @@ exports.validatePunch = async (req, res) => {
       }
     }
 
-    // Outside all office buffers
-    if (closestBuf) {
-      await logPunch(closestBuf.id, minDist, false);
-      return res.json({
-        success: true,
-        data: {
-          valid: false,
-          message: `You are ${Math.round(minDist)}m from ${closestBuf.name}. Must be within ${closestBuf.radius_meters}m.`,
-          distance: Math.round(minDist),
-          location_id: closestBuf.id,
-          location_name: closestBuf.name
-        }
-      });
-    }
+    // ── Log invalid punch (outside all buffers) ───────────────────────────────
+    await db.query(
+      `INSERT INTO attendance_geofence_logs
+         (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [empId, closestBuf?.id || null, latitude, longitude,
+       Math.round(minDist), false, req.body.punch_type || 'in']
+    ).catch(() => {});
 
-    // All assigned locations are global zones — allow
-    await logPunch(null, 0, true);
-    return res.json({ success: true, data: { valid: true, message: 'No strict office assigned — punch allowed', distance: 0 } });
-
+    res.json({
+      success: true,
+      data: {
+        valid: false,
+        message: `Outside all buffers. Nearest: ${closestBuf?.name} (${minDist}m away, limit: ${closestBuf?.radius_meters}m)`,
+        distance: minDist,
+        location_id: closestBuf?.id,
+        location_name: closestBuf?.name
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -544,9 +482,16 @@ exports.bulkAssignBuffer = async (req, res) => {
 // ── Remove Buffer from Employee ───────────────────────────────────────────────
 exports.removeBuffer = async (req, res) => {
   try {
+    const { employee_id, location_id } = req.params;
+    // Remove from employee_geofence
     await db.query(
       'DELETE FROM employee_geofence WHERE employee_id=$1 AND office_location_id=$2',
-      [req.params.employee_id, req.params.location_id]
+      [employee_id, location_id]
+    );
+    // Also remove from employee_buffer_rules (so punch validation doesn't grant access)
+    await db.query(
+      'DELETE FROM employee_buffer_rules WHERE employee_id=$1',
+      [employee_id]
     );
     res.json({ success: true, message: 'Buffer assignment removed' });
   } catch (err) {
@@ -562,11 +507,25 @@ exports.toggleUniversal = async (req, res) => {
     if (is_universal === undefined)
       return res.status(400).json({ success: false, message: 'is_universal required' });
 
+    // UPSERT — works even if employee had no employee_geofence row (e.g. was universal-rule only)
     await db.query(
-      `UPDATE employee_geofence SET is_universal=$1, assigned_by=$2
-       WHERE employee_id=$3 AND office_location_id=$4`,
+      `INSERT INTO employee_geofence (employee_id, office_location_id, is_universal, assigned_by)
+       VALUES ($3, $4, $1, $2)
+       ON CONFLICT (employee_id, office_location_id)
+       DO UPDATE SET is_universal = $1, assigned_by = $2`,
       [is_universal, req.user.id, employee_id, location_id]
     );
+
+    // Also sync employee_buffer_rules to match
+    const ruleType = is_universal ? 'universal' : 'office';
+    await db.query(
+      `INSERT INTO employee_buffer_rules (employee_id, rule_type, assigned_by, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (employee_id)
+       DO UPDATE SET rule_type = $2, assigned_by = $3, updated_at = NOW()`,
+      [employee_id, ruleType, req.user.id]
+    );
+
     res.json({ success: true, message: `Access changed to ${is_universal ? 'Universal' : 'Specific'}` });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -598,6 +557,8 @@ exports.getEmployeesForLocation = async (req, res) => {
     const locNameLower = loc.name.toLowerCase();
 
     // ── 1. Get ASSIGNED employees ─────────────────────────────────────────────
+    // Also fetch employees with universal buffer rule who are NOT in employee_geofence
+    // (they were assigned universal access via the buffer-rules page, not geofence-tab)
     const assignedRes = await db.query(
       `SELECT e.id, e.employee_code,
               CONCAT(e.first_name,' ',e.last_name) AS full_name,
@@ -610,7 +571,22 @@ exports.getEmployeesForLocation = async (req, res) => {
        JOIN employees e ON e.id = eg.employee_id
        LEFT JOIN departments d ON d.id = e.department_id
        WHERE eg.office_location_id = $1 AND e.is_active = TRUE
-       ORDER BY e.first_name`,
+       UNION
+       -- Employees with universal buffer rule (no specific location assignment)
+       SELECT e.id, e.employee_code,
+              CONCAT(e.first_name,' ',e.last_name) AS full_name,
+              d.name AS department_name, e.role, e.city,
+              TRUE AS is_universal,
+              TRUE AS is_assigned_here,
+              $2::text AS assigned_location_name,
+              'Universal' AS buffer_type
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       LEFT JOIN departments d ON d.id = e.department_id
+       WHERE ebr.rule_type = 'universal'
+         AND e.is_active = TRUE
+         AND e.id NOT IN (SELECT employee_id FROM employee_geofence WHERE office_location_id = $1)
+       ORDER BY full_name`,
       [locationId, loc.name]
     );
 
@@ -882,24 +858,25 @@ exports.getBufferRule = async (req, res) => {
 
 // ── UPSERT (POST or PUT) buffer rule ─────────────────────────────────────────
 exports.upsertBufferRule = async (req, res) => {
-  const client = await db.getClient();
   try {
-    await client.query('BEGIN');
-
-    const employee_id = req.params.employee_id || req.body.employee_id;
+    const employee_id  = req.params.employee_id || req.body.employee_id;
     const { rule_type, state, district } = req.body;
     if (!employee_id || !rule_type)
       return res.status(400).json({ success: false, message: 'employee_id and rule_type required' });
 
-    // ── 1. Sync employee_type ─────────────────────────────────────────────────
+    // ── Sync employee_type — but NEVER override with 'wfh' for universal ──────
+    // universal rule_type means "punch from anywhere" — it does NOT mean the
+    // employee is a WFH employee. Onsite seniors can be universal too.
+    // Only office→onsite, state/district→offsite mappings are automatic.
+    // For universal: keep whatever employee_type they already have.
     if (rule_type === 'office') {
-      await client.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
+      await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
     } else if (rule_type === 'state' || rule_type === 'district') {
-      await client.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
+      await db.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
     }
+    // universal → do NOT change employee_type (keep onsite/offsite/wfh as-is)
 
-    // ── 2. Save the buffer rule ───────────────────────────────────────────────
-    const r = await client.query(
+    const r = await db.query(
       `INSERT INTO employee_buffer_rules
          (employee_id, rule_type, state, district, assigned_by, updated_at)
        VALUES ($1,$2,$3,$4,$5,NOW())
@@ -912,129 +889,9 @@ exports.upsertBufferRule = async (req, res) => {
        RETURNING *`,
       [employee_id, rule_type, state || null, district || null, req.user.id]
     );
-
-    // ── 3. Move employee OUT of old locations, clean up empty auto-locations ────
-
-    if (rule_type === 'district' || rule_type === 'state' || rule_type === 'universal') {
-      // Moving AWAY from office → remove from all strict-office assignments
-      await client.query(
-        `DELETE FROM employee_geofence
-         WHERE employee_id = $1
-           AND office_location_id IN (
-             SELECT id FROM office_locations WHERE radius_meters < 10000
-           )`,
-        [employee_id]
-      );
-    }
-
-    if (rule_type === 'office') {
-      // Moving BACK to office → remove from all global (district/state) locations
-      // then delete any auto-created district/state locations that now have 0 employees
-      const globalLocs = await client.query(
-        `SELECT eg.office_location_id AS loc_id
-         FROM employee_geofence eg
-         JOIN office_locations ol ON ol.id = eg.office_location_id
-         WHERE eg.employee_id = $1 AND ol.radius_meters >= 10000`,
-        [employee_id]
-      );
-      const globalLocIds = globalLocs.rows.map(r => r.loc_id);
-
-      if (globalLocIds.length) {
-        // Remove employee from those global locations
-        await client.query(
-          `DELETE FROM employee_geofence
-           WHERE employee_id = $1 AND office_location_id = ANY($2::int[])`,
-          [employee_id, globalLocIds]
-        );
-
-        // Delete any auto-created global locations now with 0 employees
-        for (const locId of globalLocIds) {
-          const remaining = await client.query(
-            `SELECT COUNT(*) AS cnt FROM employee_geofence WHERE office_location_id = $1`,
-            [locId]
-          );
-          if (parseInt(remaining.rows[0].cnt) === 0) {
-            // Only delete auto-created zones (radius 999999), not manually-set ones
-            await client.query(
-              `DELETE FROM office_locations WHERE id = $1 AND radius_meters >= 999999`,
-              [locId]
-            );
-          }
-        }
-      }
-
-      // Assign employee to the specified office location
-      const { office_location_id } = req.body;
-      if (office_location_id) {
-        await client.query(
-          `INSERT INTO employee_geofence (employee_id, office_location_id, is_universal, assigned_by)
-           VALUES ($1, $2, FALSE, $3)
-           ON CONFLICT (employee_id, office_location_id) DO UPDATE SET is_universal = FALSE`,
-          [employee_id, office_location_id, req.user.id]
-        );
-      }
-    }
-
-    // ── 4. Auto-create / find location for district or state, then assign ──────
-    let newLocId = null;
-
-    if (rule_type === 'district' && district && state) {
-      const locName = `District – ${district}, ${state}`;
-      const address = `${district} District, ${state}, India`;
-
-      // Find existing or create
-      const existing = await client.query(
-        `SELECT id FROM office_locations WHERE LOWER(name) = LOWER($1) AND is_active = TRUE LIMIT 1`,
-        [locName]
-      );
-      if (existing.rows.length) {
-        newLocId = existing.rows[0].id;
-      } else {
-        const created = await client.query(
-          `INSERT INTO office_locations (name, latitude, longitude, radius_meters, address, is_active, created_by)
-           VALUES ($1, 0, 0, 999999, $2, TRUE, $3) RETURNING id`,
-          [locName, address, req.user.id]
-        );
-        newLocId = created.rows[0].id;
-      }
-    } else if (rule_type === 'state' && state) {
-      const locName = `State – ${state}`;
-      const address = `${state}, India`;
-
-      const existing = await client.query(
-        `SELECT id FROM office_locations WHERE LOWER(name) = LOWER($1) AND is_active = TRUE LIMIT 1`,
-        [locName]
-      );
-      if (existing.rows.length) {
-        newLocId = existing.rows[0].id;
-      } else {
-        const created = await client.query(
-          `INSERT INTO office_locations (name, latitude, longitude, radius_meters, address, is_active, created_by)
-           VALUES ($1, 0, 0, 999999, $2, TRUE, $3) RETURNING id`,
-          [locName, address, req.user.id]
-        );
-        newLocId = created.rows[0].id;
-      }
-    }
-
-    // ── 5. Assign employee to the new district/state location ─────────────────
-    if (newLocId) {
-      await client.query(
-        `INSERT INTO employee_geofence (employee_id, office_location_id, is_universal, assigned_by)
-         VALUES ($1, $2, TRUE, $3)
-         ON CONFLICT (employee_id, office_location_id) DO NOTHING`,
-        [employee_id, newLocId, req.user.id]
-      );
-    }
-
-    await client.query('COMMIT');
-    res.json({ success: true, data: r.rows[0], new_location_id: newLocId });
+    res.json({ success: true, data: r.rows[0] });
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error(err);
     res.status(500).json({ success: false, message: err.message });
-  } finally {
-    client.release();
   }
 };
 
