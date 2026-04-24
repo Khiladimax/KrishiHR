@@ -1369,20 +1369,14 @@ async function drawDistrictBoundary(state, district) {
     const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
     new google.maps.Polygon({
       paths: ring, map: _map,
-      strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
-      fillColor: '#ec4899', fillOpacity: 0.12
+      strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 4,
+      fillColor: '#ec4899', fillOpacity: 0.35
     });
-    // Phase 1: Show overview with BOTH user + district so user sees context + line
-    const districtBounds = new google.maps.LatLngBounds();
-    ring.forEach(p => districtBounds.extend(p));
-    const overviewBounds = new google.maps.LatLngBounds();
-    ring.forEach(p => overviewBounds.extend(p));
-    if (_pLat && _pLng) overviewBounds.extend({ lat: _pLat, lng: _pLng });
-    _map.fitBounds(overviewBounds, { top: 60, bottom: 80, left: 60, right: 60 });
-    // Phase 2: After 2.5s, zoom into district so boundary is clearly visible
-    setTimeout(() => {
-      if (_map) _map.fitBounds(districtBounds, { top: 50, bottom: 50, left: 50, right: 50 });
-    }, 2500);
+    // Single fitBounds: show BOTH user + district, stay there, no auto-zoom
+    const bounds = new google.maps.LatLngBounds();
+    ring.forEach(p => bounds.extend(p));
+    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
 
     // Distance calculation + dotted line from user to nearest boundary point
     if (_pLat && _pLng) {
