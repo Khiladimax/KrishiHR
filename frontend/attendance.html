@@ -1372,11 +1372,15 @@ async function drawDistrictBoundary(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 4,
       fillColor: '#ec4899', fillOpacity: 0.35
     });
-    // Single fitBounds: show BOTH user + district, stay there, no auto-zoom
+    // Show BOTH user + district. After fitBounds settles, enforce min zoom 5
+    // so map never zooms out past India level regardless of modal pixel size.
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(p => bounds.extend(p));
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
     _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
+    google.maps.event.addListenerOnce(_map, 'idle', () => {
+      if (_map.getZoom() < 5) _map.setZoom(5);
+    });
 
     // Distance calculation + dotted line from user to nearest boundary point
     if (_pLat && _pLng) {
