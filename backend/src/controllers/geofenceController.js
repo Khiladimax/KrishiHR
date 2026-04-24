@@ -271,14 +271,94 @@ exports.getUnassignedEmployees = async (req, res) => {
 };
 
 // ── Validate Punch (called before punch-in/out) ───────────────────────────────
+// Priority: employee_buffer_rules.rule_type ALWAYS wins over raw office radius check.
+// Flow:
+//   1. Load employee's buffer rule (rule_type: office | district | state | universal)
+//   2. If rule_type = universal  → always allow
+//   3. If rule_type = state      → resolve GPS to state polygon, compare
+//   4. If rule_type = district   → resolve GPS to district polygon, compare
+//   5. If rule_type = office     → check distance against assigned office radius
+//   6. If no rule set            → fall back to legacy office radius check
 exports.validatePunch = async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
     const empId = req.user.id;
+    const punchType = req.body.punch_type || 'in';
 
     if (!latitude || !longitude)
       return res.json({ success: true, data: { valid: true, message: 'No GPS provided — punch allowed', distance: 0 } });
 
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    // ── 1. Load buffer rule ───────────────────────────────────────────────────
+    const ruleRes = await db.query(
+      `SELECT ebr.rule_type, ebr.state, ebr.district
+       FROM employee_buffer_rules ebr
+       WHERE ebr.employee_id = $1`,
+      [empId]
+    );
+    const rule = ruleRes.rows[0] || null;
+
+    // Helper to log punch attempt
+    const logPunch = (locId, dist, valid) =>
+      db.query(
+        `INSERT INTO attendance_geofence_logs
+           (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [empId, locId || null, lat, lng, Math.round(dist || 0), valid, punchType]
+      ).catch(() => {});
+
+    // ── 2. UNIVERSAL — punch from anywhere ───────────────────────────────────
+    if (rule?.rule_type === 'universal') {
+      await logPunch(null, 0, true);
+      return res.json({ success: true, data: { valid: true, message: 'Universal access — punch allowed from anywhere', distance: 0 } });
+    }
+
+    // ── 3. STATE — must be inside assigned state polygon ────────────────────
+    if (rule?.rule_type === 'state') {
+      const resolved = resolveLocation(lat, lng);
+      if (!resolved) {
+        await logPunch(null, 0, false);
+        return res.json({ success: true, data: { valid: false, message: 'Your location could not be matched to any region in India.' } });
+      }
+      const match = resolved.state.toUpperCase() === (rule.state || '').toUpperCase();
+      await logPunch(null, 0, match);
+      return res.json({
+        success: true,
+        data: {
+          valid: match,
+          message: match
+            ? `✓ Verified in ${resolved.state}`
+            : `You are in ${resolved.state}. Must be in ${rule.state} to punch in.`
+        }
+      });
+    }
+
+    // ── 4. DISTRICT — must be inside assigned district polygon ──────────────
+    if (rule?.rule_type === 'district') {
+      const resolved = resolveLocation(lat, lng);
+      if (!resolved) {
+        await logPunch(null, 0, false);
+        return res.json({ success: true, data: { valid: false, message: 'Your location could not be matched to any region in India.' } });
+      }
+      const stateOk    = resolved.state.toUpperCase()    === (rule.state    || '').toUpperCase();
+      const districtOk = resolved.district.toLowerCase() === (rule.district || '').toLowerCase();
+      const match = stateOk && districtOk;
+      await logPunch(null, 0, match);
+      return res.json({
+        success: true,
+        data: {
+          valid: match,
+          message: match
+            ? `✓ Verified in ${rule.district}, ${rule.state}`
+            : `You are in ${resolved.district}, ${resolved.state}. Must be in ${rule.district}, ${rule.state} to punch in.`
+        }
+      });
+    }
+
+    // ── 5. OFFICE — check distance against assigned office radius ────────────
+    // (also used as fallback when rule_type = 'office' or no rule set)
     const buffers = await db.query(
       `SELECT ol.*, eg.is_universal
        FROM employee_geofence eg
@@ -287,48 +367,30 @@ exports.validatePunch = async (req, res) => {
       [empId]
     );
 
-    if (!buffers.rows.length)
-      return res.json({ success: true, data: { valid: true, message: 'No buffer assigned — punch allowed from anywhere', distance: 0 } });
+    if (!buffers.rows.length) {
+      return res.json({ success: true, data: { valid: true, message: 'No office assigned — punch allowed', distance: 0 } });
+    }
 
-    // If employee has ANY universal assignment → always allow
-    const hasUniversal = buffers.rows.some(b => b.is_universal);
-    if (hasUniversal) {
-      // ── Log the punch ────────────────────────────────────────────────────────
-      await db.query(
-        `INSERT INTO attendance_geofence_logs
-           (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [empId, buffers.rows[0].office_location_id || null,
-         latitude, longitude, 0, true, req.body.punch_type || 'in']
-      ).catch(() => {}); // non-fatal if log fails
-      return res.json({
-        success: true,
-        data: {
-          valid: true,
-          message: 'Universal access — punch allowed from any location',
-          distance: 0
-        }
-      });
+    // If no rule set at all and employee has universal geofence flag → allow
+    if (!rule && buffers.rows.some(b => b.is_universal)) {
+      await logPunch(buffers.rows[0].id, 0, true);
+      return res.json({ success: true, data: { valid: true, message: 'Universal access — punch allowed from any location', distance: 0 } });
     }
 
     let minDist = Infinity, closestBuf = null;
     for (const buf of buffers.rows) {
-      const dist = haversine(latitude, longitude, parseFloat(buf.latitude), parseFloat(buf.longitude));
+      // Skip global zones (radius >= 10000) when doing office distance check
+      if (buf.radius_meters >= 10000) continue;
+      const dist = haversine(lat, lng, parseFloat(buf.latitude), parseFloat(buf.longitude));
       if (dist < minDist) { minDist = dist; closestBuf = buf; }
       if (dist <= buf.radius_meters) {
-        // ── Log valid punch ───────────────────────────────────────────────────
-        await db.query(
-          `INSERT INTO attendance_geofence_logs
-             (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [empId, buf.id, latitude, longitude, Math.round(dist), true, req.body.punch_type || 'in']
-        ).catch(() => {});
+        await logPunch(buf.id, dist, true);
         return res.json({
           success: true,
           data: {
             valid: true,
-            message: `Within ${buf.name} buffer (${dist}m from center)`,
-            distance: dist,
+            message: `✓ Within ${buf.name} (${Math.round(dist)}m from center)`,
+            distance: Math.round(dist),
             location_id: buf.id,
             location_name: buf.name
           }
@@ -336,25 +398,25 @@ exports.validatePunch = async (req, res) => {
       }
     }
 
-    // ── Log invalid punch (outside all buffers) ───────────────────────────────
-    await db.query(
-      `INSERT INTO attendance_geofence_logs
-         (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [empId, closestBuf?.id || null, latitude, longitude,
-       Math.round(minDist), false, req.body.punch_type || 'in']
-    ).catch(() => {});
+    // Outside all office buffers
+    if (closestBuf) {
+      await logPunch(closestBuf.id, minDist, false);
+      return res.json({
+        success: true,
+        data: {
+          valid: false,
+          message: `You are ${Math.round(minDist)}m from ${closestBuf.name}. Must be within ${closestBuf.radius_meters}m.`,
+          distance: Math.round(minDist),
+          location_id: closestBuf.id,
+          location_name: closestBuf.name
+        }
+      });
+    }
 
-    res.json({
-      success: true,
-      data: {
-        valid: false,
-        message: `Outside all buffers. Nearest: ${closestBuf?.name} (${minDist}m away, limit: ${closestBuf?.radius_meters}m)`,
-        distance: minDist,
-        location_id: closestBuf?.id,
-        location_name: closestBuf?.name
-      }
-    });
+    // All assigned locations are global zones — allow
+    await logPunch(null, 0, true);
+    return res.json({ success: true, data: { valid: true, message: 'No strict office assigned — punch allowed', distance: 0 } });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
