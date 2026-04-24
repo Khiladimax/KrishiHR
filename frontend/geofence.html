@@ -4,194 +4,404 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KrishiHR — Geofence & Locations</title>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA&libraries=geometry"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-
 <style>
-  /* ── Stats Strip ─────────────────────────────────────────── */
-  .geo-stats {
-    display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px;
-  }
-  .geo-stat-card {
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: var(--radius); padding: 14px 16px;
-  }
+/* ═══════════════════════════════════════════════════
+   GEOFENCE PAGE — Premium Redesign
+   Font: Plus Jakarta Sans (display) + DM Sans (body)
+   Theme: Deep forest green + warm off-white + slate
+   ═══════════════════════════════════════════════════ */
 
-  /* ── Map card ────────────────────────────────────────────── */
-  #main-map {
-    width: 100%; height: 340px;
-    border-radius: var(--radius);
-    border: 1.5px solid var(--border);
-  }
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
 
-  /* ── Unified Location Table ───────────────────────────────── */
-  .loc-table {
-    width: 100%; border-collapse: collapse; font-size: 13px;
-  }
-  .loc-table thead th {
-    padding: 9px 12px;
-    text-align: left; font-size: 10.5px; font-weight: 700;
-    color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
-    background: var(--surface2); border-bottom: 1.5px solid var(--border);
-    white-space: nowrap;
-  }
-  .loc-table tbody tr {
-    border-bottom: 1px solid var(--border);
-    transition: background .12s;
-  }
-  .loc-table tbody tr:hover { background: var(--surface2); }
-  .loc-table tbody tr.loc-selected { background: var(--accent-l); }
-  .loc-table tbody td { padding: 9px 12px; vertical-align: middle; }
-  .loc-table .section-header td {
-    padding: 6px 12px;
-    font-size: 9.5px; font-weight: 800; color: var(--muted2);
-    text-transform: uppercase; letter-spacing: 1px;
-    background: var(--surface2); border-bottom: 1px solid var(--border);
-  }
+:root {
+  --g-green:     #1e6b3c;
+  --g-green-l:   #eaf4ee;
+  --g-green-m:   #c6e6d1;
+  --g-blue:      #1d4ed8;
+  --g-blue-l:    #dbeafe;
+  --g-amber:     #92400e;
+  --g-amber-l:   #fef3c7;
+  --g-purple:    #5b21b6;
+  --g-purple-l:  #ede9fe;
+  --g-red:       #b91c1c;
+  --g-red-l:     #fee2e2;
+  --g-slate:     #1e293b;
+  --g-slate-2:   #334155;
+  --g-muted:     #64748b;
+  --g-muted-l:   #94a3b8;
+  --g-border:    #e2e8f0;
+  --g-border-h:  #cbd5e1;
+  --g-surface:   #ffffff;
+  --g-surface-2: #f8fafc;
+  --g-surface-3: #f1f5f9;
+  --shadow-xs: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-sm: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -1px rgba(0,0,0,.04);
+  --shadow-md: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -2px rgba(0,0,0,.04);
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 99px;
+}
 
-  /* ── Type badges ─────────────────────────────────────────── */
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 20px;
-    font-size: 10px; font-weight: 700; white-space: nowrap;
-  }
-  .badge-office    { background: #dbeafe; color: #1d4ed8; }
-  .badge-global    { background: var(--accent-l); color: var(--accent); }
-  .badge-wfh       { background: #ede9fe; color: #5b21b6; }
-  .badge-onsite    { background: #dbeafe; color: #1d4ed8; }
-  .badge-offsite   { background: #dcfce7; color: #166534; }
-  .badge-universal { background: #ede9fe; color: #5b21b6; }
-  .badge-none      { background: var(--surface2); color: var(--muted); }
+/* ── STAT CARDS ──────────────────────────────────────────── */
+.g-stats {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 14px;
+  margin-bottom: 20px;
+}
+.g-stat {
+  background: var(--g-surface);
+  border: 1.5px solid var(--g-border);
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 14px;
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow .2s, border-color .2s;
+  position: relative; overflow: hidden;
+}
+.g-stat::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.g-stat:nth-child(1)::before { background: var(--g-slate); }
+.g-stat:nth-child(2)::before { background: var(--g-blue); }
+.g-stat:nth-child(3)::before { background: var(--g-green); }
+.g-stat:nth-child(4)::before { background: #059669; }
+.g-stat:hover { box-shadow: var(--shadow-sm); border-color: var(--g-border-h); }
+.g-stat-icon {
+  width: 44px; height: 44px; border-radius: var(--r-md); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.g-stat-val {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 30px; font-weight: 800; line-height: 1;
+  letter-spacing: -1px;
+}
+.g-stat-label {
+  font-size: 11px; font-weight: 600; color: var(--g-muted);
+  text-transform: uppercase; letter-spacing: .6px; margin-top: 3px;
+}
 
-  /* ── Employee mini-table inside expanded row ─────────────── */
-  .emp-sub-table {
-    width: 100%; border-collapse: collapse; font-size: 12px;
-    margin: 0;
-  }
-  .emp-sub-table thead th {
-    padding: 6px 10px;
-    text-align: left; font-size: 10px; font-weight: 700;
-    color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
-    background: var(--surface); border-bottom: 1px solid var(--border);
-  }
-  .emp-sub-table tbody tr { border-bottom: 1px solid var(--border); }
-  .emp-sub-table tbody tr:last-child { border-bottom: none; }
-  .emp-sub-table tbody td { padding: 7px 10px; vertical-align: middle; }
+/* ── MAP CARD ─────────────────────────────────────────────── */
+.g-map-card {
+  background: var(--g-surface); border: 1.5px solid var(--g-border);
+  border-radius: var(--r-lg); overflow: hidden; margin-bottom: 20px;
+  box-shadow: var(--shadow-xs);
+}
+.g-map-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--g-border);
+}
+.g-map-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px; font-weight: 700; color: var(--g-slate);
+  display: flex; align-items: center; gap: 8px;
+}
+#main-map { width: 100%; height: 320px; }
+.g-map-footer {
+  display: flex; gap: 20px; padding: 10px 18px;
+  border-top: 1px solid var(--g-border); background: var(--g-surface-2);
+}
+.g-legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--g-muted); font-weight: 500;
+}
+.g-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
-  /* ── Buffer slider (inline in table) ────────────────────── */
-  .buf-slider {
-    -webkit-appearance: none; width: 130px; height: 5px;
-    border-radius: 99px;
-    background: linear-gradient(90deg, var(--accent) var(--pct,30%), var(--border) var(--pct,30%));
-    outline: none; cursor: pointer;
-  }
-  .buf-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 14px; height: 14px;
-    border-radius: 50%; background: var(--accent);
-    border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.15);
-    cursor: pointer;
-  }
-  .buf-val {
-    display: inline-block; min-width: 44px; font-size: 11px;
-    font-weight: 700; color: var(--accent); text-align: right;
-  }
+/* ── MAIN TABLE CARD ─────────────────────────────────────── */
+.g-card {
+  background: var(--g-surface); border: 1.5px solid var(--g-border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-xs); overflow: hidden;
+}
+.g-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--g-border);
+  background: var(--g-surface);
+}
+.g-card-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px; font-weight: 700; color: var(--g-slate);
+}
+.g-card-sub { font-size: 12px; color: var(--g-muted); margin-top: 2px; }
 
-  /* ── Expand/collapse row ─────────────────────────────────── */
-  .expand-btn {
-    background: none; border: none; cursor: pointer;
-    font-size: 14px; line-height: 1; padding: 0 4px;
-    color: var(--muted); transition: transform .2s;
-  }
-  .expand-btn.open { transform: rotate(90deg); color: var(--accent); }
+/* ── TOOLBAR ─────────────────────────────────────────────── */
+.g-toolbar {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 14px 20px; border-bottom: 1px solid var(--g-border);
+  background: var(--g-surface-2);
+}
+.g-search-wrap { position: relative; }
+.g-search-wrap svg {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--g-muted-l); pointer-events: none;
+}
+.g-search {
+  padding: 8px 12px 8px 36px; width: 230px;
+  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
+  font-size: 13px; font-family: 'DM Sans', sans-serif;
+  background: var(--g-surface); color: var(--g-slate); outline: none;
+  transition: all .15s;
+}
+.g-search:focus { border-color: var(--g-green); box-shadow: 0 0 0 3px rgba(30,107,60,.1); }
+.g-filter-sel {
+  padding: 8px 12px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
+  background: var(--g-surface); color: var(--g-slate); outline: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: border-color .15s;
+}
+.g-filter-sel:focus { border-color: var(--g-green); }
+.g-count { font-size: 12px; color: var(--g-muted); font-weight: 500; margin-left: auto; }
 
-  /* ── Search/filter bar ───────────────────────────────────── */
-  .geo-toolbar {
-    display: flex; gap: 8px; align-items: center;
-    margin-bottom: 14px; flex-wrap: wrap;
-  }
-  .geo-search {
-    padding: 7px 12px 7px 32px;
-    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-    font-size: 13px; background: var(--surface2); color: var(--text);
-    outline: none; transition: all .15s; font-family: 'DM Sans', sans-serif;
-    width: 220px;
-  }
-  .geo-search:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(74,140,28,.1); }
-  .geo-search-wrap { position: relative; }
-  .geo-search-wrap::before {
-    content: '🔍'; position: absolute; left: 9px; top: 50%;
-    transform: translateY(-50%); font-size: 12px; pointer-events: none;
-  }
+/* ── MAIN LOC TABLE ──────────────────────────────────────── */
+.g-table { width: 100%; border-collapse: collapse; }
+.g-table thead th {
+  padding: 10px 16px; text-align: left;
+  font-size: 10px; font-weight: 700; color: var(--g-muted);
+  text-transform: uppercase; letter-spacing: .6px;
+  background: var(--g-surface-3); border-bottom: 1.5px solid var(--g-border);
+  white-space: nowrap;
+}
+.g-section-hdr td {
+  padding: 7px 16px;
+  font-size: 9.5px; font-weight: 800; color: var(--g-muted);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  background: linear-gradient(to right, var(--g-surface-3), var(--g-surface-2));
+  border-bottom: 1px solid var(--g-border);
+}
+.g-table tbody tr.loc-row { border-bottom: 1px solid var(--g-border); transition: background .12s; }
+.g-table tbody tr.loc-row:hover { background: #fafcfb; }
+.g-table tbody td { padding: 11px 16px; vertical-align: middle; }
 
-  /* ── Inline edit rule select ─────────────────────────────── */
-  .rule-sel {
-    font-size: 11px; padding: 3px 6px;
-    border: 1.5px solid var(--border); border-radius: 6px;
-    background: var(--surface); color: var(--text);
-    cursor: pointer;
-  }
-  .rule-sel:focus { border-color: var(--accent); outline: none; }
+/* ── BADGES ──────────────────────────────────────────────── */
+.gbadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  font-size: 10.5px; font-weight: 700; white-space: nowrap; letter-spacing: .2px;
+}
+.gbadge-office  { background: var(--g-blue-l);   color: var(--g-blue); }
+.gbadge-global  { background: var(--g-green-l);  color: var(--g-green); }
+.gbadge-wfh     { background: var(--g-purple-l); color: var(--g-purple); }
+.gbadge-active  { background: #dcfce7; color: #15803d; }
+.gbadge-inactive{ background: var(--g-surface-3); color: var(--g-muted); }
+.gbadge-onsite  { background: var(--g-blue-l);   color: var(--g-blue); }
+.gbadge-offsite { background: var(--g-green-l);  color: var(--g-green); }
+.gbadge-univ    { background: var(--g-purple-l); color: var(--g-purple); }
+.gbadge-none    { background: var(--g-surface-3); color: var(--g-muted-l); }
+.gbadge-district{ background: var(--g-green-l);  color: #166534; }
+.gbadge-state   { background: var(--g-amber-l);  color: var(--g-amber); }
 
-  /* ── Save button (inline) ────────────────────────────────── */
-  .save-mini {
-    font-size: 10px; padding: 3px 8px;
-    background: var(--accent); color: #fff;
-    border: none; border-radius: 6px; cursor: pointer;
-    font-weight: 700; white-space: nowrap;
-  }
-  .save-mini:hover { opacity: .88; }
+/* ── EXPAND BUTTON ───────────────────────────────────────── */
+.g-expand {
+  width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--g-surface-3); color: var(--g-muted);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; transition: all .18s; flex-shrink: 0;
+}
+.g-expand:hover { background: var(--g-green-m); color: var(--g-green); }
+.g-expand.open  { background: var(--g-green); color: #fff; transform: rotate(90deg); }
 
-  /* ── Quick-edit employee rule inline ─────────────────────── */
-  .emp-rule-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* ── SLIDER ──────────────────────────────────────────────── */
+.g-slider {
+  -webkit-appearance: none; height: 5px; border-radius: 99px;
+  outline: none; cursor: pointer;
+  background: linear-gradient(90deg, var(--g-green) var(--pct,30%), var(--g-border) var(--pct,30%));
+}
+.g-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 15px; height: 15px;
+  border-radius: 50%; background: var(--g-green);
+  border: 2.5px solid #fff; box-shadow: 0 1px 5px rgba(30,107,60,.35); cursor: pointer;
+}
+.g-sval {
+  min-width: 46px; font-size: 11.5px; font-weight: 700; color: var(--g-green);
+  font-family: 'Plus Jakarta Sans', sans-serif; text-align: right;
+}
 
-  /* ── Tab bar ─────────────────────────────────────────────── */
-  .tab-bar {
-    display: flex; gap: 2px;
-    background: var(--surface2); border-radius: var(--radius-sm);
-    padding: 3px; margin-bottom: 14px;
-  }
-  .tab-btn {
-    flex: 1; padding: 7px 12px; border: none; border-radius: 7px;
-    background: none; font-size: 12px; font-weight: 600; color: var(--muted);
-    cursor: pointer; transition: all .15s;
-  }
-  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-xs); }
+/* ── ACTION ICON BUTTONS ─────────────────────────────────── */
+.g-icon-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm); border: 1.5px solid var(--g-border);
+  background: var(--g-surface); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; transition: all .15s; color: var(--g-muted);
+}
+.g-icon-btn:hover { border-color: var(--g-green); background: var(--g-green-l); color: var(--g-green); }
+.g-icon-btn.danger:hover { border-color: var(--g-red); background: var(--g-red-l); color: var(--g-red); }
 
-  /* ── Inline map legend ───────────────────────────────────── */
-  .map-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
-  .map-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
-  .map-legend-dot { width: 11px; height: 11px; border-radius: 3px; }
+/* ── SAVE MINI BUTTON ────────────────────────────────────── */
+.g-save-btn {
+  padding: 4px 10px; font-size: 10.5px; font-weight: 700;
+  background: var(--g-green); color: #fff; border: none;
+  border-radius: 6px; cursor: pointer; white-space: nowrap;
+  font-family: 'DM Sans', sans-serif; transition: opacity .15s;
+}
+.g-save-btn:hover { opacity: .85; }
+.g-apply-btn {
+  padding: 5px 12px; font-size: 11px; font-weight: 700;
+  background: var(--g-green); color: #fff; border: none;
+  border-radius: 7px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+  transition: all .15s; display: inline-flex; align-items: center; gap: 4px;
+}
+.g-apply-btn:hover { opacity: .88; transform: translateY(-1px); }
+.g-remove-btn {
+  width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
+  background: none; color: var(--g-muted-l); font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.g-remove-btn:hover { background: var(--g-red-l); color: var(--g-red); }
 
-  /* ── Inline buffer slider styles ────────────────────────── */
-  .buffer-slider {
-    -webkit-appearance: none; width: 100%; height: 6px;
-    border-radius: 99px;
-    background: linear-gradient(90deg, var(--accent) var(--pct, 30%), var(--border) var(--pct, 30%));
-    outline: none; cursor: pointer;
-  }
-  .buffer-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 18px; height: 18px;
-    border-radius: 50%; background: var(--accent);
-    border: 3px solid #fff; box-shadow: var(--shadow-sm); cursor: pointer;
-  }
+/* ── SUB EMPLOYEE PANEL ──────────────────────────────────── */
+.g-sub-panel td { background: #f6faf7 !important; }
+.g-sub-panel .g-accent-bar { border-left: 3px solid var(--g-green); }
+.g-emp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.g-emp-table thead th {
+  padding: 8px 14px; text-align: left;
+  font-size: 9.5px; font-weight: 700; color: var(--g-muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  background: rgba(30,107,60,.05); border-bottom: 1px solid rgba(30,107,60,.12);
+}
+.g-emp-table tbody tr { border-bottom: 1px solid rgba(30,107,60,.08); transition: background .1s; }
+.g-emp-table tbody tr:hover { background: rgba(30,107,60,.03); }
+.g-emp-table tbody tr:last-child { border-bottom: none; }
+.g-emp-table tbody td { padding: 9px 14px; vertical-align: middle; }
 
-  /* ── Assign employees modal list ─────────────────────────── */
-  .asgn-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 0; border-bottom: 1px solid var(--border); gap: 8px;
-  }
-  .asgn-row:last-child { border-bottom: none; }
-  .search-input {
-    width: 100%; padding: 8px 12px 8px 34px;
-    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-    font-size: 13px; background: var(--surface2); color: var(--text);
-    outline: none; transition: all .15s; font-family: 'DM Sans', sans-serif;
-  }
-  .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(74,140,28,.1); }
-  .search-wrap { position: relative; margin-bottom: 14px; }
-  .search-wrap::before {
-    content: '🔍'; position: absolute; left: 10px; top: 50%;
-    transform: translateY(-50%); font-size: 13px; pointer-events: none;
-  }
+/* ── RULE SELECT ─────────────────────────────────────────── */
+.g-rule-sel {
+  padding: 5px 8px; font-size: 11.5px; font-weight: 600;
+  border: 1.5px solid var(--g-border); border-radius: 7px;
+  background: var(--g-surface); color: var(--g-slate); outline: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: border-color .15s;
+}
+.g-rule-sel:focus { border-color: var(--g-green); }
+
+/* ── STATE/DISTRICT DROPDOWNS ────────────────────────────── */
+.g-loc-select {
+  width: 100%; padding: 6px 10px; font-size: 11px; font-weight: 500;
+  border: 1.5px solid var(--g-border); border-radius: 7px;
+  background: var(--g-surface); color: var(--g-slate); outline: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: border-color .15s;
+  margin-top: 4px;
+}
+.g-loc-select:focus { border-color: var(--g-green); box-shadow: 0 0 0 2px rgba(30,107,60,.08); }
+
+/* ── AVATAR ──────────────────────────────────────────────── */
+.g-avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 700; color: var(--g-green);
+  background: var(--g-green-l); border: 1.5px solid var(--g-green-m);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* ── LOC NAME CELL ───────────────────────────────────────── */
+.g-loc-name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13.5px; font-weight: 700; color: var(--g-slate); }
+.g-loc-addr { font-size: 11px; color: var(--g-muted-l); margin-top: 2px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── EMP COUNT CHIP ──────────────────────────────────────── */
+.g-emp-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--g-surface-2); border: 1.5px solid var(--g-border);
+  border-radius: var(--r-pill); padding: 3px 10px;
+  font-size: 12px; font-weight: 600; color: var(--g-slate-2);
+}
+.g-emp-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--g-green); }
+
+/* ── BUFFER DISPLAY ──────────────────────────────────────── */
+.g-boundary-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700; color: var(--g-slate-2);
+}
+.g-boundary-sub { font-size: 10px; color: var(--g-muted-l); margin-top: 1px; }
+
+/* ── MODAL OVERRIDES ─────────────────────────────────────── */
+.g-modal-inner {
+  font-family: 'DM Sans', sans-serif;
+}
+.g-form-label {
+  font-size: 10.5px; font-weight: 700; color: var(--g-muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; display: block;
+}
+.g-input {
+  width: 100%; padding: 9px 12px;
+  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
+  font-size: 13px; font-family: 'DM Sans', sans-serif;
+  color: var(--g-slate); background: var(--g-surface); outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.g-input:focus { border-color: var(--g-green); box-shadow: 0 0 0 3px rgba(30,107,60,.1); }
+.g-global-note {
+  background: var(--g-green-l); border-left: 3px solid var(--g-green);
+  border-radius: var(--r-sm); padding: 10px 14px;
+  font-size: 12px; color: var(--g-green); font-weight: 500;
+}
+
+/* ── REFRESH BTN ─────────────────────────────────────────── */
+.g-refresh-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
+  background: var(--g-surface); color: var(--g-muted); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+}
+.g-refresh-btn:hover { border-color: var(--g-green); color: var(--g-green); background: var(--g-green-l); }
+
+/* ── EXPAND ALL BTNS ─────────────────────────────────────── */
+.g-ghost-btn {
+  padding: 7px 12px; font-size: 11.5px; font-weight: 600;
+  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
+  background: var(--g-surface); color: var(--g-muted); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+}
+.g-ghost-btn:hover { border-color: var(--g-slate); color: var(--g-slate); }
+
+/* ── SUB PANEL HEADER ────────────────────────────────────── */
+.g-sub-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 8px; border-bottom: 1px solid rgba(30,107,60,.1);
+}
+.g-sub-label {
+  font-size: 11px; font-weight: 700; color: var(--g-green);
+  text-transform: uppercase; letter-spacing: .6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.g-add-btn {
+  padding: 5px 12px; font-size: 11px; font-weight: 700;
+  border: 1.5px solid var(--g-green); border-radius: var(--r-sm);
+  background: transparent; color: var(--g-green); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+}
+.g-add-btn:hover { background: var(--g-green); color: #fff; }
+
+/* ── ASGN MODAL ROW ──────────────────────────────────────── */
+.g-asgn-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 0; border-bottom: 1px solid var(--g-border);
+}
+.g-asgn-row:last-child { border-bottom: none; }
+
+/* ── EMPTY STATE ─────────────────────────────────────────── */
+.g-empty {
+  text-align: center; padding: 20px; color: var(--g-muted); font-size: 13px;
+}
+
+/* ── BUFFER SLIDER MODAL ─────────────────────────────────── */
+.g-buf-slider-modal {
+  -webkit-appearance: none; width: 100%; height: 6px; border-radius: 99px;
+  background: linear-gradient(90deg, var(--g-green) var(--pct,30%), var(--g-border) var(--pct,30%));
+  outline: none; cursor: pointer; margin: 8px 0;
+}
+.g-buf-slider-modal::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--g-green);
+  border: 3px solid #fff; box-shadow: 0 2px 6px rgba(30,107,60,.3); cursor: pointer;
+}
+
+/* ── ANIMATIONS ──────────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.g-stats { animation: fadeSlideIn .35s ease both; }
+.g-map-card { animation: fadeSlideIn .4s .05s ease both; }
+.g-card { animation: fadeSlideIn .45s .1s ease both; }
+
 </style>
 </head>
 <body>
@@ -203,9 +413,7 @@
     <div class="logo-mark" id="sidebar-logo-mark">
       <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
-    <div>
-      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div>
-    </div>
+    <div><div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div></div>
   </div>
   <nav id="sidebar-nav"></nav>
   <div class="sidebar-footer">
@@ -222,7 +430,10 @@
   <div class="topbar">
     <div class="topbar-left">
       <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
-      <div class="topbar-title">📍 Geofence & Locations</div>
+      <div class="topbar-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#1e6b3c;vertical-align:middle;margin-right:6px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Geofence &amp; Locations
+      </div>
     </div>
     <div class="topbar-right">
       <button class="btn btn-primary btn-sm" onclick="openAddLocation()">+ Add Location</button>
@@ -233,129 +444,156 @@
 
   <div class="content fade-in">
 
-    <!-- Stats Strip -->
-    <div class="geo-stats" id="geo-stats">
-      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Total Locations</div><div style="font-size:28px;font-weight:800;color:var(--text)" id="stat-total">—</div></div>
-      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Office (Strict)</div><div style="font-size:28px;font-weight:800;color:#1d4ed8" id="stat-offices">—</div></div>
-      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Global Zones</div><div style="font-size:28px;font-weight:800;color:var(--accent)" id="stat-global">—</div></div>
-      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Assigned Employees</div><div style="font-size:28px;font-weight:800;color:var(--green)" id="stat-assigned">—</div></div>
+    <!-- ── STAT CARDS ──────────────────────────────────────── -->
+    <div class="g-stats" id="geo-stats">
+      <div class="g-stat">
+        <div class="g-stat-icon" style="background:#f1f5f9">📍</div>
+        <div>
+          <div class="g-stat-val" id="stat-total" style="color:var(--g-slate)">—</div>
+          <div class="g-stat-label">Total Locations</div>
+        </div>
+      </div>
+      <div class="g-stat">
+        <div class="g-stat-icon" style="background:#dbeafe">🏢</div>
+        <div>
+          <div class="g-stat-val" id="stat-offices" style="color:var(--g-blue)">—</div>
+          <div class="g-stat-label">Office (Strict)</div>
+        </div>
+      </div>
+      <div class="g-stat">
+        <div class="g-stat-icon" style="background:#eaf4ee">🌍</div>
+        <div>
+          <div class="g-stat-val" id="stat-global" style="color:var(--g-green)">—</div>
+          <div class="g-stat-label">Global Zones</div>
+        </div>
+      </div>
+      <div class="g-stat">
+        <div class="g-stat-icon" style="background:#d1fae5">👥</div>
+        <div>
+          <div class="g-stat-val" id="stat-assigned" style="color:#059669">—</div>
+          <div class="g-stat-label">Assigned Employees</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Map Card -->
-    <div class="card" style="padding:16px;margin-bottom:18px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:13px;font-weight:700;color:var(--text)" id="map-title">📍 All Locations Overview</div>
-        <button class="btn btn-ghost btn-sm" onclick="resetMapView()">Reset View</button>
+    <!-- ── MAP CARD ────────────────────────────────────────── -->
+    <div class="g-map-card">
+      <div class="g-map-header">
+        <div class="g-map-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--g-green)"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span id="map-title">All Locations Overview</span>
+        </div>
+        <button class="g-refresh-btn" onclick="resetMapView()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          Reset View
+        </button>
       </div>
       <div id="main-map"></div>
-      <div class="map-legend">
-        <div class="map-legend-item"><div class="map-legend-dot" style="background:#1d4ed8"></div>Office (Strict)</div>
-        <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--accent)"></div>State Zone (Global)</div>
-        <div class="map-legend-item"><div class="map-legend-dot" style="background:#8b5cf6"></div>Work From Home</div>
+      <div class="g-map-footer">
+        <div class="g-legend-item"><div class="g-legend-dot" style="background:#1d4ed8"></div>Office (Strict)</div>
+        <div class="g-legend-item"><div class="g-legend-dot" style="background:#1e6b3c"></div>State Zone (Global)</div>
+        <div class="g-legend-item"><div class="g-legend-dot" style="background:#8b5cf6"></div>Work From Home</div>
       </div>
     </div>
 
-    <!-- UNIFIED LOCATION + EMPLOYEE TABLE -->
-    <div class="card">
-      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <!-- ── UNIFIED TABLE CARD ──────────────────────────────── -->
+    <div class="g-card">
+      <div class="g-card-header">
         <div>
-          <div class="card-title">🏢 All Locations &amp; Employees</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">Expand any location to view, edit buffer &amp; manage employee rules inline</div>
+          <div class="g-card-title">All Locations &amp; Employees</div>
+          <div class="g-card-sub">Expand any location to view &amp; edit employee buffers and rules inline</div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Refresh</button>
+        <button class="g-refresh-btn" onclick="loadAll()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          Refresh
+        </button>
       </div>
 
       <!-- Toolbar -->
-      <div style="padding:0 16px 12px">
-        <div class="geo-toolbar">
-          <div class="geo-search-wrap">
-            <input class="geo-search" id="loc-search" placeholder="Search locations…" oninput="renderLocTable()">
-          </div>
-          <select class="rule-sel" id="filter-type" onchange="renderLocTable()" style="font-size:12px;padding:7px 10px">
-            <option value="">All types</option>
-            <option value="office">Office only</option>
-            <option value="global">Global zones</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="expandAll()">Expand All</button>
-          <button class="btn btn-ghost btn-sm" onclick="collapseAll()">Collapse All</button>
-          <span id="loc-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+      <div class="g-toolbar">
+        <div class="g-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="g-search" id="loc-search" placeholder="Search locations…" oninput="renderLocTable()">
         </div>
+        <select class="g-filter-sel" id="filter-type" onchange="renderLocTable()">
+          <option value="">All types</option>
+          <option value="office">Office only</option>
+          <option value="global">Global zones</option>
+        </select>
+        <button class="g-ghost-btn" onclick="expandAll()">Expand All</button>
+        <button class="g-ghost-btn" onclick="collapseAll()">Collapse All</button>
+        <span class="g-count" id="loc-count"></span>
+      </div>
 
-        <!-- Table -->
-        <div style="overflow-x:auto">
-          <table class="loc-table" id="loc-table">
-            <thead>
-              <tr>
-                <th style="width:32px"></th>
-                <th>Location</th>
-                <th>Type</th>
-                <th>Buffer / Zone</th>
-                <th>Employees</th>
-                <th>Status</th>
-                <th style="text-align:center">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="loc-tbody">
-              <tr><td colspan="7" style="padding:30px;text-align:center"><div class="spinner"></div></td></tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table -->
+      <div style="overflow-x:auto">
+        <table class="g-table" id="loc-table">
+          <thead>
+            <tr>
+              <th style="width:46px"></th>
+              <th>Location</th>
+              <th>Type</th>
+              <th>Buffer / Zone</th>
+              <th>Employees</th>
+              <th>Status</th>
+              <th style="text-align:center;width:140px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="loc-tbody">
+            <tr><td colspan="7" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
   </div><!-- /content -->
 </div><!-- /main -->
 
-<!-- ═══════════════════════════════════════════════════════════
-     ADD / EDIT LOCATION MODAL
-     ═══════════════════════════════════════════════════════════ -->
+<!-- ═══ ADD/EDIT LOCATION MODAL ═══════════════════════════ -->
 <div class="modal-backdrop" id="loc-modal">
-  <div class="modal" style="width:520px">
+  <div class="modal g-modal-inner" style="width:520px">
     <div class="modal-header">
       <div class="modal-title" id="loc-modal-title">Add Location</div>
       <button class="modal-close" onclick="closeModal('loc-modal')">✕</button>
     </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:0">
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
       <input type="hidden" id="loc-edit-id">
-      <div class="form-group" style="margin-bottom:14px">
-        <label class="form-label">Location Name *</label>
-        <input id="loc-name" class="form-control" style="width:100%" placeholder="e.g. Head Quarter – Mumbai">
+      <div>
+        <label class="g-form-label">Location Name *</label>
+        <input id="loc-name" class="g-input" placeholder="e.g. Head Quarter – Mumbai">
       </div>
-      <div class="form-group" style="margin-bottom:14px">
-        <label class="form-label">Type</label>
-        <select id="loc-type-sel" class="form-control" style="width:100%" onchange="onLocTypeChange()">
-          <option value="office">Office (Strict Geofence)</option>
-          <option value="state">State Zone (Global)</option>
-          <option value="wfh">Work From Home (Global)</option>
+      <div>
+        <label class="g-form-label">Type</label>
+        <select id="loc-type-sel" class="g-input" onchange="onLocTypeChange()">
+          <option value="office">🏢 Office (Strict Geofence)</option>
+          <option value="state">🌍 State Zone (Global)</option>
+          <option value="wfh">🏠 Work From Home (Global)</option>
         </select>
       </div>
       <div id="lat-lng-fields">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Latitude *</label>
-            <input id="loc-lat" class="form-control" style="width:100%" type="number" step="0.000001" placeholder="19.131006">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="g-form-label">Latitude *</label>
+            <input id="loc-lat" class="g-input" type="number" step="0.000001" placeholder="19.131006">
           </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Longitude *</label>
-            <input id="loc-lng" class="form-control" style="width:100%" type="number" step="0.000001" placeholder="72.855686">
+          <div>
+            <label class="g-form-label">Longitude *</label>
+            <input id="loc-lng" class="g-input" type="number" step="0.000001" placeholder="72.855686">
           </div>
         </div>
-        <div id="loc-radius-row" class="form-group" style="margin-bottom:14px">
-          <label class="form-label" style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px">
-            Default Buffer Radius (Meters) — <span id="radius-lbl">500</span>M
-          </label>
-          <input type="range" class="buffer-slider" id="loc-radius-slider" min="50" max="5000" step="50" value="500"
-                 style="width:100%;margin-top:6px;margin-bottom:8px"
+        <div id="loc-radius-row" style="margin-top:14px">
+          <label class="g-form-label">Buffer Radius — <span id="radius-lbl">500</span>m</label>
+          <input type="range" class="g-buf-slider-modal" id="loc-radius-slider" min="50" max="5000" step="50" value="500"
                  oninput="document.getElementById('radius-lbl').textContent=this.value;document.getElementById('loc-radius').value=this.value;updateSliderBg(this)">
-          <input type="number" id="loc-radius" class="form-control" value="500" style="width:100%"
+          <input type="number" id="loc-radius" class="g-input" value="500" style="margin-top:8px"
                  oninput="const s=document.getElementById('loc-radius-slider');s.value=this.value;document.getElementById('radius-lbl').textContent=this.value;updateSliderBg(s)">
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:14px">
-        <label class="form-label">Address</label>
-        <textarea id="loc-address" class="form-control" rows="3" style="width:100%;resize:vertical" placeholder="Full address"></textarea>
+      <div>
+        <label class="g-form-label">Address</label>
+        <textarea id="loc-address" class="g-input" rows="3" style="resize:vertical" placeholder="Full address"></textarea>
       </div>
-      <div id="loc-global-note" style="display:none;background:var(--accent-l);border-radius:var(--radius-sm);padding:10px 13px;border-left:3px solid var(--accent);font-size:12px;color:var(--accent);font-weight:600">
+      <div id="loc-global-note" class="g-global-note" style="display:none">
         🌍 Global zone — employees assigned here can punch in from anywhere. No GPS check is enforced.
       </div>
     </div>
@@ -366,11 +604,9 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     ASSIGN EMPLOYEES MODAL
-     ═══════════════════════════════════════════════════════════ -->
+<!-- ═══ ASSIGN EMPLOYEES MODAL ════════════════════════════ -->
 <div class="modal-backdrop" id="assign-modal">
-  <div class="modal modal-lg">
+  <div class="modal modal-lg g-modal-inner">
     <div class="modal-header">
       <div class="modal-title" id="assign-modal-title">Assign Employees</div>
       <button class="modal-close" onclick="closeModal('assign-modal')">✕</button>
@@ -382,7 +618,7 @@
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn btn-ghost btn-sm" onclick="selectAllAssign()">Select All</button>
         <button class="btn btn-ghost btn-sm" onclick="clearAllAssign()">Clear All</button>
-        <span id="assign-sel-count" style="font-size:12px;color:var(--muted);align-self:center"></span>
+        <span id="assign-sel-count" style="font-size:12px;color:var(--g-muted);align-self:center"></span>
       </div>
       <div id="assign-emp-list" style="max-height:380px;overflow-y:auto"></div>
     </div>
@@ -393,20 +629,18 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     DELETE CONFIRM MODAL
-     ═══════════════════════════════════════════════════════════ -->
+<!-- ═══ DELETE CONFIRM MODAL ══════════════════════════════ -->
 <div class="modal-backdrop" id="delete-confirm-modal">
   <div class="modal" style="width:420px">
     <div class="modal-header">
-      <div class="modal-title">🗑️ Delete Location</div>
+      <div class="modal-title">Delete Location</div>
       <button class="modal-close" onclick="closeModal('delete-confirm-modal')">✕</button>
     </div>
     <div class="modal-body">
-      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:#b91c1c;font-weight:600">
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 14px;font-size:13px;color:#b91c1c;font-weight:600">
         ⚠️ This will permanently delete the location. This cannot be undone.
       </div>
-      <div style="margin-top:12px;font-size:13px;color:var(--text)">
+      <div style="margin-top:12px;font-size:13px;color:var(--g-slate)">
         Location: <strong id="delete-confirm-name"></strong>
       </div>
     </div>
@@ -417,7 +651,7 @@
   </div>
 </div>
 
-<!-- NOTIFICATIONS PANEL -->
+<!-- NOTIFICATIONS -->
 <div id="notif-overlay" style="display:none;position:fixed;inset:0;z-index:190" onclick="closeNotifications()"></div>
 <div id="notif-panel">
   <div class="flex-between" style="margin-bottom:20px">
@@ -432,6 +666,7 @@
 
 <script src="app.js"></script>
 <script>
+
 Auth.guard();
 buildSidebar('geofence.html');
 loadNotifBadge();
@@ -1205,6 +1440,278 @@ async function markAllRead() {
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+</script>
+
+<script>
+// ── REDESIGNED RENDER FUNCTIONS ─────────────────────────────
+// Override locRow and empSubRow with premium styled versions
+
+function locRow(l) {
+  const isGlobal = l.radius_meters >= 10000;
+  const isWFH    = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
+  const typeBadge = isWFH
+    ? `<span class="gbadge gbadge-wfh">🏠 WFH</span>`
+    : isGlobal
+      ? `<span class="gbadge gbadge-global">🌍 Global</span>`
+      : `<span class="gbadge gbadge-office">🏢 Office</span>`;
+  const statusBadge = l.is_active
+    ? `<span class="gbadge gbadge-active">● Active</span>`
+    : `<span class="gbadge gbadge-inactive">Inactive</span>`;
+
+  const bufferInfo = isGlobal
+    ? `<div class="g-boundary-tag">🌐 Universal access</div>`
+    : `<div style="display:flex;align-items:center;gap:8px">
+        <input type="range" class="g-slider" id="sl-${l.id}"
+          min="50" max="5000" step="50" value="${l.radius_meters}" style="width:110px"
+          oninput="onSliderInput(${l.id},this)">
+        <span class="g-sval" id="sv-${l.id}">${l.radius_meters}m</span>
+        <button class="g-save-btn" onclick="saveLocRadius(${l.id})">Save</button>
+      </div>`;
+
+  const isExpanded = _expandedRows.has(l.id);
+  const locJson = JSON.stringify(l).replace(/"/g,'&quot;');
+
+  return `<tr id="lrow-${l.id}" class="loc-row">
+    <td style="text-align:center">
+      <button class="g-expand ${isExpanded?'open':''}" id="ebtn-${l.id}" onclick="toggleExpand(${l.id},true)" title="Show employees">▶</button>
+    </td>
+    <td>
+      <div class="g-loc-name">${l.name}</div>
+      ${l.address ? `<div class="g-loc-addr">${l.address}</div>` : ''}
+    </td>
+    <td>${typeBadge}</td>
+    <td>${bufferInfo}</td>
+    <td>
+      <div class="g-emp-chip">
+        <div class="g-emp-chip-dot"></div>
+        ${l.assigned_count || 0} employees
+      </div>
+    </td>
+    <td>${statusBadge}</td>
+    <td style="text-align:center">
+      <div style="display:inline-flex;gap:5px;align-items:center">
+        <button class="g-icon-btn" onclick="panToLocation(${locJson})" title="View on map">🗺️</button>
+        <button class="g-icon-btn" onclick="openAssignModal(${l.id})" title="Manage employees">👥</button>
+        <button class="g-icon-btn" onclick="openEditLocation(${l.id})" title="Edit">✏️</button>
+        <button class="g-icon-btn danger" onclick="openDeleteLocation(${l.id},'${l.name.replace(/'/g,"\'")}')" title="Delete">🗑️</button>
+      </div>
+    </td>
+  </tr>
+  ${isExpanded ? empSubRow(l.id) : `<tr id="sub-${l.id}" style="display:none"><td colspan="7"></td></tr>`}`;
+}
+
+function empSubRow(locId) {
+  const emps = _locEmployees[locId];
+  const loc  = _allLocations.find(l => l.id == locId);
+  const isGlobalLoc = loc && loc.radius_meters >= 10000;
+  const locName = loc?.name || '';
+  const isWFHLoc = locName.toLowerCase().includes('work from home');
+
+  if (!emps) {
+    return `<tr id="sub-${locId}" class="g-sub-panel">
+      <td class="g-accent-bar"></td>
+      <td colspan="6" style="padding:20px;text-align:center;background:#f6faf7"><div class="spinner"></div></td>
+    </tr>`;
+  }
+  if (!emps.length) {
+    return `<tr id="sub-${locId}" class="g-sub-panel">
+      <td class="g-accent-bar" style="background:#f6faf7"></td>
+      <td colspan="6" style="background:#f6faf7;padding:16px">
+        <div class="g-empty">No employees assigned. <a href="#" onclick="openAssignModal(${locId});return false" style="color:var(--g-green);font-weight:600">Add employees →</a></div>
+      </td>
+    </tr>`;
+  }
+
+  const rows = emps.map(e => {
+    const rule     = _allRules.find(r => r.id == e.id);
+    const rt       = rule?.rule_type || '';
+    const boundary = rt === 'district' ? `${rule.district}, ${rule.state}`
+                   : rt === 'state'    ? rule.state
+                   : rt === 'office'   ? 'Office radius'
+                   : rt === 'universal'? 'Anywhere' : '—';
+
+    const etBadge = e.employee_type === 'onsite'  ? `<span class="gbadge gbadge-onsite">Onsite</span>`
+                  : e.employee_type === 'offsite' ? `<span class="gbadge gbadge-offsite">Offsite</span>`
+                  : e.employee_type === 'wfh'     ? `<span class="gbadge gbadge-univ">WFH</span>`
+                  : `<span class="gbadge gbadge-none">—</span>`;
+
+    const ruleBadge = rt === 'office'    ? `<span class="gbadge gbadge-office">Office</span>`
+                    : rt === 'district'  ? `<span class="gbadge gbadge-district">District</span>`
+                    : rt === 'state'     ? `<span class="gbadge gbadge-state">State</span>`
+                    : rt === 'universal' ? `<span class="gbadge gbadge-univ">Universal</span>`
+                    : `<span class="gbadge gbadge-none">Not Set</span>`;
+
+    // Buffer / Boundary cell
+    let bufCell;
+    if (!isGlobalLoc) {
+      const bval = e.custom_radius || loc?.radius_meters || 300;
+      bufCell = `<div style="display:flex;align-items:center;gap:6px">
+        <input type="range" class="g-slider" id="esl-${e.id}-${locId}"
+          min="50" max="5000" step="50" value="${bval}" style="width:110px"
+          oninput="onEmpSliderInput(${e.id},${locId},this)">
+        <span class="g-sval" id="esv-${e.id}-${locId}">${bval}m</span>
+        <button class="g-save-btn" onclick="saveEmpRadius(${e.id},${locId})">Save</button>
+      </div>`;
+    } else if (isWFHLoc || rt === 'universal') {
+      bufCell = `<span class="gbadge gbadge-univ">🌍 Anywhere</span>`;
+    } else if (rt === 'district' && rule?.district && rule?.state) {
+      bufCell = `<div><div class="g-boundary-tag">📍 ${rule.district}</div><div class="g-boundary-sub">${rule.state}</div></div>`;
+    } else if (rt === 'state' && rule?.state) {
+      bufCell = `<div><div class="g-boundary-tag">🗺️ ${rule.state}</div><div class="g-boundary-sub">State boundary</div></div>`;
+    } else {
+      const sn = locName.replace(/^state\s*[-–]\s*/i,'').replace(/^district\s*[-–]\s*/i,'').split(',')[0].trim();
+      bufCell = `<div><div class="g-boundary-tag">🗺️ ${sn}</div><div class="g-boundary-sub">State boundary</div></div>`;
+    }
+
+    return `<tr>
+      <td></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="g-avatar">${e.first_name?.[0]||'?'}</div>
+          <div>
+            <div style="font-weight:600;font-size:12.5px;color:var(--g-slate)">${e.first_name} ${e.last_name}</div>
+            <div style="font-size:10.5px;color:var(--g-muted-l)">${e.employee_code}</div>
+          </div>
+        </div>
+      </td>
+      <td>${etBadge}</td>
+      <td>${bufCell}</td>
+      <td style="min-width:280px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px">
+          ${ruleBadge}
+          <select class="g-rule-sel" id="rsel-${e.id}" onchange="onEmpRuleChange(${e.id},${locId},this)">
+            <option value="office"    ${rt==='office'   ?'selected':''}>🏢 Office</option>
+            <option value="district"  ${rt==='district' ?'selected':''}>📍 District</option>
+            <option value="state"     ${rt==='state'    ?'selected':''}>🗺️ State</option>
+            <option value="universal" ${rt==='universal'?'selected':''}>🌍 Universal</option>
+          </select>
+        </div>
+        <div id="state-wrap-${e.id}" style="display:${(rt==='state'||rt==='district')?'flex':'none'};flex-direction:column;gap:3px">
+          <select class="g-loc-select" id="state-sel-${e.id}" onchange="onStateChange(${e.id})">
+            <option value="">— select state —</option>
+            ${BR_STATES.map(s=>`<option value="${s}" ${rule?.state===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <select class="g-loc-select" id="dist-sel-${e.id}" style="display:${rt==='district'?'block':'none'}">
+            <option value="">— select district —</option>
+            ${rule?.state && BR_DISTRICTS[rule.state] ? BR_DISTRICTS[rule.state].map(d=>`<option value="${d}" ${rule?.district===d?'selected':''}>${d}</option>`).join('') : ''}
+          </select>
+        </div>
+        <div style="font-size:10.5px;color:var(--g-muted-l);margin-top:4px" id="boundary-${e.id}">${boundary}</div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:5px">
+          <button class="g-apply-btn" onclick="saveEmpRule(${e.id},${locId})">✓ Apply</button>
+          <button class="g-remove-btn" onclick="removeAssignment(${locId},${e.id})" title="Remove">✕</button>
+        </div>
+      </td>
+      <td></td>
+    </tr>`;
+  }).join('');
+
+  return `<tr id="sub-${locId}" class="g-sub-panel">
+    <td class="g-accent-bar" style="background:#f6faf7"></td>
+    <td colspan="6" style="padding:0;background:#f6faf7">
+      <div class="g-sub-header">
+        <div class="g-sub-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          ${emps.length} Assigned Employee${emps.length!==1?'s':''}
+        </div>
+        <button class="g-add-btn" onclick="openAssignModal(${locId})">+ Add / Remove</button>
+      </div>
+      <table class="g-emp-table">
+        <thead>
+          <tr>
+            <th style="width:30px"></th>
+            <th>Employee</th>
+            <th>Type</th>
+            <th>${isGlobalLoc ? 'Boundary' : 'Buffer Radius'}</th>
+            <th>Rule / Change</th>
+            <th>Actions</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </td>
+  </tr>`;
+}
+
+// Assign modal rows — styled
+async function openAssignModal(locId) {
+  _assignLocId = locId;
+  const loc = _allLocations.find(l => l.id === locId);
+  document.getElementById('assign-modal-title').textContent = `Assign Employees — ${loc?.name || ''}`;
+  document.getElementById('assign-search').value = '';
+  const data = await api('GET', `/geofence/locations/${locId}/employees`);
+  const assigned = data?.data || [];
+  const assignedIds = new Set(assigned.map(e => e.id));
+  const isGlobalLoc = (loc?.radius_meters || 0) >= 10000;
+  document.getElementById('assign-emp-list').innerHTML = _allEmployees.map(e => {
+    const isChecked   = assignedIds.has(e.id);
+    const isUniversal = assigned.find(a => a.id === e.id)?.is_universal ?? isGlobalLoc;
+    return `<div class="g-asgn-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="acheck-${e.id}" ${isChecked?'checked':''} onchange="updateAssignCount()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--g-green)">
+        <div class="g-avatar" style="width:28px;height:28px;font-size:10.5px">${e.first_name?.[0]||'?'}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--g-slate)">${e.first_name} ${e.last_name}</div>
+          <div style="font-size:11px;color:var(--g-muted)">${e.employee_code} · ${e.city||'—'}</div>
+        </div>
+      </div>
+      <label style="font-size:11.5px;color:var(--g-muted);display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="auniv-${e.id}" ${isUniversal?'checked':''} style="accent-color:var(--g-green)">
+        Universal
+      </label>
+    </div>`;
+  }).join('');
+  updateAssignCount();
+  openModal('assign-modal');
+}
+
+// Section header override
+function renderLocTable() {
+  const q      = (document.getElementById('loc-search').value || '').toLowerCase();
+  const filter = document.getElementById('filter-type').value;
+  const locs   = _allLocations.filter(l => {
+    if (q && !l.name.toLowerCase().includes(q)) return false;
+    if (filter === 'office' && l.radius_meters >= 10000) return false;
+    if (filter === 'global' && l.radius_meters < 10000) return false;
+    return true;
+  });
+  document.getElementById('loc-count').textContent = locs.length + ' location' + (locs.length!==1?'s':'');
+  const offices = locs.filter(l => l.radius_meters < 10000);
+  const global  = locs.filter(l => l.radius_meters >= 10000);
+  const tbody = document.getElementById('loc-tbody');
+  let html = '';
+  if (offices.length) {
+    html += `<tr class="g-section-hdr"><td colspan="7">🏢 &nbsp;Office Locations</td></tr>`;
+    offices.forEach(l => { html += locRow(l); });
+  }
+  if (global.length) {
+    html += `<tr class="g-section-hdr"><td colspan="7">🌍 &nbsp;Global / State Zones</td></tr>`;
+    global.forEach(l => { html += locRow(l); });
+  }
+  if (!locs.length) {
+    html = `<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--g-muted)">No locations found</td></tr>`;
+  }
+  tbody.innerHTML = html;
+  _expandedRows.forEach(id => {
+    const loc = _allLocations.find(l => l.id === id);
+    if (loc) toggleExpand(id, false);
+  });
+  // init sliders
+  setTimeout(() => {
+    document.querySelectorAll('.g-slider').forEach(sl => updateBufSliderBg(sl));
+  }, 60);
+}
+
+// Slider bg for new class
+function updateBufSliderBg(slider) {
+  if (!slider) return;
+  const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+  slider.style.background = `linear-gradient(90deg, var(--g-green) ${pct}%, var(--g-border) ${pct}%)`;
+}
 </script>
 </body>
 </html>
