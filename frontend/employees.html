@@ -1208,7 +1208,7 @@ async function showEmpDetail(id) {
       </div>
 
       <!-- Compensation -->
-      ${Role.isAdminOrHR() ? `
+      ${Role.canViewSalary() ? `
       <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;border:1px solid var(--border)">
         <div class="section-title" style="margin-bottom:10px">Compensation</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
