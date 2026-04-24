@@ -1207,14 +1207,17 @@ function openMapPunch(type) {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 5,
+      zoom: 1,
       center: { lat: 20.5937, lng: 78.9629 },
       mapTypeId: 'roadmap',
       streetViewControl: false,
       mapTypeControl: true,
       mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
-      gestureHandling: 'greedy'
+      gestureHandling: 'greedy',
+      disableDefaultUI: false
     });
+    // Map starts at zoom 1 — fitBounds() inside loadOfficeBuffers/drawDistrictBoundary
+    // will be the ONLY camera movement, eliminating the India→district jump.
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
     // loadOfficeBuffers() is called AFTER GPS fix so fitBounds always includes
@@ -1296,6 +1299,8 @@ async function loadOfficeBuffers() {
       fillColor: '#3b82f6', fillOpacity: 0.04
     });
     _mapCircles.push(universalCircle);
+    // Pan to user if GPS available
+    if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
     return;
   }
 
@@ -1391,19 +1396,21 @@ async function drawDistrictBoundary(state, district) {
         distText = `${(minDistM / 1000).toFixed(1)} km`;
       }
 
-      // Show distance in the status bar
+      // Show distance in the status bar — store in data attr so validateGeo doesn't wipe it
       const statusEl = document.getElementById('map-status');
       if (statusEl) {
-        const existing = statusEl.innerHTML;
-        statusEl.innerHTML = existing +
-          ` &nbsp;|&nbsp; 📏 <b>${distText} from nearest boundary edge</b>`;
+        statusEl.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${distText} from nearest boundary edge</b>`;
+        statusEl.innerHTML = (statusEl.innerHTML || '') + ' ' + statusEl.dataset.distText;
       }
-      // Also add a distance label on the map
-      const distLabel = new google.maps.InfoWindow({
-        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8">📏 ${distText} to boundary</div>`,
-        position: userLatLng
+      // Distance label on map — anchored to user dot, auto-closes after 6s
+      if (_mapInfoWindow) _mapInfoWindow.close();
+      _mapInfoWindow = new google.maps.InfoWindow({
+        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8;white-space:nowrap">📏 ${distText} from boundary</div>`,
+        position: userLatLng,
+        disableAutoPan: true
       });
-      distLabel.open(_map);
+      _mapInfoWindow.open(_map);
+      setTimeout(() => _mapInfoWindow && _mapInfoWindow.close(), 6000);
     }
   } catch (e) { console.error('drawDistrictBoundary:', e); }
 }
@@ -1443,7 +1450,9 @@ async function validateGeo(lat, lng) {
 function setMapStatus(type, msg) {
   const el = document.getElementById('map-status');
   el.className = 'map-status ' + type;
-  el.innerHTML = msg;
+  // Re-append distance label if it was set (distance calc runs before validation)
+  const distText = el.dataset.distText || '';
+  el.innerHTML = msg + (distText ? ' ' + distText : '');
 }
 
 async function confirmPunch() {
