@@ -433,7 +433,7 @@
           </div>
         </div>
 
-        <div class="form-group" style="margin-bottom:14px">
+        <div id="loc-radius-row" class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px">
             Buffer Radius (Meters) — <span id="radius-lbl">500</span>M
           </label>
@@ -508,6 +508,19 @@
       <button class="btn btn-outline" onclick="closeModal('delete-blocked-modal')">Close</button>
       <button class="btn btn-primary" onclick="closeModal('delete-blocked-modal'); openAssignModal(_deleteLocId)">👤 Manage Assignments</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LOCATION DETAIL MODAL
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="loc-detail-modal">
+  <div class="modal modal-lg" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div class="modal-title" id="loc-detail-modal-title">Location Details</div>
+      <button class="modal-close" onclick="closeModal('loc-detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="loc-detail-modal-body" style="overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -591,15 +604,8 @@ async function loadAll() {
 
 function updateStats() {
   const locs    = _allLocations.filter(l => l.is_active);
-  const isZoneType = l => {
-    const n = l.name.toLowerCase();
-    const t = (l.location_type || '').toLowerCase();
-    return t === 'state' || t === 'district' || t === 'wfh'
-        || n.startsWith('state') || n.startsWith('district')
-        || n.includes('work from home') || n.includes('wfh');
-  };
-  const offices = locs.filter(l => !isZoneType(l));
-  const global  = locs.filter(l =>  isZoneType(l));
+  const offices = locs.filter(l => l.radius_meters < 10000);
+  const global  = locs.filter(l => l.radius_meters >= 10000);
   const assigned = new Set();
   _allEmployees.forEach(e => {
     if (_allLocations.some(l => (l.assigned_employees||[]).includes(e.id) || true)) {}
@@ -627,16 +633,8 @@ function renderLocList(filter = '') {
     return;
   }
 
-  // Classify by name/type — not by radius
-  const isZoneType = l => {
-    const n = l.name.toLowerCase();
-    const t = (l.location_type || '').toLowerCase();
-    return t === 'state' || t === 'district' || t === 'wfh'
-        || n.startsWith('state') || n.startsWith('district')
-        || n.includes('work from home') || n.includes('wfh');
-  };
-  const offices = locs.filter(l => !isZoneType(l));
-  const global  = locs.filter(l =>  isZoneType(l));
+  const offices = locs.filter(l => l.radius_meters < 10000);
+  const global  = locs.filter(l => l.radius_meters >= 10000);
 
   let html = '';
   if (offices.length) {
@@ -651,30 +649,12 @@ function renderLocList(filter = '') {
 }
 
 function locCard(l) {
-  // Use location_type from API if available; fall back to name-based detection
-  const locType   = (l.location_type || '').toLowerCase();
-  const isWFH     = locType === 'wfh' || l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
-  const isState   = locType === 'state'    || l.name.toLowerCase().startsWith('state');
-  const isDistrict= locType === 'district' || l.name.toLowerCase().startsWith('district');
-  const isGlobal  = isWFH || isState || isDistrict;  // Global = non-office zones
-
-  const typeClass = isWFH      ? 'loc-type-wfh'
-                  : isState    ? 'loc-type-state'
-                  : isDistrict ? 'loc-type-state'
-                  : 'loc-type-office';
-  const typeLabel = isWFH      ? 'WFH'
-                  : isState    ? 'State'
-                  : isDistrict ? 'District'
-                  : 'Office';
+  const isGlobal  = l.radius_meters >= 10000;
+  const isWFH     = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
+  const typeClass = isWFH ? 'loc-type-wfh' : isGlobal ? 'loc-type-state' : 'loc-type-office';
+  const typeLabel = isWFH ? 'WFH' : isGlobal ? 'Global' : 'Office';
   const active    = _selectedLoc?.id === l.id ? 'active' : '';
   const globalCls = isGlobal ? 'global-zone' : '';
-
-  // Sub-label: show boundary info instead of generic "Universal access"
-  const subLabel  = isDistrict && l.address ? `📍 ${l.address}`
-                  : isState    && l.address ? `🗺️ ${l.address}`
-                  : isWFH                   ? '🏠 Remote / Work From Home'
-                  : isGlobal                ? '🌍 Wide-area zone'
-                  : `📏 ${l.radius_meters}m buffer`;
 
   return `<div class="loc-card ${active} ${globalCls}" onclick="selectLocation(${l.id})">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
@@ -685,7 +665,9 @@ function locCard(l) {
       </div>
     </div>
     <div style="display:flex;gap:12px;font-size:11px;color:var(--muted)">
-      <span>${subLabel}</span>
+      ${isGlobal
+        ? '<span>🌍 Universal access</span>'
+        : `<span>📏 ${l.radius_meters}m buffer</span>`}
       <span>👤 ${l.assigned_count || 0} employees</span>
     </div>
     ${l.address ? `<div style="font-size:11px;color:var(--muted2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.address}</div>` : ''}
@@ -703,11 +685,8 @@ function renderMapMarkers() {
     const lng = parseFloat(l.longitude);
     if (!lat || !lng || (lat === 0 && lng === 0)) return;
 
-    const locType   = (l.location_type || '').toLowerCase();
-    const isWFH     = locType === 'wfh' || l.name.toLowerCase().includes('work from home');
-    const isState   = locType === 'state'    || l.name.toLowerCase().startsWith('state');
-    const isDistrict= locType === 'district' || l.name.toLowerCase().startsWith('district');
-    const isGlobal  = isWFH || isState || isDistrict;
+    const isGlobal = l.radius_meters >= 10000;
+    const isWFH    = l.name.toLowerCase().includes('work from home');
     const color    = isWFH ? '#8b5cf6' : isGlobal ? '#4a8c1c' : '#1d4ed8';
     const shortName = l.name.split('–')[0].split('-')[0].trim().substring(0, 14);
 
@@ -769,21 +748,16 @@ async function selectLocation(id) {
 }
 
 async function renderDetailPanel(loc) {
-  document.getElementById('no-selection').style.display = 'none';
-  document.getElementById('detail-panel').style.display = '';
-
-  const locType   = (loc.location_type || '').toLowerCase();
-  const isWFH     = locType === 'wfh' || loc.name.toLowerCase().includes('work from home') || loc.name.toLowerCase().includes('wfh');
-  const isState   = locType === 'state'    || loc.name.toLowerCase().startsWith('state');
-  const isDistrict= locType === 'district' || loc.name.toLowerCase().startsWith('district');
-  const isGlobal  = isWFH || isState || isDistrict;
-  const typeLabel = isWFH ? '🏠 Work From Home' : isDistrict ? '📍 District Zone' : isState ? '🗺️ State Zone' : '🏢 Office (Strict Geofence)';
+  const isGlobal = loc.radius_meters >= 10000;
+  const isWFH    = loc.name.toLowerCase().includes('work from home');
+  const typeLabel = isWFH ? '🏠 Work From Home' : isGlobal ? '🌍 State Zone (Global)' : '🏢 Office (Strict Geofence)';
   const typeColor = isWFH ? '#8b5cf6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
 
   // Fetch assigned employees for this location
   const assigned = await fetchAssignedEmployees(loc.id);
 
-  document.getElementById('detail-content').innerHTML = `
+  document.getElementById('loc-detail-modal-title').textContent = loc.name;
+  document.getElementById('loc-detail-modal-body').innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
       <div>
         <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">${loc.name}</div>
@@ -874,6 +848,7 @@ async function renderDetailPanel(loc) {
     </div>
   `;
 
+  openModal('loc-detail-modal');
   updateSliderBg(document.getElementById('live-radius-slider'));
 }
 
@@ -931,6 +906,7 @@ async function toggleLocActive(locId, activate) {
 let _deleteLocId = null;
 
 async function openDeleteLocation(locId, locName) {
+  closeModal('loc-detail-modal');
   _deleteLocId = locId;
 
   // Check assigned employees first
@@ -1030,6 +1006,7 @@ function openAddLocation() {
 }
 
 function openEditLocation(id) {
+  closeModal('loc-detail-modal');
   const loc = _allLocations.find(l => l.id === id);
   if (!loc) return;
   const isGlobal = loc.radius_meters >= 10000;
@@ -1053,8 +1030,13 @@ function openEditLocation(id) {
 
 function onLocTypeChange() {
   const type = document.getElementById('loc-type-sel').value;
-  const showLatLng = type === 'office' || type === 'state';
+  // For office: show lat/lng + radius, hide global note
+  // For state: show lat/lng but hide radius slider (it's set to max automatically), show global note
+  // For wfh: hide lat/lng and radius, show global note
   document.getElementById('lat-lng-fields').style.display = type === 'wfh' ? 'none' : '';
+  // Hide the buffer radius slider row for non-office types (radius is irrelevant for global zones)
+  const radiusRow = document.getElementById('loc-radius-row');
+  if (radiusRow) radiusRow.style.display = type === 'office' ? '' : 'none';
   document.getElementById('loc-global-note').style.display = type !== 'office' ? '' : 'none';
 }
 
@@ -1106,6 +1088,7 @@ async function saveLocation() {
 let _assignLocName = '';
 
 async function openAssignModal(locId) {
+  closeModal('loc-detail-modal');
   _assignLocId = locId;
   const loc = _allLocations.find(l => l.id === locId);
   _assignLocName = loc?.name || '';
