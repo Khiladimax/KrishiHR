@@ -1311,14 +1311,16 @@ function openMapPunch(type) {
   document.getElementById('map-modal-title').textContent = type === 'in' ? '📍 Punch In — Verify Location' : '📍 Punch Out — Verify Location';
   document.getElementById('map-status').className = 'map-status loading';
   document.getElementById('map-status').innerHTML = '📡 Getting your location…';
+  document.getElementById('map-status').dataset.distText = '';
   document.getElementById('map-acc').textContent = '';
   document.getElementById('confirm-punch-btn').disabled = true;
 
   setTimeout(() => {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
+    // zoom:1 so no India-flash before fitBounds fires
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 5,
+      zoom: 1,
       center: { lat: 20.5937, lng: 78.9629 },
       mapTypeId: 'roadmap',
       streetViewControl: false,
@@ -1328,14 +1330,15 @@ function openMapPunch(type) {
     });
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
-    loadOfficeBuffers();
 
     if (!navigator.geolocation) {
       setMapStatus('fail', '⚠ GPS not supported. You can still punch manually.');
       document.getElementById('confirm-punch-btn').disabled = false;
+      loadOfficeBuffers().catch(() => {});
       return;
     }
-    navigator.geolocation.getCurrentPosition(pos => {
+
+    navigator.geolocation.getCurrentPosition(async pos => {
       _pLat = pos.coords.latitude; _pLng = pos.coords.longitude;
       const acc = Math.round(pos.coords.accuracy);
       document.getElementById('map-acc').textContent = `GPS accuracy: ±${acc}m`;
@@ -1354,20 +1357,20 @@ function openMapPunch(type) {
         _mapInfoWindow.setContent('<b>Your Location</b>');
         _mapInfoWindow.open(_map, _mapMarker);
       });
-      _map.panTo({ lat: _pLat, lng: _pLng });
-      _map.setZoom(16);
+      // Load buffers AFTER GPS — fitBounds inside will cover both user + boundary
+      await loadOfficeBuffers();
       validateGeo(_pLat, _pLng);
     }, () => {
       setMapStatus('fail', '⚠ Location access denied. Punch will be recorded without GPS.');
       document.getElementById('confirm-punch-btn').disabled = false;
       document.getElementById('map-acc').textContent = 'No GPS — punch will be recorded without location data.';
+      loadOfficeBuffers().catch(() => {});
     }, { timeout: 15000, enableHighAccuracy: true });
   }, 150);
 }
 
 async function loadOfficeBuffers() {
-  // Load employee's own buffer rule and draw the correct boundary
-  _mapCircles.forEach(c => { if(c.setMap) c.setMap(null); });
+  _mapCircles.forEach(c => { if (c.setMap) c.setMap(null); });
   _mapCircles = [];
 
   const user = Auth.getUser();
@@ -1377,70 +1380,95 @@ async function loadOfficeBuffers() {
   const rule = ruleData?.data;
   if (!rule) return;
 
-  if (rule.rule_type === 'office') {
-    // Draw office radius circle(s)
+  if (rule.rule_type === 'district' && rule.state && rule.district) {
+    await drawDistrictPolygon(rule.state, rule.district);
+
+  } else if (rule.rule_type === 'state' && rule.state) {
+    await drawStatePolygon(rule.state);
+
+  } else if (rule.rule_type === 'universal') {
+    setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
+    document.getElementById('confirm-punch-btn').disabled = false;
+    if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
+
+  } else {
+    // office rule — draw circles
     const locData = await api('GET', '/geofence/my-locations');
-    (locData?.data || []).forEach(loc => {
-      if (!loc.latitude) return;
+    const locs = locData?.data || [];
+    const officeBounds = new google.maps.LatLngBounds();
+    locs.forEach(loc => {
+      if (!loc.latitude || loc.radius_meters >= 10000) return;
       const lat = +loc.latitude, lng = +loc.longitude;
       const circle = new google.maps.Circle({
         map: _map, center: { lat, lng }, radius: loc.radius_meters,
         strokeColor: '#10b981', strokeOpacity: 0.8, strokeWeight: 2,
         fillColor: '#10b981', fillOpacity: 0.1
       });
-      const lbl = new google.maps.Marker({
-        position: { lat, lng }, map: _map,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="90" height="22"><rect rx="5" width="90" height="22" fill="#10b981"/><text x="45" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="white" font-family="Arial,sans-serif">${loc.name.substring(0,14)}</text></svg>`),
-          scaledSize: new google.maps.Size(90, 22), anchor: new google.maps.Point(45, 11)
-        }
-      });
-      _mapCircles.push(circle, lbl);
-      _map.panTo({ lat, lng });
+      _mapCircles.push(circle);
+      officeBounds.union(circle.getBounds());
     });
-
-  } else if (rule.rule_type === 'district' && rule.state && rule.district) {
-    // Draw district polygon boundary
-    drawDistrictPolygon(rule.state, rule.district);
-
-  } else if (rule.rule_type === 'state' && rule.state) {
-    // Draw state boundary (all districts of that state)
-    drawStatePolygon(rule.state);
-
-  } else if (rule.rule_type === 'universal') {
-    // No boundary to draw — universal access
-    setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
-    document.getElementById('confirm-punch-btn').disabled = false;
+    if (_pLat && _pLng) officeBounds.extend({ lat: _pLat, lng: _pLng });
+    if (!officeBounds.isEmpty()) {
+      _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
+    } else if (_pLat && _pLng) {
+      _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14);
+    }
   }
 }
 
 async function drawDistrictPolygon(state, district) {
   try {
-    // Fetch boundary data from backend
     const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}`);
     if (!res?.data?.coordinates) return;
     const coords = res.data.coordinates;
-    const paths = coords.map(ring => ring.map(([lng, lat]) => ({ lat, lng })));
+    const ring = coords[0].map(([lng, lat]) => ({ lat, lng }));
     const poly = new google.maps.Polygon({
-      paths, map: _map,
-      strokeColor: '#10b981', strokeOpacity: 0.9, strokeWeight: 2,
-      fillColor: '#10b981', fillOpacity: 0.12
+      paths: ring, map: _map,
+      strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
+      fillColor: '#ec4899', fillOpacity: 0.12
     });
     _mapCircles.push(poly);
-    // Center map on polygon
+
+    // fitBounds includes BOTH district polygon AND user blue dot
     const bounds = new google.maps.LatLngBounds();
-    paths[0].forEach(p => bounds.extend(p));
-    _map.fitBounds(bounds);
-    // Label
-    const center = bounds.getCenter();
-    const lbl = new google.maps.Marker({
-      position: center, map: _map,
-      icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="110" height="22"><rect rx="5" width="110" height="22" fill="#10b981"/><text x="55" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="white" font-family="Arial,sans-serif">${district}</text></svg>`),
-        scaledSize: new google.maps.Size(110, 22), anchor: new google.maps.Point(55, 11)
+    ring.forEach(p => bounds.extend(p));
+    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+
+    // Distance from user to nearest polygon edge
+    if (_pLat && _pLng) {
+      const userLatLng = new google.maps.LatLng(_pLat, _pLng);
+      let minDistM = Infinity;
+      for (let i = 0; i < ring.length; i++) {
+        const a = new google.maps.LatLng(ring[i].lat, ring[i].lng);
+        const b = new google.maps.LatLng(ring[(i + 1) % ring.length].lat, ring[(i + 1) % ring.length].lng);
+        const t = Math.max(0, Math.min(1,
+          ((userLatLng.lat() - a.lat()) * (b.lat() - a.lat()) +
+           (userLatLng.lng() - a.lng()) * (b.lng() - a.lng())) /
+          ((b.lat() - a.lat()) ** 2 + (b.lng() - a.lng()) ** 2)
+        ));
+        const nearPt = new google.maps.LatLng(
+          a.lat() + t * (b.lat() - a.lat()),
+          a.lng() + t * (b.lng() - a.lng())
+        );
+        const d = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, nearPt);
+        if (d < minDistM) minDistM = d;
       }
-    });
-    _mapCircles.push(lbl);
+      const distText = minDistM < 1000
+        ? `${Math.round(minDistM)} m from boundary`
+        : `${(minDistM / 1000).toFixed(1)} km from boundary`;
+      const statusEl = document.getElementById('map-status');
+      if (statusEl) statusEl.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${distText}</b>`;
+      // Distance label on map — auto-closes after 6s
+      if (_mapInfoWindow) _mapInfoWindow.close();
+      _mapInfoWindow = new google.maps.InfoWindow({
+        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8;white-space:nowrap">📏 ${distText}</div>`,
+        position: userLatLng,
+        disableAutoPan: true
+      });
+      _mapInfoWindow.open(_map);
+      setTimeout(() => _mapInfoWindow && _mapInfoWindow.close(), 6000);
+    }
   } catch(e) { console.error('drawDistrictPolygon error', e); }
 }
 
@@ -1452,21 +1480,21 @@ async function drawStatePolygon(state) {
     const bounds = new google.maps.LatLngBounds();
     districts.forEach(d => {
       if (!d.coordinates) return;
-      const paths = d.coordinates.map(ring => ring.map(([lng, lat]) => ({ lat, lng })));
+      const ring = d.coordinates[0].map(([lng, lat]) => ({ lat, lng }));
       const poly = new google.maps.Polygon({
-        paths, map: _map,
-        strokeColor: '#10b981', strokeOpacity: 0.6, strokeWeight: 1.5,
-        fillColor: '#10b981', fillOpacity: 0.08
+        paths: ring, map: _map,
+        strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2,
+        fillColor: '#ec4899', fillOpacity: 0.08
       });
       _mapCircles.push(poly);
-      paths[0].forEach(p => bounds.extend(p));
+      ring.forEach(p => bounds.extend(p));
     });
-    _map.fitBounds(bounds);
+    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    if (!bounds.isEmpty()) _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
   } catch(e) { console.error('drawStatePolygon error', e); }
 }
 
 async function validateGeo(lat, lng) {
-  // Call the new buffer rules validation
   const data = await api('POST', '/geofence/validate-buffer', { latitude: lat, longitude: lng });
   if (!data) {
     setMapStatus('loading', '⚠ Could not validate — proceeding anyway');
@@ -1485,7 +1513,8 @@ async function validateGeo(lat, lng) {
 function setMapStatus(type, msg) {
   const el = document.getElementById('map-status');
   el.className = 'map-status ' + type;
-  el.innerHTML = msg;
+  const distText = el.dataset.distText || '';
+  el.innerHTML = msg + (distText ? ' ' + distText : '');
 }
 
 async function confirmPunch() {
