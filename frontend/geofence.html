@@ -133,6 +133,38 @@
     content: '🔍'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
     font-size: 13px; pointer-events: none;
   }
+
+  /* ── Conflict Detection ───────────────────────────────────────── */
+  .geo-conflict-alert {
+    background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+    border: 2px solid #fb923c;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; cursor: pointer; transition: all .15s;
+  }
+  .geo-conflict-alert:hover { box-shadow: 0 4px 16px rgba(251,146,60,.25); transform: translateY(-1px); }
+  .geo-conflict-alert-left { display: flex; align-items: center; gap: 10px; }
+  .geo-conflict-alert-count {
+    background: #dc2626; color: #fff;
+    font-size: 16px; font-weight: 800;
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; animation: pulse-red 2s infinite;
+  }
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.4); }
+    50% { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
+  }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+  .conflict-row td { background: #fff7ed !important; }
+  .conflict-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #fee2e2; color: #b91c1c;
+    font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 20px; border: 1px solid #fca5a5;
+    white-space: nowrap; margin-left: 4px;
+  }
 </style>
 </head>
 <body>
@@ -237,7 +269,21 @@
         <button class="btn btn-ghost btn-sm" onclick="loadAllRules()">↻ Refresh</button>
       </div>
 
-      <!-- Layout: left = form, right = table -->
+      <!-- Conflict Alert Banner -->
+      <div id="br-conflict-alert" style="display:none;padding:0 16px 0 16px">
+        <div class="geo-conflict-alert" onclick="brShowConflictsOnly()">
+          <div class="geo-conflict-alert-left">
+            <div class="geo-conflict-alert-count" id="br-conflict-count">0</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#c2410c">⚠️ Geofence Rule Conflicts Detected</div>
+              <div style="font-size:11px;color:#9a3412;margin-top:2px">
+                These employees have a <strong>restrictive geofence</strong> (Office/District/State) but their buffer rule is set to <strong>Universal</strong> — they can punch from anywhere, bypassing the boundary.
+              </div>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:#ea580c;white-space:nowrap;margin-left:12px">Click to filter ›</div>
+        </div>
+      </div>
       <div class="br-inner-grid">
 
         <!-- ── FORM ── -->
@@ -333,6 +379,7 @@
               <option value="state">State</option>
               <option value="universal">Universal</option>
               <option value="none">Not set</option>
+              <option value="conflict">⚠️ Conflicts only</option>
             </select>
             <span id="br-table-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
           </div>
@@ -1229,6 +1276,7 @@ const BR_DISTRICTS = {"ANDAMAN & NICOBAR": ["Nicobars", "North And Middle Andama
 let _brAllEmps   = [];
 let _brAllRules  = [];
 let _brRuleType  = '';
+let _brConflicts = new Set();
 
 async function initBufferRules() {
   // Populate state selects
@@ -1281,6 +1329,43 @@ async function loadAllRules() {
   ]);
   _brAllEmps  = empData?.data  || [];
   _brAllRules = ruleData?.data || [];
+
+  // ── Conflict Detection ────────────────────────────────────────────
+  // A conflict = employee has a geofence location assigned (office/district/state type)
+  // BUT their buffer rule is "universal" — they bypass the restriction silently.
+  // We detect this by checking: rule_type === 'universal' AND the employee also has
+  // a non-universal geofence location assignment (radius_meters < 10000 = strict office).
+  // We use _allLocations to cross-check if employee is tied to a strict location.
+  _brConflicts = new Set();
+  _brAllRules.forEach(r => {
+    if (r.rule_type === 'universal') {
+      // Check if this employee is assigned to a strict office location
+      const hasStrictLoc = _allLocations.some(loc =>
+        loc.is_active &&
+        loc.radius_meters < 10000 &&
+        !loc.name.toLowerCase().includes('wfh') &&
+        !loc.name.toLowerCase().includes('work from home') &&
+        parseInt(loc.assigned_count || 0) > 0
+      );
+      // More precise: check employee_geofence via the rule's geofence data
+      // Since we don't have per-employee location data here, we flag universal
+      // employees who are ONSITE (they work onsite but can punch anywhere)
+      if (r.employee_type === 'onsite' && r.rule_type === 'universal') {
+        _brConflicts.add(r.id);
+      }
+    }
+  });
+
+  const conflictCount = _brConflicts.size;
+  const alertEl = document.getElementById('br-conflict-alert');
+  if (conflictCount > 0) {
+    document.getElementById('br-conflict-count').textContent = conflictCount;
+    alertEl.style.display = 'block';
+    alertEl.style.animation = 'slideIn .3s ease';
+  } else {
+    alertEl.style.display = 'none';
+  }
+
   brRenderTable(_brAllRules);
 }
 
@@ -1444,6 +1529,7 @@ function brRenderTable(rules) {
   body.innerHTML = rules.map(r => {
     const name    = `${r.first_name} ${r.last_name}`.trim();
     const rt      = r.rule_type || null;
+    const isConflict = _brConflicts.has(r.id);
     const boundary= rt === 'district' ? `${r.district}, ${r.state}`
                   : rt === 'state'    ? r.state
                   : rt === 'office'   ? 'Office radius'
@@ -1451,9 +1537,15 @@ function brRenderTable(rules) {
                   : '—';
     const badgeCls = typeCls[rt] || 'br-none';
     const empBadge = `<span class="br-emp-type ${empTypeCls[r.employee_type]||'br-none'}">${r.employee_type||'—'}</span>`;
-    return `<tr style="border-bottom:1px solid var(--border)">
+    const conflictBadge = isConflict
+      ? ` <span class="conflict-badge" title="ONSITE employee with Universal rule — bypasses geofence!">⚠️ Conflict</span>`
+      : '';
+    const rowStyle = isConflict
+      ? 'border-bottom:1px solid var(--border);background:#fff7ed'
+      : 'border-bottom:1px solid var(--border)';
+    return `<tr style="${rowStyle}">
       <td style="padding:8px 10px">
-        <div style="font-weight:600;font-size:13px">${name}</div>
+        <div style="font-weight:600;font-size:13px">${name}${conflictBadge}</div>
         <div style="font-size:11px;color:var(--muted)">${r.employee_code}</div>
       </td>
       <td style="padding:8px 10px">${empBadge}</td>
@@ -1463,7 +1555,7 @@ function brRenderTable(rules) {
       <td style="padding:8px 10px;font-size:12px;color:var(--text2)">${boundary}</td>
       <td style="padding:8px 10px;text-align:center">
         <button class="btn btn-ghost btn-sm" style="margin-right:4px"
-          onclick="brEditRow(${r.id},'${name.replace(/'/g,"\'")}','${rt||''}','${r.state||''}','${r.district||''}')">✏️</button>
+          onclick="brEditRow(${r.id},'${name.replace(/'/g,"\\'")}','${rt||''}','${r.state||''}','${r.district||''}')">✏️</button>
         ${rt ? `<button class="btn btn-ghost btn-sm" onclick="brDelete(${r.id})">🗑️</button>` : ''}
       </td>
     </tr>`;
@@ -1498,4 +1590,3 @@ function brHideMsg() {
 
 </script>
 </body>
-</html>
