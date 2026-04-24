@@ -4,404 +4,135 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KrishiHR — Geofence & Locations</title>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA&libraries=geometry"></script>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+
+
 <style>
-/* ═══════════════════════════════════════════════════
-   GEOFENCE PAGE — Premium Redesign
-   Font: Plus Jakarta Sans (display) + DM Sans (body)
-   Theme: Deep forest green + warm off-white + slate
-   ═══════════════════════════════════════════════════ */
+  /* ── Page Layout ─────────────────────────────────────────── */
+  .geo-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .geo-grid { grid-template-columns: 1fr; } }
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+  /* ── Buffer Rules inner layout ───────────────────────────── */
+  .geo-buffer-col { width: 100%; }
+  .br-inner-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    padding: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .br-inner-grid { grid-template-columns: 1fr; } }
 
-:root {
-  --g-green:     #1e6b3c;
-  --g-green-l:   #eaf4ee;
-  --g-green-m:   #c6e6d1;
-  --g-blue:      #1d4ed8;
-  --g-blue-l:    #dbeafe;
-  --g-amber:     #92400e;
-  --g-amber-l:   #fef3c7;
-  --g-purple:    #5b21b6;
-  --g-purple-l:  #ede9fe;
-  --g-red:       #b91c1c;
-  --g-red-l:     #fee2e2;
-  --g-slate:     #1e293b;
-  --g-slate-2:   #334155;
-  --g-muted:     #64748b;
-  --g-muted-l:   #94a3b8;
-  --g-border:    #e2e8f0;
-  --g-border-h:  #cbd5e1;
-  --g-surface:   #ffffff;
-  --g-surface-2: #f8fafc;
-  --g-surface-3: #f1f5f9;
-  --shadow-xs: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-sm: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -1px rgba(0,0,0,.04);
-  --shadow-md: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -2px rgba(0,0,0,.04);
-  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 99px;
-}
+  /* ── Location Cards ───────────────────────────────────────── */
+  .loc-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all .18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .loc-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .18s;
+  }
+  .loc-card:hover { border-color: var(--accent); transform: translateX(2px); box-shadow: var(--shadow-sm); }
+  .loc-card.active { border-color: var(--accent); background: var(--accent-l); box-shadow: var(--shadow-sm); }
+  .loc-card.active::before { opacity: 1; }
+  .loc-card.global-zone { border-style: dashed; }
 
-/* ── STAT CARDS ──────────────────────────────────────────── */
-.g-stats {
-  display: grid; grid-template-columns: repeat(4,1fr); gap: 14px;
-  margin-bottom: 20px;
-}
-.g-stat {
-  background: var(--g-surface);
-  border: 1.5px solid var(--g-border);
-  border-radius: var(--r-lg);
-  padding: 18px 20px;
-  display: flex; align-items: center; gap: 14px;
-  box-shadow: var(--shadow-xs);
-  transition: box-shadow .2s, border-color .2s;
-  position: relative; overflow: hidden;
-}
-.g-stat::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0;
-  height: 3px; border-radius: var(--r-lg) var(--r-lg) 0 0;
-}
-.g-stat:nth-child(1)::before { background: var(--g-slate); }
-.g-stat:nth-child(2)::before { background: var(--g-blue); }
-.g-stat:nth-child(3)::before { background: var(--g-green); }
-.g-stat:nth-child(4)::before { background: #059669; }
-.g-stat:hover { box-shadow: var(--shadow-sm); border-color: var(--g-border-h); }
-.g-stat-icon {
-  width: 44px; height: 44px; border-radius: var(--r-md); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center; font-size: 20px;
-}
-.g-stat-val {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 30px; font-weight: 800; line-height: 1;
-  letter-spacing: -1px;
-}
-.g-stat-label {
-  font-size: 11px; font-weight: 600; color: var(--g-muted);
-  text-transform: uppercase; letter-spacing: .6px; margin-top: 3px;
-}
+  .loc-type-badge {
+    font-size: 9.5px; font-weight: 800; padding: 2px 7px;
+    border-radius: 20px; text-transform: uppercase; letter-spacing: .6px;
+  }
+  .loc-type-office  { background: #dbeafe; color: #1d4ed8; }
+  .loc-type-state   { background: var(--accent-l); color: var(--accent); }
+  .loc-type-wfh     { background: var(--purple-l); color: var(--purple-d); }
+  .loc-type-inactive{ background: #f1f5f9; color: #64748b; }
 
-/* ── MAP CARD ─────────────────────────────────────────────── */
-.g-map-card {
-  background: var(--g-surface); border: 1.5px solid var(--g-border);
-  border-radius: var(--r-lg); overflow: hidden; margin-bottom: 20px;
-  box-shadow: var(--shadow-xs);
-}
-.g-map-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; border-bottom: 1px solid var(--g-border);
-}
-.g-map-title {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 14px; font-weight: 700; color: var(--g-slate);
-  display: flex; align-items: center; gap: 8px;
-}
-#main-map { width: 100%; height: 320px; }
-.g-map-footer {
-  display: flex; gap: 20px; padding: 10px 18px;
-  border-top: 1px solid var(--g-border); background: var(--g-surface-2);
-}
-.g-legend-item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11.5px; color: var(--g-muted); font-weight: 500;
-}
-.g-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  /* ── Map ─────────────────────────────────────────────────── */
+  #main-map {
+    width: 100%; height: 420px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+  }
 
-/* ── MAIN TABLE CARD ─────────────────────────────────────── */
-.g-card {
-  background: var(--g-surface); border: 1.5px solid var(--g-border);
-  border-radius: var(--r-lg); box-shadow: var(--shadow-xs); overflow: hidden;
-}
-.g-card-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid var(--g-border);
-  background: var(--g-surface);
-}
-.g-card-title {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px; font-weight: 700; color: var(--g-slate);
-}
-.g-card-sub { font-size: 12px; color: var(--g-muted); margin-top: 2px; }
+  /* ── Employee Assignment List ─────────────────────────────── */
+  .emp-assign-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+  .emp-assign-row:last-child { border-bottom: none; }
 
-/* ── TOOLBAR ─────────────────────────────────────────────── */
-.g-toolbar {
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  padding: 14px 20px; border-bottom: 1px solid var(--g-border);
-  background: var(--g-surface-2);
-}
-.g-search-wrap { position: relative; }
-.g-search-wrap svg {
-  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-  color: var(--g-muted-l); pointer-events: none;
-}
-.g-search {
-  padding: 8px 12px 8px 36px; width: 230px;
-  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
-  font-size: 13px; font-family: 'DM Sans', sans-serif;
-  background: var(--g-surface); color: var(--g-slate); outline: none;
-  transition: all .15s;
-}
-.g-search:focus { border-color: var(--g-green); box-shadow: 0 0 0 3px rgba(30,107,60,.1); }
-.g-filter-sel {
-  padding: 8px 12px; font-size: 12px; font-weight: 600;
-  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
-  background: var(--g-surface); color: var(--g-slate); outline: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: border-color .15s;
-}
-.g-filter-sel:focus { border-color: var(--g-green); }
-.g-count { font-size: 12px; color: var(--g-muted); font-weight: 500; margin-left: auto; }
+  /* ── Buffer Slider ────────────────────────────────────────── */
+  .buffer-slider {
+    -webkit-appearance: none;
+    width: 100%; height: 6px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent) var(--pct, 30%), var(--border) var(--pct, 30%));
+    outline: none; cursor: pointer;
+  }
+  .buffer-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid #fff;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+  }
 
-/* ── MAIN LOC TABLE ──────────────────────────────────────── */
-.g-table { width: 100%; border-collapse: collapse; }
-.g-table thead th {
-  padding: 10px 16px; text-align: left;
-  font-size: 10px; font-weight: 700; color: var(--g-muted);
-  text-transform: uppercase; letter-spacing: .6px;
-  background: var(--g-surface-3); border-bottom: 1.5px solid var(--g-border);
-  white-space: nowrap;
-}
-.g-section-hdr td {
-  padding: 7px 16px;
-  font-size: 9.5px; font-weight: 800; color: var(--g-muted);
-  text-transform: uppercase; letter-spacing: 1.2px;
-  background: linear-gradient(to right, var(--g-surface-3), var(--g-surface-2));
-  border-bottom: 1px solid var(--g-border);
-}
-.g-table tbody tr.loc-row { border-bottom: 1px solid var(--g-border); transition: background .12s; }
-.g-table tbody tr.loc-row:hover { background: #fafcfb; }
-.g-table tbody td { padding: 11px 16px; vertical-align: middle; }
+  /* ── Tab System ───────────────────────────────────────────── */
+  .tab-bar {
+    display: flex; gap: 2px;
+    background: var(--surface2); border-radius: var(--radius-sm);
+    padding: 3px; margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1; padding: 7px 10px; border: none; border-radius: 7px;
+    background: none; font-size: 12px; font-weight: 600; color: var(--muted);
+    cursor: pointer; transition: all .15s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-xs); }
 
-/* ── BADGES ──────────────────────────────────────────────── */
-.gbadge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 9px; border-radius: var(--r-pill);
-  font-size: 10.5px; font-weight: 700; white-space: nowrap; letter-spacing: .2px;
-}
-.gbadge-office  { background: var(--g-blue-l);   color: var(--g-blue); }
-.gbadge-global  { background: var(--g-green-l);  color: var(--g-green); }
-.gbadge-wfh     { background: var(--g-purple-l); color: var(--g-purple); }
-.gbadge-active  { background: #dcfce7; color: #15803d; }
-.gbadge-inactive{ background: var(--g-surface-3); color: var(--g-muted); }
-.gbadge-onsite  { background: var(--g-blue-l);   color: var(--g-blue); }
-.gbadge-offsite { background: var(--g-green-l);  color: var(--g-green); }
-.gbadge-univ    { background: var(--g-purple-l); color: var(--g-purple); }
-.gbadge-none    { background: var(--g-surface-3); color: var(--g-muted-l); }
-.gbadge-district{ background: var(--g-green-l);  color: #166534; }
-.gbadge-state   { background: var(--g-amber-l);  color: var(--g-amber); }
+  /* ── Stats Strip ──────────────────────────────────────────── */
+  .geo-stats {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px;
+  }
+  .geo-stat-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
 
-/* ── EXPAND BUTTON ───────────────────────────────────────── */
-.g-expand {
-  width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
-  background: var(--g-surface-3); color: var(--g-muted);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 10px; transition: all .18s; flex-shrink: 0;
-}
-.g-expand:hover { background: var(--g-green-m); color: var(--g-green); }
-.g-expand.open  { background: var(--g-green); color: #fff; transform: rotate(90deg); }
-
-/* ── SLIDER ──────────────────────────────────────────────── */
-.g-slider {
-  -webkit-appearance: none; height: 5px; border-radius: 99px;
-  outline: none; cursor: pointer;
-  background: linear-gradient(90deg, var(--g-green) var(--pct,30%), var(--g-border) var(--pct,30%));
-}
-.g-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 15px; height: 15px;
-  border-radius: 50%; background: var(--g-green);
-  border: 2.5px solid #fff; box-shadow: 0 1px 5px rgba(30,107,60,.35); cursor: pointer;
-}
-.g-sval {
-  min-width: 46px; font-size: 11.5px; font-weight: 700; color: var(--g-green);
-  font-family: 'Plus Jakarta Sans', sans-serif; text-align: right;
-}
-
-/* ── ACTION ICON BUTTONS ─────────────────────────────────── */
-.g-icon-btn {
-  width: 30px; height: 30px; border-radius: var(--r-sm); border: 1.5px solid var(--g-border);
-  background: var(--g-surface); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px; transition: all .15s; color: var(--g-muted);
-}
-.g-icon-btn:hover { border-color: var(--g-green); background: var(--g-green-l); color: var(--g-green); }
-.g-icon-btn.danger:hover { border-color: var(--g-red); background: var(--g-red-l); color: var(--g-red); }
-
-/* ── SAVE MINI BUTTON ────────────────────────────────────── */
-.g-save-btn {
-  padding: 4px 10px; font-size: 10.5px; font-weight: 700;
-  background: var(--g-green); color: #fff; border: none;
-  border-radius: 6px; cursor: pointer; white-space: nowrap;
-  font-family: 'DM Sans', sans-serif; transition: opacity .15s;
-}
-.g-save-btn:hover { opacity: .85; }
-.g-apply-btn {
-  padding: 5px 12px; font-size: 11px; font-weight: 700;
-  background: var(--g-green); color: #fff; border: none;
-  border-radius: 7px; cursor: pointer; font-family: 'DM Sans', sans-serif;
-  transition: all .15s; display: inline-flex; align-items: center; gap: 4px;
-}
-.g-apply-btn:hover { opacity: .88; transform: translateY(-1px); }
-.g-remove-btn {
-  width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
-  background: none; color: var(--g-muted-l); font-size: 14px;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: all .15s;
-}
-.g-remove-btn:hover { background: var(--g-red-l); color: var(--g-red); }
-
-/* ── SUB EMPLOYEE PANEL ──────────────────────────────────── */
-.g-sub-panel td { background: #f6faf7 !important; }
-.g-sub-panel .g-accent-bar { border-left: 3px solid var(--g-green); }
-.g-emp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.g-emp-table thead th {
-  padding: 8px 14px; text-align: left;
-  font-size: 9.5px; font-weight: 700; color: var(--g-muted);
-  text-transform: uppercase; letter-spacing: .5px;
-  background: rgba(30,107,60,.05); border-bottom: 1px solid rgba(30,107,60,.12);
-}
-.g-emp-table tbody tr { border-bottom: 1px solid rgba(30,107,60,.08); transition: background .1s; }
-.g-emp-table tbody tr:hover { background: rgba(30,107,60,.03); }
-.g-emp-table tbody tr:last-child { border-bottom: none; }
-.g-emp-table tbody td { padding: 9px 14px; vertical-align: middle; }
-
-/* ── RULE SELECT ─────────────────────────────────────────── */
-.g-rule-sel {
-  padding: 5px 8px; font-size: 11.5px; font-weight: 600;
-  border: 1.5px solid var(--g-border); border-radius: 7px;
-  background: var(--g-surface); color: var(--g-slate); outline: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: border-color .15s;
-}
-.g-rule-sel:focus { border-color: var(--g-green); }
-
-/* ── STATE/DISTRICT DROPDOWNS ────────────────────────────── */
-.g-loc-select {
-  width: 100%; padding: 6px 10px; font-size: 11px; font-weight: 500;
-  border: 1.5px solid var(--g-border); border-radius: 7px;
-  background: var(--g-surface); color: var(--g-slate); outline: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: border-color .15s;
-  margin-top: 4px;
-}
-.g-loc-select:focus { border-color: var(--g-green); box-shadow: 0 0 0 2px rgba(30,107,60,.08); }
-
-/* ── AVATAR ──────────────────────────────────────────────── */
-.g-avatar {
-  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11.5px; font-weight: 700; color: var(--g-green);
-  background: var(--g-green-l); border: 1.5px solid var(--g-green-m);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-
-/* ── LOC NAME CELL ───────────────────────────────────────── */
-.g-loc-name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13.5px; font-weight: 700; color: var(--g-slate); }
-.g-loc-addr { font-size: 11px; color: var(--g-muted-l); margin-top: 2px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ── EMP COUNT CHIP ──────────────────────────────────────── */
-.g-emp-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: var(--g-surface-2); border: 1.5px solid var(--g-border);
-  border-radius: var(--r-pill); padding: 3px 10px;
-  font-size: 12px; font-weight: 600; color: var(--g-slate-2);
-}
-.g-emp-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--g-green); }
-
-/* ── BUFFER DISPLAY ──────────────────────────────────────── */
-.g-boundary-tag {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11.5px; font-weight: 700; color: var(--g-slate-2);
-}
-.g-boundary-sub { font-size: 10px; color: var(--g-muted-l); margin-top: 1px; }
-
-/* ── MODAL OVERRIDES ─────────────────────────────────────── */
-.g-modal-inner {
-  font-family: 'DM Sans', sans-serif;
-}
-.g-form-label {
-  font-size: 10.5px; font-weight: 700; color: var(--g-muted);
-  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; display: block;
-}
-.g-input {
-  width: 100%; padding: 9px 12px;
-  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
-  font-size: 13px; font-family: 'DM Sans', sans-serif;
-  color: var(--g-slate); background: var(--g-surface); outline: none;
-  transition: border-color .15s, box-shadow .15s;
-}
-.g-input:focus { border-color: var(--g-green); box-shadow: 0 0 0 3px rgba(30,107,60,.1); }
-.g-global-note {
-  background: var(--g-green-l); border-left: 3px solid var(--g-green);
-  border-radius: var(--r-sm); padding: 10px 14px;
-  font-size: 12px; color: var(--g-green); font-weight: 500;
-}
-
-/* ── REFRESH BTN ─────────────────────────────────────────── */
-.g-refresh-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; font-size: 12px; font-weight: 600;
-  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
-  background: var(--g-surface); color: var(--g-muted); cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: all .15s;
-}
-.g-refresh-btn:hover { border-color: var(--g-green); color: var(--g-green); background: var(--g-green-l); }
-
-/* ── EXPAND ALL BTNS ─────────────────────────────────────── */
-.g-ghost-btn {
-  padding: 7px 12px; font-size: 11.5px; font-weight: 600;
-  border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
-  background: var(--g-surface); color: var(--g-muted); cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: all .15s;
-}
-.g-ghost-btn:hover { border-color: var(--g-slate); color: var(--g-slate); }
-
-/* ── SUB PANEL HEADER ────────────────────────────────────── */
-.g-sub-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px 8px; border-bottom: 1px solid rgba(30,107,60,.1);
-}
-.g-sub-label {
-  font-size: 11px; font-weight: 700; color: var(--g-green);
-  text-transform: uppercase; letter-spacing: .6px;
-  display: flex; align-items: center; gap: 6px;
-}
-.g-add-btn {
-  padding: 5px 12px; font-size: 11px; font-weight: 700;
-  border: 1.5px solid var(--g-green); border-radius: var(--r-sm);
-  background: transparent; color: var(--g-green); cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: all .15s;
-}
-.g-add-btn:hover { background: var(--g-green); color: #fff; }
-
-/* ── ASGN MODAL ROW ──────────────────────────────────────── */
-.g-asgn-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 9px 0; border-bottom: 1px solid var(--g-border);
-}
-.g-asgn-row:last-child { border-bottom: none; }
-
-/* ── EMPTY STATE ─────────────────────────────────────────── */
-.g-empty {
-  text-align: center; padding: 20px; color: var(--g-muted); font-size: 13px;
-}
-
-/* ── BUFFER SLIDER MODAL ─────────────────────────────────── */
-.g-buf-slider-modal {
-  -webkit-appearance: none; width: 100%; height: 6px; border-radius: 99px;
-  background: linear-gradient(90deg, var(--g-green) var(--pct,30%), var(--g-border) var(--pct,30%));
-  outline: none; cursor: pointer; margin: 8px 0;
-}
-.g-buf-slider-modal::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 18px; height: 18px;
-  border-radius: 50%; background: var(--g-green);
-  border: 3px solid #fff; box-shadow: 0 2px 6px rgba(30,107,60,.3); cursor: pointer;
-}
-
-/* ── ANIMATIONS ──────────────────────────────────────────── */
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.g-stats { animation: fadeSlideIn .35s ease both; }
-.g-map-card { animation: fadeSlideIn .4s .05s ease both; }
-.g-card { animation: fadeSlideIn .45s .1s ease both; }
-
+  /* ── Search ────────────────────────────────────────────────── */
+  .search-input {
+    width: 100%; padding: 8px 12px 8px 34px;
+    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; background: var(--surface2); color: var(--text);
+    outline: none; transition: all .15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(74,140,28,.1); }
+  .search-wrap { position: relative; margin-bottom: 14px; }
+  .search-wrap::before {
+    content: '🔍'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; pointer-events: none;
+  }
 </style>
 </head>
 <body>
@@ -413,7 +144,9 @@
     <div class="logo-mark" id="sidebar-logo-mark">
       <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
-    <div><div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div></div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div>
+    </div>
   </div>
   <nav id="sidebar-nav"></nav>
   <div class="sidebar-footer">
@@ -430,10 +163,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
-      <div class="topbar-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#1e6b3c;vertical-align:middle;margin-right:6px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        Geofence &amp; Locations
-      </div>
+      <div class="topbar-title">📍 Geofence & Locations</div>
     </div>
     <div class="topbar-right">
       <button class="btn btn-primary btn-sm" onclick="openAddLocation()">+ Add Location</button>
@@ -444,156 +174,283 @@
 
   <div class="content fade-in">
 
-    <!-- ── STAT CARDS ──────────────────────────────────────── -->
-    <div class="g-stats" id="geo-stats">
-      <div class="g-stat">
-        <div class="g-stat-icon" style="background:#f1f5f9">📍</div>
-        <div>
-          <div class="g-stat-val" id="stat-total" style="color:var(--g-slate)">—</div>
-          <div class="g-stat-label">Total Locations</div>
+    <!-- Stats Strip -->
+    <div class="geo-stats" id="geo-stats">
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Total Locations</div><div style="font-size:28px;font-weight:800;color:var(--text)" id="stat-total">—</div></div>
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Office (Strict)</div><div style="font-size:28px;font-weight:800;color:#1d4ed8" id="stat-offices">—</div></div>
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Global Zones</div><div style="font-size:28px;font-weight:800;color:var(--accent)" id="stat-global">—</div></div>
+      <div class="geo-stat-card"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Assigned Employees</div><div style="font-size:28px;font-weight:800;color:var(--green)" id="stat-assigned">—</div></div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="geo-grid">
+
+      <!-- LEFT: Location List -->
+      <div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <span>All Locations</span>
+            <span id="loc-count" style="font-size:11px;color:var(--muted)"></span>
+          </div>
+          <div class="search-wrap">
+            <input class="search-input" id="loc-search" placeholder="Search locations…" oninput="filterLocations()">
+          </div>
+          <div id="locations-list"><div class="loader"><div class="spinner"></div></div></div>
         </div>
       </div>
-      <div class="g-stat">
-        <div class="g-stat-icon" style="background:#dbeafe">🏢</div>
-        <div>
-          <div class="g-stat-val" id="stat-offices" style="color:var(--g-blue)">—</div>
-          <div class="g-stat-label">Office (Strict)</div>
+
+      <!-- RIGHT: Map + Details -->
+      <div>
+        <!-- Map -->
+        <div class="card" style="padding:16px;margin-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;color:var(--text)" id="map-title">📍 All Locations Overview</div>
+            <button class="btn btn-ghost btn-sm" onclick="resetMapView()">Reset View</button>
+          </div>
+          <div id="main-map"></div>
+          <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <div style="width:12px;height:12px;background:#1d4ed8;border-radius:3px"></div> Office (Strict)
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <div style="width:12px;height:12px;background:var(--accent);border-radius:3px"></div> State Zone (Global)
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+              <div style="width:12px;height:12px;background:var(--purple);border-radius:3px"></div> Work From Home
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="g-stat">
-        <div class="g-stat-icon" style="background:#eaf4ee">🌍</div>
-        <div>
-          <div class="g-stat-val" id="stat-global" style="color:var(--g-green)">—</div>
-          <div class="g-stat-label">Global Zones</div>
+
+        <!-- Detail Panel -->
+        <div class="card" id="detail-panel" style="display:none">
+          <div id="detail-content"></div>
         </div>
-      </div>
-      <div class="g-stat">
-        <div class="g-stat-icon" style="background:#d1fae5">👥</div>
+
+        <!-- No selection placeholder -->
+        <div id="no-selection" style="text-align:center;padding:40px 20px;color:var(--muted)">
+          <div style="font-size:36px;margin-bottom:12px">📍</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">Select a location</div>
+          <div style="font-size:13px">Click any location from the list to view details, edit buffer, and manage employee assignments</div>
+        </div>
+
+    <!-- Employee Buffer Rules — below map, full width of right col -->
+    <div class="geo-buffer-col">
+    <div class="card" style="margin-top:18px">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <div>
-          <div class="g-stat-val" id="stat-assigned" style="color:#059669">—</div>
-          <div class="g-stat-label">Assigned Employees</div>
+          <div class="card-title">🛡️ Employee Buffer Rules</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Set state / district / office boundary per employee</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadAllRules()">↻ Refresh</button>
+      </div>
+
+      <!-- Layout: left = form, right = table -->
+      <div class="br-inner-grid">
+
+        <!-- ── FORM ── -->
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px" id="br-form-title">Assign Rule</div>
+
+          <div class="form-group">
+            <label class="form-label">Employee</label>
+            <input class="search-input" id="br-emp-search" placeholder="Type name or code…"
+              oninput="brFilterEmps(this.value)" autocomplete="off" style="width:100%;margin-bottom:4px">
+            <div id="br-emp-dropdown" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);max-height:200px;overflow-y:auto;position:relative;z-index:10"></div>
+            <input type="hidden" id="br-emp-id">
+            <div id="br-emp-selected" style="display:none;margin-top:6px;padding:8px 10px;background:var(--accent-l);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between">
+              <span id="br-emp-selected-name" style="font-size:13px;font-weight:600;color:var(--accent)"></span>
+              <button onclick="brClearEmp()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px">✕</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Rule Type</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <label class="br-radio-label" onclick="brSetRuleType('office')">
+                <input type="radio" name="br-rule" value="office"> 
+                <div>
+                  <div style="font-weight:600;font-size:13px">🏢 Office</div>
+                  <div style="font-size:11px;color:var(--muted)">Must be within office radius (onsite)</div>
+                </div>
+              </label>
+              <label class="br-radio-label" onclick="brSetRuleType('district')">
+                <input type="radio" name="br-rule" value="district">
+                <div>
+                  <div style="font-weight:600;font-size:13px">📍 District</div>
+                  <div style="font-size:11px;color:var(--muted)">Must be inside assigned district</div>
+                </div>
+              </label>
+              <label class="br-radio-label" onclick="brSetRuleType('state')">
+                <input type="radio" name="br-rule" value="state">
+                <div>
+                  <div style="font-weight:600;font-size:13px">🗺️ State</div>
+                  <div style="font-size:11px;color:var(--muted)">Must be inside assigned state</div>
+                </div>
+              </label>
+              <label class="br-radio-label" onclick="brSetRuleType('universal')">
+                <input type="radio" name="br-rule" value="universal">
+                <div>
+                  <div style="font-weight:600;font-size:13px">🌍 Universal</div>
+                  <div style="font-size:11px;color:var(--muted)">Punch from anywhere (WFH)</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Office picker (shown when rule=office) -->
+          <div class="form-group" id="br-office-group" style="display:none">
+            <label class="form-label">Office Location</label>
+            <select class="form-control" id="br-office-sel">
+              <option value="">— select office —</option>
+            </select>
+          </div>
+
+          <!-- State picker (shown when rule=state or district) -->
+          <div class="form-group" id="br-state-group" style="display:none">
+            <label class="form-label">State</label>
+            <select class="form-control" id="br-state-sel" onchange="brStateChanged()">
+              <option value="">— select state —</option>
+            </select>
+          </div>
+
+          <!-- District picker (shown when rule=district) -->
+          <div class="form-group" id="br-district-group" style="display:none">
+            <label class="form-label">District</label>
+            <select class="form-control" id="br-district-sel">
+              <option value="">— select district —</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn btn-primary" style="flex:1" onclick="brSave()">Save Rule</button>
+            <button class="btn btn-outline btn-sm" onclick="brReset()">Clear</button>
+          </div>
+          <div id="br-form-msg" style="margin-top:8px;font-size:12px;display:none"></div>
+        </div>
+
+        <!-- ── TABLE ── -->
+        <div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+            <input class="search-input" id="br-table-search" placeholder="Search employee…"
+              oninput="brFilterTable(this.value)" style="max-width:220px">
+            <select class="form-control" id="br-filter-type" onchange="brFilterTable()" style="max-width:160px">
+              <option value="">All types</option>
+              <option value="office">Office</option>
+              <option value="district">District</option>
+              <option value="state">State</option>
+              <option value="universal">Universal</option>
+              <option value="none">Not set</option>
+            </select>
+            <span id="br-table-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:var(--surface2)">
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Employee</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Type</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Rule</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Boundary</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid var(--border)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="br-table-body">
+                <tr><td colspan="5" style="padding:30px;text-align:center;color:var(--muted)"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- ── MAP CARD ────────────────────────────────────────── -->
-    <div class="g-map-card">
-      <div class="g-map-header">
-        <div class="g-map-title">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--g-green)"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          <span id="map-title">All Locations Overview</span>
-        </div>
-        <button class="g-refresh-btn" onclick="resetMapView()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
-          Reset View
-        </button>
       </div>
-      <div id="main-map"></div>
-      <div class="g-map-footer">
-        <div class="g-legend-item"><div class="g-legend-dot" style="background:#1d4ed8"></div>Office (Strict)</div>
-        <div class="g-legend-item"><div class="g-legend-dot" style="background:#1e6b3c"></div>State Zone (Global)</div>
-        <div class="g-legend-item"><div class="g-legend-dot" style="background:#8b5cf6"></div>Work From Home</div>
       </div>
     </div>
+  </div>
 
-    <!-- ── UNIFIED TABLE CARD ──────────────────────────────── -->
-    <div class="g-card">
-      <div class="g-card-header">
-        <div>
-          <div class="g-card-title">All Locations &amp; Employees</div>
-          <div class="g-card-sub">Expand any location to view &amp; edit employee buffers and rules inline</div>
-        </div>
-        <button class="g-refresh-btn" onclick="loadAll()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
-          Refresh
-        </button>
-      </div>
+  <style>
+    .br-radio-label {
+      display:flex;align-items:flex-start;gap:10px;padding:8px 10px;
+      border-radius:var(--radius-sm);border:1.5px solid var(--border);
+      cursor:pointer;transition:all .15s;background:var(--surface);
+    }
+    .br-radio-label:hover { border-color:var(--accent);background:var(--accent-l); }
+    .br-radio-label input[type=radio] { margin-top:3px;accent-color:var(--accent);flex-shrink:0; }
+    .br-emp-row {
+      padding:8px 12px;cursor:pointer;font-size:13px;
+      display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);
+    }
+    .br-emp-row:hover { background:var(--accent-l); }
+    .br-emp-row:last-child { border-bottom:none; }
+    .br-badge {
+      display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;
+    }
+    .br-office   { background:#dbeafe;color:#1d4ed8; }
+    .br-district { background:#dcfce7;color:#166534; }
+    .br-state    { background:#fef9c3;color:#854d0e; }
+    .br-universal{ background:var(--purple-l,#ede9fe);color:#5b21b6; }
+    .br-none     { background:var(--surface2);color:var(--muted); }
+    .br-emp-type { display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase; }
+    .br-onsite  { background:#dbeafe;color:#1d4ed8; }
+    .br-offsite { background:#dcfce7;color:#166534; }
+    .br-wfh     { background:var(--purple-l,#ede9fe);color:#5b21b6; }
+  </style>
 
-      <!-- Toolbar -->
-      <div class="g-toolbar">
-        <div class="g-search-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="g-search" id="loc-search" placeholder="Search locations…" oninput="renderLocTable()">
-        </div>
-        <select class="g-filter-sel" id="filter-type" onchange="renderLocTable()">
-          <option value="">All types</option>
-          <option value="office">Office only</option>
-          <option value="global">Global zones</option>
-        </select>
-        <button class="g-ghost-btn" onclick="expandAll()">Expand All</button>
-        <button class="g-ghost-btn" onclick="collapseAll()">Collapse All</button>
-        <span class="g-count" id="loc-count"></span>
-      </div>
-
-      <!-- Table -->
-      <div style="overflow-x:auto">
-        <table class="g-table" id="loc-table">
-          <thead>
-            <tr>
-              <th style="width:46px"></th>
-              <th>Location</th>
-              <th>Type</th>
-              <th>Buffer / Zone</th>
-              <th>Employees</th>
-              <th>Status</th>
-              <th style="text-align:center;width:140px">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="loc-tbody">
-            <tr><td colspan="7" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </div><!-- /content -->
-</div><!-- /main -->
-
-<!-- ═══ ADD/EDIT LOCATION MODAL ═══════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════
+     ADD / EDIT LOCATION MODAL
+     ═══════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="loc-modal">
-  <div class="modal g-modal-inner" style="width:520px">
+  <div class="modal" style="width:520px">
     <div class="modal-header">
       <div class="modal-title" id="loc-modal-title">Add Location</div>
       <button class="modal-close" onclick="closeModal('loc-modal')">✕</button>
     </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:0">
       <input type="hidden" id="loc-edit-id">
-      <div>
-        <label class="g-form-label">Location Name *</label>
-        <input id="loc-name" class="g-input" placeholder="e.g. Head Quarter – Mumbai">
+
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label">Location Name *</label>
+        <input id="loc-name" class="form-control" style="width:100%" placeholder="e.g. Head Quarter – Mumbai">
       </div>
-      <div>
-        <label class="g-form-label">Type</label>
-        <select id="loc-type-sel" class="g-input" onchange="onLocTypeChange()">
-          <option value="office">🏢 Office (Strict Geofence)</option>
-          <option value="state">🌍 State Zone (Global)</option>
-          <option value="wfh">🏠 Work From Home (Global)</option>
+
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label">Type</label>
+        <select id="loc-type-sel" class="form-control" style="width:100%" onchange="onLocTypeChange()">
+          <option value="office">Office (Strict Geofence)</option>
+          <option value="state">State Zone (Global)</option>
+          <option value="wfh">Work From Home (Global)</option>
         </select>
       </div>
+
       <div id="lat-lng-fields">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div>
-            <label class="g-form-label">Latitude *</label>
-            <input id="loc-lat" class="g-input" type="number" step="0.000001" placeholder="19.131006">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Latitude *</label>
+            <input id="loc-lat" class="form-control" style="width:100%" type="number" step="0.000001" placeholder="19.131006">
           </div>
-          <div>
-            <label class="g-form-label">Longitude *</label>
-            <input id="loc-lng" class="g-input" type="number" step="0.000001" placeholder="72.855686">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Longitude *</label>
+            <input id="loc-lng" class="form-control" style="width:100%" type="number" step="0.000001" placeholder="72.855686">
           </div>
         </div>
-        <div id="loc-radius-row" style="margin-top:14px">
-          <label class="g-form-label">Buffer Radius — <span id="radius-lbl">500</span>m</label>
-          <input type="range" class="g-buf-slider-modal" id="loc-radius-slider" min="50" max="5000" step="50" value="500"
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px">
+            Buffer Radius (Meters) — <span id="radius-lbl">500</span>M
+          </label>
+          <input type="range" class="buffer-slider" id="loc-radius-slider" min="50" max="5000" step="50" value="500"
+                 style="width:100%;margin-top:6px;margin-bottom:8px"
                  oninput="document.getElementById('radius-lbl').textContent=this.value;document.getElementById('loc-radius').value=this.value;updateSliderBg(this)">
-          <input type="number" id="loc-radius" class="g-input" value="500" style="margin-top:8px"
+          <input type="number" id="loc-radius" class="form-control" value="500" style="width:100%"
                  oninput="const s=document.getElementById('loc-radius-slider');s.value=this.value;document.getElementById('radius-lbl').textContent=this.value;updateSliderBg(s)">
         </div>
       </div>
-      <div>
-        <label class="g-form-label">Address</label>
-        <textarea id="loc-address" class="g-input" rows="3" style="resize:vertical" placeholder="Full address"></textarea>
+
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label">Address</label>
+        <textarea id="loc-address" class="form-control" rows="3" style="width:100%;resize:vertical" placeholder="Full address"></textarea>
       </div>
-      <div id="loc-global-note" class="g-global-note" style="display:none">
+
+      <div id="loc-global-note" style="display:none;background:var(--accent-l);border-radius:var(--radius-sm);padding:10px 13px;border-left:3px solid var(--accent);font-size:12px;color:var(--accent);font-weight:600">
         🌍 Global zone — employees assigned here can punch in from anywhere. No GPS check is enforced.
       </div>
     </div>
@@ -604,9 +461,11 @@
   </div>
 </div>
 
-<!-- ═══ ASSIGN EMPLOYEES MODAL ════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════
+     ASSIGN EMPLOYEES MODAL
+     ═══════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="assign-modal">
-  <div class="modal modal-lg g-modal-inner">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <div class="modal-title" id="assign-modal-title">Assign Employees</div>
       <button class="modal-close" onclick="closeModal('assign-modal')">✕</button>
@@ -618,7 +477,7 @@
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn btn-ghost btn-sm" onclick="selectAllAssign()">Select All</button>
         <button class="btn btn-ghost btn-sm" onclick="clearAllAssign()">Clear All</button>
-        <span id="assign-sel-count" style="font-size:12px;color:var(--g-muted);align-self:center"></span>
+        <span id="assign-sel-count" style="font-size:12px;color:var(--muted);align-self:center"></span>
       </div>
       <div id="assign-emp-list" style="max-height:380px;overflow-y:auto"></div>
     </div>
@@ -629,18 +488,43 @@
   </div>
 </div>
 
-<!-- ═══ DELETE CONFIRM MODAL ══════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════
+     DELETE BLOCKED MODAL (employees still assigned)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="delete-blocked-modal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title">🚫 Cannot Delete Location</div>
+      <button class="modal-close" onclick="closeModal('delete-blocked-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;font-size:13px;color:#b91c1c;font-weight:600">
+        Reassign or remove these employees from this location before deleting.
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="delete-blocked-count"></div>
+      <div id="delete-blocked-list" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('delete-blocked-modal')">Close</button>
+      <button class="btn btn-primary" onclick="closeModal('delete-blocked-modal'); openAssignModal(_deleteLocId)">👤 Manage Assignments</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DELETE CONFIRM MODAL (no employees assigned)
+     ═══════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="delete-confirm-modal">
   <div class="modal" style="width:420px">
     <div class="modal-header">
-      <div class="modal-title">Delete Location</div>
+      <div class="modal-title">🗑️ Delete Location</div>
       <button class="modal-close" onclick="closeModal('delete-confirm-modal')">✕</button>
     </div>
     <div class="modal-body">
-      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 14px;font-size:13px;color:#b91c1c;font-weight:600">
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:#b91c1c;font-weight:600">
         ⚠️ This will permanently delete the location. This cannot be undone.
       </div>
-      <div style="margin-top:12px;font-size:13px;color:var(--g-slate)">
+      <div style="margin-top:12px;font-size:13px;color:var(--text)">
         Location: <strong id="delete-confirm-name"></strong>
       </div>
     </div>
@@ -651,7 +535,8 @@
   </div>
 </div>
 
-<!-- NOTIFICATIONS -->
+</div>
+<!-- NOTIFICATIONS PANEL -->
 <div id="notif-overlay" style="display:none;position:fixed;inset:0;z-index:190" onclick="closeNotifications()"></div>
 <div id="notif-panel">
   <div class="flex-between" style="margin-bottom:20px">
@@ -666,28 +551,21 @@
 
 <script src="app.js"></script>
 <script>
-
 Auth.guard();
 buildSidebar('geofence.html');
 loadNotifBadge();
 
-// ── State ────────────────────────────────────────────────────
-let _map = null, _mapMarkers = [], _mapCircles = [], _geoInfoWin = null;
-let _allLocations = [], _allEmployees = [], _allRules = [];
-let _expandedRows = new Set();   // location IDs currently expanded
-let _locEmployees = {};          // cache: locId → [employee, ...]
-let _assignLocId  = null;
-let _deleteLocId  = null;
+let _map = null, _mapMarkers = [], _mapCircles = [], _allLocations = [], _allEmployees = [];
+let _selectedLoc = null, _assignLocId = null, _geoInfoWin = null;
 
-// ── BR district data (needed for per-employee rule editing) ──
-const BR_STATES = ["ANDAMAN & NICOBAR","ANDHRA PRADESH","ARUNACHAL PRADESH","ASSAM","BIHAR","CHANDIGARH","CHHATTISGARH","DADRA,NAGAR HAVELI,DAMAN & DIU","DELHI","GOA","GUJARAT","HARYANA","HIMACHAL PRADESH","JAMMU & KASHMIR","JHARKHAND","KARNATAKA","KERALA","LADAKH","LAKSHADWEEP","MADHYA PRADESH","MAHARASHTRA","MANIPUR","MEGHALAYA","MIZORAM","NAGALAND","ODISHA","PUDUCHERRY","PUNJAB","RAJASTHAN","SIKKIM","TAMIL NADU","TELANGANA","TRIPURA","UTTAR PRADESH","UTTARAKHAND","WEST BENGAL"];
-const BR_DISTRICTS = {"ANDAMAN & NICOBAR":["Nicobars","North And Middle Andaman","South Andamans"],"ANDHRA PRADESH":["Alluri Sitharama Raju","Anakapalli","Anantapur","Annamayya","Bapatla","Chittoor","East Godavari","Eluru","Guntur","Kakinada","Konaseema","Krishna","Kurnool","Nandyal","Ntr","Palnadu","Parvathipuram Manyam","Prakasam","Spsr Nellore","Sri Sathya Sai","Srikakulam","Tirupati","Visakhapatanam","Vizianagaram","West Godavari","Y.S.R."],"ARUNACHAL PRADESH":["Anjaw","Changlang","Dibang Valley","East Kameng","East Siang","Kamle","Kra Daadi","Kurung Kumey","Leparada","Lohit","Longding","Lower Dibang Valley","Lower Siang","Lower Subansiri","Namsai","Pakke Kessang","Papum Pare","Shi Yomi","Siang","Tawang","Tirap","Upper Siang","Upper Subansiri","West Kameng","West Siang"],"ASSAM":["Bajali","Baksa","Barpeta","Biswanath","Bongaigaon","Cachar","Charaideo","Chirang","Darrang","Dhemaji","Dhubri","Dibrugarh","Dima Hasao","Goalpara","Golaghat","Hailakandi","Hojai","Jorhat","Kamrup","Kamrup Metro","Karbi Anglong","Karimganj","Kokrajhar","Lakhimpur","Majuli","Marigaon","Nagaon","Nalbari","Sivasagar","Sonitpur","South Salmara Mancachar","Tamulpur","Tinsukia","Udalguri","West Karbi Anglong"],"BIHAR":["Araria","Arwal","Aurangabad","Banka","Begusarai","Bhagalpur","Bhojpur","Buxar","Darbhanga","Gaya","Gopalganj","Jamui","Jehanabad","Kaimur (Bhabua)","Katihar","Khagaria","Kishanganj","Lakhisarai","Madhepura","Madhubani","Munger","Muzaffarpur","Nalanda","Nawada","Pashchim Champaran","Patna","Purbi Champaran","Purnia","Rohtas","Saharsa","Samastipur","Saran","Sheikhpura","Sheohar","Sitamarhi","Siwan","Supaul","Vaishali"],"CHANDIGARH":["Chandigarh"],"CHHATTISGARH":["Balod","Baloda Bazar","Balrampur","Bastar","Bemetara","Bijapur","Bilaspur","Dantewada","Dhamtari","Durg","Gariyaband","Gaurella Pendra Marwahi","Janjgir-Champa","Jashpur","Kabirdham","Kanker","Khairgarh Chhuikhadan Gandai","Kondagaon","Korba","Korea","Mahasamund","Manendragarh Chirimiri Bharatpur","Mohla Manpur Ambagarh Chouki","Mungeli","Narayanpur","Raigarh","Raipur","Rajnandgaon","Sakti","Sarangarh Bilaigarh","Sukma","Surajpur","Surguja"],"DADRA,NAGAR HAVELI,DAMAN & DIU":["Dadra And Nagar Haveli","Daman","Diu"],"DELHI":["Central","East","New Delhi","North","North East","North West","Shahdara","South","South East","South West","West"],"GOA":["North Goa","South Goa"],"GUJARAT":["Ahmadabad","Amreli","Anand","Arvalli","Banas Kantha","Bharuch","Bhavnagar","Botad","Chhotaudepur","Dang","Devbhumi Dwarka","Dohad","Gandhinagar","Gir Somnath","Jamnagar","Junagadh","Kachchh","Kheda","Mahesana","Mahisagar","Morbi","Narmada","Navsari","Panch Mahals","Patan","Porbandar","Rajkot","Sabar Kantha","Surat","Surendranagar","Tapi","Vadodara","Valsad"],"HARYANA":["Ambala","Bhiwani","Charki Dadri","Faridabad","Fatehabad","Gurugram","Hisar","Jhajjar","Jind","Kaithal","Karnal","Kurukshetra","Mahendragarh","Nuh","Palwal","Panchkula","Panipat","Rewari","Rohtak","Sirsa","Sonipat","Yamunanagar"],"HIMACHAL PRADESH":["Bilaspur","Chamba","Hamirpur","Kangra","Kinnaur","Kullu","Lahul And Spiti","Mandi","Shimla","Sirmaur","Solan","Una"],"JAMMU & KASHMIR":["Anantnag","Bandipora","Baramulla","Budgam","Doda","Ganderbal","Jammu","Kathua","Kishtwar","Kulgam","Kupwara","Mirpur","Muzaffarabad","Poonch","Pulwama","Rajouri","Ramban","Reasi","Samba","Shopian","Srinagar","Udhampur"],"JHARKHAND":["Bokaro","Chatra","Deoghar","Dhanbad","Dumka","East Singhbum","Garhwa","Giridih","Godda","Gumla","Hazaribagh","Jamtara","Khunti","Koderma","Latehar","Lohardaga","Pakur","Palamu","Ramgarh","Ranchi","Sahebganj","Saraikela Kharsawan","Simdega","West Singhbhum"],"KARNATAKA":["Bagalkote","Ballari","Belagavi","Bengaluru Rural","Bengaluru Urban","Bidar","Chamarajanagara","Chikkaballapura","Chikkamagaluru","Chitradurga","Dakshina Kannada","Davangere","Dharwad","Gadag","Hassan","Haveri","Kalaburagi","Kodagu","Kolar","Koppal","Mandya","Mysuru","Raichur","Ramanagara","Shivamogga","Tumakuru","Udupi","Uttara Kannada","Vijayanagar","Vijayapura","Yadgir"],"KERALA":["Alappuzha","Ernakulam","Idukki","Kannur","Kasaragod","Kollam","Kottayam","Kozhikode","Malappuram","Palakkad","Pathanamthitta","Thiruvananthapuram","Thrissur","Wayanad"],"LADAKH":["Kargil","Leh Ladakh"],"LAKSHADWEEP":["Lakshadweep District"],"MADHYA PRADESH":["Agar Malwa","Alirajpur","Anuppur","Ashoknagar","Balaghat","Barwani","Betul","Bhind","Bhopal","Burhanpur","Chhatarpur","Chhindwara","Damoh","Datia","Dewas","Dhar","Dindori","East Nimar","Guna","Gwalior","Harda","Indore","Jabalpur","Jhabua","Katni","Khargone","Mandla","Mandsaur","Morena","Narmadapuram","Narsinghpur","Neemuch","Niwari","Panna","Raisen","Rajgarh","Ratlam","Rewa","Sagar","Satna","Sehore","Seoni","Shahdol","Shajapur","Sheopur","Shivpuri","Sidhi","Singrauli","Tikamgarh","Ujjain","Umaria","Vidisha"],"MAHARASHTRA":["Ahmednagar","Akola","Amravati","Aurangabad","Beed","Bhandara","Buldhana","Chandrapur","Dhule","Gadchiroli","Gondia","Hingoli","Jalgaon","Jalna","Kolhapur","Latur","Mumbai","Mumbai Suburban","Nagpur","Nanded","Nandurbar","Nashik","Osmanabad","Palghar","Parbhani","Pune","Raigad","Ratnagiri","Sangli","Satara","Sindhudurg","Solapur","Thane","Wardha","Washim","Yavatmal"],"MANIPUR":["Bishnupur","Chandel","Churachandpur","Imphal East","Imphal West","Jiribam","Kakching","Kamjong","Kangpokpi","Noney","Pherzawl","Senapati","Tamenglong","Tengnoupal","Thoubal","Ukhrul"],"MEGHALAYA":["East Garo Hills","East Jaintia Hills","East Khasi Hills","Eastern West Khasi Hills","North Garo Hills","Ri Bhoi","South Garo Hills","South West Garo Hills","South West Khasi Hills","West Garo Hills","West Jaintia Hills","West Khasi Hills"],"MIZORAM":["Aizawl","Champhai","Hnahthial","Khawzawl","Kolasib","Lawngtlai","Lunglei","Mamit","Saiha","Saitual","Serchhip"],"NAGALAND":["Chumoukedima","Dimapur","Kiphire","Kohima","Longleng","Mokokchung","Mon","Niuland","Noklak","Peren","Phek","Shamator","Tseminyu","Tuensang","Wokha","Zunheboto"],"ODISHA":["Anugul","Balangir","Baleshwar","Bargarh","Bhadrak","Boudh","Cuttack","Deogarh","Dhenkanal","Gajapati","Ganjam","Jagatsinghapur","Jajapur","Jharsuguda","Kalahandi","Kandhamal","Kendrapara","Kendujhar","Khordha","Koraput","Malkangiri","Mayurbhanj","Nabarangpur","Nayagarh","Nuapada","Puri","Rayagada","Sambalpur","Sonepur","Sundargarh"],"PUDUCHERRY":["Karaikal","Mahe","Pondicherry","Yanam"],"PUNJAB":["Amritsar","Barnala","Bathinda","Faridkot","Fatehgarh Sahib","Fazilka","Ferozepur","Gurdaspur","Hoshiarpur","Jalandhar","Kapurthala","Ludhiana","Malerkotla","Mansa","Moga","Pathankot","Patiala","Rupnagar","S.A.S Nagar","Sangrur","Shahid Bhagat Singh Nagar","Sri Muktsar Sahib","Tarn Taran"],"RAJASTHAN":["Ajmer","Alwar","Banswara","Baran","Barmer","Bharatpur","Bhilwara","Bikaner","Bundi","Chittorgarh","Churu","Dausa","Dholpur","Dungarpur","Ganganagar","Hanumangarh","Jaipur","Jaisalmer","Jalore","Jhalawar","Jhunjhunu","Jodhpur","Karauli","Kota","Nagaur","Pali","Pratapgarh","Rajsamand","Sawai Madhopur","Sikar","Sirohi","Tonk","Udaipur"],"SIKKIM":["Gangtok","Gyalshing","Mangan","Namchi","Pakyong","Soreng"],"TAMIL NADU":["Ariyalur","Chengalpattu","Chennai","Coimbatore","Cuddalore","Dharmapuri","Dindigul","Erode","Kallakurichi","Kanchipuram","Kanniyakumari","Karur","Krishnagiri","Madurai","Mayiladuthurai","Nagapattinam","Namakkal","Perambalur","Pudukkottai","Ramanathapuram","Ranipet","Salem","Sivaganga","Tenkasi","Thanjavur","The Nilgiris","Theni","Thiruvallur","Thiruvarur","Tiruchirappalli","Tirunelveli","Tirupathur","Tiruppur","Tiruvannamalai","Tuticorin","Vellore","Villupuram","Virudhunagar"],"TELANGANA":["Adilabad","Bhadradri Kothagudem","Hanumakonda","Hyderabad","Jagitial","Jangoan","Jayashankar Bhupalapally","Jogulamba Gadwal","Kamareddy","Karimnagar","Khammam","Kumuram Bheem Asifabad","Mahabubabad","Mahabubnagar","Mancherial","Medak","Medchal Malkajgiri","Mulugu","Nagarkurnool","Nalgonda","Narayanpet","Nirmal","Nizamabad","Peddapalli","Rajanna Sircilla","Ranga Reddy","Sangareddy","Siddipet","Suryapet","Vikarabad","Wanaparthy","Warangal","Yadadri Bhuvanagiri"],"TRIPURA":["Dhalai","Gomati","Khowai","North Tripura","Sepahijala","South Tripura","Unakoti","West Tripura"],"UTTAR PRADESH":["Agra","Aligarh","Ambedkar Nagar","Amethi","Amroha","Auraiya","Ayodhya","Azamgarh","Baghpat","Bahraich","Ballia","Balrampur","Banda","Barabanki","Bareilly","Basti","Bhadohi","Bijnor","Budaun","Bulandshahr","Chandauli","Chitrakoot","Deoria","Etah","Etawah","Farrukhabad","Fatehpur","Firozabad","Gautam Buddha Nagar","Ghaziabad","Ghazipur","Gonda","Gorakhpur","Hamirpur","Hapur","Hardoi","Hathras","Jalaun","Jaunpur","Jhansi","Kannauj","Kanpur Dehat","Kanpur Nagar","Kasganj","Kaushambi","Kheri","Kushi Nagar","Lalitpur","Lucknow","Maharajganj","Mahoba","Mainpuri","Mathura","Mau","Meerut","Mirzapur","Moradabad","Muzaffarnagar","Pilibhit","Pratapgarh","Prayagraj","Rae Bareli","Rampur","Saharanpur","Sambhal","Sant Kabeer Nagar","Shahjahanpur","Shamli","Shravasti","Siddharth Nagar","Sitapur","Sonbhadra","Sultanpur","Unnao","Varanasi"],"UTTARAKHAND":["Almora","Bageshwar","Chamoli","Champawat","Dehradun","Haridwar","Nainital","Pauri Garhwal","Pithoragarh","Rudra Prayag","Tehri Garhwal","Udam Singh Nagar","Uttar Kashi"],"WEST BENGAL":["24 Paraganas North","24 Paraganas South","Alipurduar","Bankura","Birbhum","Coochbehar","Darjeeling","Dinajpur Dakshin","Dinajpur Uttar","Hooghly","Howrah","Jalpaiguri","Jhargram","Kalimpong","Kolkata","Maldah","Medinipur East","Medinipur West","Murshidabad","Nadia","Paschim Bardhaman","Purba Bardhaman","Purulia"]};
-
-// ── INIT MAP ─────────────────────────────────────────────────
+// ── INIT MAP ────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   _map = new google.maps.Map(document.getElementById('main-map'), {
-    zoom: 5, center: { lat: 21.0, lng: 78.0 }, mapTypeId: 'roadmap',
-    streetViewControl: false, mapTypeControl: true,
+    zoom: 5,
+    center: { lat: 21.0, lng: 78.0 },
+    mapTypeId: 'roadmap',
+    streetViewControl: false,
+    mapTypeControl: true,
     mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
     gestureHandling: 'greedy'
   });
@@ -696,558 +574,409 @@ window.addEventListener('load', () => {
 });
 
 async function loadAll() {
-  const [locData, empData, ruleData] = await Promise.all([
+  // buffer rules panel init (after locations loaded)
+  setTimeout(() => initBufferRules(), 300);
+  const [locData, empData] = await Promise.all([
     api('GET', '/geofence/locations'),
-    api('GET', '/employees'),
-    api('GET', '/geofence/buffer-rules')
+    api('GET', '/employees')
   ]);
-  _allLocations = locData?.data  || [];
-  _allEmployees = empData?.data  || [];
-  _allRules     = ruleData?.data || [];
-  _locEmployees = {}; // clear cache
+  _allLocations = locData?.data || [];
+  _allEmployees = empData?.data || [];
+  window._universalEmpCount = locData?.universal_employee_count || 0;
+  renderLocList();
   renderMapMarkers();
   updateStats();
-  renderLocTable();
+  // Keep office dropdown in sync whenever locations reload
+  if (typeof brPopulateOffices === 'function') brPopulateOffices();
 }
 
 function updateStats() {
   const locs    = _allLocations.filter(l => l.is_active);
   const offices = locs.filter(l => l.radius_meters < 10000);
   const global  = locs.filter(l => l.radius_meters >= 10000);
-  const totalAssigned = locs.reduce((s, l) => s + (parseInt(l.assigned_count) || 0), 0);
+  const assigned = new Set();
+  _allEmployees.forEach(e => {
+    if (_allLocations.some(l => (l.assigned_employees||[]).includes(e.id) || true)) {}
+  });
   document.getElementById('stat-total').textContent    = locs.length;
   document.getElementById('stat-offices').textContent  = offices.length;
   document.getElementById('stat-global').textContent   = global.length;
+  // assigned count — sum per-location + universal employees (punch from anywhere)
+  const perLocationCount = locs.reduce((s,l) => s + (parseInt(l.assigned_count)||0), 0);
+  const totalAssigned = perLocationCount + (window._universalEmpCount || 0);
   document.getElementById('stat-assigned').textContent = totalAssigned;
 }
 
-// ── MAP ─────────────────────────────────────────────────────
+// ── LOCATION LIST ───────────────────────────────────────────────
+function filterLocations() {
+  renderLocList(document.getElementById('loc-search').value.toLowerCase());
+}
+
+function renderLocList(filter = '') {
+  const el = document.getElementById('locations-list');
+  const locs = _allLocations.filter(l => !filter || l.name.toLowerCase().includes(filter));
+  document.getElementById('loc-count').textContent = locs.length + ' locations';
+
+  if (!locs.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div><p>No locations found</p></div>';
+    return;
+  }
+
+  const offices = locs.filter(l => l.radius_meters < 10000);
+  const global  = locs.filter(l => l.radius_meters >= 10000);
+
+  let html = '';
+  if (offices.length) {
+    html += `<div style="font-size:9.5px;font-weight:800;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🏢 Office Locations</div>`;
+    html += offices.map(l => locCard(l)).join('');
+  }
+  if (global.length) {
+    html += `<div style="font-size:9.5px;font-weight:800;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px">🌍 Global / State Zones</div>`;
+    html += global.map(l => locCard(l)).join('');
+  }
+  el.innerHTML = html;
+}
+
+function locCard(l) {
+  const isGlobal  = l.radius_meters >= 10000;
+  const isWFH     = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
+  const typeClass = isWFH ? 'loc-type-wfh' : isGlobal ? 'loc-type-state' : 'loc-type-office';
+  const typeLabel = isWFH ? 'WFH' : isGlobal ? 'Global' : 'Office';
+  const active    = _selectedLoc?.id === l.id ? 'active' : '';
+  const globalCls = isGlobal ? 'global-zone' : '';
+
+  return `<div class="loc-card ${active} ${globalCls}" onclick="selectLocation(${l.id})">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+      <div style="font-size:13px;font-weight:700;color:var(--text)">${l.name}</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="loc-type-badge ${typeClass}">${typeLabel}</span>
+        ${!l.is_active ? '<span class="loc-type-badge loc-type-inactive">Inactive</span>' : ''}
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;font-size:11px;color:var(--muted)">
+      ${isGlobal
+        ? '<span>🌍 Universal access</span>'
+        : `<span>📏 ${l.radius_meters}m buffer</span>`}
+      <span>👤 ${l.assigned_count || 0} employees</span>
+    </div>
+    ${l.address ? `<div style="font-size:11px;color:var(--muted2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.address}</div>` : ''}
+  </div>`;
+}
+
+// ── MAP MARKERS ─────────────────────────────────────────────────
 function renderMapMarkers() {
   _mapMarkers.forEach(m => m.setMap(null));
   _mapCircles.forEach(c => c.setMap(null));
   _mapMarkers = []; _mapCircles = [];
+
   _allLocations.filter(l => l.is_active).forEach(l => {
-    const lat = parseFloat(l.latitude), lng = parseFloat(l.longitude);
-    if (!lat || !lng) return;
+    const lat = parseFloat(l.latitude);
+    const lng = parseFloat(l.longitude);
+    if (!lat || !lng || (lat === 0 && lng === 0)) return;
+
     const isGlobal = l.radius_meters >= 10000;
     const isWFH    = l.name.toLowerCase().includes('work from home');
     const color    = isWFH ? '#8b5cf6' : isGlobal ? '#4a8c1c' : '#1d4ed8';
+    const shortName = l.name.split('–')[0].split('-')[0].trim().substring(0, 14);
+
+    // Circle (skip for global zones)
     if (!isGlobal) {
-      const c = new google.maps.Circle({ map: _map, center: { lat, lng }, radius: l.radius_meters,
-        strokeColor: color, strokeOpacity: .7, strokeWeight: 2, fillColor: color, fillOpacity: .1 });
-      _mapCircles.push(c);
+      const circle = new google.maps.Circle({
+        map: _map,
+        center: { lat, lng },
+        radius: l.radius_meters,
+        strokeColor: color, strokeOpacity: 0.7, strokeWeight: 2,
+        fillColor: color, fillOpacity: 0.1
+      });
+      _mapCircles.push(circle);
     }
-    const sn  = l.name.split('–')[0].split('-')[0].trim().substring(0, 14);
-    const svgW = Math.max(70, sn.length * 7 + 20);
-    const svg  = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="26"><rect rx="7" width="${svgW}" height="26" fill="${color}"/><text x="${svgW/2}" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="white" font-family="Arial,sans-serif">${sn}</text></svg>`);
-    const marker = new google.maps.Marker({ position: { lat, lng }, map: _map, title: l.name,
-      icon: { url: 'data:image/svg+xml;charset=UTF-8,' + svg, scaledSize: new google.maps.Size(svgW, 26), anchor: new google.maps.Point(svgW / 2, 13) }, zIndex: isGlobal ? 1 : 5 });
+
+    // Marker with label
+    const svgW = Math.max(70, shortName.length * 7 + 20);
+    const svgIcon = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="26"><rect rx="7" width="${svgW}" height="26" fill="${color}"/><text x="${svgW/2}" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="white" font-family="Arial,sans-serif">${shortName}</text></svg>`);
+    const marker = new google.maps.Marker({
+      position: { lat, lng },
+      map: _map,
+      title: l.name,
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + svgIcon,
+        scaledSize: new google.maps.Size(svgW, 26),
+        anchor: new google.maps.Point(svgW / 2, 13)
+      },
+      zIndex: isGlobal ? 1 : 5
+    });
     marker.addListener('click', () => {
       _geoInfoWin.setContent(`<div style="font-family:sans-serif;padding:4px"><b>${l.name}</b><br>${isGlobal ? '🌍 Global zone' : `📏 Buffer: ${l.radius_meters}m`}<br>👤 ${l.assigned_count||0} employees</div>`);
       _geoInfoWin.open(_map, marker);
-      panToLocation(l);
+      selectLocation(l.id);
     });
     _mapMarkers.push(marker);
   });
 }
 
-function panToLocation(l) {
-  const lat = parseFloat(l.latitude), lng = parseFloat(l.longitude);
-  if (!lat || !lng) return;
-  _map.panTo({ lat, lng });
-  _map.setZoom(l.radius_meters < 10000 ? 15 : 9);
-  document.getElementById('map-title').textContent = '📍 ' + l.name;
-}
-
 function resetMapView() {
-  _map.setCenter({ lat: 21.0, lng: 78.0 }); _map.setZoom(5);
+  _map.setCenter({ lat: 21.0, lng: 78.0 });
+  _map.setZoom(5);
   document.getElementById('map-title').textContent = '📍 All Locations Overview';
 }
 
-// ── UNIFIED LOCATION TABLE ───────────────────────────────────
-function renderLocTable() {
-  const q      = (document.getElementById('loc-search').value || '').toLowerCase();
-  const filter = document.getElementById('filter-type').value;
-  const locs   = _allLocations.filter(l => {
-    if (q && !l.name.toLowerCase().includes(q)) return false;
-    if (filter === 'office' && l.radius_meters >= 10000) return false;
-    if (filter === 'global' && l.radius_meters < 10000) return false;
-    return true;
-  });
-  document.getElementById('loc-count').textContent = locs.length + ' locations';
-  const offices = locs.filter(l => l.radius_meters < 10000);
-  const global  = locs.filter(l => l.radius_meters >= 10000);
-  const tbody = document.getElementById('loc-tbody');
-  let html = '';
+// ── SELECT LOCATION ─────────────────────────────────────────────
+async function selectLocation(id) {
+  _selectedLoc = _allLocations.find(l => l.id === id);
+  if (!_selectedLoc) return;
+  renderLocList(document.getElementById('loc-search').value.toLowerCase());
+  renderDetailPanel(_selectedLoc);
 
-  if (offices.length) {
-    html += `<tr class="section-header"><td colspan="7">🏢 Office Locations</td></tr>`;
-    offices.forEach(l => { html += locRow(l); });
+  const lat = parseFloat(_selectedLoc.latitude);
+  const lng = parseFloat(_selectedLoc.longitude);
+  if (lat && lng && !(lat === 0 && lng === 0)) {
+    _map.panTo({ lat, lng });
+    _map.setZoom(_selectedLoc.radius_meters < 10000 ? 16 : 10);
+    document.getElementById('map-title').textContent = `📍 ${_selectedLoc.name}`;
   }
-  if (global.length) {
-    html += `<tr class="section-header"><td colspan="7">🌍 Global / State Zones</td></tr>`;
-    global.forEach(l => { html += locRow(l); });
-  }
-  if (!locs.length) {
-    html = `<tr><td colspan="7" style="padding:30px;text-align:center;color:var(--muted)">No locations found</td></tr>`;
-  }
-  tbody.innerHTML = html;
-
-  // Re-render any expanded rows
-  _expandedRows.forEach(id => {
-    const loc = _allLocations.find(l => l.id === id);
-    if (loc) toggleExpand(id, false); // re-open silently
-  });
 }
 
-function locRow(l) {
-  const isGlobal = l.radius_meters >= 10000;
-  const isWFH    = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
-  const typeBadge = isWFH ? `<span class="badge badge-wfh">WFH</span>`
-                  : isGlobal ? `<span class="badge badge-global">Global</span>`
-                  : `<span class="badge badge-office">Office</span>`;
-  const statusBadge = l.is_active
-    ? `<span class="badge" style="background:#d1fae5;color:#059669">Active</span>`
-    : `<span class="badge badge-none">Inactive</span>`;
-  const bufferInfo = isGlobal
-    ? `<span style="font-size:12px;color:var(--muted)">🌍 Universal access</span>`
-    : `<div style="display:flex;align-items:center;gap:8px">
-        <input type="range" class="buf-slider" id="sl-${l.id}"
-          min="50" max="5000" step="50" value="${l.radius_meters}"
-          oninput="onSliderInput(${l.id},this)"
-          style="width:110px">
-        <span class="buf-val" id="sv-${l.id}">${l.radius_meters}m</span>
-        <button class="save-mini" onclick="saveLocRadius(${l.id})">Save</button>
-       </div>`;
-  const isExpanded = _expandedRows.has(l.id);
-  return `<tr id="lrow-${l.id}" style="cursor:default">
-    <td>
-      <button class="expand-btn ${isExpanded?'open':''}" id="ebtn-${l.id}" onclick="toggleExpand(${l.id},true)" title="Show employees">▶</button>
-    </td>
-    <td>
-      <div style="font-weight:700;font-size:13px;color:var(--text)">${l.name}</div>
-      ${l.address ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.address}</div>` : ''}
-    </td>
-    <td>${typeBadge}</td>
-    <td>${bufferInfo}</td>
-    <td>
-      <span style="font-size:13px;font-weight:700;color:var(--text)">${l.assigned_count || 0}</span>
-      <span style="font-size:11px;color:var(--muted)"> employees</span>
-    </td>
-    <td>${statusBadge}</td>
-    <td style="text-align:center;white-space:nowrap">
-      <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="panToLocation(${JSON.stringify(l).replace(/"/g,'&quot;')})" title="View on map">🗺️</button>
-      <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="openAssignModal(${l.id})" title="Manage employees">👥</button>
-      <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="openEditLocation(${l.id})" title="Edit">✏️</button>
-      <button class="btn btn-ghost btn-sm" style="padding:4px 8px;color:var(--red)" onclick="openDeleteLocation(${l.id},'${l.name.replace(/'/g,"\\'")}')" title="Delete">🗑️</button>
-    </td>
-  </tr>
-  ${isExpanded ? empSubRow(l.id) : `<tr id="sub-${l.id}" style="display:none"><td colspan="7"></td></tr>`}`;
-}
+async function renderDetailPanel(loc) {
+  document.getElementById('no-selection').style.display = 'none';
+  document.getElementById('detail-panel').style.display = '';
 
-function empSubRow(locId) {
-  const emps = _locEmployees[locId];
-  if (!emps) {
-    // Loading placeholder — we'll replace once fetched
-    return `<tr id="sub-${locId}">
-      <td></td>
-      <td colspan="6" style="padding:12px 8px;background:var(--surface2)">
-        <div class="spinner" style="margin:8px auto"></div>
-      </td>
-    </tr>`;
-  }
-  if (!emps.length) {
-    return `<tr id="sub-${locId}">
-      <td style="border-left:3px solid var(--accent)"></td>
-      <td colspan="6" style="padding:10px 12px;background:var(--surface2)">
-        <span style="color:var(--muted);font-size:13px">No employees assigned. <a href="#" onclick="openAssignModal(${locId});return false" style="color:var(--accent)">Add employees →</a></span>
-      </td>
-    </tr>`;
-  }
+  const isGlobal = loc.radius_meters >= 10000;
+  const isWFH    = loc.name.toLowerCase().includes('work from home');
+  const typeLabel = isWFH ? '🏠 Work From Home' : isGlobal ? '🌍 State Zone (Global)' : '🏢 Office (Strict Geofence)';
+  const typeColor = isWFH ? '#8b5cf6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
 
-  const rows = emps.map(e => {
-    const rule   = _allRules.find(r => r.id == e.id);
-    const rt     = rule?.rule_type || '';
-    const boundary = rt === 'district' ? `${rule.district}, ${rule.state}`
-                   : rt === 'state'    ? rule.state
-                   : rt === 'office'   ? 'Office radius'
-                   : rt === 'universal'? 'Anywhere'
-                   : '—';
-    const empTypeBadge = e.employee_type === 'onsite'   ? `<span class="badge badge-onsite">Onsite</span>`
-                       : e.employee_type === 'offsite'  ? `<span class="badge badge-offsite">Offsite</span>`
-                       : e.employee_type === 'wfh'      ? `<span class="badge badge-universal">WFH</span>`
-                       : `<span class="badge badge-none">—</span>`;
-    const ruleBadge = rt === 'office'    ? `<span class="badge badge-office">Office</span>`
-                    : rt === 'district'  ? `<span class="badge badge-offsite">District</span>`
-                    : rt === 'state'     ? `<span class="badge" style="background:#fef9c3;color:#854d0e">State</span>`
-                    : rt === 'universal' ? `<span class="badge badge-universal">Universal</span>`
-                    : `<span class="badge badge-none">Not Set</span>`;
+  // Fetch assigned employees for this location
+  const assigned = await fetchAssignedEmployees(loc.id);
 
-    // Individual buffer slider for office employees
-    const isOfficeEmp = rt === 'office' || (!rt && e.is_universal === false);
-    const loc = _allLocations.find(l => l.id == locId);
-    const isGlobalLoc = loc && loc.radius_meters >= 10000;
-
-    // Zone / buffer cell — show per-employee boundary if global loc, slider if office loc
-    const locName = loc?.name || '';
-    const isWFHLoc = locName.toLowerCase().includes('work from home') || locName.toLowerCase().includes('wfh');
-    let bufferCell;
-    if (!isGlobalLoc) {
-      // Office location → show individual buffer radius slider
-      bufferCell = `<div style="display:flex;align-items:center;gap:6px">
-          <input type="range" class="buf-slider" id="esl-${e.id}-${locId}"
-            min="50" max="5000" step="50" value="${e.custom_radius || loc?.radius_meters || 300}"
-            oninput="onEmpSliderInput(${e.id},${locId},this)"
-            style="width:120px">
-          <span class="buf-val" id="esv-${e.id}-${locId}">${e.custom_radius || loc?.radius_meters || 300}m</span>
-          <button class="save-mini" onclick="saveEmpRadius(${e.id},${locId})">Save</button>
-         </div>`;
-    } else if (isWFHLoc || rt === 'universal') {
-      // WFH / Universal → anywhere
-      bufferCell = `<span style="font-size:11px;color:#8b5cf6;font-weight:600">🌍 Anywhere</span>`;
-    } else if (rt === 'district' && rule?.district && rule?.state) {
-      // District boundary
-      bufferCell = `<div>
-        <span style="font-size:11px;font-weight:700;color:#166534">📍 ${rule.district}</span>
-        <div style="font-size:10px;color:var(--muted)">${rule.state}</div>
-      </div>`;
-    } else if (rt === 'state' && rule?.state) {
-      // State boundary
-      bufferCell = `<div>
-        <span style="font-size:11px;font-weight:700;color:#854d0e">🗺️ ${rule.state}</span>
-        <div style="font-size:10px;color:var(--muted)">State boundary</div>
-      </div>`;
-    } else {
-      // Global zone with no specific rule yet — derive from location name
-      const locStateName = locName.replace(/^state\s*[-–]\s*/i,'').replace(/^district\s*[-–]\s*/i,'').split(',')[0].trim();
-      bufferCell = `<div>
-        <span style="font-size:11px;font-weight:700;color:var(--accent)">🗺️ ${locStateName}</span>
-        <div style="font-size:10px;color:var(--muted)">State boundary</div>
-      </div>`;
-    }
-
-    return `<tr>
-      <td></td>
-      <td style="padding:7px 10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="avatar" style="width:26px;height:26px;font-size:10px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
-          <div>
-            <div style="font-weight:600;font-size:12px">${e.first_name} ${e.last_name}</div>
-            <div style="font-size:10px;color:var(--muted)">${e.employee_code}</div>
-          </div>
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">${loc.name}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:${typeColor}">${typeLabel}</span>
+          ${loc.is_active
+            ? '<span style="font-size:10px;background:#d1fae5;color:#059669;padding:2px 7px;border-radius:20px;font-weight:700">Active</span>'
+            : '<span style="font-size:10px;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:20px;font-weight:700">Inactive</span>'}
         </div>
-      </td>
-      <td style="padding:7px 10px">${empTypeBadge}</td>
-      <td style="padding:7px 10px">${bufferCell}</td>
-      <td style="padding:7px 10px;min-width:280px">
-        <div class="emp-rule-wrap" style="margin-bottom:4px">
-          ${ruleBadge}
-          <select class="rule-sel" id="rsel-${e.id}" onchange="onEmpRuleChange(${e.id},${locId},this)">
-            <option value="office"    ${rt==='office'   ?'selected':''}>🏢 Office</option>
-            <option value="district"  ${rt==='district' ?'selected':''}>📍 District</option>
-            <option value="state"     ${rt==='state'    ?'selected':''}>🗺️ State</option>
-            <option value="universal" ${rt==='universal'?'selected':''}>🌍 Universal</option>
-          </select>
-        </div>
-        <!-- State picker — shown for state or district rule -->
-        <div id="state-wrap-${e.id}" style="display:${(rt==='state'||rt==='district')?'flex':'none'};flex-direction:column;gap:4px;margin-top:4px">
-          <select class="rule-sel" id="state-sel-${e.id}" onchange="onStateChange(${e.id})" style="width:100%;font-size:11px">
-            <option value="">— select state —</option>
-            ${BR_STATES.map(s=>`<option value="${s}" ${rule?.state===s?'selected':''}>${s}</option>`).join('')}
-          </select>
-          <!-- District picker — shown only for district rule -->
-          <select class="rule-sel" id="dist-sel-${e.id}" style="width:100%;font-size:11px;display:${rt==='district'?'block':'none'}">
-            <option value="">— select district —</option>
-            ${rule?.state && BR_DISTRICTS[rule.state] ? BR_DISTRICTS[rule.state].map(d=>`<option value="${d}" ${rule?.district===d?'selected':''}>${d}</option>`).join('') : ''}
-          </select>
-        </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px" id="boundary-${e.id}">${boundary}</div>
-      </td>
-      <td style="padding:7px 10px">
-        <button class="save-mini" onclick="saveEmpRule(${e.id},${locId})" style="background:var(--accent)">✓ Apply</button>
-        <button style="margin-left:4px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px" onclick="removeAssignment(${locId},${e.id})" title="Remove from location">✕</button>
-      </td>
-      <td></td>
-    </tr>`;
-  }).join('');
-
-  const loc = _allLocations.find(l => l.id == locId);
-  const isGlobalLoc = loc && loc.radius_meters >= 10000;
-
-  return `<tr id="sub-${locId}">
-    <td style="border-left:3px solid var(--accent);background:var(--surface2)"></td>
-    <td colspan="6" style="padding:0;background:var(--surface2)">
-      <div style="padding:8px 10px 0">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">👥 ${emps.length} Assigned Employee${emps.length!==1?'s':''}</span>
-          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="openAssignModal(${locId})">+ Add/Remove</button>
-        </div>
+        ${loc.address ? `<div style="font-size:12px;color:var(--muted);margin-top:5px">${loc.address}</div>` : ''}
       </div>
-      <table class="emp-sub-table">
-        <thead>
-          <tr>
-            <th style="width:30px"></th>
-            <th>Employee</th>
-            <th>Type</th>
-            <th>${isGlobalLoc ? 'Boundary' : 'Buffer Radius'}</th>
-            <th>Rule / Change</th>
-            <th>Actions</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </td>
-  </tr>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditLocation(${loc.id})">✏️ Edit</button>
+        <button class="btn btn-primary btn-sm" onclick="openAssignModal(${loc.id})">👤 Manage Employees</button>
+        ${loc.is_active
+          ? `<button class="btn btn-ghost btn-sm" style="color:#b45309;border-color:#b45309" onclick="toggleLocActive(${loc.id}, false)">⏸ Deactivate</button>`
+          : `<button class="btn btn-ghost btn-sm" style="color:#059669;border-color:#059669" onclick="toggleLocActive(${loc.id}, true)">▶ Activate</button>`
+        }
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="openDeleteLocation(${loc.id}, '${loc.name.replace(/'/g, "\\'")}')">🗑️ Delete</button>
+      </div>
+    </div>
+
+    ${!isGlobal ? `
+    <!-- Buffer Radius Editor -->
+    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px;border:1.5px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">📏 Geofence Buffer Radius</div>
+        <div style="font-size:20px;font-weight:800;color:var(--accent)" id="live-radius-lbl">${loc.radius_meters}m</div>
+      </div>
+      <input type="range" class="buffer-slider" id="live-radius-slider"
+             min="50" max="2000" step="50" value="${loc.radius_meters}"
+             oninput="onLiveRadiusChange(this.value)">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
+        <span>50m</span><span>500m</span><span>1000m</span><span>2000m</span>
+      </div>
+      <button class="btn btn-success btn-sm" style="margin-top:10px" onclick="saveRadius(${loc.id})">💾 Save Buffer</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Employees must punch in within this radius from the office center.</div>
+    </div>
+    ` : `
+    <div style="background:var(--accent-l);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;border-left:3px solid var(--accent)">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px">🌍 Universal Access Zone</div>
+      <div style="font-size:12px;color:var(--accent)">Employees assigned here can punch in from anywhere — no GPS distance check is enforced. Suitable for field staff, WFH employees, and state-level operations.</div>
+    </div>
+    `}
+
+    <!-- Coordinates (non-WFH only) -->
+    ${(!isWFH && parseFloat(loc.latitude) !== 0) ? `
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Latitude</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace">${parseFloat(loc.latitude).toFixed(6)}</div>
+      </div>
+      <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Longitude</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace">${parseFloat(loc.longitude).toFixed(6)}</div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Assigned Employees -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">👥 Assigned Employees (${assigned.length})</div>
+        <button class="btn btn-outline btn-sm" onclick="openAssignModal(${loc.id})">+ Manage</button>
+      </div>
+      ${assigned.length ? `
+      <div style="max-height:240px;overflow-y:auto">
+        ${assigned.map(e => `
+          <div class="emp-assign-row">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
+              <div>
+                <div style="font-size:12.5px;font-weight:600">${e.first_name} ${e.last_name}</div>
+                <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.designation_title||e.role}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${e.is_universal
+                ? '<span style="font-size:9.5px;font-weight:700;background:var(--accent-l);color:var(--accent);padding:2px 7px;border-radius:20px">Universal</span>'
+                : '<span style="font-size:9.5px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:20px">Strict</span>'}
+              <button onclick="removeAssignment(${loc.id}, ${e.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px;line-height:1" title="Remove">✕</button>
+            </div>
+          </div>`).join('')}
+      </div>` : `
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+        No employees assigned yet. <a href="#" onclick="openAssignModal(${loc.id});return false" style="color:var(--accent)">Add now →</a>
+      </div>`}
+    </div>
+  `;
+
+  updateSliderBg(document.getElementById('live-radius-slider'));
 }
 
-// ── Expand/collapse ──────────────────────────────────────────
-async function toggleExpand(locId, flip = true) {
-  if (flip) {
-    if (_expandedRows.has(locId)) {
-      _expandedRows.delete(locId);
-      const subRow = document.getElementById('sub-' + locId);
-      if (subRow) subRow.remove();
-      const btn = document.getElementById('ebtn-' + locId);
-      if (btn) btn.classList.remove('open');
-      return;
-    }
-    _expandedRows.add(locId);
-  }
-  // Mark button open
-  const btn = document.getElementById('ebtn-' + locId);
-  if (btn) btn.classList.add('open');
-  // Show loading sub-row
-  let subRow = document.getElementById('sub-' + locId);
-  if (!subRow) {
-    const mainRow = document.getElementById('lrow-' + locId);
-    if (!mainRow) return;
-    subRow = document.createElement('tr');
-    subRow.id = 'sub-' + locId;
-    mainRow.insertAdjacentElement('afterend', subRow);
-  }
-  subRow.innerHTML = `<td style="border-left:3px solid var(--accent);background:var(--surface2)"></td><td colspan="6" style="padding:16px;background:var(--surface2);text-align:center"><div class="spinner"></div></td>`;
+function onLiveRadiusChange(val) {
+  document.getElementById('live-radius-lbl').textContent = val + 'm';
+  const slider = document.getElementById('live-radius-slider');
+  updateSliderBg(slider);
 
-  // Fetch employees if not cached
-  if (!_locEmployees[locId]) {
-    const data = await api('GET', `/geofence/locations/${locId}/employees`);
-    const emps = data?.data || [];
-    // Enrich with employee_type from _allEmployees
-    _locEmployees[locId] = emps.map(e => {
-      const full = _allEmployees.find(a => a.id === e.id) || {};
-      return { ...full, ...e };
+  // Update circle on map
+  _mapCircles.forEach(c => c.setMap(null));
+  _mapCircles = [];
+  const lat = parseFloat(_selectedLoc.latitude);
+  const lng = parseFloat(_selectedLoc.longitude);
+  if (lat && lng) {
+    const c = new google.maps.Circle({
+      map: _map,
+      center: { lat, lng },
+      radius: parseInt(val),
+      strokeColor: '#1d4ed8', strokeOpacity: 0.8, strokeWeight: 2,
+      fillColor: '#1d4ed8', fillOpacity: 0.1
     });
+    _mapCircles.push(c);
   }
-
-  // Re-render sub-row
-  const loc = _allLocations.find(l => l.id === locId);
-  if (!loc) return;
-  // Replace subrow with full content
-  const tmp = document.createElement('table');
-  tmp.innerHTML = '<tbody>' + empSubRow(locId) + '</tbody>';
-  const newRow = tmp.querySelector('tr');
-  subRow.replaceWith(newRow);
-
-  // Init sliders
-  setTimeout(() => {
-    (_locEmployees[locId] || []).forEach(e => {
-      const sl = document.getElementById(`esl-${e.id}-${locId}`);
-      if (sl) updateBufSliderBg(sl);
-    });
-    const locSl = document.getElementById(`sl-${locId}`);
-    if (locSl) updateBufSliderBg(locSl);
-  }, 50);
 }
 
-function expandAll() {
-  _allLocations.forEach(l => {
-    if (!_expandedRows.has(l.id)) toggleExpand(l.id, true);
-  });
-}
-function collapseAll() {
-  [..._expandedRows].forEach(id => toggleExpand(id, true));
-}
-
-// ── Slider helpers ───────────────────────────────────────────
-function updateBufSliderBg(slider) {
+function updateSliderBg(slider) {
   if (!slider) return;
   const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
-  slider.style.setProperty('--pct', pct + '%');
   slider.style.background = `linear-gradient(90deg, var(--accent) ${pct}%, var(--border) ${pct}%)`;
 }
 
-function onSliderInput(locId, slider) {
-  const valEl = document.getElementById('sv-' + locId);
-  if (valEl) valEl.textContent = slider.value + 'm';
-  updateBufSliderBg(slider);
-}
-
-function onEmpSliderInput(empId, locId, slider) {
-  const valEl = document.getElementById(`esv-${empId}-${locId}`);
-  if (valEl) valEl.textContent = slider.value + 'm';
-  updateBufSliderBg(slider);
-}
-
-// ── Save location buffer (global for entire office) ──────────
-async function saveLocRadius(locId) {
-  const sl = document.getElementById('sl-' + locId);
-  if (!sl) return;
-  const val = parseInt(sl.value);
+async function saveRadius(locId) {
+  const val = parseInt(document.getElementById('live-radius-slider').value);
   const data = await api('PUT', `/geofence/locations/${locId}`, { radius_meters: val });
   if (data?.success) {
     toast(`Buffer updated to ${val}m`);
     const loc = _allLocations.find(l => l.id === locId);
     if (loc) loc.radius_meters = val;
     renderMapMarkers();
-  } else toast(data?.message || 'Update failed', 'error');
-}
-
-// ── Save per-employee buffer (custom_radius in employee_geofence) ──
-async function saveEmpRadius(empId, locId) {
-  const sl = document.getElementById(`esl-${empId}-${locId}`);
-  if (!sl) return;
-  const val = parseInt(sl.value);
-  // Use bulk-assign endpoint to update custom_radius for this employee+location
-  const data = await api('POST', '/geofence/bulk-assign', {
-    employee_ids: [empId],
-    office_location_id: locId,
-    is_universal: false,
-    custom_radius: val
-  });
-  if (data?.success) {
-    toast(`Employee buffer set to ${val}m`);
-    // Update local cache
-    if (_locEmployees[locId]) {
-      const emp = _locEmployees[locId].find(e => e.id === empId);
-      if (emp) emp.custom_radius = val;
-    }
   } else {
-    // Fallback: just show success since most systems don't have custom_radius per-employee
-    // The important thing is the UI demonstrates intent
-    toast(`Buffer preference saved (${val}m)`);
+    toast(data?.message || 'Update failed', 'error');
   }
 }
 
-// ── Employee rule change — show/hide state & district dropdowns inline ───────
-function onEmpRuleChange(empId, locId, sel) {
-  const rt         = sel.value;
-  const officeWrap = document.getElementById(`office-wrap-${empId}`);
-  const stateWrap  = document.getElementById(`state-wrap-${empId}`);
-  const distSel    = document.getElementById(`dist-sel-${empId}`);
-  // Show/hide office selector
-  if (officeWrap) officeWrap.style.display = rt === 'office' ? 'block' : 'none';
-  // Show state picker for state or district rules
-  if (stateWrap) stateWrap.style.display = (rt === 'state' || rt === 'district') ? 'flex' : 'none';
-  // Show district picker only for district rule
-  if (distSel) distSel.style.display = rt === 'district' ? 'block' : 'none';
-}
-
-function onStateChange(empId) {
-  const stateSel = document.getElementById(`state-sel-${empId}`);
-  const distSel  = document.getElementById(`dist-sel-${empId}`);
-  if (!stateSel || !distSel) return;
-  const state = stateSel.value;
-  distSel.innerHTML = '<option value="">— select district —</option>';
-  if (state && BR_DISTRICTS[state]) {
-    BR_DISTRICTS[state].forEach(d => {
-      const o = document.createElement('option');
-      o.value = d; o.textContent = d;
-      distSel.appendChild(o);
-    });
-  }
-}
-
-async function saveEmpRule(empId, locId) {
-  const sel      = document.getElementById(`rsel-${empId}`);
-  const stateSel = document.getElementById(`state-sel-${empId}`);
-  const distSel  = document.getElementById(`dist-sel-${empId}`);
-  if (!sel) return;
-  const ruleType = sel.value;
-  let body = { employee_id: empId, rule_type: ruleType };
-
-  if (ruleType === 'office') {
-    // Read from the office dropdown — user picks which office (Mumbai, Delhi, etc.)
-    const officeSel = document.getElementById(`office-sel-${empId}`);
-    const selectedOfficeId = officeSel ? parseInt(officeSel.value) : null;
-    if (!selectedOfficeId) { toast('Please select an office location', 'error'); return; }
-    body.office_location_id = selectedOfficeId;
-  } else if (ruleType === 'universal') {
-    body.state = null; body.district = null;
-  } else if (ruleType === 'state') {
-    const state = stateSel?.value;
-    if (!state) { toast('Please select a state', 'error'); return; }
-    body.state = state;
-  } else if (ruleType === 'district') {
-    const state = stateSel?.value;
-    const dist  = distSel?.value;
-    if (!state) { toast('Please select a state', 'error'); return; }
-    if (!dist)  { toast('Please select a district', 'error'); return; }
-    body.state    = state;
-    body.district = dist;
-  }
-
-  const r = await api('POST', '/geofence/buffer-rules', body);
-  if (r?.success) {
-    const loc = _allLocations.find(l => l.id === locId);
-    let toastMsg = 'Rule saved ✓';
-    if (ruleType === 'district') toastMsg = `✓ Moved to District: ${body.district}, ${body.state}`;
-    else if (ruleType === 'state') toastMsg = `✓ Moved to State: ${body.state}`;
-    else if (ruleType === 'universal') toastMsg = '✓ Set to Universal — punch from anywhere';
-    else if (ruleType === 'office') {
-      const officeLoc = _allLocations.find(l => l.id === body.office_location_id);
-      toastMsg = `✓ Moved to ${officeLoc?.name || 'office'} — empty locations cleaned up`;
-    }
-    toast(toastMsg);
-
-    // ── Full reload: locations, rules, employee caches ─────────────────────
-    // This ensures: old office count drops, new district/state location appears
-    _locEmployees = {};
-    const [locData, ruleData] = await Promise.all([
-      api('GET', '/geofence/locations'),
-      api('GET', '/geofence/buffer-rules')
-    ]);
-    _allLocations = locData?.data || [];
-    _allRules     = ruleData?.data || [];
-
-    // Keep the current row's location expanded if it still exists
-    const stillExpanded = new Set();
-    _expandedRows.forEach(id => { if (_allLocations.some(l => l.id === id)) stillExpanded.add(id); });
-    _expandedRows.clear();
-
-    updateStats();
-    renderLocTable();
-
-    // Re-expand rows that were open (the old office may still be expanded to show remaining staff)
-    for (const id of stillExpanded) {
-      await toggleExpand(id, true);
-    }
-
-    // Also expand the NEW location if one was auto-created
-    if (r.new_location_id && !stillExpanded.has(r.new_location_id)) {
-      await toggleExpand(r.new_location_id, true);
-    }
-  } else toast(r?.message || 'Failed', 'error');
-}
-
-async function removeAssignment(locId, empId) {
-  if (!confirm('Remove this employee from the location?')) return;
-  const data = await api('DELETE', `/geofence/${empId}/${locId}`);
+async function toggleLocActive(locId, activate) {
+  const data = await api('PUT', `/geofence/locations/${locId}`, { is_active: activate });
   if (data?.success) {
-    toast('Assignment removed');
-    delete _locEmployees[locId];
-    const locData = await api('GET', '/geofence/locations');
-    _allLocations = locData?.data || [];
-    updateStats();
-    renderLocTable();
-    // Re-open expanded row
-    if (_expandedRows.has(locId)) {
-      _expandedRows.delete(locId);
-      await toggleExpand(locId, true);
-    }
-  } else toast('Failed', 'error');
+    toast(activate ? 'Location activated' : 'Location deactivated');
+    await loadAll();
+    if (_selectedLoc) selectLocation(_selectedLoc.id);
+  } else toast(data?.message || 'Failed', 'error');
 }
 
-// ── ADD / EDIT LOCATION ──────────────────────────────────────
+// ── DELETE LOCATION ──────────────────────────────────────────
+let _deleteLocId = null;
+
+async function openDeleteLocation(locId, locName) {
+  _deleteLocId = locId;
+
+  // Check assigned employees first
+  const data = await api('GET', `/geofence/locations/${locId}/employees`);
+  if (!data?.success) { toast('Failed to check assigned employees', 'error'); return; }
+
+  const employees = data.data || [];
+
+  if (employees.length > 0) {
+    // Show blocking modal
+    document.getElementById('delete-blocked-count').textContent =
+      `${employees.length} employee${employees.length > 1 ? 's are' : ' is'} currently assigned to this location:`;
+    document.getElementById('delete-blocked-list').innerHTML = employees.map(e => {
+      const fullName = e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unknown';
+      const empCode  = e.code || e.employee_code || '';
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">
+          ${(fullName || '?')[0].toUpperCase()}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${fullName}</div>
+          <div style="font-size:11px;color:var(--muted)">${empCode}</div>
+        </div>
+      </div>`;
+    }).join('');
+    openModal('delete-blocked-modal');
+  } else {
+    // Show confirmation modal
+    document.getElementById('delete-confirm-name').textContent = locName;
+    openModal('delete-confirm-modal');
+  }
+}
+
+async function confirmHardDelete() {
+  if (!_deleteLocId) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+
+  const data = await api('DELETE', `/geofence/locations/${_deleteLocId}`);
+  btn.disabled = false;
+  btn.textContent = 'Delete Permanently';
+
+  if (data?.success) {
+    closeModal('delete-confirm-modal');
+    toast('Location permanently deleted');
+    _selectedLoc = null;
+    document.getElementById('detail-content').innerHTML =
+      '<div style="text-align:center;padding:40px 0;color:var(--muted)">Select a location to view details</div>';
+    await loadAll();
+  } else {
+    toast(data?.message || 'Delete failed', 'error');
+  }
+}
+
+// ── FETCH ASSIGNED EMPLOYEES ────────────────────────────────────
+async function fetchAssignedEmployees(locId) {
+  // Get all employees and check which are assigned to this location
+  // Use geofence/employee/:id for each, or better — filter from employee list
+  // Since API gives us assigned_count but not the list, we iterate employees
+  // Alternatively call a location-specific endpoint if available
+  // We'll use the employee geofence endpoint per location (manual join)
+  try {
+    // Filter employees who have this location assigned
+    // We need to call individual employee geofence endpoints — do it in parallel for displayed employees
+    const results = await Promise.all(
+      _allEmployees.slice(0, 60).map(async e => {
+        const r = await api('GET', `/geofence/employee/${e.id}`);
+        if (r?.data?.some(g => g.office_location_id === locId)) {
+          const match = r.data.find(g => g.office_location_id === locId);
+          return { ...e, is_universal: match?.is_universal };
+        }
+        return null;
+      })
+    );
+    return results.filter(Boolean);
+  } catch { return []; }
+}
+
+// ── ADD / EDIT LOCATION ─────────────────────────────────────────
 function openAddLocation() {
   document.getElementById('loc-edit-id').value = '';
   document.getElementById('loc-modal-title').textContent = 'Add Location';
@@ -1270,6 +999,7 @@ function openEditLocation(id) {
   if (!loc) return;
   const isGlobal = loc.radius_meters >= 10000;
   const isWFH    = loc.name.toLowerCase().includes('work from home');
+
   document.getElementById('loc-edit-id').value = id;
   document.getElementById('loc-modal-title').textContent = `Edit — ${loc.name}`;
   document.getElementById('loc-name').value = loc.name;
@@ -1288,9 +1018,8 @@ function openEditLocation(id) {
 
 function onLocTypeChange() {
   const type = document.getElementById('loc-type-sel').value;
+  const showLatLng = type === 'office' || type === 'state';
   document.getElementById('lat-lng-fields').style.display = type === 'wfh' ? 'none' : '';
-  const radiusRow = document.getElementById('loc-radius-row');
-  if (radiusRow) radiusRow.style.display = type === 'office' ? '' : 'none';
   document.getElementById('loc-global-note').style.display = type !== 'office' ? '' : 'none';
 }
 
@@ -1302,59 +1031,79 @@ async function saveLocation() {
   const lng     = parseFloat(document.getElementById('loc-lng').value) || 0;
   const radius  = type !== 'office' ? 999999 : parseInt(document.getElementById('loc-radius').value) || 500;
   const address = document.getElementById('loc-address').value.trim();
+
   if (!name) { toast('Location name required', 'error'); return; }
   if (type === 'office' && (!lat || !lng)) { toast('Latitude & longitude required for office', 'error'); return; }
-  const body = { name, location_type: type, latitude: lat, longitude: lng, radius_meters: radius, address, is_active: true };
+
+  // FIX: include location_type so backend knows office vs state/wfh zone
+  const is_active = true;
+  const body = { name, location_type: type, latitude: lat, longitude: lng, radius_meters: radius, address, is_active };
+  let data;
+
+  // Show saving indicator
   const saveBtn = document.getElementById('loc-save-btn');
-  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+  const origText = saveBtn.textContent;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
   try {
-    const data = id
-      ? await api('PUT', `/geofence/locations/${id}`, body)
-      : await api('POST', '/geofence/locations', body);
-    if (data?.success) {
-      toast(id ? 'Location updated' : 'Location added');
-      closeModal('loc-modal');
-      await loadAll();
-    } else toast(data?.message || 'Failed', 'error');
-  } finally { saveBtn.disabled = false; saveBtn.textContent = id ? 'Save Changes' : 'Add Location'; }
+    if (id) {
+      data = await api('PUT', `/geofence/locations/${id}`, body);
+    } else {
+      data = await api('POST', '/geofence/locations', body);
+    }
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = origText;
+  }
+
+  if (data?.success) {
+    toast(id ? 'Location updated' : 'Location added');
+    closeModal('loc-modal');
+    await loadAll();
+    if (_selectedLoc) selectLocation(_selectedLoc.id);
+  } else {
+    toast(data?.message || 'Failed', 'error');
+  }
 }
 
-function updateSliderBg(slider) {
-  if (!slider) return;
-  const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
-  slider.style.background = `linear-gradient(90deg, var(--accent) ${pct}%, var(--border) ${pct}%)`;
-}
+// ── ASSIGN EMPLOYEES MODAL ──────────────────────────────────────
+let _assignLocName = '';
 
-// ── ASSIGN EMPLOYEES MODAL ───────────────────────────────────
 async function openAssignModal(locId) {
   _assignLocId = locId;
   const loc = _allLocations.find(l => l.id === locId);
-  document.getElementById('assign-modal-title').textContent = `👥 Assign Employees — ${loc?.name || ''}`;
+  _assignLocName = loc?.name || '';
+  document.getElementById('assign-modal-title').textContent = `👤 Assign Employees — ${_assignLocName}`;
   document.getElementById('assign-search').value = '';
 
-  // Get currently assigned
-  const data = await api('GET', `/geofence/locations/${locId}/employees`);
-  const assigned = data?.data || [];
+  // Get currently assigned employees
+  const assigned = await fetchAssignedEmployees(locId);
   const assignedIds = new Set(assigned.map(e => e.id));
   const isGlobalLoc = (loc?.radius_meters || 0) >= 10000;
 
   document.getElementById('assign-emp-list').innerHTML = _allEmployees.map(e => {
-    const isChecked   = assignedIds.has(e.id);
+    const isChecked = assignedIds.has(e.id);
     const isUniversal = assigned.find(a => a.id === e.id)?.is_universal ?? isGlobalLoc;
-    return `<div class="asgn-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
+    return `<div class="emp-assign-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
       <div style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="acheck-${e.id}" ${isChecked?'checked':''} onchange="updateAssignCount()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
-        <div class="avatar" style="width:26px;height:26px;font-size:10px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
+        <div class="avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
         <div>
           <div style="font-size:12.5px;font-weight:600">${e.first_name} ${e.last_name}</div>
           <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.city||'—'}</div>
         </div>
       </div>
-      <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer">
-        <input type="checkbox" id="auniv-${e.id}" ${isUniversal?'checked':''} style="accent-color:var(--accent)"> Universal
-      </label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="auniv-${e.id}" ${isUniversal?'checked':''} style="accent-color:var(--accent)">
+          Universal
+        </label>
+        <span style="font-size:10px;background:var(--surface2);padding:2px 7px;border-radius:20px;color:var(--muted)">${e.city||'—'}</span>
+      </div>
     </div>`;
   }).join('');
+
   updateAssignCount();
   openModal('assign-modal');
 }
@@ -1363,72 +1112,90 @@ function updateAssignCount() {
   const checked = document.querySelectorAll('[id^="acheck-"]:checked').length;
   document.getElementById('assign-sel-count').textContent = `${checked} selected`;
 }
+
 function filterAssignList() {
   const q = document.getElementById('assign-search').value.toLowerCase();
   document.querySelectorAll('[id^="arow-"]').forEach(row => {
     row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none';
   });
 }
-function selectAllAssign() { document.querySelectorAll('[id^="acheck-"]').forEach(cb => cb.checked = true); updateAssignCount(); }
-function clearAllAssign()  { document.querySelectorAll('[id^="acheck-"]').forEach(cb => cb.checked = false); updateAssignCount(); }
+
+function selectAllAssign() {
+  document.querySelectorAll('[id^="acheck-"]').forEach(cb => cb.checked = true);
+  updateAssignCount();
+}
+function clearAllAssign() {
+  document.querySelectorAll('[id^="acheck-"]').forEach(cb => cb.checked = false);
+  updateAssignCount();
+}
 
 async function saveAssignments() {
   const checked = [], unchecked = [];
   _allEmployees.forEach(e => {
     const cb = document.getElementById(`acheck-${e.id}`);
     if (!cb) return;
-    if (cb.checked) checked.push(e.id); else unchecked.push(e.id);
+    if (cb.checked) checked.push(e.id);
+    else unchecked.push(e.id);
   });
+
   const isUniversalFor = {};
   _allEmployees.forEach(e => {
     const ucb = document.getElementById(`auniv-${e.id}`);
     if (ucb) isUniversalFor[e.id] = ucb.checked;
   });
+
   let ok = true;
+
+  // Assign checked employees
   if (checked.length) {
-    const univIds   = checked.filter(id => isUniversalFor[id]);
-    const strictIds = checked.filter(id => !isUniversalFor[id]);
-    if (univIds.length)   { const r = await api('POST', '/geofence/bulk-assign', { employee_ids: univIds,   office_location_id: _assignLocId, is_universal: true  }); if (!r?.success) ok = false; }
-    if (strictIds.length) { const r = await api('POST', '/geofence/bulk-assign', { employee_ids: strictIds, office_location_id: _assignLocId, is_universal: false }); if (!r?.success) ok = false; }
+    // Group by is_universal value
+    const univIds    = checked.filter(id => isUniversalFor[id]);
+    const strictIds  = checked.filter(id => !isUniversalFor[id]);
+
+    if (univIds.length) {
+      const r = await api('POST', '/geofence/bulk-assign', { employee_ids: univIds, office_location_id: _assignLocId, is_universal: true });
+      if (!r?.success) ok = false;
+    }
+    if (strictIds.length) {
+      const r = await api('POST', '/geofence/bulk-assign', { employee_ids: strictIds, office_location_id: _assignLocId, is_universal: false });
+      if (!r?.success) ok = false;
+    }
   }
-  for (const id of unchecked) { await api('DELETE', `/geofence/${id}/${_assignLocId}`); }
+
+  // Remove unchecked employees
+  for (const id of unchecked) {
+    await api('DELETE', `/geofence/${id}/${_assignLocId}`);
+  }
+
   if (ok) {
-    toast(`Assignments saved`);
+    toast(`Assignments saved for ${checked.length} employees`);
     closeModal('assign-modal');
-    delete _locEmployees[_assignLocId];
     await loadAll();
-    if (_expandedRows.has(_assignLocId)) { _expandedRows.delete(_assignLocId); await toggleExpand(_assignLocId, true); }
-  } else toast('Some assignments failed', 'error');
-}
-
-// ── DELETE LOCATION ──────────────────────────────────────────
-async function openDeleteLocation(locId, locName) {
-  _deleteLocId = locId;
-  const data = await api('GET', `/geofence/locations/${locId}/employees`);
-  const emps = data?.data || [];
-  if (emps.length) {
-    toast(`Cannot delete — ${emps.length} employee(s) still assigned. Remove them first.`, 'error');
-    return;
+    if (_selectedLoc) renderDetailPanel(_selectedLoc);
+    // Refresh stats
+    const locData = await api('GET', '/geofence/locations');
+    _allLocations = locData?.data || [];
+    renderLocList();
+    updateStats();
+  } else {
+    toast('Some assignments failed', 'error');
   }
-  document.getElementById('delete-confirm-name').textContent = locName;
-  openModal('delete-confirm-modal');
 }
 
-async function confirmHardDelete() {
-  if (!_deleteLocId) return;
-  const btn = document.getElementById('delete-confirm-btn');
-  btn.disabled = true; btn.textContent = 'Deleting…';
-  const data = await api('DELETE', `/geofence/locations/${_deleteLocId}`);
-  btn.disabled = false; btn.textContent = 'Delete Permanently';
+async function removeAssignment(locId, empId) {
+  if (!confirm('Remove this employee from the location?')) return;
+  const data = await api('DELETE', `/geofence/${empId}/${locId}`);
   if (data?.success) {
-    closeModal('delete-confirm-modal');
-    toast('Location permanently deleted');
-    _expandedRows.delete(_deleteLocId);
-    await loadAll();
-  } else toast(data?.message || 'Delete failed', 'error');
+    toast('Assignment removed');
+    renderDetailPanel(_selectedLoc);
+    const locData = await api('GET', '/geofence/locations');
+    _allLocations = locData?.data || [];
+    renderLocList();
+    updateStats();
+  } else toast('Failed', 'error');
 }
 
-// ── NOTIFICATIONS ────────────────────────────────────────────
+// ── NOTIFICATIONS ───────────────────────────────────────────────
 async function openNotifications() {
   document.getElementById('notif-panel').style.right = '0';
   document.getElementById('notif-overlay').style.display = 'block';
@@ -1443,10 +1210,12 @@ async function openNotifications() {
       </div>`).join('')
     : '<div class="empty-state"><div class="empty-icon">🔔</div><p>No notifications</p></div>';
 }
+
 function closeNotifications() {
   document.getElementById('notif-panel').style.right = '-400px';
   document.getElementById('notif-overlay').style.display = 'none';
 }
+
 async function markAllRead() {
   await api('PATCH', '/notifications/read-all');
   toast('All notifications marked read');
@@ -1455,285 +1224,282 @@ async function markAllRead() {
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-</script>
+// ══════════════════════════════════════════════════════════════════
+//  BUFFER RULES — frontend logic
+// ══════════════════════════════════════════════════════════════════
+const BR_STATES = ["ANDAMAN & NICOBAR", "ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHANDIGARH", "CHHATTISGARH", "DADRA,NAGAR HAVELI,DAMAN & DIU", "DELHI", "GOA", "GUJARAT", "HARYANA", "HIMACHAL PRADESH", "JAMMU & KASHMIR", "JHARKHAND", "KARNATAKA", "KERALA", "LADAKH", "LAKSHADWEEP", "MADHYA PRADESH", "MAHARASHTRA", "MANIPUR", "MEGHALAYA", "MIZORAM", "NAGALAND", "ODISHA", "PUDUCHERRY", "PUNJAB", "RAJASTHAN", "SIKKIM", "TAMIL NADU", "TELANGANA", "TRIPURA", "UTTAR PRADESH", "UTTARAKHAND", "WEST BENGAL"];
+const BR_DISTRICTS = {"ANDAMAN & NICOBAR": ["Nicobars", "North And Middle Andaman", "South Andamans"], "ANDHRA PRADESH": ["Alluri Sitharama Raju", "Anakapalli", "Anantapur", "Annamayya", "Bapatla", "Chittoor", "East Godavari", "Eluru", "Guntur", "Kakinada", "Konaseema", "Krishna", "Kurnool", "Nandyal", "Ntr", "Palnadu", "Parvathipuram Manyam", "Prakasam", "Spsr Nellore", "Sri Sathya Sai", "Srikakulam", "Tirupati", "Visakhapatanam", "Vizianagaram", "West Godavari", "Y.S.R."], "ARUNACHAL PRADESH": ["Anjaw", "Changlang", "Dibang Valley", "East Kameng", "East Siang", "Kamle", "Kra Daadi", "Kurung Kumey", "Leparada", "Lohit", "Longding", "Lower Dibang Valley", "Lower Siang", "Lower Subansiri", "Namsai", "Pakke Kessang", "Papum Pare", "Shi Yomi", "Siang", "Tawang", "Tirap", "Upper Siang", "Upper Subansiri", "West Kameng", "West Siang"], "ASSAM": ["Bajali", "Baksa", "Barpeta", "Biswanath", "Bongaigaon", "Cachar", "Charaideo", "Chirang", "Darrang", "Dhemaji", "Dhubri", "Dibrugarh", "Dima Hasao", "Goalpara", "Golaghat", "Hailakandi", "Hojai", "Jorhat", "Kamrup", "Kamrup Metro", "Karbi Anglong", "Karimganj", "Kokrajhar", "Lakhimpur", "Majuli", "Marigaon", "Nagaon", "Nalbari", "Sivasagar", "Sonitpur", "South Salmara Mancachar", "Tamulpur", "Tinsukia", "Udalguri", "West Karbi Anglong"], "BIHAR": ["Araria", "Arwal", "Aurangabad", "Banka", "Begusarai", "Bhagalpur", "Bhojpur", "Buxar", "Darbhanga", "Gaya", "Gopalganj", "Jamui", "Jehanabad", "Kaimur (Bhabua)", "Katihar", "Khagaria", "Kishanganj", "Lakhisarai", "Madhepura", "Madhubani", "Munger", "Muzaffarpur", "Nalanda", "Nawada", "Pashchim Champaran", "Patna", "Purbi Champaran", "Purnia", "Rohtas", "Saharsa", "Samastipur", "Saran", "Sheikhpura", "Sheohar", "Sitamarhi", "Siwan", "Supaul", "Vaishali"], "CHANDIGARH": ["Chandigarh"], "CHHATTISGARH": ["Balod", "Baloda Bazar", "Balrampur", "Bastar", "Bemetara", "Bijapur", "Bilaspur", "Dantewada", "Dhamtari", "Durg", "Gariyaband", "Gaurella Pendra Marwahi", "Janjgir-Champa", "Jashpur", "Kabirdham", "Kanker", "Khairgarh Chhuikhadan Gandai", "Kondagaon", "Korba", "Korea", "Mahasamund", "Manendragarh Chirimiri Bharatpur", "Mohla Manpur Ambagarh Chouki", "Mungeli", "Narayanpur", "Raigarh", "Raipur", "Rajnandgaon", "Sakti", "Sarangarh Bilaigarh", "Sukma", "Surajpur", "Surguja"], "DADRA,NAGAR HAVELI,DAMAN & DIU": ["Dadra And Nagar Haveli", "Daman", "Diu"], "DELHI": ["Central", "East", "New Delhi", "North", "North East", "North West", "Shahdara", "South", "South East", "South West", "West"], "GOA": ["North Goa", "South Goa"], "GUJARAT": ["Ahmadabad", "Amreli", "Anand", "Arvalli", "Banas Kantha", "Bharuch", "Bhavnagar", "Botad", "Chhotaudepur", "Dang", "Devbhumi Dwarka", "Dohad", "Gandhinagar", "Gir Somnath", "Jamnagar", "Junagadh", "Kachchh", "Kheda", "Mahesana", "Mahisagar", "Morbi", "Narmada", "Navsari", "Panch Mahals", "Patan", "Porbandar", "Rajkot", "Sabar Kantha", "Surat", "Surendranagar", "Tapi", "Vadodara", "Valsad"], "HARYANA": ["Ambala", "Bhiwani", "Charki Dadri", "Faridabad", "Fatehabad", "Gurugram", "Hisar", "Jhajjar", "Jind", "Kaithal", "Karnal", "Kurukshetra", "Mahendragarh", "Nuh", "Palwal", "Panchkula", "Panipat", "Rewari", "Rohtak", "Sirsa", "Sonipat", "Yamunanagar"], "HIMACHAL PRADESH": ["Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu", "Lahul And Spiti", "Mandi", "Shimla", "Sirmaur", "Solan", "Una"], "JAMMU & KASHMIR": ["Anantnag", "Bandipora", "Baramulla", "Budgam", "Doda", "Ganderbal", "Jammu", "Kathua", "Kishtwar", "Kulgam", "Kupwara", "Mirpur", "Muzaffarabad", "Poonch", "Pulwama", "Rajouri", "Ramban", "Reasi", "Samba", "Shopian", "Srinagar", "Udhampur"], "JHARKHAND": ["Bokaro", "Chatra", "Deoghar", "Dhanbad", "Dumka", "East Singhbum", "Garhwa", "Giridih", "Godda", "Gumla", "Hazaribagh", "Jamtara", "Khunti", "Koderma", "Latehar", "Lohardaga", "Pakur", "Palamu", "Ramgarh", "Ranchi", "Sahebganj", "Saraikela Kharsawan", "Simdega", "West Singhbhum"], "KARNATAKA": ["Bagalkote", "Ballari", "Belagavi", "Bengaluru Rural", "Bengaluru Urban", "Bidar", "Chamarajanagara", "Chikkaballapura", "Chikkamagaluru", "Chitradurga", "Dakshina Kannada", "Davangere", "Dharwad", "Gadag", "Hassan", "Haveri", "Kalaburagi", "Kodagu", "Kolar", "Koppal", "Mandya", "Mysuru", "Raichur", "Ramanagara", "Shivamogga", "Tumakuru", "Udupi", "Uttara Kannada", "Vijayanagar", "Vijayapura", "Yadgir"], "KERALA": ["Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod", "Kollam", "Kottayam", "Kozhikode", "Malappuram", "Palakkad", "Pathanamthitta", "Thiruvananthapuram", "Thrissur", "Wayanad"], "LADAKH": ["Kargil", "Leh Ladakh"], "LAKSHADWEEP": ["Lakshadweep District"], "MADHYA PRADESH": ["Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani", "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara", "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "East Nimar", "Guna", "Gwalior", "Harda", "Indore", "Jabalpur", "Jhabua", "Katni", "Khargone", "Mandla", "Mandsaur", "Morena", "Narmadapuram", "Narsinghpur", "Neemuch", "Niwari", "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa", "Sagar", "Satna", "Sehore", "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri", "Sidhi", "Singrauli", "Tikamgarh", "Ujjain", "Umaria", "Vidisha"], "MAHARASHTRA": ["Ahmednagar", "Akola", "Amravati", "Aurangabad", "Beed", "Bhandara", "Buldhana", "Chandrapur", "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon", "Jalna", "Kolhapur", "Latur", "Mumbai", "Mumbai Suburban", "Nagpur", "Nanded", "Nandurbar", "Nashik", "Osmanabad", "Palghar", "Parbhani", "Pune", "Raigad", "Ratnagiri", "Sangli", "Satara", "Sindhudurg", "Solapur", "Thane", "Wardha", "Washim", "Yavatmal"], "MANIPUR": ["Bishnupur", "Chandel", "Churachandpur", "Imphal East", "Imphal West", "Jiribam", "Kakching", "Kamjong", "Kangpokpi", "Noney", "Pherzawl", "Senapati", "Tamenglong", "Tengnoupal", "Thoubal", "Ukhrul"], "MEGHALAYA": ["East Garo Hills", "East Jaintia Hills", "East Khasi Hills", "Eastern West Khasi Hills", "North Garo Hills", "Ri Bhoi", "South Garo Hills", "South West Garo Hills", "South West Khasi Hills", "West Garo Hills", "West Jaintia Hills", "West Khasi Hills"], "MIZORAM": ["Aizawl", "Champhai", "Hnahthial", "Khawzawl", "Kolasib", "Lawngtlai", "Lunglei", "Mamit", "Saiha", "Saitual", "Serchhip"], "NAGALAND": ["Chumoukedima", "Dimapur", "Kiphire", "Kohima", "Longleng", "Mokokchung", "Mon", "Niuland", "Noklak", "Peren", "Phek", "Shamator", "Tseminyu", "Tuensang", "Wokha", "Zunheboto"], "ODISHA": ["Anugul", "Balangir", "Baleshwar", "Bargarh", "Bhadrak", "Boudh", "Cuttack", "Deogarh", "Dhenkanal", "Gajapati", "Ganjam", "Jagatsinghapur", "Jajapur", "Jharsuguda", "Kalahandi", "Kandhamal", "Kendrapara", "Kendujhar", "Khordha", "Koraput", "Malkangiri", "Mayurbhanj", "Nabarangpur", "Nayagarh", "Nuapada", "Puri", "Rayagada", "Sambalpur", "Sonepur", "Sundargarh"], "PUDUCHERRY": ["Karaikal", "Mahe", "Pondicherry", "Yanam"], "PUNJAB": ["Amritsar", "Barnala", "Bathinda", "Faridkot", "Fatehgarh Sahib", "Fazilka", "Ferozepur", "Gurdaspur", "Hoshiarpur", "Jalandhar", "Kapurthala", "Ludhiana", "Malerkotla", "Mansa", "Moga", "Pathankot", "Patiala", "Rupnagar", "S.A.S Nagar", "Sangrur", "Shahid Bhagat Singh Nagar", "Sri Muktsar Sahib", "Tarn Taran"], "RAJASTHAN": ["Ajmer", "Alwar", "Banswara", "Baran", "Barmer", "Bharatpur", "Bhilwara", "Bikaner", "Bundi", "Chittorgarh", "Churu", "Dausa", "Dholpur", "Dungarpur", "Ganganagar", "Hanumangarh", "Jaipur", "Jaisalmer", "Jalore", "Jhalawar", "Jhunjhunu", "Jodhpur", "Karauli", "Kota", "Nagaur", "Pali", "Pratapgarh", "Rajsamand", "Sawai Madhopur", "Sikar", "Sirohi", "Tonk", "Udaipur"], "SIKKIM": ["Gangtok", "Gyalshing", "Mangan", "Namchi", "Pakyong", "Soreng"], "TAMIL NADU": ["Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri", "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", "Kanniyakumari", "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam", "Namakkal", "Perambalur", "Pudukkottai", "Ramanathapuram", "Ranipet", "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "The Nilgiris", "Theni", "Thiruvallur", "Thiruvarur", "Tiruchirappalli", "Tirunelveli", "Tirupathur", "Tiruppur", "Tiruvannamalai", "Tuticorin", "Vellore", "Villupuram", "Virudhunagar"], "TELANGANA": ["Adilabad", "Bhadradri Kothagudem", "Hanumakonda", "Hyderabad", "Jagitial", "Jangoan", "Jayashankar Bhupalapally", "Jogulamba Gadwal", "Kamareddy", "Karimnagar", "Khammam", "Kumuram Bheem Asifabad", "Mahabubabad", "Mahabubnagar", "Mancherial", "Medak", "Medchal Malkajgiri", "Mulugu", "Nagarkurnool", "Nalgonda", "Narayanpet", "Nirmal", "Nizamabad", "Peddapalli", "Rajanna Sircilla", "Ranga Reddy", "Sangareddy", "Siddipet", "Suryapet", "Vikarabad", "Wanaparthy", "Warangal", "Yadadri Bhuvanagiri"], "TRIPURA": ["Dhalai", "Gomati", "Khowai", "North Tripura", "Sepahijala", "South Tripura", "Unakoti", "West Tripura"], "UTTAR PRADESH": ["Agra", "Aligarh", "Ambedkar Nagar", "Amethi", "Amroha", "Auraiya", "Ayodhya", "Azamgarh", "Baghpat", "Bahraich", "Ballia", "Balrampur", "Banda", "Barabanki", "Bareilly", "Basti", "Bhadohi", "Bijnor", "Budaun", "Bulandshahr", "Chandauli", "Chitrakoot", "Deoria", "Etah", "Etawah", "Farrukhabad", "Fatehpur", "Firozabad", "Gautam Buddha Nagar", "Ghaziabad", "Ghazipur", "Gonda", "Gorakhpur", "Hamirpur", "Hapur", "Hardoi", "Hathras", "Jalaun", "Jaunpur", "Jhansi", "Kannauj", "Kanpur Dehat", "Kanpur Nagar", "Kasganj", "Kaushambi", "Kheri", "Kushi Nagar", "Lalitpur", "Lucknow", "Maharajganj", "Mahoba", "Mainpuri", "Mathura", "Mau", "Meerut", "Mirzapur", "Moradabad", "Muzaffarnagar", "Pilibhit", "Pratapgarh", "Prayagraj", "Rae Bareli", "Rampur", "Saharanpur", "Sambhal", "Sant Kabeer Nagar", "Shahjahanpur", "Shamli", "Shravasti", "Siddharth Nagar", "Sitapur", "Sonbhadra", "Sultanpur", "Unnao", "Varanasi"], "UTTARAKHAND": ["Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar", "Nainital", "Pauri Garhwal", "Pithoragarh", "Rudra Prayag", "Tehri Garhwal", "Udam Singh Nagar", "Uttar Kashi"], "WEST BENGAL": ["24 Paraganas North", "24 Paraganas South", "Alipurduar", "Bankura", "Birbhum", "Coochbehar", "Darjeeling", "Dinajpur Dakshin", "Dinajpur Uttar", "Hooghly", "Howrah", "Jalpaiguri", "Jhargram", "Kalimpong", "Kolkata", "Maldah", "Medinipur East", "Medinipur West", "Murshidabad", "Nadia", "Paschim Bardhaman", "Purba Bardhaman", "Purulia"]};
 
-<script>
-// ── REDESIGNED RENDER FUNCTIONS ─────────────────────────────
-// Override locRow and empSubRow with premium styled versions
+let _brAllEmps   = [];
+let _brAllRules  = [];
+let _brRuleType  = '';
 
-function locRow(l) {
-  const isGlobal = l.radius_meters >= 10000;
-  const isWFH    = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
-  const typeBadge = isWFH
-    ? `<span class="gbadge gbadge-wfh">🏠 WFH</span>`
-    : isGlobal
-      ? `<span class="gbadge gbadge-global">🌍 Global</span>`
-      : `<span class="gbadge gbadge-office">🏢 Office</span>`;
-  const statusBadge = l.is_active
-    ? `<span class="gbadge gbadge-active">● Active</span>`
-    : `<span class="gbadge gbadge-inactive">Inactive</span>`;
+async function initBufferRules() {
+  // Populate state selects
+  const stateSel = document.getElementById('br-state-sel');
+  BR_STATES.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    stateSel.appendChild(o);
+  });
 
-  const bufferInfo = isGlobal
-    ? `<div class="g-boundary-tag">🌐 Universal access</div>`
-    : `<div style="display:flex;align-items:center;gap:8px">
-        <input type="range" class="g-slider" id="sl-${l.id}"
-          min="50" max="5000" step="50" value="${l.radius_meters}" style="width:110px"
-          oninput="onSliderInput(${l.id},this)">
-        <span class="g-sval" id="sv-${l.id}">${l.radius_meters}m</span>
-        <button class="g-save-btn" onclick="saveLocRadius(${l.id})">Save</button>
-      </div>`;
+  // Populate office select — show all strict office locations (radius < 10000m)
+  brPopulateOffices();
 
-  const isExpanded = _expandedRows.has(l.id);
-  const locJson = JSON.stringify(l).replace(/"/g,'&quot;');
-
-  return `<tr id="lrow-${l.id}" class="loc-row">
-    <td style="text-align:center">
-      <button class="g-expand ${isExpanded?'open':''}" id="ebtn-${l.id}" onclick="toggleExpand(${l.id},true)" title="Show employees">▶</button>
-    </td>
-    <td>
-      <div class="g-loc-name">${l.name}</div>
-      ${l.address ? `<div class="g-loc-addr">${l.address}</div>` : ''}
-    </td>
-    <td>${typeBadge}</td>
-    <td>${bufferInfo}</td>
-    <td>
-      <div class="g-emp-chip">
-        <div class="g-emp-chip-dot"></div>
-        ${l.assigned_count || 0} employees
-      </div>
-    </td>
-    <td>${statusBadge}</td>
-    <td style="text-align:center">
-      <div style="display:inline-flex;gap:5px;align-items:center">
-        <button class="g-icon-btn" onclick="panToLocation(${locJson})" title="View on map">🗺️</button>
-        <button class="g-icon-btn" onclick="openAssignModal(${l.id})" title="Manage employees">👥</button>
-        <button class="g-icon-btn" onclick="openEditLocation(${l.id})" title="Edit">✏️</button>
-        <button class="g-icon-btn danger" onclick="openDeleteLocation(${l.id},'${l.name.replace(/'/g,"\'")}')" title="Delete">🗑️</button>
-      </div>
-    </td>
-  </tr>
-  ${isExpanded ? empSubRow(l.id) : `<tr id="sub-${l.id}" style="display:none"><td colspan="7"></td></tr>`}`;
+  await loadAllRules();
 }
 
-function empSubRow(locId) {
-  const emps = _locEmployees[locId];
-  const loc  = _allLocations.find(l => l.id == locId);
-  const isGlobalLoc = loc && loc.radius_meters >= 10000;
-  const locName = loc?.name || '';
-  const isWFHLoc = locName.toLowerCase().includes('work from home');
-
-  if (!emps) {
-    return `<tr id="sub-${locId}" class="g-sub-panel">
-      <td class="g-accent-bar"></td>
-      <td colspan="6" style="padding:20px;text-align:center;background:#f6faf7"><div class="spinner"></div></td>
-    </tr>`;
+function brPopulateOffices() {
+  const offSel = document.getElementById('br-office-sel');
+  const prevVal = offSel.value;
+  // Keep only the default placeholder option
+  offSel.innerHTML = '<option value="">— select office —</option>';
+  // Show all active strict-office locations (radius < 10000m, not WFH)
+  const offices = (_allLocations || []).filter(l =>
+    l.is_active &&
+    l.radius_meters < 10000 &&
+    !l.name.toLowerCase().includes('work from home') &&
+    !l.name.toLowerCase().includes('wfh')
+  );
+  if (offices.length === 0) {
+    const o = document.createElement('option');
+    o.disabled = true;
+    o.textContent = 'No office locations found';
+    offSel.appendChild(o);
+  } else {
+    offices.forEach(l => {
+      const o = document.createElement('option');
+      o.value = l.id;
+      o.textContent = l.name;
+      offSel.appendChild(o);
+    });
+    // Restore previous selection if still valid
+    if (prevVal) offSel.value = prevVal;
   }
-  if (!emps.length) {
-    return `<tr id="sub-${locId}" class="g-sub-panel">
-      <td class="g-accent-bar" style="background:#f6faf7"></td>
-      <td colspan="6" style="background:#f6faf7;padding:16px">
-        <div class="g-empty">No employees assigned. <a href="#" onclick="openAssignModal(${locId});return false" style="color:var(--g-green);font-weight:600">Add employees →</a></div>
-      </td>
-    </tr>`;
-  }
+}
 
-  const rows = emps.map(e => {
-    const rule     = _allRules.find(r => r.id == e.id);
-    const rt       = rule?.rule_type || '';
-    const boundary = rt === 'district' ? `${rule.district}, ${rule.state}`
-                   : rt === 'state'    ? rule.state
-                   : rt === 'office'   ? 'Office radius'
-                   : rt === 'universal'? 'Anywhere' : '—';
+async function loadAllRules() {
+  const [empData, ruleData] = await Promise.all([
+    api('GET', '/employees'),
+    api('GET', '/geofence/buffer-rules')
+  ]);
+  _brAllEmps  = empData?.data  || [];
+  _brAllRules = ruleData?.data || [];
+  brRenderTable(_brAllRules);
+}
 
-    const etBadge = e.employee_type === 'onsite'  ? `<span class="gbadge gbadge-onsite">Onsite</span>`
-                  : e.employee_type === 'offsite' ? `<span class="gbadge gbadge-offsite">Offsite</span>`
-                  : e.employee_type === 'wfh'     ? `<span class="gbadge gbadge-univ">WFH</span>`
-                  : `<span class="gbadge gbadge-none">—</span>`;
+// ── Employee search dropdown ──────────────────────────────────────
+function brFilterEmps(q) {
+  const dd = document.getElementById('br-emp-dropdown');
+  if (!q || q.length < 1) { dd.style.display = 'none'; return; }
+  const matches = _brAllEmps.filter(e =>
+    `${e.first_name} ${e.last_name}`.toLowerCase().includes(q.toLowerCase()) ||
+    e.employee_code.toLowerCase().includes(q.toLowerCase())
+  ).slice(0, 8);
+  if (!matches.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = matches.map(e => `
+    <div class="br-emp-row" onclick="brSelectEmp(${e.id},'${e.first_name} ${e.last_name} (${e.employee_code})')">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-l);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">
+        ${(e.first_name[0]||(e.last_name||' ')[0]||'?').toUpperCase()}
+      </div>
+      <div>
+        <div style="font-weight:600">${e.first_name} ${e.last_name}</div>
+        <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.role}</div>
+      </div>
+    </div>`).join('');
+  dd.style.display = 'block';
+}
 
-    const ruleBadge = rt === 'office'    ? `<span class="gbadge gbadge-office">Office</span>`
-                    : rt === 'district'  ? `<span class="gbadge gbadge-district">District</span>`
-                    : rt === 'state'     ? `<span class="gbadge gbadge-state">State</span>`
-                    : rt === 'universal' ? `<span class="gbadge gbadge-univ">Universal</span>`
-                    : `<span class="gbadge gbadge-none">Not Set</span>`;
+function brSelectEmp(id, label) {
+  document.getElementById('br-emp-id').value = id;
+  document.getElementById('br-emp-search').value = '';
+  document.getElementById('br-emp-dropdown').style.display = 'none';
+  const sel = document.getElementById('br-emp-selected');
+  document.getElementById('br-emp-selected-name').textContent = label;
+  sel.style.display = 'flex';
 
-    // Buffer / Boundary cell
-    let bufCell;
-    if (!isGlobalLoc) {
-      const bval = e.custom_radius || loc?.radius_meters || 300;
-      bufCell = `<div style="display:flex;align-items:center;gap:6px">
-        <input type="range" class="g-slider" id="esl-${e.id}-${locId}"
-          min="50" max="5000" step="50" value="${bval}" style="width:110px"
-          oninput="onEmpSliderInput(${e.id},${locId},this)">
-        <span class="g-sval" id="esv-${e.id}-${locId}">${bval}m</span>
-        <button class="g-save-btn" onclick="saveEmpRadius(${e.id},${locId})">Save</button>
-      </div>`;
-    } else if (isWFHLoc || rt === 'universal') {
-      bufCell = `<span class="gbadge gbadge-univ">🌍 Anywhere</span>`;
-    } else if (rt === 'district' && rule?.district && rule?.state) {
-      bufCell = `<div><div class="g-boundary-tag">📍 ${rule.district}</div><div class="g-boundary-sub">${rule.state}</div></div>`;
-    } else if (rt === 'state' && rule?.state) {
-      bufCell = `<div><div class="g-boundary-tag">🗺️ ${rule.state}</div><div class="g-boundary-sub">State boundary</div></div>`;
-    } else {
-      const sn = locName.replace(/^state\s*[-–]\s*/i,'').replace(/^district\s*[-–]\s*/i,'').split(',')[0].trim();
-      bufCell = `<div><div class="g-boundary-tag">🗺️ ${sn}</div><div class="g-boundary-sub">State boundary</div></div>`;
+  // Load existing rule for this employee
+  const existing = _brAllRules.find(r => r.id == id);
+  if (existing && existing.rule_type) {
+    brSetRuleType(existing.rule_type);
+    document.querySelector(`input[name="br-rule"][value="${existing.rule_type}"]`).checked = true;
+    if (existing.state) {
+      document.getElementById('br-state-sel').value = existing.state;
+      brStateChanged();
     }
+    if (existing.district) {
+      document.getElementById('br-district-sel').value = existing.district;
+    }
+  }
+}
 
-    return `<tr>
-      <td></td>
-      <td>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="g-avatar">${e.first_name?.[0]||'?'}</div>
-          <div>
-            <div style="font-weight:600;font-size:12.5px;color:var(--g-slate)">${e.first_name} ${e.last_name}</div>
-            <div style="font-size:10.5px;color:var(--g-muted-l)">${e.employee_code}</div>
-          </div>
-        </div>
+function brClearEmp() {
+  document.getElementById('br-emp-id').value = '';
+  document.getElementById('br-emp-search').value = '';
+  document.getElementById('br-emp-selected').style.display = 'none';
+  brReset();
+}
+
+function brSetRuleType(type) {
+  _brRuleType = type;
+  document.getElementById('br-office-group').style.display   = type === 'office'   ? '' : 'none';
+  document.getElementById('br-state-group').style.display    = (type === 'state' || type === 'district') ? '' : 'none';
+  document.getElementById('br-district-group').style.display = type === 'district' ? '' : 'none';
+}
+
+function brStateChanged() {
+  const state = document.getElementById('br-state-sel').value;
+  const distSel = document.getElementById('br-district-sel');
+  distSel.innerHTML = '<option value="">— select district —</option>';
+  if (!state || !BR_DISTRICTS[state]) return;
+  BR_DISTRICTS[state].forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    distSel.appendChild(o);
+  });
+}
+
+function brReset() {
+  _brRuleType = '';
+  document.querySelectorAll('input[name="br-rule"]').forEach(r => r.checked = false);
+  ['br-office-group','br-state-group','br-district-group'].forEach(id =>
+    document.getElementById(id).style.display = 'none'
+  );
+  document.getElementById('br-state-sel').value = '';
+  document.getElementById('br-district-sel').innerHTML = '<option value="">— select district —</option>';
+  document.getElementById('br-office-sel').value = '';
+  brHideMsg();
+}
+
+async function brSave() {
+  const empId = document.getElementById('br-emp-id').value;
+  if (!empId) return brShowMsg('Select an employee first', 'error');
+  if (!_brRuleType) return brShowMsg('Select a rule type', 'error');
+
+  const body = { employee_id: parseInt(empId), rule_type: _brRuleType };
+
+  if (_brRuleType === 'state') {
+    body.state = document.getElementById('br-state-sel').value;
+    if (!body.state) return brShowMsg('Select a state', 'error');
+  }
+  if (_brRuleType === 'district') {
+    body.state    = document.getElementById('br-state-sel').value;
+    body.district = document.getElementById('br-district-sel').value;
+    if (!body.state)    return brShowMsg('Select a state', 'error');
+    if (!body.district) return brShowMsg('Select a district', 'error');
+  }
+  if (_brRuleType === 'office') {
+    const offId = document.getElementById('br-office-sel').value;
+    if (!offId) return brShowMsg('Select an office location', 'error');
+    // Also update employee_geofence to point to this office
+    await api('POST', '/geofence/assign', {
+      employee_id: parseInt(empId),
+      office_location_id: parseInt(offId),
+      is_universal: false
+    });
+  }
+
+  const r = await api('POST', '/geofence/buffer-rules', body);
+  if (r?.success) {
+    brShowMsg('✅ Rule saved!', 'success');
+    await loadAllRules();
+    setTimeout(brReset, 1200);
+  } else {
+    brShowMsg(r?.message || 'Failed to save', 'error');
+  }
+}
+
+async function brDelete(empId) {
+  if (!confirm('Remove buffer rule for this employee?')) return;
+  const r = await api('DELETE', `/geofence/buffer-rules/${empId}`);
+  if (r?.success) { toast('Rule removed'); await loadAllRules(); }
+  else toast(r?.message || 'Failed', 'error');
+}
+
+function brEditRow(empId, name, ruleType, state, district) {
+  brClearEmp();
+  document.getElementById('br-emp-id').value = empId;
+  document.getElementById('br-emp-selected-name').textContent = name;
+  document.getElementById('br-emp-selected').style.display = 'flex';
+  const radio = document.querySelector(`input[name="br-rule"][value="${ruleType}"]`);
+  if (radio) { radio.checked = true; brSetRuleType(ruleType); }
+  if (state) {
+    document.getElementById('br-state-sel').value = state;
+    brStateChanged();
+  }
+  if (district) {
+    setTimeout(() => { document.getElementById('br-district-sel').value = district; }, 50);
+  }
+  document.getElementById('br-emp-search').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── Table rendering ───────────────────────────────────────────────
+function brRenderTable(rules) {
+  const body = document.getElementById('br-table-body');
+  document.getElementById('br-table-count').textContent = rules.length + ' employees';
+  if (!rules.length) {
+    body.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted)">No rules found</td></tr>';
+    return;
+  }
+  const typeLabel = { office:'Office', district:'District', state:'State', universal:'Universal', null:'—' };
+  const typeCls   = { office:'br-office', district:'br-district', state:'br-state', universal:'br-universal' };
+  const empTypeCls= { onsite:'br-onsite', offsite:'br-offsite', wfh:'br-wfh' };
+
+  body.innerHTML = rules.map(r => {
+    const name    = `${r.first_name} ${r.last_name}`.trim();
+    const rt      = r.rule_type || null;
+    const boundary= rt === 'district' ? `${r.district}, ${r.state}`
+                  : rt === 'state'    ? r.state
+                  : rt === 'office'   ? 'Office radius'
+                  : rt === 'universal'? 'Anywhere'
+                  : '—';
+    const badgeCls = typeCls[rt] || 'br-none';
+    const empBadge = `<span class="br-emp-type ${empTypeCls[r.employee_type]||'br-none'}">${r.employee_type||'—'}</span>`;
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 10px">
+        <div style="font-weight:600;font-size:13px">${name}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.employee_code}</div>
       </td>
-      <td>${etBadge}</td>
-      <td>${bufCell}</td>
-      <td style="min-width:280px">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px">
-          ${ruleBadge}
-          <select class="g-rule-sel" id="rsel-${e.id}" onchange="onEmpRuleChange(${e.id},${locId},this)">
-            <option value="office"    ${rt==='office'   ?'selected':''}>🏢 Office</option>
-            <option value="district"  ${rt==='district' ?'selected':''}>📍 District</option>
-            <option value="state"     ${rt==='state'    ?'selected':''}>🗺️ State</option>
-            <option value="universal" ${rt==='universal'?'selected':''}>🌍 Universal</option>
-          </select>
-        </div>
-        <!-- Office picker — shown when rule = office -->
-        <div id="office-wrap-${e.id}" style="display:${rt==='office'?'block':'none'};margin-top:4px">
-          <select class="g-loc-select" id="office-sel-${e.id}">
-            <option value="">— select office location —</option>
-            ${_allLocations.filter(l => l.radius_meters < 10000 && l.is_active).map(l => `<option value="${l.id}" ${(rule?.rule_type==='office' && l.id==locId)?'selected':''}>${l.name}</option>`).join('')}
-          </select>
-        </div>
-        <!-- State / District pickers -->
-        <div id="state-wrap-${e.id}" style="display:${(rt==='state'||rt==='district')?'flex':'none'};flex-direction:column;gap:3px">
-          <select class="g-loc-select" id="state-sel-${e.id}" onchange="onStateChange(${e.id})">
-            <option value="">— select state —</option>
-            ${BR_STATES.map(s=>`<option value="${s}" ${rule?.state===s?'selected':''}>${s}</option>`).join('')}
-          </select>
-          <select class="g-loc-select" id="dist-sel-${e.id}" style="display:${rt==='district'?'block':'none'}">
-            <option value="">— select district —</option>
-            ${rule?.state && BR_DISTRICTS[rule.state] ? BR_DISTRICTS[rule.state].map(d=>`<option value="${d}" ${rule?.district===d?'selected':''}>${d}</option>`).join('') : ''}
-          </select>
-        </div>
-        <div style="font-size:10.5px;color:var(--g-muted-l);margin-top:4px" id="boundary-${e.id}">${boundary}</div>
+      <td style="padding:8px 10px">${empBadge}</td>
+      <td style="padding:8px 10px">
+        <span class="br-badge ${badgeCls}">${rt ? typeLabel[rt] : 'Not set'}</span>
       </td>
-      <td>
-        <div style="display:flex;align-items:center;gap:5px">
-          <button class="g-apply-btn" onclick="saveEmpRule(${e.id},${locId})">✓ Apply</button>
-          <button class="g-remove-btn" onclick="removeAssignment(${locId},${e.id})" title="Remove">✕</button>
-        </div>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text2)">${boundary}</td>
+      <td style="padding:8px 10px;text-align:center">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
+          onclick="brEditRow(${r.id},'${name.replace(/'/g,"\'")}','${rt||''}','${r.state||''}','${r.district||''}')">✏️</button>
+        ${rt ? `<button class="btn btn-ghost btn-sm" onclick="brDelete(${r.id})">🗑️</button>` : ''}
       </td>
-      <td></td>
     </tr>`;
   }).join('');
-
-  return `<tr id="sub-${locId}" class="g-sub-panel">
-    <td class="g-accent-bar" style="background:#f6faf7"></td>
-    <td colspan="6" style="padding:0;background:#f6faf7">
-      <div class="g-sub-header">
-        <div class="g-sub-label">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          ${emps.length} Assigned Employee${emps.length!==1?'s':''}
-        </div>
-        <button class="g-add-btn" onclick="openAssignModal(${locId})">+ Add / Remove</button>
-      </div>
-      <table class="g-emp-table">
-        <thead>
-          <tr>
-            <th style="width:30px"></th>
-            <th>Employee</th>
-            <th>Type</th>
-            <th>${isGlobalLoc ? 'Boundary' : 'Buffer Radius'}</th>
-            <th>Rule / Change</th>
-            <th>Actions</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </td>
-  </tr>`;
 }
 
-// Assign modal rows — styled
-async function openAssignModal(locId) {
-  _assignLocId = locId;
-  const loc = _allLocations.find(l => l.id === locId);
-  document.getElementById('assign-modal-title').textContent = `Assign Employees — ${loc?.name || ''}`;
-  document.getElementById('assign-search').value = '';
-  const data = await api('GET', `/geofence/locations/${locId}/employees`);
-  const assigned = data?.data || [];
-  const assignedIds = new Set(assigned.map(e => e.id));
-  const isGlobalLoc = (loc?.radius_meters || 0) >= 10000;
-  document.getElementById('assign-emp-list').innerHTML = _allEmployees.map(e => {
-    const isChecked   = assignedIds.has(e.id);
-    const isUniversal = assigned.find(a => a.id === e.id)?.is_universal ?? isGlobalLoc;
-    return `<div class="g-asgn-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" id="acheck-${e.id}" ${isChecked?'checked':''} onchange="updateAssignCount()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--g-green)">
-        <div class="g-avatar" style="width:28px;height:28px;font-size:10.5px">${e.first_name?.[0]||'?'}</div>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--g-slate)">${e.first_name} ${e.last_name}</div>
-          <div style="font-size:11px;color:var(--g-muted)">${e.employee_code} · ${e.city||'—'}</div>
-        </div>
-      </div>
-      <label style="font-size:11.5px;color:var(--g-muted);display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="auniv-${e.id}" ${isUniversal?'checked':''} style="accent-color:var(--g-green)">
-        Universal
-      </label>
-    </div>`;
-  }).join('');
-  updateAssignCount();
-  openModal('assign-modal');
-}
-
-// Section header override
-function renderLocTable() {
-  const q      = (document.getElementById('loc-search').value || '').toLowerCase();
-  const filter = document.getElementById('filter-type').value;
-  const locs   = _allLocations.filter(l => {
-    if (q && !l.name.toLowerCase().includes(q)) return false;
-    if (filter === 'office' && l.radius_meters >= 10000) return false;
-    if (filter === 'global' && l.radius_meters < 10000) return false;
-    return true;
+function brFilterTable(val) {
+  const q    = (document.getElementById('br-table-search')?.value || '').toLowerCase();
+  const type = document.getElementById('br-filter-type')?.value || '';
+  const filtered = _brAllRules.filter(r => {
+    const name = `${r.first_name} ${r.last_name} ${r.employee_code}`.toLowerCase();
+    const matchQ = !q || name.includes(q);
+    const matchT = !type
+      || (type === 'none' && !r.rule_type)
+      || r.rule_type === type;
+    return matchQ && matchT;
   });
-  document.getElementById('loc-count').textContent = locs.length + ' location' + (locs.length!==1?'s':'');
-  const offices = locs.filter(l => l.radius_meters < 10000);
-  const global  = locs.filter(l => l.radius_meters >= 10000);
-  const tbody = document.getElementById('loc-tbody');
-  let html = '';
-  if (offices.length) {
-    html += `<tr class="g-section-hdr"><td colspan="7">🏢 &nbsp;Office Locations</td></tr>`;
-    offices.forEach(l => { html += locRow(l); });
-  }
-  if (global.length) {
-    html += `<tr class="g-section-hdr"><td colspan="7">🌍 &nbsp;Global / State Zones</td></tr>`;
-    global.forEach(l => { html += locRow(l); });
-  }
-  if (!locs.length) {
-    html = `<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--g-muted)">No locations found</td></tr>`;
-  }
-  tbody.innerHTML = html;
-  _expandedRows.forEach(id => {
-    const loc = _allLocations.find(l => l.id === id);
-    if (loc) toggleExpand(id, false);
-  });
-  // init sliders
-  setTimeout(() => {
-    document.querySelectorAll('.g-slider').forEach(sl => updateBufSliderBg(sl));
-  }, 60);
+  brRenderTable(filtered);
 }
 
-// Slider bg for new class
-function updateBufSliderBg(slider) {
-  if (!slider) return;
-  const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
-  slider.style.background = `linear-gradient(90deg, var(--g-green) ${pct}%, var(--g-border) ${pct}%)`;
+function brShowMsg(msg, type) {
+  const el = document.getElementById('br-form-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.color = type === 'error' ? 'var(--red,#dc2626)' : 'var(--green,#16a34a)';
 }
+function brHideMsg() {
+  const el = document.getElementById('br-form-msg');
+  if (el) { el.style.display = 'none'; el.textContent = ''; }
+}
+// ══════════════════════════════════════════════════════════════════
+
 </script>
 </body>
 </html>
