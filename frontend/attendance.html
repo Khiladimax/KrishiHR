@@ -1372,14 +1372,29 @@ async function drawDistrictBoundary(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 4,
       fillColor: '#ec4899', fillOpacity: 0.35
     });
-    // Show BOTH user + district. After fitBounds settles, enforce min zoom 5
-    // so map never zooms out past India level regardless of modal pixel size.
+    // Show BOTH user + district in one fitBounds.
+    // After map settles, enforce a smart minimum zoom based on distance:
+    // - Far (>500km): min zoom 5 (India level)
+    // - Medium (100-500km): min zoom 6
+    // - Near (<100km): min zoom 9 (regional detail)
+    // - Very near (<30km): min zoom 11 (local street level)
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(p => bounds.extend(p));
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
     _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
     google.maps.event.addListenerOnce(_map, 'idle', () => {
-      if (_map.getZoom() < 5) _map.setZoom(5);
+      const currentZoom = _map.getZoom();
+      let minZoom = 5;
+      if (_pLat && _pLng) {
+        const distCenter = google.maps.geometry.spherical.computeDistanceBetween(
+          new google.maps.LatLng(_pLat, _pLng), bounds.getCenter()
+        );
+        if (distCenter < 30000)       minZoom = 11; // <30km  → street level
+        else if (distCenter < 100000) minZoom = 9;  // <100km → regional
+        else if (distCenter < 500000) minZoom = 6;  // <500km → state level
+        else                          minZoom = 5;  // far    → India level
+      }
+      if (currentZoom < minZoom) _map.setZoom(minZoom);
     });
 
     // Distance calculation + dotted line from user to nearest boundary point
