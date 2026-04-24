@@ -882,25 +882,24 @@ exports.getBufferRule = async (req, res) => {
 
 // ── UPSERT (POST or PUT) buffer rule ─────────────────────────────────────────
 exports.upsertBufferRule = async (req, res) => {
+  const client = await db.getClient();
   try {
-    const employee_id  = req.params.employee_id || req.body.employee_id;
+    await client.query('BEGIN');
+
+    const employee_id = req.params.employee_id || req.body.employee_id;
     const { rule_type, state, district } = req.body;
     if (!employee_id || !rule_type)
       return res.status(400).json({ success: false, message: 'employee_id and rule_type required' });
 
-    // ── Sync employee_type — but NEVER override with 'wfh' for universal ──────
-    // universal rule_type means "punch from anywhere" — it does NOT mean the
-    // employee is a WFH employee. Onsite seniors can be universal too.
-    // Only office→onsite, state/district→offsite mappings are automatic.
-    // For universal: keep whatever employee_type they already have.
+    // ── 1. Sync employee_type ─────────────────────────────────────────────────
     if (rule_type === 'office') {
-      await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
+      await client.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
     } else if (rule_type === 'state' || rule_type === 'district') {
-      await db.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
+      await client.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
     }
-    // universal → do NOT change employee_type (keep onsite/offsite/wfh as-is)
 
-    const r = await db.query(
+    // ── 2. Save the buffer rule ───────────────────────────────────────────────
+    const r = await client.query(
       `INSERT INTO employee_buffer_rules
          (employee_id, rule_type, state, district, assigned_by, updated_at)
        VALUES ($1,$2,$3,$4,$5,NOW())
@@ -913,9 +912,129 @@ exports.upsertBufferRule = async (req, res) => {
        RETURNING *`,
       [employee_id, rule_type, state || null, district || null, req.user.id]
     );
-    res.json({ success: true, data: r.rows[0] });
+
+    // ── 3. Move employee OUT of old locations, clean up empty auto-locations ────
+
+    if (rule_type === 'district' || rule_type === 'state' || rule_type === 'universal') {
+      // Moving AWAY from office → remove from all strict-office assignments
+      await client.query(
+        `DELETE FROM employee_geofence
+         WHERE employee_id = $1
+           AND office_location_id IN (
+             SELECT id FROM office_locations WHERE radius_meters < 10000
+           )`,
+        [employee_id]
+      );
+    }
+
+    if (rule_type === 'office') {
+      // Moving BACK to office → remove from all global (district/state) locations
+      // then delete any auto-created district/state locations that now have 0 employees
+      const globalLocs = await client.query(
+        `SELECT eg.office_location_id AS loc_id
+         FROM employee_geofence eg
+         JOIN office_locations ol ON ol.id = eg.office_location_id
+         WHERE eg.employee_id = $1 AND ol.radius_meters >= 10000`,
+        [employee_id]
+      );
+      const globalLocIds = globalLocs.rows.map(r => r.loc_id);
+
+      if (globalLocIds.length) {
+        // Remove employee from those global locations
+        await client.query(
+          `DELETE FROM employee_geofence
+           WHERE employee_id = $1 AND office_location_id = ANY($2::int[])`,
+          [employee_id, globalLocIds]
+        );
+
+        // Delete any auto-created global locations now with 0 employees
+        for (const locId of globalLocIds) {
+          const remaining = await client.query(
+            `SELECT COUNT(*) AS cnt FROM employee_geofence WHERE office_location_id = $1`,
+            [locId]
+          );
+          if (parseInt(remaining.rows[0].cnt) === 0) {
+            // Only delete auto-created zones (radius 999999), not manually-set ones
+            await client.query(
+              `DELETE FROM office_locations WHERE id = $1 AND radius_meters >= 999999`,
+              [locId]
+            );
+          }
+        }
+      }
+
+      // Assign employee to the specified office location
+      const { office_location_id } = req.body;
+      if (office_location_id) {
+        await client.query(
+          `INSERT INTO employee_geofence (employee_id, office_location_id, is_universal, assigned_by)
+           VALUES ($1, $2, FALSE, $3)
+           ON CONFLICT (employee_id, office_location_id) DO UPDATE SET is_universal = FALSE`,
+          [employee_id, office_location_id, req.user.id]
+        );
+      }
+    }
+
+    // ── 4. Auto-create / find location for district or state, then assign ──────
+    let newLocId = null;
+
+    if (rule_type === 'district' && district && state) {
+      const locName = `District – ${district}, ${state}`;
+      const address = `${district} District, ${state}, India`;
+
+      // Find existing or create
+      const existing = await client.query(
+        `SELECT id FROM office_locations WHERE LOWER(name) = LOWER($1) AND is_active = TRUE LIMIT 1`,
+        [locName]
+      );
+      if (existing.rows.length) {
+        newLocId = existing.rows[0].id;
+      } else {
+        const created = await client.query(
+          `INSERT INTO office_locations (name, latitude, longitude, radius_meters, address, is_active, created_by)
+           VALUES ($1, 0, 0, 999999, $2, TRUE, $3) RETURNING id`,
+          [locName, address, req.user.id]
+        );
+        newLocId = created.rows[0].id;
+      }
+    } else if (rule_type === 'state' && state) {
+      const locName = `State – ${state}`;
+      const address = `${state}, India`;
+
+      const existing = await client.query(
+        `SELECT id FROM office_locations WHERE LOWER(name) = LOWER($1) AND is_active = TRUE LIMIT 1`,
+        [locName]
+      );
+      if (existing.rows.length) {
+        newLocId = existing.rows[0].id;
+      } else {
+        const created = await client.query(
+          `INSERT INTO office_locations (name, latitude, longitude, radius_meters, address, is_active, created_by)
+           VALUES ($1, 0, 0, 999999, $2, TRUE, $3) RETURNING id`,
+          [locName, address, req.user.id]
+        );
+        newLocId = created.rows[0].id;
+      }
+    }
+
+    // ── 5. Assign employee to the new district/state location ─────────────────
+    if (newLocId) {
+      await client.query(
+        `INSERT INTO employee_geofence (employee_id, office_location_id, is_universal, assigned_by)
+         VALUES ($1, $2, TRUE, $3)
+         ON CONFLICT (employee_id, office_location_id) DO NOTHING`,
+        [employee_id, newLocId, req.user.id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, data: r.rows[0], new_location_id: newLocId });
   } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
     res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
   }
 };
 
