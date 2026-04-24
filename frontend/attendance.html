@@ -825,43 +825,57 @@ showODWFHButtons();
 })();
 
 async function checkTodayPunch() {
-  // FIX: use IST date + correct month/year params the backend understands
-  const istToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-    year:'numeric', month:'2-digit', day:'2-digit'
-  }).format(new Date());
-  const [istYear, istMonth] = istToday.split('-').map(Number);
-  const data = await api('GET', `/attendance?month=${istMonth}&year=${istYear}`);
   const inBtn  = document.getElementById('punch-in-btn');
   const outBtn = document.getElementById('punch-out-btn');
-  inBtn.style.display = 'none'; outBtn.style.display = 'none';
+  inBtn.style.display  = 'none';
+  outBtn.style.display = 'none';
 
-  // Check if today is a non-working day
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 6=Saturday
-  if (dayOfWeek === 0) return; // Sunday = no punch
-  if (dayOfWeek === 6) {
-    // For 2nd_4th_off employees: block punch on 2nd & 4th Saturday
-    // For all_working employees: allow punch on all Saturdays
-    const meForPunch = await api('GET', '/auth/me').catch(()=>null);
-    const punchSatPolicy = meForPunch?.data?.saturday_policy || meForPunch?.saturday_policy || '2nd_4th_off';
-    if (punchSatPolicy === '2nd_4th_off') {
-      const date = now.getDate();
-      const weekNum = Math.ceil(date / 7);
-      if (weekNum === 2 || weekNum === 4) return; // 2nd/4th Saturday = holiday, no punch
+  // Use IST for date calculations — server is UTC, user is IST
+  const istToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+  const [istYear, istMonth, istDay] = istToday.split('-').map(Number);
+
+  // IST day-of-week (avoids UTC midnight boundary bug)
+  const istDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
+
+  // Sunday → no punch ever
+  if (istDow === 0) return;
+
+  // Saturday → check employee's saturday_policy
+  if (istDow === 6) {
+    // Fetch policy — default ALLOW (not block) if API fails
+    let satPolicy = 'all_working'; // fail-open: show button if we can't determine policy
+    try {
+      const me = await api('GET', '/auth/me');
+      satPolicy = me?.data?.saturday_policy || me?.saturday_policy || 'all_working';
+    } catch(e) { satPolicy = 'all_working'; }
+
+    if (satPolicy === '2nd_4th_off') {
+      // Count how many Saturdays have occurred in this month up to today (IST)
+      let satCount = 0;
+      for (let d = 1; d <= istDay; d++) {
+        if (new Date(istYear, istMonth - 1, d).getDay() === 6) satCount++;
+      }
+      if (satCount === 2 || satCount === 4) return; // 2nd or 4th Saturday = off
     }
+    // all_working → fall through and show button
   }
 
+  // Fetch attendance records for this month
+  const data = await api('GET', `/attendance?month=${istMonth}&year=${istYear}`);
   const records = data?.data || [];
-  // FIX: find today's specific record by date, not just first record
   const todayRec = Array.isArray(records)
     ? records.find(r => (r.date_str || r.date?.toString().split('T')[0]) === istToday)
     : null;
-  if (!todayRec || !todayRec.punch_in) inBtn.style.display = 'flex';
-  else if (!todayRec.punch_out) {
+
+  if (!todayRec || !todayRec.punch_in) {
+    inBtn.style.display = 'flex';
+  } else if (!todayRec.punch_out) {
     outBtn.style.display = 'flex';
-    // Already punched in — resume GPS tracking if not already running
-    startMovementTracking(); // SW deduplicates — safe to call even if already running
+    startMovementTracking();
   }
+  // both punched → buttons stay hidden (done for the day)
 }
 
 async function loadEmployeeFilter() {
