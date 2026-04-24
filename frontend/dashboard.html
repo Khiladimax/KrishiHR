@@ -1407,10 +1407,44 @@ async function drawDistrictPolygon(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
-    // Fit to district boundary ONLY — don't include user (could be 1000km away)
+    // Smart fitBounds: if user is within 200km of district, show both together.
+    // If farther (e.g. Mumbai→Azamgarh = 1261km), show district zoomed + place user dot off-screen
+    // with a visible "Your Location" mini-marker at district center edge so user knows they're far.
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(p => bounds.extend(p));
-    _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+
+    if (_pLat && _pLng) {
+      const districtCenter = bounds.getCenter();
+      const userPt = new google.maps.LatLng(_pLat, _pLng);
+      const distToCenter = google.maps.geometry.spherical.computeDistanceBetween(userPt, districtCenter);
+
+      if (distToCenter < 200000) {
+        // User is near district — extend bounds to show both
+        bounds.extend({ lat: _pLat, lng: _pLng });
+        _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+      } else {
+        // User is far — fit district only, but add a small label showing user is far away
+        _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+        // Add a small "📍 You (1261 km away)" label at nearest district edge
+        const distKm = (distToCenter / 1000).toFixed(0);
+        const farLabel = new google.maps.Marker({
+          position: bounds.getSouthWest(),
+          map: _map,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+              `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="22"><rect rx="4" width="140" height="22" fill="#4361ee" opacity="0.9"/><text x="70" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="white" font-family="Arial,sans-serif">📍 You are ${distKm}km away</text></svg>`
+            ),
+            scaledSize: new google.maps.Size(140, 22),
+            anchor: new google.maps.Point(0, 22)
+          },
+          zIndex: 20
+        });
+        _mapCircles.push(farLabel);
+      }
+    } else {
+      // No GPS yet — fit district only
+      _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    }
     // Distance in status bar only (no popup)
     if (_pLat && _pLng) {
       const u = new google.maps.LatLng(_pLat, _pLng);
