@@ -684,7 +684,7 @@
       <div class="map-status loading" id="map-status">📡 Getting your location…</div>
       <div id="punch-map" style="width:100%;height:320px;border-radius:12px;border:1.5px solid var(--border);margin-bottom:12px"></div>
       <div class="map-acc" id="map-acc"></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">🟢 Green circle = assigned office zone &nbsp;|&nbsp; 🔵 Blue circle = universal (punch from anywhere) &nbsp;|&nbsp; 🔵 Blue dot = your location</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">🟢 Green circle = assigned office zone &nbsp;|&nbsp; 🔵 Blue circle = universal (punch from anywhere) &nbsp;|&nbsp; 🟦🌸 Blue border + pink fill = district/state boundary &nbsp;|&nbsp; 🔵 Blue dot = your location</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('map-punch-backdrop').classList.remove('open')">Cancel</button>
@@ -1340,15 +1340,72 @@ async function drawDistrictBoundary(state, district) {
     const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
     const poly = new google.maps.Polygon({
       paths: ring, map: _map,
-      strokeColor: '#10b981', strokeOpacity: 0.9, strokeWeight: 3,
-      fillColor: '#10b981', fillOpacity: 0.12
+      strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
+      fillColor: '#ec4899', fillOpacity: 0.12
     });
     _mapCircles.push(poly);
-    // Fit bounds to polygon + employee dot
+
+    // Build district bounds
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(pt => bounds.extend(pt));
+
+    // Always include user location in bounds so both are visible
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
-    _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
+    _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+
+    // ── Calculate distance from user to nearest edge of district ─────────
+    if (_pLat && _pLng) {
+      const userLatLng = new google.maps.LatLng(_pLat, _pLng);
+
+      // Find nearest point on any edge of the polygon ring
+      let minDistM = Infinity;
+      for (let i = 0; i < ring.length; i++) {
+        const a = new google.maps.LatLng(ring[i].lat, ring[i].lng);
+        const b = new google.maps.LatLng(ring[(i + 1) % ring.length].lat, ring[(i + 1) % ring.length].lng);
+        // Distance from user to segment ab: pick closest of nearest-point-on-segment or endpoints
+        const dA = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, a);
+        const dB = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, b);
+        // Interpolate along segment to find closest point
+        const segLen = google.maps.geometry.spherical.computeDistanceBetween(a, b);
+        let dSeg = Math.min(dA, dB);
+        if (segLen > 0) {
+          // Project user onto the segment using dot-product approximation
+          const t = Math.max(0, Math.min(1,
+            ((userLatLng.lat() - a.lat()) * (b.lat() - a.lat()) +
+             (userLatLng.lng() - a.lng()) * (b.lng() - a.lng())) /
+            ((b.lat() - a.lat()) ** 2 + (b.lng() - a.lng()) ** 2)
+          ));
+          const nearPt = new google.maps.LatLng(
+            a.lat() + t * (b.lat() - a.lat()),
+            a.lng() + t * (b.lng() - a.lng())
+          );
+          dSeg = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, nearPt);
+        }
+        if (dSeg < minDistM) minDistM = dSeg;
+      }
+
+      // Format distance
+      let distText;
+      if (minDistM < 1000) {
+        distText = `${Math.round(minDistM)} m`;
+      } else {
+        distText = `${(minDistM / 1000).toFixed(1)} km`;
+      }
+
+      // Show distance in the status bar
+      const statusEl = document.getElementById('map-status');
+      if (statusEl) {
+        const existing = statusEl.innerHTML;
+        statusEl.innerHTML = existing +
+          ` &nbsp;|&nbsp; 📏 <b>${distText} from nearest boundary edge</b>`;
+      }
+      // Also add a distance label on the map
+      const distLabel = new google.maps.InfoWindow({
+        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8">📏 ${distText} to boundary</div>`,
+        position: userLatLng
+      });
+      distLabel.open(_map);
+    }
   } catch (e) { console.error('drawDistrictBoundary:', e); }
 }
 
@@ -1365,8 +1422,8 @@ async function drawStateBoundary(state) {
       const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
       const poly = new google.maps.Polygon({
         paths: ring, map: _map,
-        strokeColor: '#10b981', strokeOpacity: 0.7, strokeWeight: 2,
-        fillColor: '#10b981', fillOpacity: 0.08
+        strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2,
+        fillColor: '#ec4899', fillOpacity: 0.08
       });
       _mapCircles.push(poly);
       ring.forEach(pt => bounds.extend(pt));
