@@ -870,7 +870,13 @@ async function checkTodayPunch() {
       for (let d = 1; d <= istDay; d++) {
         if (new Date(istYear, istMonth - 1, d).getDay() === 6) satCount++;
       }
-      if (satCount === 2 || satCount === 4) { renderPunchBar(null, istDow, true); return; }
+      if (satCount === 2 || satCount === 4) {
+      renderPunchBar(null, istDow, true);
+      // Still show punch button — employee may work on holiday
+      const inBtn = document.getElementById('punch-in-btn');
+      if (inBtn) inBtn.style.display = 'flex';
+      return;
+    }
     }
   }
 
@@ -892,12 +898,24 @@ function renderPunchBar(rec, dow, isHoliday = false) {
   const timetxt = document.getElementById('punch-time-text');
   if (!bar) return;
 
-  if (isHoliday || dow === 0) {
+  if (dow === 0) {
+    // Sunday — no punch ever
     bar.className = 'punch-bar state-done';
     dot.className = 'punch-status-dot done';
-    txt.textContent = dow === 0 ? '🌿 Sunday — Rest day' : '🏖 Holiday — No punch required';
+    txt.textContent = '🌿 Sunday — Rest day';
     timetxt.textContent = '';
     return;
+  }
+  if (isHoliday && (!rec || !rec.punch_in)) {
+    // Holiday but not yet punched — show bar + button (employee may choose to work)
+    bar.className = 'punch-bar state-not-punched';
+    dot.className = 'punch-status-dot';
+    txt.textContent = '🏖 Holiday — No punch required';
+    timetxt.textContent = 'You may still punch in if working today';
+    // Don't return — let the button show below
+  } else if (isHoliday && rec?.punch_in) {
+    // Holiday but punched in — show normal working/done state
+    // Fall through to normal logic below
   }
   if (!rec || !rec.punch_in) {
     bar.className = 'punch-bar state-not-punched';
@@ -1354,34 +1372,14 @@ async function drawDistrictBoundary(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
-    // Smart fitBounds: if user is within 200km of district show both, else show district + far-label.
+    // Always show BOTH user location AND district boundary.
+    // Extend bounds with user dot so map automatically frames both.
+    // If they're 1200km apart, the map zooms to India level — that's correct,
+    // the employee can see exactly where they are vs where they need to be.
     const bounds = new google.maps.LatLngBounds();
-    ring.forEach(pt => bounds.extend(pt));
-
-    if (_pLat && _pLng) {
-      const districtCenter = bounds.getCenter();
-      const userPt = new google.maps.LatLng(_pLat, _pLng);
-      const distToCenter = google.maps.geometry.spherical.computeDistanceBetween(userPt, districtCenter);
-      if (distToCenter < 200000) {
-        bounds.extend({ lat: _pLat, lng: _pLng });
-        _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
-      } else {
-        _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
-        const distKm = (distToCenter / 1000).toFixed(0);
-        const farLabel = new google.maps.Marker({
-          position: bounds.getSouthWest(), map: _map,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-              `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="22"><rect rx="4" width="140" height="22" fill="#4361ee" opacity="0.9"/><text x="70" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="white" font-family="Arial,sans-serif">📍 You are ${distKm}km away</text></svg>`
-            ),
-            scaledSize: new google.maps.Size(140, 22), anchor: new google.maps.Point(0, 22)
-          }, zIndex: 20
-        });
-        _mapCircles.push(farLabel);
-      }
-    } else {
-      _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
-    }
+    ring.forEach(p => bounds.extend(p));
+    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
 
     // Distance calculation — show in status bar only (no map popup)
     if (_pLat && _pLng) {
