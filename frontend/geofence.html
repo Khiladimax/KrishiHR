@@ -678,17 +678,29 @@ function empSubRow(locId) {
       </td>
       <td style="padding:7px 10px">${empTypeBadge}</td>
       <td style="padding:7px 10px">${bufferCell}</td>
-      <td style="padding:7px 10px">
-        <div class="emp-rule-wrap">
+      <td style="padding:7px 10px;min-width:280px">
+        <div class="emp-rule-wrap" style="margin-bottom:4px">
           ${ruleBadge}
           <select class="rule-sel" id="rsel-${e.id}" onchange="onEmpRuleChange(${e.id},${locId},this)">
-            <option value="office" ${rt==='office'?'selected':''}>🏢 Office</option>
-            <option value="district" ${rt==='district'?'selected':''}>📍 District</option>
-            <option value="state" ${rt==='state'?'selected':''}>🗺️ State</option>
+            <option value="office"    ${rt==='office'   ?'selected':''}>🏢 Office</option>
+            <option value="district"  ${rt==='district' ?'selected':''}>📍 District</option>
+            <option value="state"     ${rt==='state'    ?'selected':''}>🗺️ State</option>
             <option value="universal" ${rt==='universal'?'selected':''}>🌍 Universal</option>
           </select>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">${boundary}</div>
+        <!-- State picker — shown for state or district rule -->
+        <div id="state-wrap-${e.id}" style="display:${(rt==='state'||rt==='district')?'flex':'none'};flex-direction:column;gap:4px;margin-top:4px">
+          <select class="rule-sel" id="state-sel-${e.id}" onchange="onStateChange(${e.id})" style="width:100%;font-size:11px">
+            <option value="">— select state —</option>
+            ${BR_STATES.map(s=>`<option value="${s}" ${rule?.state===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <!-- District picker — shown only for district rule -->
+          <select class="rule-sel" id="dist-sel-${e.id}" style="width:100%;font-size:11px;display:${rt==='district'?'block':'none'}">
+            <option value="">— select district —</option>
+            ${rule?.state && BR_DISTRICTS[rule.state] ? BR_DISTRICTS[rule.state].map(d=>`<option value="${d}" ${rule?.district===d?'selected':''}>${d}</option>`).join('') : ''}
+          </select>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px" id="boundary-${e.id}">${boundary}</div>
       </td>
       <td style="padding:7px 10px">
         <button class="save-mini" onclick="saveEmpRule(${e.id},${locId})" style="background:var(--accent)">✓ Apply</button>
@@ -855,38 +867,69 @@ async function saveEmpRadius(empId, locId) {
   }
 }
 
-// ── Employee rule change dropdown ────────────────────────────
+// ── Employee rule change — show/hide state & district dropdowns inline ───────
 function onEmpRuleChange(empId, locId, sel) {
-  // Store pending change — user must click Apply
+  const rt        = sel.value;
+  const stateWrap = document.getElementById(`state-wrap-${empId}`);
+  const distSel   = document.getElementById(`dist-sel-${empId}`);
+  if (!stateWrap) return;
+  // Show state picker for state or district rules
+  stateWrap.style.display = (rt === 'state' || rt === 'district') ? 'flex' : 'none';
+  // Show district picker only for district rule
+  if (distSel) distSel.style.display = rt === 'district' ? 'block' : 'none';
+}
+
+function onStateChange(empId) {
+  const stateSel = document.getElementById(`state-sel-${empId}`);
+  const distSel  = document.getElementById(`dist-sel-${empId}`);
+  if (!stateSel || !distSel) return;
+  const state = stateSel.value;
+  distSel.innerHTML = '<option value="">— select district —</option>';
+  if (state && BR_DISTRICTS[state]) {
+    BR_DISTRICTS[state].forEach(d => {
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d;
+      distSel.appendChild(o);
+    });
+  }
 }
 
 async function saveEmpRule(empId, locId) {
-  const sel = document.getElementById(`rsel-${empId}`);
+  const sel      = document.getElementById(`rsel-${empId}`);
+  const stateSel = document.getElementById(`state-sel-${empId}`);
+  const distSel  = document.getElementById(`dist-sel-${empId}`);
   if (!sel) return;
   const ruleType = sel.value;
   let body = { employee_id: empId, rule_type: ruleType };
 
-  // If moving TO a different location type, update geofence assignment
   if (ruleType === 'office') {
-    // Keep at this office location
     await api('POST', '/geofence/assign', { employee_id: empId, office_location_id: locId, is_universal: false });
   } else if (ruleType === 'universal') {
     body.state = null; body.district = null;
-  } else if (ruleType === 'district' || ruleType === 'state') {
-    // For district/state rules, user needs to specify — show a small prompt
-    const state = prompt('Enter state (e.g. MAHARASHTRA):');
-    if (!state) return;
-    body.state = state.toUpperCase();
-    if (ruleType === 'district') {
-      const dist = prompt('Enter district (e.g. Mumbai):');
-      if (!dist) return;
-      body.district = dist;
-    }
+  } else if (ruleType === 'state') {
+    const state = stateSel?.value;
+    if (!state) { toast('Please select a state', 'error'); return; }
+    body.state = state;
+  } else if (ruleType === 'district') {
+    const state = stateSel?.value;
+    const dist  = distSel?.value;
+    if (!state) { toast('Please select a state', 'error'); return; }
+    if (!dist)  { toast('Please select a district', 'error'); return; }
+    body.state    = state;
+    body.district = dist;
   }
 
   const r = await api('POST', '/geofence/buffer-rules', body);
   if (r?.success) {
-    toast('Rule saved — refreshing…');
+    // Update boundary label inline without full re-render
+    const boundaryEl = document.getElementById(`boundary-${empId}`);
+    if (boundaryEl) {
+      boundaryEl.textContent = ruleType === 'district' ? `${body.district}, ${body.state}`
+        : ruleType === 'state' ? body.state
+        : ruleType === 'office' ? 'Office radius'
+        : ruleType === 'universal' ? 'Anywhere' : '—';
+    }
+    toast('Rule saved ✓');
     // Update local rule cache
     const idx = _allRules.findIndex(r2 => r2.id == empId);
     const updated = { ...(_allRules[idx] || {}), ...body, id: empId };
