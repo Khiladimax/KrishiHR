@@ -133,38 +133,6 @@
     content: '🔍'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
     font-size: 13px; pointer-events: none;
   }
-
-  /* ── Conflict Detection ───────────────────────────────────────── */
-  .geo-conflict-alert {
-    background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
-    border: 2px solid #fb923c;
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px; cursor: pointer; transition: all .15s;
-  }
-  .geo-conflict-alert:hover { box-shadow: 0 4px 16px rgba(251,146,60,.25); transform: translateY(-1px); }
-  .geo-conflict-alert-left { display: flex; align-items: center; gap: 10px; }
-  .geo-conflict-alert-count {
-    background: #dc2626; color: #fff;
-    font-size: 16px; font-weight: 800;
-    width: 34px; height: 34px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; animation: pulse-red 2s infinite;
-  }
-  @keyframes pulse-red {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.4); }
-    50% { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
-  }
-  @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
-  .conflict-row td { background: #fff7ed !important; }
-  .conflict-badge {
-    display: inline-flex; align-items: center; gap: 3px;
-    background: #fee2e2; color: #b91c1c;
-    font-size: 10px; font-weight: 700; padding: 2px 7px;
-    border-radius: 20px; border: 1px solid #fca5a5;
-    white-space: nowrap; margin-left: 4px;
-  }
 </style>
 </head>
 <body>
@@ -258,6 +226,13 @@
           <div id="detail-content"></div>
         </div>
 
+        <!-- No selection placeholder -->
+        <div id="no-selection" style="text-align:center;padding:40px 20px;color:var(--muted)">
+          <div style="font-size:36px;margin-bottom:12px">📍</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">Select a location</div>
+          <div style="font-size:13px">Click any location from the list to view details, edit buffer, and manage employee assignments</div>
+        </div>
+
     <!-- Employee Buffer Rules — below map, full width of right col -->
     <div class="geo-buffer-col">
     <div class="card" style="margin-top:18px">
@@ -269,21 +244,7 @@
         <button class="btn btn-ghost btn-sm" onclick="loadAllRules()">↻ Refresh</button>
       </div>
 
-      <!-- Conflict Alert Banner -->
-      <div id="br-conflict-alert" style="display:none;padding:0 16px 0 16px">
-        <div class="geo-conflict-alert" onclick="brShowConflictsOnly()">
-          <div class="geo-conflict-alert-left">
-            <div class="geo-conflict-alert-count" id="br-conflict-count">0</div>
-            <div>
-              <div style="font-size:13px;font-weight:700;color:#c2410c">⚠️ Geofence Rule Conflicts Detected</div>
-              <div style="font-size:11px;color:#9a3412;margin-top:2px">
-                These employees have a <strong>restrictive geofence</strong> (Office/District/State) but their buffer rule is set to <strong>Universal</strong> — they can punch from anywhere, bypassing the boundary.
-              </div>
-            </div>
-          </div>
-          <div style="font-size:11px;font-weight:600;color:#ea580c;white-space:nowrap;margin-left:12px">Click to filter ›</div>
-        </div>
-      </div>
+      <!-- Layout: left = form, right = table -->
       <div class="br-inner-grid">
 
         <!-- ── FORM ── -->
@@ -379,7 +340,6 @@
               <option value="state">State</option>
               <option value="universal">Universal</option>
               <option value="none">Not set</option>
-              <option value="conflict">⚠️ Conflicts only</option>
             </select>
             <span id="br-table-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
           </div>
@@ -473,7 +433,7 @@
           </div>
         </div>
 
-        <div id="loc-radius-row" class="form-group" style="margin-bottom:14px">
+        <div class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px">
             Buffer Radius (Meters) — <span id="radius-lbl">500</span>M
           </label>
@@ -548,19 +508,6 @@
       <button class="btn btn-outline" onclick="closeModal('delete-blocked-modal')">Close</button>
       <button class="btn btn-primary" onclick="closeModal('delete-blocked-modal'); openAssignModal(_deleteLocId)">👤 Manage Assignments</button>
     </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     LOCATION DETAIL MODAL
-     ═══════════════════════════════════════════════════════════ -->
-<div class="modal-backdrop" id="loc-detail-modal">
-  <div class="modal modal-lg" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column">
-    <div class="modal-header" style="flex-shrink:0">
-      <div class="modal-title" id="loc-detail-modal-title">Location Details</div>
-      <button class="modal-close" onclick="closeModal('loc-detail-modal')">✕</button>
-    </div>
-    <div class="modal-body" id="loc-detail-modal-body" style="overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -644,8 +591,15 @@ async function loadAll() {
 
 function updateStats() {
   const locs    = _allLocations.filter(l => l.is_active);
-  const offices = locs.filter(l => l.radius_meters < 10000);
-  const global  = locs.filter(l => l.radius_meters >= 10000);
+  const isZoneType = l => {
+    const n = l.name.toLowerCase();
+    const t = (l.location_type || '').toLowerCase();
+    return t === 'state' || t === 'district' || t === 'wfh'
+        || n.startsWith('state') || n.startsWith('district')
+        || n.includes('work from home') || n.includes('wfh');
+  };
+  const offices = locs.filter(l => !isZoneType(l));
+  const global  = locs.filter(l =>  isZoneType(l));
   const assigned = new Set();
   _allEmployees.forEach(e => {
     if (_allLocations.some(l => (l.assigned_employees||[]).includes(e.id) || true)) {}
@@ -673,8 +627,16 @@ function renderLocList(filter = '') {
     return;
   }
 
-  const offices = locs.filter(l => l.radius_meters < 10000);
-  const global  = locs.filter(l => l.radius_meters >= 10000);
+  // Classify by name/type — not by radius
+  const isZoneType = l => {
+    const n = l.name.toLowerCase();
+    const t = (l.location_type || '').toLowerCase();
+    return t === 'state' || t === 'district' || t === 'wfh'
+        || n.startsWith('state') || n.startsWith('district')
+        || n.includes('work from home') || n.includes('wfh');
+  };
+  const offices = locs.filter(l => !isZoneType(l));
+  const global  = locs.filter(l =>  isZoneType(l));
 
   let html = '';
   if (offices.length) {
@@ -689,12 +651,30 @@ function renderLocList(filter = '') {
 }
 
 function locCard(l) {
-  const isGlobal  = l.radius_meters >= 10000;
-  const isWFH     = l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
-  const typeClass = isWFH ? 'loc-type-wfh' : isGlobal ? 'loc-type-state' : 'loc-type-office';
-  const typeLabel = isWFH ? 'WFH' : isGlobal ? 'Global' : 'Office';
+  // Use location_type from API if available; fall back to name-based detection
+  const locType   = (l.location_type || '').toLowerCase();
+  const isWFH     = locType === 'wfh' || l.name.toLowerCase().includes('work from home') || l.name.toLowerCase().includes('wfh');
+  const isState   = locType === 'state'    || l.name.toLowerCase().startsWith('state');
+  const isDistrict= locType === 'district' || l.name.toLowerCase().startsWith('district');
+  const isGlobal  = isWFH || isState || isDistrict;  // Global = non-office zones
+
+  const typeClass = isWFH      ? 'loc-type-wfh'
+                  : isState    ? 'loc-type-state'
+                  : isDistrict ? 'loc-type-state'
+                  : 'loc-type-office';
+  const typeLabel = isWFH      ? 'WFH'
+                  : isState    ? 'State'
+                  : isDistrict ? 'District'
+                  : 'Office';
   const active    = _selectedLoc?.id === l.id ? 'active' : '';
   const globalCls = isGlobal ? 'global-zone' : '';
+
+  // Sub-label: show boundary info instead of generic "Universal access"
+  const subLabel  = isDistrict && l.address ? `📍 ${l.address}`
+                  : isState    && l.address ? `🗺️ ${l.address}`
+                  : isWFH                   ? '🏠 Remote / Work From Home'
+                  : isGlobal                ? '🌍 Wide-area zone'
+                  : `📏 ${l.radius_meters}m buffer`;
 
   return `<div class="loc-card ${active} ${globalCls}" onclick="selectLocation(${l.id})">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
@@ -705,9 +685,7 @@ function locCard(l) {
       </div>
     </div>
     <div style="display:flex;gap:12px;font-size:11px;color:var(--muted)">
-      ${isGlobal
-        ? '<span>🌍 Universal access</span>'
-        : `<span>📏 ${l.radius_meters}m buffer</span>`}
+      <span>${subLabel}</span>
       <span>👤 ${l.assigned_count || 0} employees</span>
     </div>
     ${l.address ? `<div style="font-size:11px;color:var(--muted2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.address}</div>` : ''}
@@ -725,8 +703,11 @@ function renderMapMarkers() {
     const lng = parseFloat(l.longitude);
     if (!lat || !lng || (lat === 0 && lng === 0)) return;
 
-    const isGlobal = l.radius_meters >= 10000;
-    const isWFH    = l.name.toLowerCase().includes('work from home');
+    const locType   = (l.location_type || '').toLowerCase();
+    const isWFH     = locType === 'wfh' || l.name.toLowerCase().includes('work from home');
+    const isState   = locType === 'state'    || l.name.toLowerCase().startsWith('state');
+    const isDistrict= locType === 'district' || l.name.toLowerCase().startsWith('district');
+    const isGlobal  = isWFH || isState || isDistrict;
     const color    = isWFH ? '#8b5cf6' : isGlobal ? '#4a8c1c' : '#1d4ed8';
     const shortName = l.name.split('–')[0].split('-')[0].trim().substring(0, 14);
 
@@ -788,37 +769,67 @@ async function selectLocation(id) {
 }
 
 async function renderDetailPanel(loc) {
-  const isGlobal = loc.radius_meters >= 10000;
-  const isWFH    = loc.name.toLowerCase().includes('work from home');
-  const typeLabel = isWFH ? 'Work From Home' : isGlobal ? 'State Zone (Global)' : 'Office (Strict Geofence)';
-  const typeIcon  = isWFH ? '🏠' : isGlobal ? '🌍' : '🏢';
-  const typeBg    = isWFH ? '#ede9fe' : isGlobal ? 'var(--accent-l)' : '#dbeafe';
-  const typeColor = isWFH ? '#5b21b6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
+  document.getElementById('no-selection').style.display = 'none';
+  document.getElementById('detail-panel').style.display = '';
 
-  document.getElementById('loc-detail-modal-title').textContent = loc.name;
-  document.getElementById('loc-detail-modal-body').innerHTML = `
+  const locType   = (loc.location_type || '').toLowerCase();
+  const isWFH     = locType === 'wfh' || loc.name.toLowerCase().includes('work from home') || loc.name.toLowerCase().includes('wfh');
+  const isState   = locType === 'state'    || loc.name.toLowerCase().startsWith('state');
+  const isDistrict= locType === 'district' || loc.name.toLowerCase().startsWith('district');
+  const isGlobal  = isWFH || isState || isDistrict;
+  const typeLabel = isWFH ? '🏠 Work From Home' : isDistrict ? '📍 District Zone' : isState ? '🗺️ State Zone' : '🏢 Office (Strict Geofence)';
+  const typeColor = isWFH ? '#8b5cf6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
 
-    <!-- ── Header: name + status + type ── -->
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px">
+  // Fetch assigned employees for this location
+  const assigned = await fetchAssignedEmployees(loc.id);
+
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
       <div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${typeBg};color:${typeColor}">${typeIcon} ${typeLabel}</span>
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">${loc.name}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:${typeColor}">${typeLabel}</span>
           ${loc.is_active
-            ? '<span style="font-size:10px;background:#d1fae5;color:#059669;padding:3px 9px;border-radius:20px;font-weight:700">● Active</span>'
-            : '<span style="font-size:10px;background:#f1f5f9;color:#64748b;padding:3px 9px;border-radius:20px;font-weight:700">● Inactive</span>'}
+            ? '<span style="font-size:10px;background:#d1fae5;color:#059669;padding:2px 7px;border-radius:20px;font-weight:700">Active</span>'
+            : '<span style="font-size:10px;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:20px;font-weight:700">Inactive</span>'}
         </div>
-        ${loc.address ? `<div style="font-size:12px;color:var(--muted);line-height:1.5">${loc.address}</div>` : ''}
+        ${loc.address ? `<div style="font-size:12px;color:var(--muted);margin-top:5px">${loc.address}</div>` : ''}
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-outline btn-sm" onclick="openEditLocation(${loc.id})" title="Edit location">✏️ Edit</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditLocation(${loc.id})">✏️ Edit</button>
+        <button class="btn btn-primary btn-sm" onclick="openAssignModal(${loc.id})">👤 Manage Employees</button>
         ${loc.is_active
-          ? `<button class="btn btn-ghost btn-sm" style="color:#b45309;border-color:#fde68a" onclick="toggleLocActive(${loc.id}, false)" title="Deactivate">⏸</button>`
-          : `<button class="btn btn-ghost btn-sm" style="color:#059669;border-color:#6ee7b7" onclick="toggleLocActive(${loc.id}, true)" title="Activate">▶</button>`}
-        <button class="btn btn-ghost btn-sm" style="color:var(--red,#dc2626);border-color:#fca5a5" onclick="openDeleteLocation(${loc.id}, '${loc.name.replace(/'/g, "\\'")}')" title="Delete">🗑️</button>
+          ? `<button class="btn btn-ghost btn-sm" style="color:#b45309;border-color:#b45309" onclick="toggleLocActive(${loc.id}, false)">⏸ Deactivate</button>`
+          : `<button class="btn btn-ghost btn-sm" style="color:#059669;border-color:#059669" onclick="toggleLocActive(${loc.id}, true)">▶ Activate</button>`
+        }
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="openDeleteLocation(${loc.id}, '${loc.name.replace(/'/g, "\\'")}')">🗑️ Delete</button>
       </div>
     </div>
 
-    <!-- ── Coordinates row ── -->
+    ${!isGlobal ? `
+    <!-- Buffer Radius Editor -->
+    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px;border:1.5px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">📏 Geofence Buffer Radius</div>
+        <div style="font-size:20px;font-weight:800;color:var(--accent)" id="live-radius-lbl">${loc.radius_meters}m</div>
+      </div>
+      <input type="range" class="buffer-slider" id="live-radius-slider"
+             min="50" max="2000" step="50" value="${loc.radius_meters}"
+             oninput="onLiveRadiusChange(this.value)">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
+        <span>50m</span><span>500m</span><span>1000m</span><span>2000m</span>
+      </div>
+      <button class="btn btn-success btn-sm" style="margin-top:10px" onclick="saveRadius(${loc.id})">💾 Save Buffer</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Employees must punch in within this radius from the office center.</div>
+    </div>
+    ` : `
+    <div style="background:var(--accent-l);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;border-left:3px solid var(--accent)">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px">🌍 Universal Access Zone</div>
+      <div style="font-size:12px;color:var(--accent)">Employees assigned here can punch in from anywhere — no GPS distance check is enforced. Suitable for field staff, WFH employees, and state-level operations.</div>
+    </div>
+    `}
+
+    <!-- Coordinates (non-WFH only) -->
     ${(!isWFH && parseFloat(loc.latitude) !== 0) ? `
     <div style="display:flex;gap:10px;margin-bottom:16px">
       <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
@@ -829,51 +840,40 @@ async function renderDetailPanel(loc) {
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Longitude</div>
         <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace">${parseFloat(loc.longitude).toFixed(6)}</div>
       </div>
-      <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Assigned</div>
-        <div style="font-size:13px;font-weight:700;color:var(--text)">${loc.assigned_count || 0} employees</div>
-      </div>
-    </div>` : `
-    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:12px;color:var(--muted)">👥 Assigned employees</div>
-      <div style="font-size:14px;font-weight:700;color:var(--text)">${loc.assigned_count || 0}</div>
-    </div>`}
-
-    <!-- ── Buffer radius (office only) ── -->
-    ${!isGlobal ? `
-    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;border:1.5px solid var(--border)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--text)">📏 Geofence Buffer Radius</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">Employees must punch in within this distance from the office pin</div>
-        </div>
-        <div style="font-size:22px;font-weight:800;color:var(--accent)" id="live-radius-lbl">${loc.radius_meters}m</div>
-      </div>
-      <input type="range" class="buffer-slider" id="live-radius-slider"
-             min="50" max="2000" step="50" value="${loc.radius_meters}"
-             oninput="onLiveRadiusChange(this.value)">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
-        <span>50m</span><span>500m</span><span>1000m</span><span>2000m</span>
-      </div>
-      <button class="btn btn-success btn-sm" style="margin-top:12px" onclick="saveRadius(${loc.id})">💾 Save Buffer</button>
     </div>
-    ` : `
-    <div style="background:var(--accent-l);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;border-left:3px solid var(--accent)">
-      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px">🌍 Universal Access Zone</div>
-      <div style="font-size:12px;color:var(--accent);line-height:1.5">No GPS boundary is enforced here. Punch-in rules for each employee are set individually in the <strong>Employee Buffer Rules</strong> section below.</div>
-    </div>
-    `}
+    ` : ''}
 
-    <!-- ── Info note about punch rules ── -->
-    <div style="background:#fefce8;border:1.5px solid #fde68a;border-radius:var(--radius-sm);padding:11px 14px;display:flex;gap:10px;align-items:flex-start">
-      <span style="font-size:16px;line-height:1">💡</span>
-      <div style="font-size:12px;color:#78350f;line-height:1.5">
-        <strong>Individual punch-in rules</strong> (Office / District / State / Universal) are managed per employee in the <strong>Employee Buffer Rules</strong> section on this page — not here. This popup only controls the location's geofence boundary.
+    <!-- Assigned Employees -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">👥 Assigned Employees (${assigned.length})</div>
+        <button class="btn btn-outline btn-sm" onclick="openAssignModal(${loc.id})">+ Manage</button>
       </div>
+      ${assigned.length ? `
+      <div style="max-height:240px;overflow-y:auto">
+        ${assigned.map(e => `
+          <div class="emp-assign-row">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
+              <div>
+                <div style="font-size:12.5px;font-weight:600">${e.first_name} ${e.last_name}</div>
+                <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.designation_title||e.role}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${e.is_universal
+                ? '<span style="font-size:9.5px;font-weight:700;background:var(--accent-l);color:var(--accent);padding:2px 7px;border-radius:20px">Universal</span>'
+                : '<span style="font-size:9.5px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:20px">Strict</span>'}
+              <button onclick="removeAssignment(${loc.id}, ${e.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px;line-height:1" title="Remove">✕</button>
+            </div>
+          </div>`).join('')}
+      </div>` : `
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+        No employees assigned yet. <a href="#" onclick="openAssignModal(${loc.id});return false" style="color:var(--accent)">Add now →</a>
+      </div>`}
     </div>
   `;
 
-  openModal('loc-detail-modal');
   updateSliderBg(document.getElementById('live-radius-slider'));
 }
 
@@ -931,7 +931,6 @@ async function toggleLocActive(locId, activate) {
 let _deleteLocId = null;
 
 async function openDeleteLocation(locId, locName) {
-  closeModal('loc-detail-modal');
   _deleteLocId = locId;
 
   // Check assigned employees first
@@ -1031,7 +1030,6 @@ function openAddLocation() {
 }
 
 function openEditLocation(id) {
-  closeModal('loc-detail-modal');
   const loc = _allLocations.find(l => l.id === id);
   if (!loc) return;
   const isGlobal = loc.radius_meters >= 10000;
@@ -1055,13 +1053,8 @@ function openEditLocation(id) {
 
 function onLocTypeChange() {
   const type = document.getElementById('loc-type-sel').value;
-  // For office: show lat/lng + radius, hide global note
-  // For state: show lat/lng but hide radius slider (it's set to max automatically), show global note
-  // For wfh: hide lat/lng and radius, show global note
+  const showLatLng = type === 'office' || type === 'state';
   document.getElementById('lat-lng-fields').style.display = type === 'wfh' ? 'none' : '';
-  // Hide the buffer radius slider row for non-office types (radius is irrelevant for global zones)
-  const radiusRow = document.getElementById('loc-radius-row');
-  if (radiusRow) radiusRow.style.display = type === 'office' ? '' : 'none';
   document.getElementById('loc-global-note').style.display = type !== 'office' ? '' : 'none';
 }
 
@@ -1113,7 +1106,6 @@ async function saveLocation() {
 let _assignLocName = '';
 
 async function openAssignModal(locId) {
-  closeModal('loc-detail-modal');
   _assignLocId = locId;
   const loc = _allLocations.find(l => l.id === locId);
   _assignLocName = loc?.name || '';
@@ -1276,7 +1268,6 @@ const BR_DISTRICTS = {"ANDAMAN & NICOBAR": ["Nicobars", "North And Middle Andama
 let _brAllEmps   = [];
 let _brAllRules  = [];
 let _brRuleType  = '';
-let _brConflicts = new Set();
 
 async function initBufferRules() {
   // Populate state selects
@@ -1329,43 +1320,6 @@ async function loadAllRules() {
   ]);
   _brAllEmps  = empData?.data  || [];
   _brAllRules = ruleData?.data || [];
-
-  // ── Conflict Detection ────────────────────────────────────────────
-  // A conflict = employee has a geofence location assigned (office/district/state type)
-  // BUT their buffer rule is "universal" — they bypass the restriction silently.
-  // We detect this by checking: rule_type === 'universal' AND the employee also has
-  // a non-universal geofence location assignment (radius_meters < 10000 = strict office).
-  // We use _allLocations to cross-check if employee is tied to a strict location.
-  _brConflicts = new Set();
-  _brAllRules.forEach(r => {
-    if (r.rule_type === 'universal') {
-      // Check if this employee is assigned to a strict office location
-      const hasStrictLoc = _allLocations.some(loc =>
-        loc.is_active &&
-        loc.radius_meters < 10000 &&
-        !loc.name.toLowerCase().includes('wfh') &&
-        !loc.name.toLowerCase().includes('work from home') &&
-        parseInt(loc.assigned_count || 0) > 0
-      );
-      // More precise: check employee_geofence via the rule's geofence data
-      // Since we don't have per-employee location data here, we flag universal
-      // employees who are ONSITE (they work onsite but can punch anywhere)
-      if (r.employee_type === 'onsite' && r.rule_type === 'universal') {
-        _brConflicts.add(r.id);
-      }
-    }
-  });
-
-  const conflictCount = _brConflicts.size;
-  const alertEl = document.getElementById('br-conflict-alert');
-  if (conflictCount > 0) {
-    document.getElementById('br-conflict-count').textContent = conflictCount;
-    alertEl.style.display = 'block';
-    alertEl.style.animation = 'slideIn .3s ease';
-  } else {
-    alertEl.style.display = 'none';
-  }
-
   brRenderTable(_brAllRules);
 }
 
@@ -1529,7 +1483,6 @@ function brRenderTable(rules) {
   body.innerHTML = rules.map(r => {
     const name    = `${r.first_name} ${r.last_name}`.trim();
     const rt      = r.rule_type || null;
-    const isConflict = _brConflicts.has(r.id);
     const boundary= rt === 'district' ? `${r.district}, ${r.state}`
                   : rt === 'state'    ? r.state
                   : rt === 'office'   ? 'Office radius'
@@ -1537,15 +1490,9 @@ function brRenderTable(rules) {
                   : '—';
     const badgeCls = typeCls[rt] || 'br-none';
     const empBadge = `<span class="br-emp-type ${empTypeCls[r.employee_type]||'br-none'}">${r.employee_type||'—'}</span>`;
-    const conflictBadge = isConflict
-      ? ` <span class="conflict-badge" title="ONSITE employee with Universal rule — bypasses geofence!">⚠️ Conflict</span>`
-      : '';
-    const rowStyle = isConflict
-      ? 'border-bottom:1px solid var(--border);background:#fff7ed'
-      : 'border-bottom:1px solid var(--border)';
-    return `<tr style="${rowStyle}">
+    return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:8px 10px">
-        <div style="font-weight:600;font-size:13px">${name}${conflictBadge}</div>
+        <div style="font-weight:600;font-size:13px">${name}</div>
         <div style="font-size:11px;color:var(--muted)">${r.employee_code}</div>
       </td>
       <td style="padding:8px 10px">${empBadge}</td>
@@ -1555,7 +1502,7 @@ function brRenderTable(rules) {
       <td style="padding:8px 10px;font-size:12px;color:var(--text2)">${boundary}</td>
       <td style="padding:8px 10px;text-align:center">
         <button class="btn btn-ghost btn-sm" style="margin-right:4px"
-          onclick="brEditRow(${r.id},'${name.replace(/'/g,"\\'")}','${rt||''}','${r.state||''}','${r.district||''}')">✏️</button>
+          onclick="brEditRow(${r.id},'${name.replace(/'/g,"\'")}','${rt||''}','${r.state||''}','${r.district||''}')">✏️</button>
         ${rt ? `<button class="btn btn-ghost btn-sm" onclick="brDelete(${r.id})">🗑️</button>` : ''}
       </td>
     </tr>`;
@@ -1590,3 +1537,4 @@ function brHideMsg() {
 
 </script>
 </body>
+</html>
