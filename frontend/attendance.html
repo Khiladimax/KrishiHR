@@ -1217,14 +1217,8 @@ function openMapPunch(type) {
     });
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
-    loadOfficeBuffers().then(() => {
-      // Auto-fit map to show all office circles if GPS not yet ready
-      if (_mapCircles.length > 0 && !_pLat) {
-        const bounds = new google.maps.LatLngBounds();
-        _mapCircles.forEach(c => { if (c.getBounds) bounds.union(c.getBounds()); });
-        if (!bounds.isEmpty()) _map.fitBounds(bounds);
-      }
-    });
+    // loadOfficeBuffers() is called AFTER GPS fix so fitBounds always includes
+    // both the district boundary AND the user's blue dot in the same view.
 
     if (!navigator.geolocation) {
       setMapStatus('fail', '⚠ GPS not supported. You can still punch manually.');
@@ -1271,6 +1265,8 @@ function openMapPunch(type) {
       setMapStatus('fail', '⚠ Location access denied. You can still punch without GPS — your punch will be recorded without location.');
       document.getElementById('confirm-punch-btn').disabled = false;
       document.getElementById('map-acc').textContent = 'No GPS — punch will be recorded without location data.';
+      // Still draw the boundary even without GPS so employee can see their zone
+      loadOfficeBuffers().catch(()=>{});
     }, { timeout: 15000, enableHighAccuracy: true });
   }, 150);
 }
