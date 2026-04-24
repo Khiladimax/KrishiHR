@@ -1250,8 +1250,22 @@ function openMapPunch(type) {
         _mapInfoWindow.setContent('<b>Your Location</b>');
         _mapInfoWindow.open(_map, _mapMarker);
       });
-      _map.panTo({ lat: _pLat, lng: _pLng });
-      _map.setZoom(16);
+      // For district/state employees: re-fit bounds to show both boundary + dot
+      // For office employees: just zoom to location
+      const _ruleCheck = await api('GET', '/auth/me').catch(()=>null);
+      const _empIdCheck = _ruleCheck?.data?.id || _ruleCheck?.id;
+      let _ruleType = null;
+      if (_empIdCheck) {
+        const _rd = await api('GET', `/geofence/buffer-rules/${_empIdCheck}`).catch(()=>null);
+        _ruleType = _rd?.data?.rule_type || null;
+      }
+      if (_ruleType === 'district' || _ruleType === 'state') {
+        // Redraw boundary with employee dot now included in fitBounds
+        await loadOfficeBuffers();
+      } else {
+        _map.panTo({ lat: _pLat, lng: _pLng });
+        _map.setZoom(15);
+      }
       validateGeo(_pLat, _pLng);
     }, () => {
       setMapStatus('fail', '⚠ Location access denied. You can still punch without GPS — your punch will be recorded without location.');
@@ -1262,42 +1276,104 @@ function openMapPunch(type) {
 }
 
 async function loadOfficeBuffers() {
-  // Try employee's own assigned locations first, fall back to all locations
-  let data = await api('GET', '/geofence/my-locations');
-  // If no locations returned (universal employee with no specific assignment),
-  // fetch all geofence locations so we can still show them on the map
-  if (!data?.success || !data.data?.length) {
-    data = await api('GET', '/geofence/locations');
-  }
-  if (!data?.success || !data.data?.length) return;
-  _mapCircles.forEach(c => { c.setMap(null); });
+  _mapCircles.forEach(c => { if (c.setMap) c.setMap(null); });
   _mapCircles = [];
+
+  // ── Step 1: Load employee's buffer rule (district / state / office / universal)
+  const session = await api('GET', '/auth/me');
+  const empId = session?.data?.id || session?.id;
+  let ruleData = null;
+  if (empId) {
+    const rd = await api('GET', `/geofence/buffer-rules/${empId}`);
+    ruleData = rd?.data || null;
+  }
+
+  const ruleType = ruleData?.rule_type || null;
+
+  // ── Step 2: Draw boundary based on rule type ───────────────────────────────
+  if (ruleType === 'district' && ruleData.state && ruleData.district) {
+    await drawDistrictBoundary(ruleData.state, ruleData.district);
+    return; // don't draw circles for district employees
+  }
+
+  if (ruleType === 'state' && ruleData.state) {
+    await drawStateBoundary(ruleData.state);
+    return;
+  }
+
+  if (ruleType === 'universal') {
+    // Show a large blue overlay — punch from anywhere
+    const universalCircle = new google.maps.Circle({
+      map: _map, center: { lat: 20.5937, lng: 78.9629 }, radius: 2500000,
+      strokeColor: '#3b82f6', strokeOpacity: 0.3, strokeWeight: 1.5,
+      fillColor: '#3b82f6', fillOpacity: 0.04
+    });
+    _mapCircles.push(universalCircle);
+    return;
+  }
+
+  // ── Step 3: Office rule (or no rule) — draw office circles ────────────────
+  let data = await api('GET', '/geofence/my-locations');
+  if (!data?.success || !data.data?.length) data = await api('GET', '/geofence/locations');
+  if (!data?.success || !data.data?.length) return;
+
   data.data.forEach(loc => {
     const lat = +loc.latitude, lng = +loc.longitude;
-    if (!lat || !lng) return;
-    const isUniversal = loc.is_universal;
-    const circleColor = isUniversal ? '#3b82f6' : '#10b981';
+    if (!lat || !lng || loc.radius_meters >= 10000) return;
     const circle = new google.maps.Circle({
-      map: _map,
-      center: { lat, lng },
-      radius: loc.radius_meters || 200,
-      strokeColor: circleColor, strokeOpacity: 0.85, strokeWeight: 2.5,
-      fillColor: circleColor, fillOpacity: 0.12
-    });
-    const labelMarker = new google.maps.Marker({
-      position: { lat, lng },
-      map: _map,
-      icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>`),
-        scaledSize: new google.maps.Size(1, 1)
-      },
-      label: { text: loc.name, color: '#fff', fontSize: '11px', fontWeight: '700', className: '' },
-      zIndex: 5
+      map: _map, center: { lat, lng }, radius: loc.radius_meters || 200,
+      strokeColor: '#10b981', strokeOpacity: 0.85, strokeWeight: 2.5,
+      fillColor: '#10b981', fillOpacity: 0.12
     });
     const infoW = new google.maps.InfoWindow({ content: `<b>${loc.name}</b><br>📏 ${loc.radius_meters}m buffer` });
     circle.addListener('click', () => infoW.open(_map));
-    _mapCircles.push(circle, labelMarker);
+    _mapCircles.push(circle);
   });
+}
+
+// ── Draw district polygon from backend boundary API ────────────────────────
+async function drawDistrictBoundary(state, district) {
+  try {
+    const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}`);
+    const coords = res?.data?.coordinates;
+    if (!coords || !coords[0]) return;
+    const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+    const poly = new google.maps.Polygon({
+      paths: ring, map: _map,
+      strokeColor: '#10b981', strokeOpacity: 0.9, strokeWeight: 3,
+      fillColor: '#10b981', fillOpacity: 0.12
+    });
+    _mapCircles.push(poly);
+    // Fit bounds to polygon + employee dot
+    const bounds = new google.maps.LatLngBounds();
+    ring.forEach(pt => bounds.extend(pt));
+    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
+  } catch (e) { console.error('drawDistrictBoundary:', e); }
+}
+
+// ── Draw state polygons from backend boundary API ──────────────────────────
+async function drawStateBoundary(state) {
+  try {
+    const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}`);
+    const districts = res?.data;
+    if (!districts?.length) return;
+    const bounds = new google.maps.LatLngBounds();
+    districts.forEach(d => {
+      const coords = d.coordinates;
+      if (!coords || !coords[0]) return;
+      const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+      const poly = new google.maps.Polygon({
+        paths: ring, map: _map,
+        strokeColor: '#10b981', strokeOpacity: 0.7, strokeWeight: 2,
+        fillColor: '#10b981', fillOpacity: 0.08
+      });
+      _mapCircles.push(poly);
+      ring.forEach(pt => bounds.extend(pt));
+    });
+    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    if (!bounds.isEmpty()) _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
+  } catch (e) { console.error('drawStateBoundary:', e); }
 }
 
 async function validateGeo(lat, lng) {
