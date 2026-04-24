@@ -1279,7 +1279,7 @@ async function initLiveLocationCard() {
 
   card.style.display = '';
   _liveMap = new google.maps.Map(document.getElementById('live-map'), {
-    zoom: 1, center: { lat: 20.5937, lng: 78.9629 },
+    zoom: 5, center: { lat: 22.5, lng: 80.0 },  // India center — fitBounds overrides after boundary loads
     mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: false,
     zoomControl: true, gestureHandling: 'greedy', clickableIcons: false
   });
@@ -1374,13 +1374,26 @@ function updateLiveDot(lat, lng, accuracy, rule) {
     });
   } else { _liveDot.setPosition(pos); }
 
-  // On first GPS fix: re-fit bounds to include BOTH boundary + user dot
+  // On first GPS fix: only re-fit to include user if they are within 100km of boundary.
+  // If district employee is in wrong city (e.g. Mumbai but assigned Azamgarh),
+  // keep boundary zoomed — just drop the blue dot without zooming out.
   if (!_liveInitialized) {
     _liveInitialized = true;
     const b = new google.maps.LatLngBounds();
-    _liveCircles.forEach(c => { if (c.getBounds) b.union(c.getBounds()); else if (c.getPath) c.getPath().forEach(p => b.extend(p)); });
-    b.extend(pos);
-    if (!b.isEmpty()) _liveMap.fitBounds(b, { top: 50, bottom: 50, left: 50, right: 50 });
+    _liveCircles.forEach(c => {
+      if (c.getBounds) b.union(c.getBounds());
+      else if (c.getPath) c.getPath().forEach(p => b.extend(p));
+    });
+    if (!b.isEmpty()) {
+      const distToCenter = google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(lat, lng), b.getCenter()
+      );
+      if (distToCenter < 100000) {
+        b.extend(pos);
+        _liveMap.fitBounds(b, { top: 50, bottom: 50, left: 50, right: 50 });
+      }
+      // else: user is far from boundary — boundary stays zoomed, dot just appears
+    }
   }
 
   // Update status badge + distance text
@@ -1443,7 +1456,7 @@ function openMapPunch(type) {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 1, center: { lat: 20.5937, lng: 78.9629 },
+      zoom: 5, center: { lat: 22.5, lng: 80.0 },  // India — fitBounds fires once GPS+boundary ready
       mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: true,
       mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
       gestureHandling: 'greedy'
@@ -1535,11 +1548,14 @@ async function drawDistrictBoundary(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
+    // Fit map to district boundary ONLY (not user location).
+    // If user is far away (e.g. Mumbai → Azamgarh = 1261km), including user in bounds
+    // would zoom out to show all of India — useless. Show district zoomed in instead.
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(pt => bounds.extend(pt));
-    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
-    _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
-    // Distance calculation
+    _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+
+    // Distance calculation — show in status bar only (no map popup)
     if (_pLat && _pLng) {
       const u = new google.maps.LatLng(_pLat, _pLng);
       let minDist = Infinity;
@@ -1554,13 +1570,6 @@ async function drawDistrictBoundary(state, district) {
       const dTxt = minDist < 1000 ? `${Math.round(minDist)} m from boundary` : `${(minDist/1000).toFixed(1)} km from boundary`;
       const el = document.getElementById('map-status');
       if (el) el.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${dTxt}</b>`;
-      if (_mapInfoWindow) _mapInfoWindow.close();
-      _mapInfoWindow = new google.maps.InfoWindow({
-        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8;white-space:nowrap">📏 ${dTxt}</div>`,
-        position: u, disableAutoPan: true
-      });
-      _mapInfoWindow.open(_map);
-      setTimeout(() => _mapInfoWindow && _mapInfoWindow.close(), 6000);
     }
   } catch(e) { console.error('drawDistrictBoundary:', e); }
 }
@@ -1577,7 +1586,7 @@ async function drawStateBoundary(state) {
       new google.maps.Polygon({ paths: ring, map: _map, strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2, fillColor: '#ec4899', fillOpacity: 0.08 });
       ring.forEach(pt => bounds.extend(pt));
     });
-    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
+    // Fit to state boundary only — not user location (could be in different state)
     if (!bounds.isEmpty()) _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
   } catch(e) { console.error('drawStateBoundary:', e); }
 }
