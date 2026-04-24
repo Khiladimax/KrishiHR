@@ -1410,13 +1410,17 @@ async function drawDistrictPolygon(state, district) {
     // Smart fitBounds: if user is within 200km of district, show both together.
     // If farther (e.g. Mumbai→Azamgarh = 1261km), show district zoomed + place user dot off-screen
     // with a visible "Your Location" mini-marker at district center edge so user knows they're far.
-    // Always include both district boundary AND user location in bounds.
-    // If 1200km apart, map zooms to India level — employee sees exactly
-    // where they are vs where their district is. That's the correct UX.
-    const bounds = new google.maps.LatLngBounds();
-    ring.forEach(p => bounds.extend(p));
-    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
-    _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
+    // Phase 1: Show overview with BOTH user + district so user sees context + line
+    const districtBounds = new google.maps.LatLngBounds();
+    ring.forEach(p => districtBounds.extend(p));
+    const overviewBounds = new google.maps.LatLngBounds();
+    ring.forEach(p => overviewBounds.extend(p));
+    if (_pLat && _pLng) overviewBounds.extend({ lat: _pLat, lng: _pLng });
+    _map.fitBounds(overviewBounds, { top: 60, bottom: 80, left: 60, right: 60 });
+    // Phase 2: After 2.5s, zoom into district so boundary is clearly visible
+    setTimeout(() => {
+      if (_map) _map.fitBounds(districtBounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    }, 2500);
     // Distance calculation + dotted line from user to nearest boundary point
     if (_pLat && _pLng) {
       const u = new google.maps.LatLng(_pLat, _pLng);
