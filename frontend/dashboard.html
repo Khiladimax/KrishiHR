@@ -1400,21 +1400,24 @@ async function loadOfficeBuffers() {
 async function drawDistrictPolygon(state, district) {
   try {
     const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}`);
-    if (!res?.data?.coordinates) return;
-    const ring = res.data.coordinates[0].map(([lng, lat]) => ({ lat, lng }));
+    const coords = res?.data?.coordinates;
+    if (!coords || !coords[0]) return;
+    const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
     new google.maps.Polygon({
       paths: ring, map: _map,
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 4,
       fillColor: '#ec4899', fillOpacity: 0.35
     });
-    // Smart fitBounds: if user is within 200km of district, show both together.
-    // If farther (e.g. Mumbai→Azamgarh = 1261km), show district zoomed + place user dot off-screen
-    // with a visible "Your Location" mini-marker at district center edge so user knows they're far.
-    // Single fitBounds: show BOTH user + district, stay there, no auto-zoom
+    // Show BOTH user + district. After fitBounds settles, enforce min zoom 5
+    // so map never zooms out past India level regardless of modal pixel size.
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(p => bounds.extend(p));
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
     _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
+    google.maps.event.addListenerOnce(_map, 'idle', () => {
+      if (_map.getZoom() < 5) _map.setZoom(5);
+    });
+
     // Distance calculation + dotted line from user to nearest boundary point
     if (_pLat && _pLng) {
       const u = new google.maps.LatLng(_pLat, _pLng);
@@ -1464,8 +1467,9 @@ async function drawDistrictPolygon(state, district) {
         _mapCircles.push(dottedLine);
       }
     }
-  } catch(e) { console.error('drawDistrictPolygon error', e); }
+  } catch(e) { console.error('drawDistrictBoundary:', e); }
 }
+
 
 async function drawStatePolygon(state) {
   try {
