@@ -1130,12 +1130,14 @@ async function saveEmpRadius(empId, locId) {
 
 // ── Employee rule change — show/hide state & district dropdowns inline ───────
 function onEmpRuleChange(empId, locId, sel) {
-  const rt        = sel.value;
-  const stateWrap = document.getElementById(`state-wrap-${empId}`);
-  const distSel   = document.getElementById(`dist-sel-${empId}`);
-  if (!stateWrap) return;
+  const rt         = sel.value;
+  const officeWrap = document.getElementById(`office-wrap-${empId}`);
+  const stateWrap  = document.getElementById(`state-wrap-${empId}`);
+  const distSel    = document.getElementById(`dist-sel-${empId}`);
+  // Show/hide office selector
+  if (officeWrap) officeWrap.style.display = rt === 'office' ? 'block' : 'none';
   // Show state picker for state or district rules
-  stateWrap.style.display = (rt === 'state' || rt === 'district') ? 'flex' : 'none';
+  if (stateWrap) stateWrap.style.display = (rt === 'state' || rt === 'district') ? 'flex' : 'none';
   // Show district picker only for district rule
   if (distSel) distSel.style.display = rt === 'district' ? 'block' : 'none';
 }
@@ -1164,8 +1166,11 @@ async function saveEmpRule(empId, locId) {
   let body = { employee_id: empId, rule_type: ruleType };
 
   if (ruleType === 'office') {
-    // Pass office_location_id in body so backend can assign AND clean up empty district/state locations
-    body.office_location_id = locId;
+    // Read from the office dropdown — user picks which office (Mumbai, Delhi, etc.)
+    const officeSel = document.getElementById(`office-sel-${empId}`);
+    const selectedOfficeId = officeSel ? parseInt(officeSel.value) : null;
+    if (!selectedOfficeId) { toast('Please select an office location', 'error'); return; }
+    body.office_location_id = selectedOfficeId;
   } else if (ruleType === 'universal') {
     body.state = null; body.district = null;
   } else if (ruleType === 'state') {
@@ -1188,7 +1193,10 @@ async function saveEmpRule(empId, locId) {
     if (ruleType === 'district') toastMsg = `✓ Moved to District: ${body.district}, ${body.state}`;
     else if (ruleType === 'state') toastMsg = `✓ Moved to State: ${body.state}`;
     else if (ruleType === 'universal') toastMsg = '✓ Set to Universal — punch from anywhere';
-    else if (ruleType === 'office') toastMsg = `✓ Moved back to ${loc?.name || 'office'} — empty district/state location deleted`;
+    else if (ruleType === 'office') {
+      const officeLoc = _allLocations.find(l => l.id === body.office_location_id);
+      toastMsg = `✓ Moved to ${officeLoc?.name || 'office'} — empty locations cleaned up`;
+    }
     toast(toastMsg);
 
     // ── Full reload: locations, rules, employee caches ─────────────────────
@@ -1593,6 +1601,14 @@ function empSubRow(locId) {
             <option value="universal" ${rt==='universal'?'selected':''}>🌍 Universal</option>
           </select>
         </div>
+        <!-- Office picker — shown when rule = office -->
+        <div id="office-wrap-${e.id}" style="display:${rt==='office'?'block':'none'};margin-top:4px">
+          <select class="g-loc-select" id="office-sel-${e.id}">
+            <option value="">— select office location —</option>
+            ${_allLocations.filter(l => l.radius_meters < 10000 && l.is_active).map(l => `<option value="${l.id}" ${(rule?.rule_type==='office' && l.id==locId)?'selected':''}>${l.name}</option>`).join('')}
+          </select>
+        </div>
+        <!-- State / District pickers -->
         <div id="state-wrap-${e.id}" style="display:${(rt==='state'||rt==='district')?'flex':'none'};flex-direction:column;gap:3px">
           <select class="g-loc-select" id="state-sel-${e.id}" onchange="onStateChange(${e.id})">
             <option value="">— select state —</option>
