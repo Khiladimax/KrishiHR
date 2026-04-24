@@ -1250,23 +1250,23 @@ function openMapPunch(type) {
         _mapInfoWindow.setContent('<b>Your Location</b>');
         _mapInfoWindow.open(_map, _mapMarker);
       });
-      // For district/state employees: re-fit bounds to show both boundary + dot
-      // For office employees: just zoom to location
-      const _ruleCheck = await api('GET', '/auth/me').catch(()=>null);
-      const _empIdCheck = _ruleCheck?.data?.id || _ruleCheck?.id;
-      let _ruleType = null;
-      if (_empIdCheck) {
-        const _rd = await api('GET', `/geofence/buffer-rules/${_empIdCheck}`).catch(()=>null);
-        _ruleType = _rd?.data?.rule_type || null;
-      }
-      if (_ruleType === 'district' || _ruleType === 'state') {
-        // Redraw boundary with employee dot now included in fitBounds
-        await loadOfficeBuffers();
-      } else {
-        _map.panTo({ lat: _pLat, lng: _pLng });
-        _map.setZoom(15);
-      }
-      validateGeo(_pLat, _pLng);
+      // Wrap in async IIFE — geolocation callback is not async
+      (async () => {
+        const _ruleCheck = await api('GET', '/auth/me').catch(()=>null);
+        const _empIdCheck = _ruleCheck?.data?.id || _ruleCheck?.id;
+        let _ruleType = null;
+        if (_empIdCheck) {
+          const _rd = await api('GET', `/geofence/buffer-rules/${_empIdCheck}`).catch(()=>null);
+          _ruleType = _rd?.data?.rule_type || null;
+        }
+        if (_ruleType === 'district' || _ruleType === 'state') {
+          await loadOfficeBuffers();
+        } else {
+          _map.panTo({ lat: _pLat, lng: _pLng });
+          _map.setZoom(15);
+        }
+        validateGeo(_pLat, _pLng);
+      })();
     }, () => {
       setMapStatus('fail', '⚠ Location access denied. You can still punch without GPS — your punch will be recorded without location.');
       document.getElementById('confirm-punch-btn').disabled = false;
