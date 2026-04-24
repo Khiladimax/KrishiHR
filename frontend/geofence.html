@@ -1164,7 +1164,8 @@ async function saveEmpRule(empId, locId) {
   let body = { employee_id: empId, rule_type: ruleType };
 
   if (ruleType === 'office') {
-    await api('POST', '/geofence/assign', { employee_id: empId, office_location_id: locId, is_universal: false });
+    // Pass office_location_id in body so backend can assign AND clean up empty district/state locations
+    body.office_location_id = locId;
   } else if (ruleType === 'universal') {
     body.state = null; body.district = null;
   } else if (ruleType === 'state') {
@@ -1182,36 +1183,41 @@ async function saveEmpRule(empId, locId) {
 
   const r = await api('POST', '/geofence/buffer-rules', body);
   if (r?.success) {
-    // Update boundary label inline without full re-render
-    const boundaryEl = document.getElementById(`boundary-${empId}`);
-    if (boundaryEl) {
-      boundaryEl.textContent = ruleType === 'district' ? `${body.district}, ${body.state}`
-        : ruleType === 'state' ? body.state
-        : ruleType === 'office' ? 'Office radius'
-        : ruleType === 'universal' ? 'Anywhere' : '—';
-    }
-    toast('Rule saved ✓');
-    // Update local rule cache
-    const idx = _allRules.findIndex(r2 => r2.id == empId);
-    const updated = { ...(_allRules[idx] || {}), ...body, id: empId };
-    if (idx >= 0) _allRules[idx] = updated; else _allRules.push(updated);
-    // Invalidate employee cache for this location and re-render sub-row
-    delete _locEmployees[locId];
-    const data = await api('GET', `/geofence/locations/${locId}/employees`);
-    const emps = data?.data || [];
-    _locEmployees[locId] = emps.map(e => ({ ...(_allEmployees.find(a => a.id === e.id)||{}), ...e }));
-    // Re-render sub-row
-    const subRow = document.getElementById('sub-' + locId);
-    if (subRow) {
-      const tmp = document.createElement('table');
-      tmp.innerHTML = '<tbody>' + empSubRow(locId) + '</tbody>';
-      subRow.replaceWith(tmp.querySelector('tr'));
-    }
-    // Update stats
-    const locData = await api('GET', '/geofence/locations');
+    const loc = _allLocations.find(l => l.id === locId);
+    let toastMsg = 'Rule saved ✓';
+    if (ruleType === 'district') toastMsg = `✓ Moved to District: ${body.district}, ${body.state}`;
+    else if (ruleType === 'state') toastMsg = `✓ Moved to State: ${body.state}`;
+    else if (ruleType === 'universal') toastMsg = '✓ Set to Universal — punch from anywhere';
+    else if (ruleType === 'office') toastMsg = `✓ Moved back to ${loc?.name || 'office'} — empty district/state location deleted`;
+    toast(toastMsg);
+
+    // ── Full reload: locations, rules, employee caches ─────────────────────
+    // This ensures: old office count drops, new district/state location appears
+    _locEmployees = {};
+    const [locData, ruleData] = await Promise.all([
+      api('GET', '/geofence/locations'),
+      api('GET', '/geofence/buffer-rules')
+    ]);
     _allLocations = locData?.data || [];
+    _allRules     = ruleData?.data || [];
+
+    // Keep the current row's location expanded if it still exists
+    const stillExpanded = new Set();
+    _expandedRows.forEach(id => { if (_allLocations.some(l => l.id === id)) stillExpanded.add(id); });
+    _expandedRows.clear();
+
     updateStats();
     renderLocTable();
+
+    // Re-expand rows that were open (the old office may still be expanded to show remaining staff)
+    for (const id of stillExpanded) {
+      await toggleExpand(id, true);
+    }
+
+    // Also expand the NEW location if one was auto-created
+    if (r.new_location_id && !stillExpanded.has(r.new_location_id)) {
+      await toggleExpand(r.new_location_id, true);
+    }
   } else toast(r?.message || 'Failed', 'error');
 }
 
