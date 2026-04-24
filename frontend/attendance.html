@@ -225,8 +225,6 @@
       <div class="topbar-title">Attendance</div>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-success btn-sm" id="punch-in-btn"  onclick="openMapPunch('in')"  style="display:none">⬤ Punch In</button>
-      <button class="btn btn-danger btn-sm"  id="punch-out-btn" onclick="openMapPunch('out')" style="display:none">◎ Punch Out</button>
       <button class="btn btn-sm" id="od-btn" onclick="openODModal()" style="display:none;background:#8b5cf6;color:white;border:none">🚗 Apply OD</button>
       <button class="btn btn-sm" id="wfh-btn" onclick="openWFHModal()" style="display:none;background:#0284c7;color:white;border:none">🏠 Apply WFH</button>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
@@ -235,6 +233,39 @@
   </div>
 
   <div class="content fade-in">
+
+    <!-- PUNCH STATUS BAR (dashboard-style) -->
+    <div class="punch-bar state-not-punched" id="punch-bar" style="margin-bottom:16px">
+      <div class="flex gap-3" style="align-items:center">
+        <div id="punch-status-dot" class="punch-status-dot"></div>
+        <div>
+          <div id="punch-status-text" style="font-weight:700;font-size:14.5px;color:var(--text)">Loading…</div>
+          <div id="punch-time-text" class="text-muted mt-1" style="font-size:12.5px"></div>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-success btn-sm" id="punch-in-btn" onclick="openMapPunch('in')" style="display:none">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+          Punch In
+        </button>
+        <button class="btn btn-danger btn-sm" id="punch-out-btn" onclick="openMapPunch('out')" style="display:none">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>
+          Punch Out
+        </button>
+      </div>
+    </div>
+
+    <!-- YOUR LOCATION CARD (live geo map, always visible) -->
+    <div class="card" id="location-card" style="margin-bottom:16px;display:none">
+      <div class="card-header" style="padding-bottom:10px">
+        <div class="card-title">
+          <span class="card-title-icon">📍</span> Your Location
+        </div>
+        <div id="loc-status-badge" style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#fef3c7;color:#92400e">Getting GPS…</div>
+      </div>
+      <div id="live-map" style="width:100%;height:220px;border-radius:10px;border:1.5px solid var(--border);margin-bottom:10px"></div>
+      <div id="loc-distance-text" style="font-size:12px;color:var(--muted);padding:0 2px"></div>
+    </div>
 
     <!-- LEGEND PILLS -->
     <div class="flex gap-2 flex-wrap" style="margin-bottom:16px">
@@ -684,7 +715,7 @@
       <div class="map-status loading" id="map-status">📡 Getting your location…</div>
       <div id="punch-map" style="width:100%;height:320px;border-radius:12px;border:1.5px solid var(--border);margin-bottom:12px"></div>
       <div class="map-acc" id="map-acc"></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">🟢 Green circle = assigned office zone &nbsp;|&nbsp; 🔵 Blue circle = universal (punch from anywhere) &nbsp;|&nbsp; 🟦🌸 Blue border + pink fill = district/state boundary &nbsp;|&nbsp; 🔵 Blue dot = your location</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">🟢 Green circle = assigned office zone &nbsp;|&nbsp; 🔵 Blue circle = universal (punch from anywhere) &nbsp;|&nbsp; 🔵 Blue dot = your location</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('map-punch-backdrop').classList.remove('open')">Cancel</button>
@@ -787,6 +818,7 @@ for (let y = new Date().getFullYear(); y >= 2020; y--)
 loadCalendar();
 checkTodayPunch();
 showODWFHButtons();
+initLiveLocationCard();
 
 // ── Deep-link handler (notification clicks route here via #regularize:ID) ─────
 (function handleDeepLink() {
@@ -825,57 +857,76 @@ showODWFHButtons();
 })();
 
 async function checkTodayPunch() {
-  const inBtn  = document.getElementById('punch-in-btn');
-  const outBtn = document.getElementById('punch-out-btn');
-  inBtn.style.display  = 'none';
-  outBtn.style.display = 'none';
-
-  // Use IST for date calculations — server is UTC, user is IST
   const istToday = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
   const [istYear, istMonth, istDay] = istToday.split('-').map(Number);
-
-  // IST day-of-week (avoids UTC midnight boundary bug)
   const istDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
 
-  // Sunday → no punch ever
-  if (istDow === 0) return;
+  const inBtn  = document.getElementById('punch-in-btn');
+  const outBtn = document.getElementById('punch-out-btn');
+  inBtn.style.display = 'none'; outBtn.style.display = 'none';
 
-  // Saturday → check employee's saturday_policy
+  // Sunday → never
+  if (istDow === 0) { renderPunchBar(null, istDow); return; }
+
+  // Saturday → check policy (fail-open: show button if API fails)
   if (istDow === 6) {
-    // Fetch policy — default ALLOW (not block) if API fails
-    let satPolicy = 'all_working'; // fail-open: show button if we can't determine policy
+    let satPolicy = 'all_working';
     try {
       const me = await api('GET', '/auth/me');
       satPolicy = me?.data?.saturday_policy || me?.saturday_policy || 'all_working';
     } catch(e) { satPolicy = 'all_working'; }
-
     if (satPolicy === '2nd_4th_off') {
-      // Count how many Saturdays have occurred in this month up to today (IST)
       let satCount = 0;
       for (let d = 1; d <= istDay; d++) {
         if (new Date(istYear, istMonth - 1, d).getDay() === 6) satCount++;
       }
-      if (satCount === 2 || satCount === 4) return; // 2nd or 4th Saturday = off
+      if (satCount === 2 || satCount === 4) { renderPunchBar(null, istDow, true); return; }
     }
-    // all_working → fall through and show button
   }
 
-  // Fetch attendance records for this month
   const data = await api('GET', `/attendance?month=${istMonth}&year=${istYear}`);
   const records = data?.data || [];
   const todayRec = Array.isArray(records)
     ? records.find(r => (r.date_str || r.date?.toString().split('T')[0]) === istToday)
     : null;
 
-  if (!todayRec || !todayRec.punch_in) {
-    inBtn.style.display = 'flex';
-  } else if (!todayRec.punch_out) {
-    outBtn.style.display = 'flex';
-    startMovementTracking();
+  renderPunchBar(todayRec, istDow);
+  if (!todayRec || !todayRec.punch_in) inBtn.style.display = 'flex';
+  else if (!todayRec.punch_out) { outBtn.style.display = 'flex'; startMovementTracking(); }
+}
+
+function renderPunchBar(rec, dow, isHoliday = false) {
+  const bar     = document.getElementById('punch-bar');
+  const dot     = document.getElementById('punch-status-dot');
+  const txt     = document.getElementById('punch-status-text');
+  const timetxt = document.getElementById('punch-time-text');
+  if (!bar) return;
+
+  if (isHoliday || dow === 0) {
+    bar.className = 'punch-bar state-done';
+    dot.className = 'punch-status-dot done';
+    txt.textContent = dow === 0 ? '🌿 Sunday — Rest day' : '🏖 Holiday — No punch required';
+    timetxt.textContent = '';
+    return;
   }
-  // both punched → buttons stay hidden (done for the day)
+  if (!rec || !rec.punch_in) {
+    bar.className = 'punch-bar state-not-punched';
+    dot.className = 'punch-status-dot';
+    txt.textContent = 'Not punched in today';
+    timetxt.textContent = 'Tap Punch In to mark your attendance';
+  } else if (rec.punch_in && !rec.punch_out) {
+    bar.className = 'punch-bar state-working';
+    dot.className = 'punch-status-dot active';
+    txt.textContent = 'Currently working 🟠';
+    timetxt.textContent = `Punched in at ${rec.punch_in?.substring(0,5) || rec.punch_in}`;
+  } else {
+    bar.className = 'punch-bar state-done';
+    dot.className = 'punch-status-dot done';
+    txt.textContent = 'Done for the day ✅';
+    timetxt.textContent = `${rec.punch_in?.substring(0,5)} → ${rec.punch_out?.substring(0,5)}`;
+  }
 }
 
 async function loadEmployeeFilter() {
@@ -1208,12 +1259,183 @@ function showDayDetail(ds) {
 let _map = null, _mapMarker = null, _mapCircles = [], _mapInfoWindow = null,
     _punchType = 'in', _pLat = null, _pLng = null;
 
+// ── MAP STATE ─────────────────────────────────────────────────────────────────
+let _liveMap = null, _liveDot = null, _liveCircles = [], _liveInfoW = null;
+let _liveInitialized = false, _liveWatchId = null;
+
+// ── LIVE LOCATION CARD (always-visible map, like Android app) ─────────────────
+async function initLiveLocationCard() {
+  const card = document.getElementById('location-card');
+  if (!card) return;
+
+  // Fetch employee rule once
+  const session = await api('GET', '/auth/me').catch(() => null);
+  const empId = session?.data?.id || session?.id;
+  let rule = null;
+  if (empId) {
+    const rd = await api('GET', `/geofence/buffer-rules/${empId}`).catch(() => null);
+    rule = rd?.data || null;
+  }
+
+  card.style.display = '';
+  _liveMap = new google.maps.Map(document.getElementById('live-map'), {
+    zoom: 1, center: { lat: 20.5937, lng: 78.9629 },
+    mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: false,
+    zoomControl: true, gestureHandling: 'greedy', clickableIcons: false
+  });
+
+  // Draw boundary based on rule (no GPS needed)
+  await drawLiveBoundary(rule);
+
+  // Start GPS watch
+  if (navigator.geolocation) {
+    _liveWatchId = navigator.geolocation.watchPosition(pos => {
+      updateLiveDot(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, rule);
+    }, () => {
+      document.getElementById('loc-status-badge').textContent = '⛔ GPS denied';
+      document.getElementById('loc-status-badge').style.background = '#fee2e2';
+      document.getElementById('loc-status-badge').style.color = '#b91c1c';
+    }, { enableHighAccuracy: true, maximumAge: 15000 });
+  } else {
+    document.getElementById('loc-status-badge').textContent = '⚠ GPS not supported';
+  }
+}
+
+async function drawLiveBoundary(rule) {
+  if (!_liveMap) return;
+  const ruleType = rule?.rule_type;
+  if (ruleType === 'district' && rule.state && rule.district) {
+    const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(rule.state)}&district=${encodeURIComponent(rule.district)}`).catch(() => null);
+    const coords = res?.data?.coordinates;
+    if (!coords || !coords[0]) return;
+    const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+    const poly = new google.maps.Polygon({
+      paths: ring, map: _liveMap,
+      strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
+      fillColor: '#ec4899', fillOpacity: 0.12
+    });
+    _liveCircles.push(poly);
+    // Fit to district (user dot added later when GPS fires)
+    const b = new google.maps.LatLngBounds();
+    ring.forEach(p => b.extend(p));
+    _liveMap.fitBounds(b, { top: 40, bottom: 40, left: 40, right: 40 });
+    window._liveDistrictRing = ring; // save for distance calc
+
+  } else if (ruleType === 'state' && rule.state) {
+    const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(rule.state)}`).catch(() => null);
+    const districts = res?.data;
+    if (!districts?.length) return;
+    const b = new google.maps.LatLngBounds();
+    districts.forEach(d => {
+      if (!d.coordinates?.[0]) return;
+      const ring = d.coordinates[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+      const poly = new google.maps.Polygon({
+        paths: ring, map: _liveMap,
+        strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2,
+        fillColor: '#ec4899', fillOpacity: 0.08
+      });
+      _liveCircles.push(poly);
+      ring.forEach(p => b.extend(p));
+    });
+    if (!b.isEmpty()) _liveMap.fitBounds(b, { top: 40, bottom: 40, left: 40, right: 40 });
+
+  } else {
+    // Office / universal — draw green circles
+    let data = await api('GET', '/geofence/my-locations').catch(() => null);
+    if (!data?.success || !data.data?.length) data = await api('GET', '/geofence/locations').catch(() => null);
+    const locs = data?.data || [];
+    const b = new google.maps.LatLngBounds();
+    locs.forEach(loc => {
+      if (!loc.latitude || loc.radius_meters >= 10000) return;
+      const circle = new google.maps.Circle({
+        map: _liveMap, center: { lat: +loc.latitude, lng: +loc.longitude },
+        radius: loc.radius_meters || 200,
+        strokeColor: '#10b981', strokeOpacity: 0.85, strokeWeight: 2.5,
+        fillColor: '#10b981', fillOpacity: 0.12
+      });
+      _liveCircles.push(circle);
+      b.union(circle.getBounds());
+    });
+    if (!b.isEmpty()) _liveMap.fitBounds(b, { top: 40, bottom: 40, left: 40, right: 40 });
+  }
+}
+
+function updateLiveDot(lat, lng, accuracy, rule) {
+  if (!_liveMap) return;
+  const pos = { lat, lng };
+  // Place / move blue dot
+  if (!_liveDot) {
+    _liveDot = new google.maps.Marker({
+      position: pos, map: _liveMap, title: 'You',
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#4361ee" stroke="white" stroke-width="2.5"/></svg>'),
+        scaledSize: new google.maps.Size(18, 18), anchor: new google.maps.Point(9, 9)
+      }, zIndex: 10
+    });
+  } else { _liveDot.setPosition(pos); }
+
+  // On first GPS fix: re-fit bounds to include BOTH boundary + user dot
+  if (!_liveInitialized) {
+    _liveInitialized = true;
+    const b = new google.maps.LatLngBounds();
+    _liveCircles.forEach(c => { if (c.getBounds) b.union(c.getBounds()); else if (c.getPath) c.getPath().forEach(p => b.extend(p)); });
+    b.extend(pos);
+    if (!b.isEmpty()) _liveMap.fitBounds(b, { top: 50, bottom: 50, left: 50, right: 50 });
+  }
+
+  // Update status badge + distance text
+  const badge = document.getElementById('loc-status-badge');
+  const distEl = document.getElementById('loc-distance-text');
+
+  // Distance to boundary
+  let distText = '';
+  const ring = window._liveDistrictRing;
+  if (ring) {
+    const userPt = new google.maps.LatLng(lat, lng);
+    let minDist = Infinity;
+    for (let i = 0; i < ring.length; i++) {
+      const a = new google.maps.LatLng(ring[i].lat, ring[i].lng);
+      const b = new google.maps.LatLng(ring[(i+1) % ring.length].lat, ring[(i+1) % ring.length].lng);
+      const t = Math.max(0, Math.min(1,
+        ((userPt.lat()-a.lat())*(b.lat()-a.lat()) + (userPt.lng()-a.lng())*(b.lng()-a.lng())) /
+        ((b.lat()-a.lat())**2 + (b.lng()-a.lng())**2)
+      ));
+      const near = new google.maps.LatLng(a.lat()+t*(b.lat()-a.lat()), a.lng()+t*(b.lng()-a.lng()));
+      const d = google.maps.geometry.spherical.computeDistanceBetween(userPt, near);
+      if (d < minDist) minDist = d;
+    }
+    distText = minDist < 1000 ? `📏 ${Math.round(minDist)} m from boundary` : `📏 ${(minDist/1000).toFixed(1)} km from boundary`;
+    if (distEl) distEl.textContent = distText + (accuracy ? `  •  GPS accuracy: ±${Math.round(accuracy)}m` : '');
+  } else if (accuracy && distEl) {
+    distEl.textContent = `GPS accuracy: ±${Math.round(accuracy)}m`;
+  }
+
+  // Validate with backend (throttled to once per 60s)
+  const now = Date.now();
+  if (!window._lastValidateTime || now - window._lastValidateTime > 60000) {
+    window._lastValidateTime = now;
+    api('POST', '/geofence/validate', { latitude: lat, longitude: lng }).then(data => {
+      if (!data) return;
+      const r = data.data;
+      if (r.valid) {
+        badge.textContent = '✅ Inside boundary';
+        badge.style.background = '#dcfce7'; badge.style.color = '#15803d';
+      } else {
+        badge.textContent = '⛔ Outside boundary';
+        badge.style.background = '#fee2e2'; badge.style.color = '#b91c1c';
+      }
+    }).catch(() => {});
+  }
+}
+
+// ── PUNCH MODAL MAP ────────────────────────────────────────────────────────────
 function openMapPunch(type) {
   _punchType = type; _pLat = null; _pLng = null;
   document.getElementById('map-punch-backdrop').classList.add('open');
   document.getElementById('map-modal-title').textContent = type === 'in' ? '📍 Punch In — Verify Location' : '📍 Punch Out — Verify Location';
   document.getElementById('map-status').className = 'map-status loading';
   document.getElementById('map-status').innerHTML = '📡 Getting your location…';
+  document.getElementById('map-status').dataset.distText = '';
   document.getElementById('map-acc').textContent = '';
   document.getElementById('confirm-punch-btn').disabled = true;
 
@@ -1221,60 +1443,40 @@ function openMapPunch(type) {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 1,
-      center: { lat: 20.5937, lng: 78.9629 },
-      mapTypeId: 'roadmap',
-      streetViewControl: false,
-      mapTypeControl: true,
+      zoom: 1, center: { lat: 20.5937, lng: 78.9629 },
+      mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: true,
       mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
-      gestureHandling: 'greedy',
-      disableDefaultUI: false
+      gestureHandling: 'greedy'
     });
-    // Map starts at zoom 1 — fitBounds() inside loadOfficeBuffers/drawDistrictBoundary
-    // will be the ONLY camera movement, eliminating the India→district jump.
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
-    // loadOfficeBuffers() is called AFTER GPS fix so fitBounds always includes
-    // both the district boundary AND the user's blue dot in the same view.
 
     if (!navigator.geolocation) {
       setMapStatus('fail', '⚠ GPS not supported. You can still punch manually.');
       document.getElementById('confirm-punch-btn').disabled = false;
+      loadOfficeBuffers().catch(() => {});
       return;
     }
-    navigator.geolocation.getCurrentPosition(pos => {
+    navigator.geolocation.getCurrentPosition(async pos => {
       _pLat = pos.coords.latitude; _pLng = pos.coords.longitude;
       const acc = Math.round(pos.coords.accuracy);
       document.getElementById('map-acc').textContent = `GPS accuracy: ±${acc}m`;
       if (_mapMarker) _mapMarker.setMap(null);
       _mapMarker = new google.maps.Marker({
-        position: { lat: _pLat, lng: _pLng },
-        map: _map,
-        title: 'Your Location',
+        position: { lat: _pLat, lng: _pLng }, map: _map, title: 'Your Location',
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#4361ee" stroke="white" stroke-width="2.5"/></svg>'),
-          scaledSize: new google.maps.Size(18, 18),
-          anchor: new google.maps.Point(9, 9)
+          scaledSize: new google.maps.Size(18, 18), anchor: new google.maps.Point(9, 9)
         }
       });
-      _mapMarker.addListener('click', () => {
-        _mapInfoWindow.setContent('<b>Your Location</b>');
-        _mapInfoWindow.open(_map, _mapMarker);
-      });
-      // Wrap in async IIFE — geolocation callback is not async
-      // FIX: Always call loadOfficeBuffers() after GPS is available.
-      // loadOfficeBuffers() handles district/state/office/universal internally
-      // and always includes _pLat/_pLng in fitBounds (no double zoom, no jump).
-      (async () => {
-        await loadOfficeBuffers();
-        validateGeo(_pLat, _pLng);
-      })();
+      _mapMarker.addListener('click', () => { _mapInfoWindow.setContent('<b>Your Location</b>'); _mapInfoWindow.open(_map, _mapMarker); });
+      await loadOfficeBuffers();
+      validateGeo(_pLat, _pLng);
     }, () => {
-      setMapStatus('fail', '⚠ Location access denied. You can still punch without GPS — your punch will be recorded without location.');
+      setMapStatus('fail', '⚠ Location access denied. Punch will be recorded without GPS.');
       document.getElementById('confirm-punch-btn').disabled = false;
       document.getElementById('map-acc').textContent = 'No GPS — punch will be recorded without location data.';
-      // Still draw the boundary even without GPS so employee can see their zone
-      loadOfficeBuffers().catch(()=>{});
+      loadOfficeBuffers().catch(() => {});
     }, { timeout: 15000, enableHighAccuracy: true });
   }, 150);
 }
@@ -1282,154 +1484,87 @@ function openMapPunch(type) {
 async function loadOfficeBuffers() {
   _mapCircles.forEach(c => { if (c.setMap) c.setMap(null); });
   _mapCircles = [];
-
-  // ── Step 1: Load employee's buffer rule (district / state / office / universal)
-  const session = await api('GET', '/auth/me');
+  const session = await api('GET', '/auth/me').catch(() => null);
   const empId = session?.data?.id || session?.id;
-  let ruleData = null;
-  if (empId) {
-    const rd = await api('GET', `/geofence/buffer-rules/${empId}`);
-    ruleData = rd?.data || null;
+  let rule = null;
+  if (empId) { const rd = await api('GET', `/geofence/buffer-rules/${empId}`).catch(() => null); rule = rd?.data || null; }
+  const ruleType = rule?.rule_type;
+
+  if (ruleType === 'district' && rule.state && rule.district) {
+    await drawDistrictBoundary(rule.state, rule.district); return;
   }
-
-  const ruleType = ruleData?.rule_type || null;
-
-  // ── Step 2: Draw boundary based on rule type ───────────────────────────────
-  if (ruleType === 'district' && ruleData.state && ruleData.district) {
-    await drawDistrictBoundary(ruleData.state, ruleData.district);
-    return; // don't draw circles for district employees
+  if (ruleType === 'state' && rule.state) {
+    await drawStateBoundary(rule.state); return;
   }
-
-  if (ruleType === 'state' && ruleData.state) {
-    await drawStateBoundary(ruleData.state);
-    return;
-  }
-
   if (ruleType === 'universal') {
-    // Show a large blue overlay — punch from anywhere
-    const universalCircle = new google.maps.Circle({
-      map: _map, center: { lat: 20.5937, lng: 78.9629 }, radius: 2500000,
-      strokeColor: '#3b82f6', strokeOpacity: 0.3, strokeWeight: 1.5,
-      fillColor: '#3b82f6', fillOpacity: 0.04
-    });
-    _mapCircles.push(universalCircle);
-    // Pan to user if GPS available
+    setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
+    document.getElementById('confirm-punch-btn').disabled = false;
     if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
     return;
   }
-
-  // ── Step 3: Office rule (or no rule) — draw office circles ────────────────
-  let data = await api('GET', '/geofence/my-locations');
-  if (!data?.success || !data.data?.length) data = await api('GET', '/geofence/locations');
-  if (!data?.success || !data.data?.length) return;
-
-  // FIX: fitBounds after drawing office circles to show user + all circles
-  const officeBounds = new google.maps.LatLngBounds();
-  data.data.forEach(loc => {
-    const lat = +loc.latitude, lng = +loc.longitude;
-    if (!lat || !lng || loc.radius_meters >= 10000) return;
+  // Office rule
+  let data = await api('GET', '/geofence/my-locations').catch(() => null);
+  if (!data?.success || !data.data?.length) data = await api('GET', '/geofence/locations').catch(() => null);
+  const locs = data?.data || [];
+  const b = new google.maps.LatLngBounds();
+  locs.forEach(loc => {
+    if (!loc.latitude || loc.radius_meters >= 10000) return;
     const circle = new google.maps.Circle({
-      map: _map, center: { lat, lng }, radius: loc.radius_meters || 200,
+      map: _map, center: { lat: +loc.latitude, lng: +loc.longitude }, radius: loc.radius_meters || 200,
       strokeColor: '#10b981', strokeOpacity: 0.85, strokeWeight: 2.5,
       fillColor: '#10b981', fillOpacity: 0.12
     });
     const infoW = new google.maps.InfoWindow({ content: `<b>${loc.name}</b><br>📏 ${loc.radius_meters}m buffer` });
     circle.addListener('click', () => infoW.open(_map));
     _mapCircles.push(circle);
-    // Extend bounds by the circle's bounding box
-    officeBounds.union(circle.getBounds());
+    b.union(circle.getBounds());
   });
-  // Include user location in bounds if available
-  if (_pLat && _pLng) officeBounds.extend({ lat: _pLat, lng: _pLng });
-  if (!officeBounds.isEmpty()) {
-    _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
-  } else if (_pLat && _pLng) {
-    _map.panTo({ lat: _pLat, lng: _pLng });
-    _map.setZoom(14);
-  }
+  if (_pLat && _pLng) b.extend({ lat: _pLat, lng: _pLng });
+  if (!b.isEmpty()) _map.fitBounds(b, { top: 60, bottom: 60, left: 60, right: 60 });
+  else if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
 }
 
-// ── Draw district polygon from backend boundary API ────────────────────────
 async function drawDistrictBoundary(state, district) {
   try {
     const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}`);
     const coords = res?.data?.coordinates;
     if (!coords || !coords[0]) return;
     const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
-    const poly = new google.maps.Polygon({
+    new google.maps.Polygon({
       paths: ring, map: _map,
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
-    _mapCircles.push(poly);
-
-    // Build district bounds
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(pt => bounds.extend(pt));
-
-    // Always include user location in bounds so both are visible
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
     _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
-
-    // ── Calculate distance from user to nearest edge of district ─────────
+    // Distance calculation
     if (_pLat && _pLng) {
-      const userLatLng = new google.maps.LatLng(_pLat, _pLng);
-
-      // Find nearest point on any edge of the polygon ring
-      let minDistM = Infinity;
+      const u = new google.maps.LatLng(_pLat, _pLng);
+      let minDist = Infinity;
       for (let i = 0; i < ring.length; i++) {
         const a = new google.maps.LatLng(ring[i].lat, ring[i].lng);
-        const b = new google.maps.LatLng(ring[(i + 1) % ring.length].lat, ring[(i + 1) % ring.length].lng);
-        // Distance from user to segment ab: pick closest of nearest-point-on-segment or endpoints
-        const dA = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, a);
-        const dB = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, b);
-        // Interpolate along segment to find closest point
-        const segLen = google.maps.geometry.spherical.computeDistanceBetween(a, b);
-        let dSeg = Math.min(dA, dB);
-        if (segLen > 0) {
-          // Project user onto the segment using dot-product approximation
-          const t = Math.max(0, Math.min(1,
-            ((userLatLng.lat() - a.lat()) * (b.lat() - a.lat()) +
-             (userLatLng.lng() - a.lng()) * (b.lng() - a.lng())) /
-            ((b.lat() - a.lat()) ** 2 + (b.lng() - a.lng()) ** 2)
-          ));
-          const nearPt = new google.maps.LatLng(
-            a.lat() + t * (b.lat() - a.lat()),
-            a.lng() + t * (b.lng() - a.lng())
-          );
-          dSeg = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, nearPt);
-        }
-        if (dSeg < minDistM) minDistM = dSeg;
+        const b2 = new google.maps.LatLng(ring[(i+1)%ring.length].lat, ring[(i+1)%ring.length].lng);
+        const t = Math.max(0, Math.min(1, ((u.lat()-a.lat())*(b2.lat()-a.lat())+(u.lng()-a.lng())*(b2.lng()-a.lng()))/((b2.lat()-a.lat())**2+(b2.lng()-a.lng())**2)));
+        const near = new google.maps.LatLng(a.lat()+t*(b2.lat()-a.lat()), a.lng()+t*(b2.lng()-a.lng()));
+        const d = google.maps.geometry.spherical.computeDistanceBetween(u, near);
+        if (d < minDist) minDist = d;
       }
-
-      // Format distance
-      let distText;
-      if (minDistM < 1000) {
-        distText = `${Math.round(minDistM)} m`;
-      } else {
-        distText = `${(minDistM / 1000).toFixed(1)} km`;
-      }
-
-      // Show distance in the status bar — store in data attr so validateGeo doesn't wipe it
-      const statusEl = document.getElementById('map-status');
-      if (statusEl) {
-        statusEl.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${distText} from nearest boundary edge</b>`;
-        statusEl.innerHTML = (statusEl.innerHTML || '') + ' ' + statusEl.dataset.distText;
-      }
-      // Distance label on map — anchored to user dot, auto-closes after 6s
+      const dTxt = minDist < 1000 ? `${Math.round(minDist)} m from boundary` : `${(minDist/1000).toFixed(1)} km from boundary`;
+      const el = document.getElementById('map-status');
+      if (el) el.dataset.distText = `&nbsp;|&nbsp; 📏 <b>${dTxt}</b>`;
       if (_mapInfoWindow) _mapInfoWindow.close();
       _mapInfoWindow = new google.maps.InfoWindow({
-        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8;white-space:nowrap">📏 ${distText} from boundary</div>`,
-        position: userLatLng,
-        disableAutoPan: true
+        content: `<div style="font-size:12px;font-weight:600;color:#1d4ed8;white-space:nowrap">📏 ${dTxt}</div>`,
+        position: u, disableAutoPan: true
       });
       _mapInfoWindow.open(_map);
       setTimeout(() => _mapInfoWindow && _mapInfoWindow.close(), 6000);
     }
-  } catch (e) { console.error('drawDistrictBoundary:', e); }
+  } catch(e) { console.error('drawDistrictBoundary:', e); }
 }
 
-// ── Draw state polygons from backend boundary API ──────────────────────────
 async function drawStateBoundary(state) {
   try {
     const res = await api('GET', `/geofence/boundary?state=${encodeURIComponent(state)}`);
@@ -1437,20 +1572,14 @@ async function drawStateBoundary(state) {
     if (!districts?.length) return;
     const bounds = new google.maps.LatLngBounds();
     districts.forEach(d => {
-      const coords = d.coordinates;
-      if (!coords || !coords[0]) return;
-      const ring = coords[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
-      const poly = new google.maps.Polygon({
-        paths: ring, map: _map,
-        strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2,
-        fillColor: '#ec4899', fillOpacity: 0.08
-      });
-      _mapCircles.push(poly);
+      if (!d.coordinates?.[0]) return;
+      const ring = d.coordinates[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+      new google.maps.Polygon({ paths: ring, map: _map, strokeColor: '#1d4ed8', strokeOpacity: 0.85, strokeWeight: 2, fillColor: '#ec4899', fillOpacity: 0.08 });
       ring.forEach(pt => bounds.extend(pt));
     });
     if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
     if (!bounds.isEmpty()) _map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
-  } catch (e) { console.error('drawStateBoundary:', e); }
+  } catch(e) { console.error('drawStateBoundary:', e); }
 }
 
 async function validateGeo(lat, lng) {
@@ -1464,7 +1593,6 @@ async function validateGeo(lat, lng) {
 function setMapStatus(type, msg) {
   const el = document.getElementById('map-status');
   el.className = 'map-status ' + type;
-  // Re-append distance label if it was set (distance calc runs before validation)
   const distText = el.dataset.distText || '';
   el.innerHTML = msg + (distText ? ' ' + distText : '');
 }
