@@ -1354,12 +1354,34 @@ async function drawDistrictBoundary(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
-    // Fit map to district boundary ONLY (not user location).
-    // If user is far away (e.g. Mumbai → Azamgarh = 1261km), including user in bounds
-    // would zoom out to show all of India — useless. Show district zoomed in instead.
+    // Smart fitBounds: if user is within 200km of district show both, else show district + far-label.
     const bounds = new google.maps.LatLngBounds();
     ring.forEach(pt => bounds.extend(pt));
-    _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+
+    if (_pLat && _pLng) {
+      const districtCenter = bounds.getCenter();
+      const userPt = new google.maps.LatLng(_pLat, _pLng);
+      const distToCenter = google.maps.geometry.spherical.computeDistanceBetween(userPt, districtCenter);
+      if (distToCenter < 200000) {
+        bounds.extend({ lat: _pLat, lng: _pLng });
+        _map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+      } else {
+        _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+        const distKm = (distToCenter / 1000).toFixed(0);
+        const farLabel = new google.maps.Marker({
+          position: bounds.getSouthWest(), map: _map,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+              `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="22"><rect rx="4" width="140" height="22" fill="#4361ee" opacity="0.9"/><text x="70" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="white" font-family="Arial,sans-serif">📍 You are ${distKm}km away</text></svg>`
+            ),
+            scaledSize: new google.maps.Size(140, 22), anchor: new google.maps.Point(0, 22)
+          }, zIndex: 20
+        });
+        _mapCircles.push(farLabel);
+      }
+    } else {
+      _map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    }
 
     // Distance calculation — show in status bar only (no map popup)
     if (_pLat && _pLng) {
