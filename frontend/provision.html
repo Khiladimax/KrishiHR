@@ -239,7 +239,9 @@ function renderProvisionList(list) {
     if (isHR && status === 'not_initiated') {
       actions += `<button class="btn btn-primary btn-sm" onclick="openInitiate(${emp.id},'${emp.first_name} ${emp.last_name}')">🚀 Initiate</button>`;
     }
-    if (isHR && status === 'manager_approved') {
+    // Show HR final approve/reject only if this user is NOT the manager who already approved
+    const alreadyApprovedAsManager = emp.reporting_manager_id === currentUser.id;
+    if (isHR && status === 'manager_approved' && !alreadyApprovedAsManager) {
       actions += `<button class="btn btn-success btn-sm" onclick="openApprove(${emp.id},'${emp.first_name} ${emp.last_name}','hr')">✅ HR Approve</button>`;
       actions += `<button class="btn btn-danger btn-sm" onclick="openApprove(${emp.id},'${emp.first_name} ${emp.last_name}','hr_reject')">✗ Reject</button>`;
     }
@@ -288,14 +290,17 @@ async function loadApprovals() {
 
     // Manager/TL sees: employees where status is 'pending' (their direct reports)
     // Admin/super_admin who is the actual reporting_manager_id also sees 'pending' to approve as manager
-    // HR sees: 'manager_approved' (needs HR final approval)
+    // HR sees: 'manager_approved' (needs HR final approval) — but NOT if they were the reporting manager who already approved
     let mine = data.data.filter(e => {
       if (isMgr && !isHR) return e.overall_status === 'pending';
       if (isHR) {
         const adminIsReportingMgr = (currentUser.role === 'admin' || currentUser.role === 'super_admin')
                                     && e.reporting_manager_id === currentUser.id
                                     && e.overall_status === 'pending';
-        return adminIsReportingMgr || e.overall_status === 'manager_approved';
+        // Don't show HR approve button if this admin was the manager who already approved
+        const alreadyApprovedAsManager = e.reporting_manager_id === currentUser.id;
+        const needsHRApproval = e.overall_status === 'manager_approved' && !alreadyApprovedAsManager;
+        return adminIsReportingMgr || needsHRApproval;
       }
       return false;
     });
