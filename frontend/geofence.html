@@ -750,60 +750,35 @@ async function selectLocation(id) {
 async function renderDetailPanel(loc) {
   const isGlobal = loc.radius_meters >= 10000;
   const isWFH    = loc.name.toLowerCase().includes('work from home');
-  const typeLabel = isWFH ? '🏠 Work From Home' : isGlobal ? '🌍 State Zone (Global)' : '🏢 Office (Strict Geofence)';
-  const typeColor = isWFH ? '#8b5cf6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
-
-  // Fetch assigned employees for this location
-  const assigned = await fetchAssignedEmployees(loc.id);
+  const typeLabel = isWFH ? 'Work From Home' : isGlobal ? 'State Zone (Global)' : 'Office (Strict Geofence)';
+  const typeIcon  = isWFH ? '🏠' : isGlobal ? '🌍' : '🏢';
+  const typeBg    = isWFH ? '#ede9fe' : isGlobal ? 'var(--accent-l)' : '#dbeafe';
+  const typeColor = isWFH ? '#5b21b6' : isGlobal ? 'var(--accent)' : '#1d4ed8';
 
   document.getElementById('loc-detail-modal-title').textContent = loc.name;
   document.getElementById('loc-detail-modal-body').innerHTML = `
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+
+    <!-- ── Header: name + status + type ── -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px">
       <div>
-        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">${loc.name}</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;color:${typeColor}">${typeLabel}</span>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${typeBg};color:${typeColor}">${typeIcon} ${typeLabel}</span>
           ${loc.is_active
-            ? '<span style="font-size:10px;background:#d1fae5;color:#059669;padding:2px 7px;border-radius:20px;font-weight:700">Active</span>'
-            : '<span style="font-size:10px;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:20px;font-weight:700">Inactive</span>'}
+            ? '<span style="font-size:10px;background:#d1fae5;color:#059669;padding:3px 9px;border-radius:20px;font-weight:700">● Active</span>'
+            : '<span style="font-size:10px;background:#f1f5f9;color:#64748b;padding:3px 9px;border-radius:20px;font-weight:700">● Inactive</span>'}
         </div>
-        ${loc.address ? `<div style="font-size:12px;color:var(--muted);margin-top:5px">${loc.address}</div>` : ''}
+        ${loc.address ? `<div style="font-size:12px;color:var(--muted);line-height:1.5">${loc.address}</div>` : ''}
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" onclick="openEditLocation(${loc.id})">✏️ Edit</button>
-        <button class="btn btn-primary btn-sm" onclick="openAssignModal(${loc.id})">👤 Manage Employees</button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-outline btn-sm" onclick="openEditLocation(${loc.id})" title="Edit location">✏️ Edit</button>
         ${loc.is_active
-          ? `<button class="btn btn-ghost btn-sm" style="color:#b45309;border-color:#b45309" onclick="toggleLocActive(${loc.id}, false)">⏸ Deactivate</button>`
-          : `<button class="btn btn-ghost btn-sm" style="color:#059669;border-color:#059669" onclick="toggleLocActive(${loc.id}, true)">▶ Activate</button>`
-        }
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="openDeleteLocation(${loc.id}, '${loc.name.replace(/'/g, "\\'")}')">🗑️ Delete</button>
+          ? `<button class="btn btn-ghost btn-sm" style="color:#b45309;border-color:#fde68a" onclick="toggleLocActive(${loc.id}, false)" title="Deactivate">⏸</button>`
+          : `<button class="btn btn-ghost btn-sm" style="color:#059669;border-color:#6ee7b7" onclick="toggleLocActive(${loc.id}, true)" title="Activate">▶</button>`}
+        <button class="btn btn-ghost btn-sm" style="color:var(--red,#dc2626);border-color:#fca5a5" onclick="openDeleteLocation(${loc.id}, '${loc.name.replace(/'/g, "\\'")}')" title="Delete">🗑️</button>
       </div>
     </div>
 
-    ${!isGlobal ? `
-    <!-- Buffer Radius Editor -->
-    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px;border:1.5px solid var(--border)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:12px;font-weight:700;color:var(--text)">📏 Geofence Buffer Radius</div>
-        <div style="font-size:20px;font-weight:800;color:var(--accent)" id="live-radius-lbl">${loc.radius_meters}m</div>
-      </div>
-      <input type="range" class="buffer-slider" id="live-radius-slider"
-             min="50" max="2000" step="50" value="${loc.radius_meters}"
-             oninput="onLiveRadiusChange(this.value)">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
-        <span>50m</span><span>500m</span><span>1000m</span><span>2000m</span>
-      </div>
-      <button class="btn btn-success btn-sm" style="margin-top:10px" onclick="saveRadius(${loc.id})">💾 Save Buffer</button>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">Employees must punch in within this radius from the office center.</div>
-    </div>
-    ` : `
-    <div style="background:var(--accent-l);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;border-left:3px solid var(--accent)">
-      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px">🌍 Universal Access Zone</div>
-      <div style="font-size:12px;color:var(--accent)">Employees assigned here can punch in from anywhere — no GPS distance check is enforced. Suitable for field staff, WFH employees, and state-level operations.</div>
-    </div>
-    `}
-
-    <!-- Coordinates (non-WFH only) -->
+    <!-- ── Coordinates row ── -->
     ${(!isWFH && parseFloat(loc.latitude) !== 0) ? `
     <div style="display:flex;gap:10px;margin-bottom:16px">
       <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
@@ -814,37 +789,47 @@ async function renderDetailPanel(loc) {
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Longitude</div>
         <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace">${parseFloat(loc.longitude).toFixed(6)}</div>
       </div>
-    </div>
-    ` : ''}
-
-    <!-- Assigned Employees -->
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:12px;font-weight:700;color:var(--text)">👥 Assigned Employees (${assigned.length})</div>
-        <button class="btn btn-outline btn-sm" onclick="openAssignModal(${loc.id})">+ Manage</button>
+      <div style="flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--border)">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px">Assigned</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${loc.assigned_count || 0} employees</div>
       </div>
-      ${assigned.length ? `
-      <div style="max-height:240px;overflow-y:auto">
-        ${assigned.map(e => `
-          <div class="emp-assign-row">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${e.first_name?.[0]||'?'}</div>
-              <div>
-                <div style="font-size:12.5px;font-weight:600">${e.first_name} ${e.last_name}</div>
-                <div style="font-size:11px;color:var(--muted)">${e.employee_code} · ${e.designation_title||e.role}</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-              ${e.is_universal
-                ? '<span style="font-size:9.5px;font-weight:700;background:var(--accent-l);color:var(--accent);padding:2px 7px;border-radius:20px">Universal</span>'
-                : '<span style="font-size:9.5px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:20px">Strict</span>'}
-              <button onclick="removeAssignment(${loc.id}, ${e.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px;line-height:1" title="Remove">✕</button>
-            </div>
-          </div>`).join('')}
-      </div>` : `
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
-        No employees assigned yet. <a href="#" onclick="openAssignModal(${loc.id});return false" style="color:var(--accent)">Add now →</a>
-      </div>`}
+    </div>` : `
+    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:12px;color:var(--muted)">👥 Assigned employees</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text)">${loc.assigned_count || 0}</div>
+    </div>`}
+
+    <!-- ── Buffer radius (office only) ── -->
+    ${!isGlobal ? `
+    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;border:1.5px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--text)">📏 Geofence Buffer Radius</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Employees must punch in within this distance from the office pin</div>
+        </div>
+        <div style="font-size:22px;font-weight:800;color:var(--accent)" id="live-radius-lbl">${loc.radius_meters}m</div>
+      </div>
+      <input type="range" class="buffer-slider" id="live-radius-slider"
+             min="50" max="2000" step="50" value="${loc.radius_meters}"
+             oninput="onLiveRadiusChange(this.value)">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
+        <span>50m</span><span>500m</span><span>1000m</span><span>2000m</span>
+      </div>
+      <button class="btn btn-success btn-sm" style="margin-top:12px" onclick="saveRadius(${loc.id})">💾 Save Buffer</button>
+    </div>
+    ` : `
+    <div style="background:var(--accent-l);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;border-left:3px solid var(--accent)">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px">🌍 Universal Access Zone</div>
+      <div style="font-size:12px;color:var(--accent);line-height:1.5">No GPS boundary is enforced here. Punch-in rules for each employee are set individually in the <strong>Employee Buffer Rules</strong> section below.</div>
+    </div>
+    `}
+
+    <!-- ── Info note about punch rules ── -->
+    <div style="background:#fefce8;border:1.5px solid #fde68a;border-radius:var(--radius-sm);padding:11px 14px;display:flex;gap:10px;align-items:flex-start">
+      <span style="font-size:16px;line-height:1">💡</span>
+      <div style="font-size:12px;color:#78350f;line-height:1.5">
+        <strong>Individual punch-in rules</strong> (Office / District / State / Universal) are managed per employee in the <strong>Employee Buffer Rules</strong> section on this page — not here. This popup only controls the location's geofence boundary.
+      </div>
     </div>
   `;
 
