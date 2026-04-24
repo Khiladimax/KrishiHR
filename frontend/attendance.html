@@ -1372,14 +1372,17 @@ async function drawDistrictBoundary(state, district) {
       strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 2.5,
       fillColor: '#ec4899', fillOpacity: 0.12
     });
-    // Always show BOTH user location AND district boundary.
-    // Extend bounds with user dot so map automatically frames both.
-    // If they're 1200km apart, the map zooms to India level — that's correct,
-    // the employee can see exactly where they are vs where they need to be.
-    const bounds = new google.maps.LatLngBounds();
-    ring.forEach(p => bounds.extend(p));
-    if (_pLat && _pLng) bounds.extend({ lat: _pLat, lng: _pLng });
-    _map.fitBounds(bounds, { top: 60, bottom: 80, left: 60, right: 60 });
+    // Phase 1: Show overview with BOTH user + district so user sees context + line
+    const districtBounds = new google.maps.LatLngBounds();
+    ring.forEach(p => districtBounds.extend(p));
+    const overviewBounds = new google.maps.LatLngBounds();
+    ring.forEach(p => overviewBounds.extend(p));
+    if (_pLat && _pLng) overviewBounds.extend({ lat: _pLat, lng: _pLng });
+    _map.fitBounds(overviewBounds, { top: 60, bottom: 80, left: 60, right: 60 });
+    // Phase 2: After 2.5s, zoom into district so boundary is clearly visible
+    setTimeout(() => {
+      if (_map) _map.fitBounds(districtBounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    }, 2500);
 
     // Distance calculation + dotted line from user to nearest boundary point
     if (_pLat && _pLng) {
