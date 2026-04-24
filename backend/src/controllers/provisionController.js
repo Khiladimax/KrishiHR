@@ -6,19 +6,26 @@
 const emailSvc = require('../config/emailService');
 const db = require('../config/db');
 
-// ── Helper: calculate prorated leave for a partial month ─────────────────────
-// E.g. employee confirmed on 24 March → they worked (31-24)/31 fraction of March
-// Permanent accrual: EL=1.5, SL=0.5, CL=0.5 per month
+// ── Helper: calculate full-year prorated leave from confirmation month ────────
+// Calendar: January–December. On confirmation, employee gets full yearly allocation
+// prorated by remaining months (confirmation month inclusive through December).
+// Permanent yearly entitlement: EL=18, CL=6, SL=6 (total 30 paid leaves)
+// Per month: EL=1.5, CL=0.5, SL=0.5
+//
+// Example: Confirmed in April (month 4) → 9 months remaining (Apr–Dec)
+//   EL = 9 × 1.5 = 13.5,  CL = 9 × 0.5 = 4.5,  SL = 9 × 0.5 = 4.5  → total 22.5
+// Example: Confirmed in October (month 10) → 3 months remaining (Oct–Dec)
+//   EL = 3 × 1.5 = 4.5,   CL = 3 × 0.5 = 1.5,  SL = 3 × 0.5 = 1.5  → total 7.5
 function proratedLeave(confirmDate, year, month) {
-  const totalDays  = new Date(year, month, 0).getDate(); // days in that month
-  const confirmDay = confirmDate.getDate();
-  const daysWorkedAsPermanent = totalDays - confirmDay + 1;
-  const fraction   = daysWorkedAsPermanent / totalDays;
+  // months remaining = confirmation month through December, inclusive
+  // e.g. month=4 (April) → 13 - 4 = 9 months
+  const remainingMonths = 13 - month;
 
   return {
-    el: parseFloat((1.5 * fraction).toFixed(2)),
-    sl: parseFloat((0.5 * fraction).toFixed(2)),
-    cl: parseFloat((0.5 * fraction).toFixed(2)),
+    el: parseFloat((1.5 * remainingMonths).toFixed(2)),
+    sl: parseFloat((0.5 * remainingMonths).toFixed(2)),
+    cl: parseFloat((0.5 * remainingMonths).toFixed(2)),
+    months: remainingMonths
   };
 }
 
@@ -343,14 +350,14 @@ exports.approveConfirmation = async (req, res) => {
                  $2, FALSE)`,
         [
           empId,
-          `Your provision period is complete. You have been confirmed as a permanent employee from ${confirmDate.toLocaleDateString('en-IN')}. EL: ${prorata.el}, SL: ${prorata.sl}, CL: ${prorata.cl} credited for this month.`
+          `Your provision period is complete. You have been confirmed as a permanent employee from ${confirmDate.toLocaleDateString('en-IN')}. Full year allocation for ${prorata.months} remaining months (${new Date(confirmDate).toLocaleString('en-IN',{month:'short'})}–Dec): EL: ${prorata.el}, SL: ${prorata.sl}, CL: ${prorata.cl} (Total: ${parseFloat((prorata.el + prorata.sl + prorata.cl).toFixed(2))} paid leaves).`
         ]
       );
 
       await client.query('COMMIT');
       return res.json({
         success: true,
-        message: `${pc.first_name} ${pc.last_name} has been confirmed as permanent employee. Prorated leaves credited: EL ${prorata.el}, SL ${prorata.sl}, CL ${prorata.cl}`,
+        message: `${pc.first_name} ${pc.last_name} has been confirmed as permanent employee. Leaves credited for ${prorata.months} remaining months: EL ${prorata.el}, SL ${prorata.sl}, CL ${prorata.cl} (Total: ${parseFloat((prorata.el + prorata.sl + prorata.cl).toFixed(2))})`,
         data: { confirmed_date: confirmDate, prorated_leaves: prorata }
       });
     }
