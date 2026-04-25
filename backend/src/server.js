@@ -274,7 +274,7 @@ cron.schedule('30 18 * * 1-6', async () => {
 
 // ── Run auto-present on startup too (handles Render cold-start missing cron) ──
 (async () => {
-  await new Promise(r => setTimeout(r, 5000)); // wait 5s for DB pool to warm up on cold start
+  await new Promise(r => setTimeout(r, 15000)); // wait 15s for DB pool to warm up on cold start
   try {
     const now = new Date();
     const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
