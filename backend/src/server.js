@@ -274,7 +274,7 @@ cron.schedule('30 18 * * 1-6', async () => {
 
 // ── Run auto-present on startup too (handles Render cold-start missing cron) ──
 (async () => {
-  await new Promise(r => setTimeout(r, 15000)); // wait 15s for DB pool to warm up on cold start
+  await new Promise(r => setTimeout(r, 5000)); // wait 5s for DB pool to warm up on cold start
   try {
     const now = new Date();
     const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -721,15 +721,3 @@ setTimeout(() => {
   pingServer();                        // fire once immediately after delay
   setInterval(pingServer, INTERVAL_MS); // then on a regular cadence
 }, INITIAL_DELAY_MS);
-
-// ── DB Keep-Alive (prevents Neon/Render DB from sleeping) ─────────────────────
-// Pings DB every 4 minutes with a lightweight query so connection pool stays warm
-const DB_PING_INTERVAL = 4 * 60 * 1000; // 4 minutes
-setInterval(async () => {
-  try {
-    await db.query('SELECT 1');
-    // Silent success — no log spam
-  } catch (err) {
-    console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
-  }
-}, DB_PING_INTERVAL);
