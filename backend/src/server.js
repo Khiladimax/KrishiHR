@@ -613,30 +613,11 @@ async function start() {
     )`);
     console.log('✅ Birthday tables ready');
 
-    // ── Migration: expand attendance status CHECK to include missing_punch_out ──
-    // Safe to run every startup — IF EXISTS / IF NOT EXISTS guards make it idempotent.
-    await db.query(`
-      ALTER TABLE attendance
-        DROP CONSTRAINT IF EXISTS attendance_status_check
-    `);
-    await db.query(`
-      ALTER TABLE attendance
-        ADD CONSTRAINT attendance_status_check
-        CHECK (status IN (
-          'present','absent','half-day','late','on-leave','od','lwp',
-          'holiday','weekend','regularized','missing_punch_out',
-          'wfh','h-el','h-cl','h-sl','h-lwp','h-wfh','lwp'
-        ))
-    `);
-    console.log('✅ attendance_status_check constraint updated');
-
-    // ✅ Add indexes that make movement tracking fast — idempotent (IF NOT EXISTS)
-    // Without these, every /movement/log ping does full table scans on growing tables
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_movement_log_emp_logged ON employee_movement_log(employee_id, logged_at DESC)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_movement_log_logged_at  ON employee_movement_log(logged_at)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_attendance_emp_date      ON attendance(employee_id, date)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_od_requests_emp_date     ON od_requests(employee_id, date, status)`);
-    console.log('✅ Movement tracking indexes ready');
+    // ── Indexes: already created in pgAdmin, skipped on every startup to avoid table locks ──
+    // ALTER TABLE attendance DROP/ADD CONSTRAINT removed — it locks the attendance table
+    // on every deploy causing all in-flight requests to timeout during redeployment.
+    // Constraint and indexes were applied once manually via pgAdmin. No-op now.
+    console.log('✅ DB schema ready');
 
     // ✅ Start accepting requests FIRST — don't block login/API on background fixes
     app.listen(PORT, () => {
