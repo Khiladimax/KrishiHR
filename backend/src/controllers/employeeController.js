@@ -46,7 +46,8 @@ async function generateEmployeeCode(client, employeeCategory) {
 // Get All (role-filtered)
 exports.getAll = async (req, res) => {
   try {
-    const { department_id, search, role: filterRole, is_active, employee_category } = req.query;
+    const { department_id, search, role: filterRole, is_active, employee_category,
+            reporting_manager_id } = req.query;
     const userRole = req.user.role;
     const userId   = req.user.id;
 
@@ -63,8 +64,12 @@ exports.getAll = async (req, res) => {
     }
 
     if (userRole === 'manager') {
-      conditions.push(`e.department_id = (SELECT department_id FROM employees WHERE id=$${idx++})`);
-      params.push(userId);
+      // If reporting_manager_id is explicitly passed (e.g. from movement.html), don't add dept filter
+      // The reporting_manager_id condition will be added below
+      if (!reporting_manager_id) {
+        conditions.push(`e.department_id = (SELECT department_id FROM employees WHERE id=$${idx++})`);
+        params.push(userId);
+      }
     } else if (userRole === 'tl') {
       conditions.push(`(e.team_leader_id=$${idx} OR e.id=$${idx})`);
       params.push(userId); idx++;
@@ -73,9 +78,11 @@ exports.getAll = async (req, res) => {
       params.push(userId);
     }
 
-    if (department_id)     { conditions.push(`e.department_id=$${idx++}`);    params.push(parseInt(department_id)); }
-    if (filterRole)        { conditions.push(`e.role=$${idx++}`);              params.push(filterRole); }
-    if (employee_category) { conditions.push(`e.employee_category=$${idx++}`); params.push(employee_category); }
+    if (department_id)       { conditions.push(`e.department_id=$${idx++}`);           params.push(parseInt(department_id)); }
+    if (filterRole)          { conditions.push(`e.role=$${idx++}`);                        params.push(filterRole); }
+    if (employee_category)   { conditions.push(`e.employee_category=$${idx++}`);           params.push(employee_category); }
+    // reporting_manager_id filter — used by movement.html to show only direct reports
+    if (reporting_manager_id){ conditions.push(`e.reporting_manager_id=$${idx++}`);        params.push(parseInt(reporting_manager_id)); }
     if (search) {
       conditions.push(
         `(LOWER(CONCAT(e.first_name,' ',e.last_name)) LIKE LOWER($${idx})
