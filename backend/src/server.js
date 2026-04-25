@@ -721,3 +721,15 @@ setTimeout(() => {
   pingServer();                        // fire once immediately after delay
   setInterval(pingServer, INTERVAL_MS); // then on a regular cadence
 }, INITIAL_DELAY_MS);
+
+// ── DB Keep-Alive (prevents Neon/Render DB from sleeping) ─────────────────────
+// Pings DB every 4 minutes with a lightweight query so connection pool stays warm
+const DB_PING_INTERVAL = 4 * 60 * 1000; // 4 minutes
+setInterval(async () => {
+  try {
+    await db.query('SELECT 1');
+    // Silent success — no log spam
+  } catch (err) {
+    console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
+  }
+}, DB_PING_INTERVAL);
