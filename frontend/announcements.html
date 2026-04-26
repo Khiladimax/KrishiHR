@@ -254,6 +254,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="card-header">
             <div class="card-title">🏆 GK Leaderboard</div>
           </div>
+          <!-- Period Tabs -->
+          <div style="display:flex;gap:6px;padding:8px 16px 0">
+            <button onclick="loadLeaderboard('month')" id="lb-tab-month"
+              style="flex:1;padding:6px 0;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .2s">
+              📅 Monthly
+            </button>
+            <button onclick="loadLeaderboard('year')" id="lb-tab-year"
+              style="flex:1;padding:6px 0;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .2s">
+              📆 Yearly
+            </button>
+            <button onclick="loadLeaderboard('all')" id="lb-tab-all"
+              style="flex:1;padding:6px 0;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .2s">
+              🏅 All Time
+            </button>
+          </div>
           <div style="padding:10px 16px">
             <div class="lb-scroll" id="gk-leaderboard"><div class="loading">Loading...</div></div>
           </div>
@@ -510,7 +525,7 @@ async function loadFeed() {
     renderGK(null);
   }
 
-  loadLeaderboard('all');
+  loadLeaderboard('month');
 }
 
 function renderThought(thought) {
@@ -713,11 +728,27 @@ async function submitGK(questionId, answer) {
   await gkModalSubmit(questionId, answer);
 }
 
-let currentLBPeriod = 'all';
+let currentLBPeriod = 'month';
 async function loadLeaderboard(period) {
   currentLBPeriod = period;
   const el = document.getElementById('gk-leaderboard');
   el.innerHTML = '<div class="loading">Loading...</div>';
+
+  // Update active tab styles
+  ['month','year','all'].forEach(p => {
+    const btn = document.getElementById('lb-tab-' + p);
+    if (!btn) return;
+    if (p === period) {
+      btn.style.background = 'var(--accent)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--accent)';
+    } else {
+      btn.style.background = 'var(--surface2)';
+      btn.style.color = 'var(--muted)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  });
+
   try {
     const res  = await fetch(`${API}/gk/leaderboard?period=${period}&limit=200`, { headers });
     const data = await res.json();
@@ -726,7 +757,9 @@ async function loadLeaderboard(period) {
       return;
     }
     const medals = ['🥇','🥈','🥉'];
+    const periodLabel = period === 'month' ? '📅 This Month' : period === 'year' ? '📆 This Year' : '🏅 All Time';
     el.innerHTML = `
+      <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:4px 2px 8px">${periodLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead>
           <tr style="border-bottom:2px solid var(--border);color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">
@@ -766,7 +799,6 @@ async function loadLeaderboard(period) {
     el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Could not load leaderboard.</div>';
   }
 }
-
 
 function renderBirthdays(birthdays) {
   const el = document.getElementById('birthdays-list');
