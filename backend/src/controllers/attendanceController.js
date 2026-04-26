@@ -882,79 +882,77 @@ exports.actionRegularization = async (req, res) => {
 // on the wrong date (1 day earlier due to UTC shift) and moves it to the
 // correct date automatically. Safe to run repeatedly — idempotent.
 exports.fixTimezoneShiftedLeaves = async () => {
-  // ✅ REWRITTEN: replaced N×2 per-row query loop with a single set-based SQL query.
-  // Old version fetched all leaves then looped day-by-day firing 2 queries per day —
-  // O(leaves × days × 2) queries, growing unboundedly. Now it's 3 queries total regardless of data size.
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
 
-    // Build the full set of (employee_id, correct_date, wrong_date) pairs in SQL:
-    // - Expand each approved leave into individual days using generate_series
-    // - Skip Sundays (DOW=0) and 2nd/4th Saturdays
-    // - wrong_date = correct_date - 1 day (timezone-shift artifact)
-    // Then find rows where wrong_date has status='on-leave' but correct_date has no row at all
-    const shifted = await client.query(`
-      WITH leave_days AS (
-        SELECT
-          lr.employee_id,
-          d::date AS correct_date,
-          (d - INTERVAL '1 day')::date AS wrong_date
-        FROM leave_requests lr,
-             generate_series(lr.from_date::timestamp, lr.to_date::timestamp, '1 day') AS d
-        WHERE lr.status = 'approved'
-          AND EXTRACT(DOW FROM d) != 0   -- skip Sundays
-          -- skip 2nd and 4th Saturdays
-          AND NOT (
-            EXTRACT(DOW FROM d) = 6
-            AND CEIL(EXTRACT(DAY FROM d) / 7.0) IN (2, 4)
-          )
-      )
-      SELECT ld.employee_id, ld.correct_date, ld.wrong_date
-      FROM leave_days ld
-      -- wrong date exists as on-leave (the shifted record)
-      JOIN attendance wrong_att
-        ON wrong_att.employee_id = ld.employee_id
-       AND wrong_att.date        = ld.wrong_date
-       AND wrong_att.status      = 'on-leave'
-      -- correct date does NOT exist yet
-      WHERE NOT EXISTS (
-        SELECT 1 FROM attendance
-        WHERE employee_id = ld.employee_id AND date = ld.correct_date
-      )
-    `);
-
-    if (!shifted.rows.length) {
-      await client.query('COMMIT');
-      console.log('[fixTimezoneShift] No shifted records found. All good!');
-      return;
-    }
-
-    // Insert correct records
-    for (const row of shifted.rows) {
-      await client.query(
-        `INSERT INTO attendance(employee_id, date, status)
-         VALUES($1, $2, 'on-leave')
-         ON CONFLICT (employee_id, date) DO NOTHING`,
-        [row.employee_id, row.correct_date]
-      );
-    }
-
-    // Fix wrong records back to absent in one UPDATE
-    const wrongDates = shifted.rows.map(r => r.wrong_date);
-    const empIds     = shifted.rows.map(r => r.employee_id);
-    await client.query(
-      `UPDATE attendance
-       SET status = 'absent'
-       WHERE status = 'on-leave'
-         AND (employee_id, date) IN (
-           SELECT UNNEST($1::int[]), UNNEST($2::date[])
-         )`,
-      [empIds, wrongDates]
+    // Find all approved leave requests
+    const leaves = await client.query(
+      `SELECT lr.employee_id, lr.from_date, lr.to_date
+       FROM leave_requests lr
+       WHERE lr.status = 'approved'`
     );
 
+    let fixed = 0;
+    for (const leave of leaves.rows) {
+      const from = new Date(leave.from_date);
+      const to   = new Date(leave.to_date);
+
+      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay();
+        if (dow === 0) continue; // Sunday
+        // saturday_policy: this fix function runs per-leave, use per-employee policy
+        // For timezone-shift fix we conservatively skip 2nd/4th Sat (safe default)
+        // since this is a rare correction function, not primary attendance marking
+        if (dow === 6) {
+          const satN = Math.floor((d.getDate() - 1) / 7) + 1; // 1st,2nd,3rd,4th,5th Sat
+          if (satN === 2 || satN === 4) continue;
+        }
+
+        // Correct date using local time (NOT toISOString)
+        const correctDate = toLocalDateString(d);
+
+        // Wrong date = 1 day before correct date
+        const wrongD = new Date(d);
+        wrongD.setDate(wrongD.getDate() - 1);
+        const wrongDate = toLocalDateString(wrongD);
+
+        // Check if attendance exists on the WRONG date as on-leave
+        const wrongRec = await client.query(
+          `SELECT id FROM attendance
+           WHERE employee_id=$1 AND date=$2 AND status='on-leave'`,
+          [leave.employee_id, wrongDate]
+        );
+
+        // Check if attendance already correctly exists on the RIGHT date
+        const correctRec = await client.query(
+          `SELECT id FROM attendance
+           WHERE employee_id=$1 AND date=$2`,
+          [leave.employee_id, correctDate]
+        );
+
+        if (wrongRec.rows.length && !correctRec.rows.length) {
+          // Move: insert correct record
+          await client.query(
+            `INSERT INTO attendance(employee_id, date, status)
+             VALUES($1, $2, 'on-leave')`,
+            [leave.employee_id, correctDate]
+          );
+          // Fix wrong record back to absent
+          await client.query(
+            `UPDATE attendance SET status='absent'
+             WHERE employee_id=$1 AND date=$2 AND status='on-leave'`,
+            [leave.employee_id, wrongDate]
+          );
+          fixed++;
+          console.log(`[fixTimezoneShift] Moved on-leave: emp=${leave.employee_id} ${wrongDate} → ${correctDate}`);
+        }
+      }
+    }
+
     await client.query('COMMIT');
-    console.log(`[fixTimezoneShift] Fixed ${shifted.rows.length} shifted attendance record(s).`);
+    if (fixed > 0) console.log(`[fixTimezoneShift] Fixed ${fixed} shifted attendance record(s).`);
+    else console.log('[fixTimezoneShift] No shifted records found. All good!');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[fixTimezoneShift] Error:', err);
@@ -1624,20 +1622,20 @@ exports.logMovement = async (req, res) => {
     const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const currentHHMM = istNow.getHours() * 100 + istNow.getMinutes();
 
-    // ── Merge OD + attendance check into ONE query instead of two ────────
-    // ✅ FIX: was 2 separate queries per ping — now 1
-    const stateQ = await db.query(
-      `SELECT
-         (SELECT COUNT(1) FROM od_requests
-          WHERE employee_id=$1 AND date=$2 AND status='approved') AS has_od,
-         (SELECT punch_in  FROM attendance WHERE employee_id=$1 AND date=$2) AS punch_in,
-         (SELECT punch_out FROM attendance WHERE employee_id=$1 AND date=$2) AS punch_out`,
+    // ── Check OD approval for today ───────────────────────────────────────
+    const odQ = await db.query(
+      `SELECT id FROM od_requests WHERE employee_id=$1 AND date=$2 AND status='approved'`,
       [empId, today]
     );
-    const { has_od, punch_in, punch_out } = stateQ.rows[0];
-    const hasOD     = parseInt(has_od) > 0;
-    const punchedIn  = !!punch_in;
-    const punchedOut = !!punch_out;
+    const hasOD = odQ.rows.length > 0;
+
+    // ── Check punch in / punch out ────────────────────────────────────────
+    const attQ = await db.query(
+      `SELECT punch_in, punch_out FROM attendance WHERE employee_id=$1 AND date=$2`,
+      [empId, today]
+    );
+    const punchedIn  = attQ.rows.length > 0 && attQ.rows[0].punch_in;
+    const punchedOut = attQ.rows.length > 0 && attQ.rows[0].punch_out;
 
     // ── RULE 1 & 3: OD approved today → track 09:30 to 18:30 only ────────
     if (hasOD) {
@@ -1672,22 +1670,15 @@ exports.logMovement = async (req, res) => {
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
     }
 
+    // ── Auto-cleanup: delete movement logs older than 3 days ─────────────
+    await db.query(`DELETE FROM employee_movement_log WHERE logged_at < NOW() - INTERVAL '3 days'`);
+
     // ── Save the point ────────────────────────────────────────────────────
     await db.query(
       `INSERT INTO employee_movement_log(employee_id, lat, lng, accuracy, logged_at)
        VALUES($1,$2,$3,$4,NOW())`,
       [empId, lat, lng, acc]
     );
-
-    // ── Cleanup old logs: fire-and-forget, NOT in the request path ────────
-    // ✅ FIX: was running a full-table DELETE on EVERY ping from EVERY employee.
-    // With 30 days of data this was locking the table ~100x/minute and causing pool exhaustion.
-    // Now runs only 1-in-50 pings (randomly) and does NOT block the response.
-    if (Math.random() < 0.02) {
-      db.query(`DELETE FROM employee_movement_log WHERE logged_at < NOW() - INTERVAL '3 days'`)
-        .catch(err => console.warn('[logMovement] cleanup error:', err.message));
-    }
-
     res.json({ success: true });
   } catch (err) {
     console.error('[logMovement Error]', err.message);
