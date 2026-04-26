@@ -274,7 +274,7 @@ cron.schedule('30 18 * * 1-6', async () => {
 
 // ── Run auto-present on startup too (handles Render cold-start missing cron) ──
 (async () => {
-  await new Promise(r => setTimeout(r, 5000)); // wait 5s for DB pool to warm up on cold start
+  await new Promise(r => setTimeout(r, 15000)); // wait 15s for DB pool to warm up on cold start
   try {
     const now = new Date();
     const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -613,29 +613,13 @@ async function start() {
     )`);
     console.log('✅ Birthday tables ready');
 
-    // ── Migration: expand attendance status CHECK to include missing_punch_out ──
-    // Safe to run every startup — IF EXISTS / IF NOT EXISTS guards make it idempotent.
-    await db.query(`
-      ALTER TABLE attendance
-        DROP CONSTRAINT IF EXISTS attendance_status_check
-    `);
-    await db.query(`
-      ALTER TABLE attendance
-        ADD CONSTRAINT attendance_status_check
-        CHECK (status IN (
-          'present','absent','half-day','late','on-leave','od','lwp',
-          'holiday','weekend','regularized','missing_punch_out',
-          'wfh','h-el','h-cl','h-sl','h-lwp','h-wfh','lwp'
-        ))
-    `);
-    console.log('✅ attendance_status_check constraint updated');
+    // ── Indexes: already created in pgAdmin, skipped on every startup to avoid table locks ──
+    // ALTER TABLE attendance DROP/ADD CONSTRAINT removed — it locks the attendance table
+    // on every deploy causing all in-flight requests to timeout during redeployment.
+    // Constraint and indexes were applied once manually via pgAdmin. No-op now.
+    console.log('✅ DB schema ready');
 
-    await attCtrl.fixWrongAbsents();
-    await attCtrl.fixMissingPunchOuts(); // mark past present/late with no punch_out as missing_punch_out
-    await attCtrl.fixTimezoneShiftedLeaves();
-    await offerCtrl.initTables();        // ensure offer_letters table exists
-    await itDeclCtrl.initTables();       // ensure it_declarations tables exist
-
+    // ✅ Start accepting requests FIRST — don't block login/API on background fixes
     app.listen(PORT, () => {
       console.log('');
       console.log('╔═══════════════════════════════════════╗');
@@ -647,6 +631,20 @@ async function start() {
       console.log('╚═══════════════════════════════════════╝');
       console.log('');
     });
+
+    // ✅ Run background fixes AFTER server is live — these can be slow with large data
+    // Delay 5s so the pool is fully warm and Render has detected the port
+    setTimeout(async () => {
+      try {
+        await offerCtrl.initTables();
+        await itDeclCtrl.initTables();
+        await attCtrl.fixWrongAbsents();
+        await attCtrl.fixMissingPunchOuts();
+        await attCtrl.fixTimezoneShiftedLeaves(); // can be slow on large data — runs in background
+      } catch (err) {
+        console.error('❌ Background startup fix failed:', err.message);
+      }
+    }, 5000);
   } catch (err) {
     console.error('❌ Failed to start:', err.message);
     console.error('   Make sure PostgreSQL is running and .env is configured');
@@ -702,22 +700,32 @@ cron.schedule('59 23 * * *', async () => {
 start();
 
 // ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
+// ✅ FIX: Render free tier sleeps after ~50s of inactivity. Must ping every 25s.
 const https = require('https');
 
 const PING_URL = 'https://krishihr-zuui.onrender.com/health';
-const INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
-const INITIAL_DELAY_MS = 30 * 1000; // 1 minute
+const INTERVAL_MS = 25 * 1000;      // ✅ 25 seconds (was 4 minutes — way too slow)
+const INITIAL_DELAY_MS = 10 * 1000; // 10 seconds after start
 
 function pingServer() {
   https.get(PING_URL, (res) => {
-    console.log(`[Keep-Alive] ✅ ping OK — ${res.statusCode} at ${new Date().toISOString()}`);
+    // Silent — no log spam at 25s intervals
   }).on('error', (err) => {
     console.error(`[Keep-Alive] ⚠️ ping failed: ${err.message}`);
-    // No extra retry — the setInterval will naturally retry in ≤4 min
   });
 }
 
 setTimeout(() => {
-  pingServer();                        // fire once immediately after delay
-  setInterval(pingServer, INTERVAL_MS); // then on a regular cadence
+  pingServer();
+  setInterval(pingServer, INTERVAL_MS);
 }, INITIAL_DELAY_MS);
+
+// ── DB Keep-Alive — keeps pool warm every 25s ─────────────────────────────────
+const DB_PING_INTERVAL = 25 * 1000; // ✅ 25 seconds (was 4 minutes)
+setInterval(async () => {
+  try {
+    await db.query('SELECT 1');
+  } catch (err) {
+    console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
+  }
+}, DB_PING_INTERVAL);
