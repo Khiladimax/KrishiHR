@@ -1645,7 +1645,11 @@ exports.logMovement = async (req, res) => {
     // ── RULE 2: No OD → must be punched in and not yet punched out ────────
     else {
       if (!punchedIn)
-        return res.status(400).json({ success: false, message: 'Not punched in today' });
+        // Return 200 (not 400) so Android does NOT retry this endlessly.
+        // A 400 caused the app to queue and retry 344+ records in a tight loop,
+        // eventually making the OS kill the process (crash).
+        // Returning 200 with skipped=true tells Android: "received, ignore it".
+        return res.json({ success: true, skipped: true, reason: 'not_punched_in' });
       if (punchedOut)
         return res.json({ success: true, skipped: true, reason: 'punched_out' });
     }
