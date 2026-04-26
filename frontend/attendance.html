@@ -888,7 +888,11 @@ async function checkTodayPunch() {
 
   renderPunchBar(todayRec, istDow);
   if (!todayRec || !todayRec.punch_in) inBtn.style.display = 'flex';
-  else if (!todayRec.punch_out) { outBtn.style.display = 'flex'; startMovementTracking(); }
+  else if (!todayRec.punch_out) {
+    outBtn.style.display = 'flex';
+    // FIX: wrap in catch so a slow/failed API call never silently skips tracking
+    startMovementTracking().catch(e => console.warn('[Tracking] page-load restart failed:', e));
+  }
 }
 
 function renderPunchBar(rec, dow, isHoliday = false) {
@@ -1516,12 +1520,15 @@ async function confirmPunch() {
     toast(data.message);
     document.getElementById('map-punch-backdrop').classList.remove('open');
     // ── GPS movement tracking ──────────────────────────────────────────────
+    // FIX: await tracking start fully before reloading — reload was racing SW registration
     if (_punchType === 'in') {
-      startMovementTracking();
+      await startMovementTracking();
+      // Force an immediate GPS ping so employee appears in movement summary right away
+      await _forceImmediatePing();
     } else {
-      stopMovementTracking();
+      await stopMovementTracking();
     }
-    setTimeout(() => location.reload(), 1000);
+    location.reload();
   } else {
     toast(data?.message || 'Failed', 'error');
     btn.disabled = false; btn.textContent = 'Confirm Punch';
@@ -2729,7 +2736,20 @@ async function startMovementTracking() {
     const token = Auth.getToken();
     const sw    = (await navigator.serviceWorker.ready).active;
     if (sw) {
-      sw.postMessage({ type: 'START_TRACKING', token, apiBase: API_BASE });
+      // FIX: wait for SW to acknowledge START_TRACKING before returning
+      // This prevents page.reload() from firing before the SW has the token
+      await new Promise((resolve) => {
+        const onMsg = (e) => {
+          if (e.data?.type === 'TRACKING_STARTED') {
+            navigator.serviceWorker.removeEventListener('message', onMsg);
+            resolve();
+          }
+        };
+        navigator.serviceWorker.addEventListener('message', onMsg);
+        sw.postMessage({ type: 'START_TRACKING', token, apiBase: API_BASE });
+        // Safety timeout: resolve after 2s even if SW doesn't ack (e.g. old SW version)
+        setTimeout(resolve, 2000);
+      });
       console.log('[Tracking] ✅ SW tracking started');
     }
     // Register for periodic sync if supported (keeps SW alive on Android)
@@ -2748,6 +2768,29 @@ async function startMovementTracking() {
   }
 }
 
+// FIX: force an immediate GPS ping right after punch-in so the employee
+// shows up in the movement summary instantly (not after the first 30s interval)
+async function _forceImmediatePing() {
+  try {
+    if (!navigator.geolocation) return;
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject,
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 });
+    });
+    await api('POST', '/attendance/movement/log', {
+      lat:      pos.coords.latitude,
+      lng:      pos.coords.longitude,
+      accuracy: pos.coords.accuracy
+    });
+    console.log('[Tracking] ✅ Immediate ping sent after punch-in');
+    // Also tell SW to do a tick now (covers Android where direct fetch may be blocked)
+    const reg = _swRegistration || await navigator.serviceWorker.getRegistration('/tracking-sw.js').catch(() => null);
+    if (reg?.active) reg.active.postMessage({ type: 'FORCE_TICK' });
+  } catch (e) {
+    console.warn('[Tracking] Immediate ping failed (non-fatal):', e.message);
+  }
+}
+
 async function stopMovementTracking() {
   // Stop watchdog
   if (_watchdogTimer) { clearInterval(_watchdogTimer); _watchdogTimer = null; }
@@ -2758,7 +2801,20 @@ async function stopMovementTracking() {
   try {
     const reg = _swRegistration || await navigator.serviceWorker.getRegistration('/tracking-sw.js');
     const sw  = reg?.active;
-    if (sw) sw.postMessage({ type: 'STOP_TRACKING' });
+    if (sw) {
+      // FIX: await SW ack before reloading on punch-out too
+      await new Promise((resolve) => {
+        const onMsg = (e) => {
+          if (e.data?.type === 'TRACKING_STOPPED') {
+            navigator.serviceWorker.removeEventListener('message', onMsg);
+            resolve();
+          }
+        };
+        navigator.serviceWorker.addEventListener('message', onMsg);
+        sw.postMessage({ type: 'STOP_TRACKING' });
+        setTimeout(resolve, 1500);
+      });
+    }
   } catch (err) {
     console.warn('[Tracking] Could not stop SW:', err);
   }
