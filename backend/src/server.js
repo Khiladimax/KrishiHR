@@ -697,6 +697,46 @@ cron.schedule('59 23 * * *', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
+// ── GK Monthly Top 5 Announcement (last day of every month, 11:59 PM IST) ──────
+cron.schedule('59 23 28-31 * *', async () => {
+  try {
+    // Only fire on the actual last day of the month
+    const now      = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDate() !== 1) return; // not last day — skip
+
+    console.log('[CRON] 📅 Posting monthly GK Top 5 announcement...');
+    const gkCtrl = require('./controllers/gkController');
+    const admin  = await db.query(`SELECT id FROM employees WHERE role IN ('admin','super_admin') AND is_active=true LIMIT 1`);
+    if (!admin.rows.length) return console.warn('[CRON] No admin found for GK announcement');
+
+    await gkCtrl.announceTop5(
+      { body: { period: 'month' }, user: { id: admin.rows[0].id } },
+      { json: (d) => console.log('[CRON] Monthly Top5 result:', d.message) }
+    );
+  } catch (err) {
+    console.error('❌ GK monthly top5 cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── GK Yearly Top 5 Announcement (Dec 31, 11:58 PM IST) ──────────────────────
+cron.schedule('58 23 31 12 *', async () => {
+  try {
+    console.log('[CRON] 📆 Posting yearly GK Top 5 announcement...');
+    const gkCtrl = require('./controllers/gkController');
+    const admin  = await db.query(`SELECT id FROM employees WHERE role IN ('admin','super_admin') AND is_active=true LIMIT 1`);
+    if (!admin.rows.length) return console.warn('[CRON] No admin found for GK yearly announcement');
+
+    await gkCtrl.announceTop5(
+      { body: { period: 'year' }, user: { id: admin.rows[0].id } },
+      { json: (d) => console.log('[CRON] Yearly Top5 result:', d.message) }
+    );
+  } catch (err) {
+    console.error('❌ GK yearly top5 cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
 start();
 
 // ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
