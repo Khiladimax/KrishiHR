@@ -6,13 +6,10 @@ require('dotenv').config();
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      // ✅ FIX: Only force SSL if DB_SSL=true is explicitly set in .env
-      // Neon needs SSL → set DB_SSL=true in Render env vars
-      // Local/on-prem PG → leave DB_SSL unset or false
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      max: 8,
+      idleTimeoutMillis: 10000,     // ✅ release idle connections after 10s (was 30s — caused pool pile-up)
+      connectionTimeoutMillis: 20000,
     }
   : {
       host:     process.env.DB_HOST     || 'localhost',
@@ -20,10 +17,10 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME     || 'hrms_db',
       user:     process.env.DB_USER     || 'postgres',
       password: process.env.DB_PASSWORD || '',
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-      ssl: false, // ✅ FIX: Local/non-Neon PG never needs SSL
+      max: 8,                       // ✅ 8 is enough — 15 caused all slots to fill with idle connections
+      idleTimeoutMillis: 10000,     // ✅ release idle connections after 10s (was 30s)
+      connectionTimeoutMillis: 20000,
+      ssl: false,
     };
 
 const pool = new Pool(poolConfig);
