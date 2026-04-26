@@ -947,3 +947,83 @@ function parseExcelDate(raw) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
 }
+
+// ══════════════════════════════════════════════════
+//  POST TOP 5 LEADERBOARD ANNOUNCEMENT
+//  Called by a cron job at end of month / end of year
+//  POST /gk/announce-top5   body: { period: 'month' | 'year', posted_by_id }
+// ══════════════════════════════════════════════════
+exports.announceTop5 = async (req, res) => {
+  try {
+    const period   = req.body.period || 'month';   // 'month' or 'year'
+    const postedBy = req.user.id;
+
+    const now   = new Date();
+    const month = now.getMonth() + 1;
+    const year  = now.getFullYear();
+
+    // Determine date filter
+    let dateFilter = '';
+    let periodLabel = '';
+    const monthNames = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+
+    if (period === 'month') {
+      dateFilter = `AND EXTRACT(MONTH FROM gr.answered_at AT TIME ZONE 'Asia/Kolkata') = ${month}
+                    AND EXTRACT(YEAR  FROM gr.answered_at AT TIME ZONE 'Asia/Kolkata') = ${year}`;
+      periodLabel = `${monthNames[month - 1]} ${year}`;
+    } else {
+      dateFilter = `AND EXTRACT(YEAR FROM gr.answered_at AT TIME ZONE 'Asia/Kolkata') = ${year}`;
+      periodLabel = `Year ${year}`;
+    }
+
+    // Fetch top 5
+    const r = await db.query(
+      `SELECT
+         e.id,
+         CONCAT(e.first_name, ' ', e.last_name) AS name,
+         COALESCE(SUM(gr.score_change), 0)                                         AS total_score,
+         COUNT(gr.id) FILTER (WHERE gr.is_correct = true)                          AS correct,
+         COUNT(gr.id) FILTER (WHERE gr.is_correct = false AND gr.answer != 'skip') AS wrong
+       FROM employees e
+       JOIN gk_daily_responses gr ON gr.employee_id = e.id
+       WHERE e.is_active = true ${dateFilter}
+       GROUP BY e.id, e.first_name, e.last_name
+       HAVING COUNT(gr.id) > 0
+       ORDER BY total_score DESC, correct DESC
+       LIMIT 5`
+    );
+
+    if (!r.rows.length) {
+      return res.json({ success: false, message: 'No data for this period yet' });
+    }
+
+    const medals  = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+    const topList = r.rows.map((e, i) =>
+      `${medals[i]} ${e.name} — ${parseFloat(e.total_score).toFixed(2)} pts (${e.correct} correct)`
+    ).join('\n');
+
+    const winner = r.rows[0].name;
+    const title   = `🏆 GK ${period === 'month' ? 'Monthly' : 'Yearly'} Champions — ${periodLabel}`;
+    const content = `🎉 Congratulations to our Top 5 GK Champions for ${periodLabel}!\n\n${topList}\n\n👏 Special shoutout to ${winner} for topping the leaderboard! Keep the knowledge flowing! 🧠🔥`;
+
+    // Prevent duplicate for same period
+    const dupCheck = await db.query(
+      `SELECT id FROM announcements WHERE title = $1 AND created_at > NOW() - INTERVAL '25 days'`,
+      [title]
+    );
+    if (dupCheck.rows.length) {
+      return res.json({ success: false, message: 'Announcement for this period already exists' });
+    }
+
+    await db.query(
+      `INSERT INTO announcements (title, content, type, posted_by) VALUES ($1, $2, 'achievement', $3)`,
+      [title, content, postedBy]
+    );
+
+    res.json({ success: true, message: `Top 5 ${period} announcement posted!`, data: r.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
