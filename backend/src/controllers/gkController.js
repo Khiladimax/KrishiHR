@@ -183,7 +183,7 @@ exports.submitAnswer = async (req, res) => {
           const emp = empR.rows[0];
           const empName = emp ? `${emp.first_name} ${emp.last_name}` : 'An employee';
           await db.query(
-            `INSERT INTO announcements (title, content, type, posted_by)
+            `INSERT INTO announcements (title, content, type, created_by)
              VALUES ($1, $2, 'achievement', $3)`,
             [
               `🔥 ${streak}-Day GK Streak!`,
