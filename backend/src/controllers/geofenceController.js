@@ -1176,9 +1176,13 @@ exports.getAllBufferRules = async (req, res) => {
   try {
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
-              ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at
+              ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
+              eg.office_location_id,
+              ol.name AS office_location_name
        FROM employees e
        LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
+       LEFT JOIN employee_geofence eg ON eg.employee_id = e.id
+       LEFT JOIN office_locations ol ON ol.id = eg.office_location_id AND ol.radius_meters < 10000
        WHERE e.is_active = TRUE
        ORDER BY e.first_name`
     );
