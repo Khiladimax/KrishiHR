@@ -505,7 +505,16 @@ function myAdvanceCard(adv) {
     <div class="req-card">
       <div class="req-top">
         <div style="flex:1">
-          <div class="req-name" style="font-size:16px;font-weight:700">${fmt.money(adv.amount)}</div>
+          ${(() => {
+            const orig = parseFloat(adv.original_requested_amount) || parseFloat(adv.amount);
+            const curr = parseFloat(adv.amount);
+            const revised = orig > curr;
+            return `<div class="req-name" style="font-size:16px;font-weight:700">
+              ${revised ? `<span style="text-decoration:line-through;color:#aaa;font-size:13px;margin-right:6px">${fmt.money(orig)}</span>` : ''}
+              ${fmt.money(curr)}
+              ${revised ? `<span style="font-size:11px;background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;margin-left:4px;font-weight:600">REVISED</span>` : ''}
+            </div>`;
+          })()}
           <div class="req-meta">Reason: ${adv.reason || '—'}</div>
           <div class="req-meta">Requested: ${fmt.date(adv.requested_at)}</div>
 
@@ -656,22 +665,34 @@ function openApproveById(btn) {
   const adv = _advMap[id];
   if (!adv) { toast('Could not load request data', 'error'); return; }
   const level = parseInt(adv.current_level) || 1;
-  openApprove(id, adv.employee_name, adv.amount, adv.reason, level);
+  openApprove(id, adv.employee_name, adv.amount, adv.reason, level, adv.original_requested_amount);
 }
 
-function openApprove(id, name, amount, reason, level) {
+function openApprove(id, name, amount, reason, level, originalAmount) {
   activeAdvId = id;
+  const orig = parseFloat(originalAmount) || parseFloat(amount);
+  const curr = parseFloat(amount);
+  const wasRevised = orig > curr;
   document.getElementById('approve-modal-title').textContent = `Review — Level ${level} (${LEVELS[level]?.label || 'Approver'})`;
   document.getElementById('approve-content').innerHTML = `
     <div class="form-row">
       <div><div class="form-label">Employee</div><b>${name}</b></div>
-      <div><div class="form-label">Requested Amount</div><b>${fmt.money(amount)}</b></div>
+      <div>
+        <div class="form-label">Original Request</div>
+        <b>${fmt.money(orig)}</b>
+      </div>
     </div>
+    ${wasRevised ? `
+    <div style="background:#fff3cd;border:1.5px solid #ffc107;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:13px">
+      ⚠️ <b>Amount was revised</b> by a previous approver:
+      <span style="text-decoration:line-through;color:#888;margin:0 6px">${fmt.money(orig)}</span>
+      → <b style="color:#e65100">${fmt.money(curr)}</b>
+    </div>` : ''}
     <div class="form-group mt-2"><div class="form-label">Reason</div>${reason || '—'}</div>
     <div class="form-group mt-2" style="background:var(--surface-raised,#f8f9fa);border:1.5px solid var(--color-primary,#4caf50);border-radius:8px;padding:12px">
-      <label class="form-label" style="color:var(--color-primary,#4caf50);font-weight:700">✏️ Approved Amount Override</label>
-      <small style="display:block;margin-bottom:6px;opacity:.75">Leave blank to approve full amount. Enter a lower value to partially approve.</small>
-      <input id="app-approved-amount" class="form-control" type="number" min="1" max="${amount}" placeholder="e.g. ${amount}" style="font-size:1.1rem;font-weight:600">
+      <label class="form-label" style="color:var(--color-primary,#4caf50);font-weight:700">✏️ Override Approved Amount</label>
+      <small style="display:block;margin-bottom:6px;opacity:.75">Leave blank to approve <b>${fmt.money(curr)}</b>. Enter a lower value to further reduce.</small>
+      <input id="app-approved-amount" class="form-control" type="number" min="1" max="${curr}" placeholder="e.g. ${curr}" style="font-size:1.1rem;font-weight:600">
     </div>
     <div class="form-group mt-2">
       <label class="form-label">Remarks</label>
