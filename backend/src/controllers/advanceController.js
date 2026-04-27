@@ -199,11 +199,18 @@ exports.action = async (req, res) => {
       console.log(`[AUTO-FIX] Corrected chain for ${empCode} (${empRole}) advance #${id}: 4→3 levels`);
     }
 
-    if (req.body.recover_from_month) {
-      await client.query(
-        `UPDATE advance_salary SET recover_from_month=$1, recover_from_year=$2 WHERE id=$3`,
-        [req.body.recover_from_month, req.body.recover_from_year || new Date().getFullYear(), id]
-      ).catch(() => {});
+    // Manager can override the approved amount (reduce if employee asked too much)
+    if (req.body.approved_amount) {
+      const overrideAmt = parseFloat(req.body.approved_amount);
+      if (!isNaN(overrideAmt) && overrideAmt > 0 && overrideAmt <= parseFloat(advance.amount)) {
+        const newEmi = advance.total_installments
+          ? Math.ceil(overrideAmt / parseInt(advance.total_installments))
+          : overrideAmt;
+        await client.query(
+          `UPDATE advance_salary SET amount=$1, monthly_emi=$2, balance_remaining=$3, updated_at=NOW() WHERE id=$4`,
+          [overrideAmt, newEmi, overrideAmt, id]
+        );
+      }
     }
 
     if (action === 'reject') {
