@@ -315,13 +315,35 @@ exports.getAll = async (req, res) => {
       conds.push(`a.employee_id=$${idx++}`);
       params.push(employee_id);
 
-    } else if (['super_admin', 'hr'].includes(userRole)) {
-      // HR / super_admin see everything — no extra filter
+    } else if (userRole === 'hr') {
+      // HR sees everything (read-only oversight) — no scope filter
+
+    } else if (userRole === 'super_admin') {
+      // MD (super_admin / KC01) sees ONLY:
+      //   1. Requests where it is currently THEIR turn (current_approver_code = their code)
+      //   2. Requests they have already approved (passed through them)
+      //   3. Their own requests
+      // NOT requests still sitting at manager/COO level — those are not their business yet
+      conds.push(`(
+        a.current_approver_code = $${idx++}
+        OR (
+          a.approval_chain::text LIKE $${idx++}
+          AND a.current_approver_code IS DISTINCT FROM $${idx++}
+          AND EXISTS (
+            SELECT 1 FROM advance_approvals aa
+            WHERE aa.advance_id = a.id
+              AND aa.approver_id = $${idx++}
+              AND aa.action = 'approve'
+          )
+        )
+        OR a.employee_id = $${idx++}
+      )`);
+      params.push(userCode, `%"${userCode}"%`, userCode, userId, userId);
 
     } else if (userRole === 'accounts') {
-      // Accounts (ACCOUNTS_CODE) sees:
+      // Accounts sees:
       //   1. Requests where they are the current approver (pending, awaiting their action)
-      //   2. Requests that are fully approved (disbursement queue)
+      //   2. Requests that are fully approved (disbursement queue — status=approved, no pending approver)
       //   3. Their own requests
       conds.push(`(
         a.current_approver_code = $${idx++}
@@ -331,13 +353,11 @@ exports.getAll = async (req, res) => {
       params.push(userCode, userId);
 
     } else if (userRole === 'admin') {
-      // Admin / COO sees:
-      //   1. Requests where they are the CURRENT approver (pending action)
-      //   2. Requests that already passed through them — i.e. their code appears
-      //      in approval_chain AND current_approver_code has moved past them
-      //      (meaning they already approved — chain index of userCode < index of current_approver_code)
+      // COO (admin) sees:
+      //   1. Requests where it is currently THEIR turn (current_approver_code = their code)
+      //   2. Requests they have already approved (passed through them) — chain contains code AND they acted
       //   3. Their own requests
-      // We use approval_chain JSON array contains their code AND status != 'pending at their level'
+      // NOT requests still at manager level awaiting L1 approval
       conds.push(`(
         a.current_approver_code = $${idx++}
         OR (
@@ -439,8 +459,14 @@ exports.getStats = async (req, res) => {
     let scopeFilter = '';
     let params = [];
 
-    if (['super_admin', 'hr', 'admin', 'accounts'].includes(userRole)) {
-      // see all
+    if (userRole === 'hr') {
+      // HR sees all for oversight
+    } else if (['super_admin', 'admin', 'accounts'].includes(userRole)) {
+      // COO/MD/Accounts: stats scoped to requests where it's their turn OR they already acted OR their own
+      scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2 OR EXISTS (
+        SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2
+      ))`;
+      params = [userCode, userId];
     } else if (['manager', 'tl'].includes(userRole)) {
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2)`;
       params = [userCode, userId];
