@@ -149,12 +149,41 @@ exports.deleteLocation = async (req, res) => {
     const locId = parseInt(req.params.id);
 
     // 1. Check if any active employees are mapped to this location
+    // FIX: Also check district/state employees tracked only in employee_buffer_rules
+    const locRes = await client.query(
+      `SELECT name FROM office_locations WHERE id = $1`, [locId]
+    );
+    const locName = locRes.rows[0]?.name || '';
+
     const mappedRes = await client.query(
-      `SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.employee_code
+      `-- Direct geofence assignments
+       SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.employee_code
        FROM employee_geofence eg
        JOIN employees e ON e.id = eg.employee_id
-       WHERE eg.office_location_id = $1 AND e.is_active = TRUE`,
-      [locId]
+       WHERE eg.office_location_id = $1 AND e.is_active = TRUE
+
+       UNION
+
+       -- District employees tracked via buffer_rules (no employee_geofence row)
+       SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.employee_code
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       WHERE ebr.rule_type = 'district'
+         AND e.is_active = TRUE
+         AND LOWER($2) LIKE 'district%'
+         AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
+
+       UNION
+
+       -- State employees tracked via buffer_rules (no employee_geofence row)
+       SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.employee_code
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       WHERE ebr.rule_type = 'state'
+         AND e.is_active = TRUE
+         AND LOWER($2) LIKE 'state%'
+         AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'`,
+      [locId, locName]
     );
 
     if (mappedRes.rows.length > 0) {
@@ -531,21 +560,47 @@ exports.getEmployeeGeofence = async (req, res) => {
 
 // ── Assign Buffer to Employee ─────────────────────────────────────────────────
 exports.assignBuffer = async (req, res) => {
+  const client = await db.getClient();
   try {
     const { employee_id, office_location_id, is_universal = false } = req.body;
     if (!employee_id || !office_location_id)
       return res.status(400).json({ success: false, message: 'employee_id and office_location_id required' });
 
-    await db.query(
+    await client.query('BEGIN');
+
+    // Insert/update the geofence row
+    await client.query(
       `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
        VALUES($1,$2,$3,$4)
        ON CONFLICT(employee_id, office_location_id)
        DO UPDATE SET is_universal=$3, assigned_by=$4`,
       [employee_id, office_location_id, is_universal, req.user.id]
     );
+
+    // FIX: Sync employee_buffer_rules so the employee is no longer treated as
+    // district/state — otherwise the old rule_type lingers and breaks display queries.
+    const ruleType = is_universal ? 'universal' : 'office';
+    await client.query(
+      `INSERT INTO employee_buffer_rules (employee_id, rule_type, state, district, assigned_by, updated_at)
+       VALUES ($1, $2, NULL, NULL, $3, NOW())
+       ON CONFLICT (employee_id)
+       DO UPDATE SET rule_type = $2, state = NULL, district = NULL, assigned_by = $3, updated_at = NOW()`,
+      [employee_id, ruleType, req.user.id]
+    );
+
+    // FIX: Also update employee_type to match
+    await client.query(
+      `UPDATE employees SET employee_type = $1 WHERE id = $2`,
+      [is_universal ? 'offsite' : 'onsite', employee_id]
+    );
+
+    await client.query('COMMIT');
     res.json({ success: true, message: `Buffer assigned${is_universal ? ' (universal)' : ''}` });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
@@ -558,13 +613,33 @@ exports.bulkAssignBuffer = async (req, res) => {
     if (!employee_ids?.length || !office_location_id)
       return res.status(400).json({ success: false, message: 'employee_ids[] and office_location_id required' });
 
+    const ruleType = is_universal ? 'universal' : 'office';
+    const empType  = is_universal ? 'offsite'   : 'onsite';
+
     for (const eid of employee_ids) {
+      // Assign geofence row
       await client.query(
         `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
          VALUES($1,$2,$3,$4)
          ON CONFLICT(employee_id, office_location_id)
          DO UPDATE SET is_universal=$3, assigned_by=$4`,
         [eid, office_location_id, is_universal, req.user.id]
+      );
+
+      // FIX: Sync buffer rule — clears any stale district/state rule so employee
+      // is no longer counted under the old district card
+      await client.query(
+        `INSERT INTO employee_buffer_rules (employee_id, rule_type, state, district, assigned_by, updated_at)
+         VALUES ($1, $2, NULL, NULL, $3, NOW())
+         ON CONFLICT (employee_id)
+         DO UPDATE SET rule_type = $2, state = NULL, district = NULL, assigned_by = $3, updated_at = NOW()`,
+        [eid, ruleType, req.user.id]
+      );
+
+      // FIX: Sync employee_type
+      await client.query(
+        `UPDATE employees SET employee_type = $1 WHERE id = $2`,
+        [empType, eid]
       );
     }
     await client.query('COMMIT');
