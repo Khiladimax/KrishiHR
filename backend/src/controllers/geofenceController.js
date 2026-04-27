@@ -29,11 +29,12 @@ exports.getLocations = async (req, res) => {
                   (
                     COUNT(DISTINCT eg.employee_id)
                     +
-                    -- District match: location name contains the district keyword
+                    -- District match: location is a district zone AND district name matches
                     (SELECT COUNT(DISTINCT ebr.employee_id)
                      FROM employee_buffer_rules ebr
                      JOIN employees emp ON emp.id = ebr.employee_id AND emp.is_active = TRUE
                      WHERE ebr.rule_type = 'district'
+                       AND LOWER(ol.name) LIKE 'district%'
                        AND LOWER(ol.name) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
                        AND NOT EXISTS (
                          SELECT 1 FROM employee_geofence eg2
@@ -41,11 +42,12 @@ exports.getLocations = async (req, res) => {
                        )
                     )
                     +
-                    -- State match: location name contains the state keyword (and rule is state-level)
+                    -- State match: location is a state zone AND state name matches
                     (SELECT COUNT(DISTINCT ebr.employee_id)
                      FROM employee_buffer_rules ebr
                      JOIN employees emp ON emp.id = ebr.employee_id AND emp.is_active = TRUE
                      WHERE ebr.rule_type = 'state'
+                       AND LOWER(ol.name) LIKE 'state%'
                        AND LOWER(ol.name) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
                        AND NOT EXISTS (
                          SELECT 1 FROM employee_geofence eg2
@@ -216,6 +218,7 @@ exports.getLocationEmployees = async (req, res) => {
        LEFT JOIN departments d ON d.id = e.department_id
        WHERE ebr.rule_type = 'district'
          AND e.is_active = TRUE
+         AND LOWER($2) LIKE 'district%'
          AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
          AND e.id NOT IN (
            SELECT employee_id FROM employee_geofence WHERE office_location_id = $1
@@ -232,6 +235,7 @@ exports.getLocationEmployees = async (req, res) => {
        LEFT JOIN departments d ON d.id = e.department_id
        WHERE ebr.rule_type = 'state'
          AND e.is_active = TRUE
+         AND LOWER($2) LIKE 'state%'
          AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
          AND e.id NOT IN (
            SELECT employee_id FROM employee_geofence WHERE office_location_id = $1
@@ -687,6 +691,7 @@ exports.getEmployeesForLocation = async (req, res) => {
        LEFT JOIN departments d ON d.id = e.department_id
        WHERE ebr.rule_type = 'district'
          AND e.is_active = TRUE
+         AND LOWER($2) LIKE 'district%'
          AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
          AND e.id NOT IN (SELECT employee_id FROM employee_geofence WHERE office_location_id = $1)
        UNION
@@ -703,6 +708,7 @@ exports.getEmployeesForLocation = async (req, res) => {
        LEFT JOIN departments d ON d.id = e.department_id
        WHERE ebr.rule_type = 'state'
          AND e.is_active = TRUE
+         AND LOWER($2) LIKE 'state%'
          AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
          AND e.id NOT IN (SELECT employee_id FROM employee_geofence WHERE office_location_id = $1)
        ORDER BY full_name`,
