@@ -86,11 +86,11 @@ exports.apply = async (req, res) => {
     const result = await client.query(
       `INSERT INTO advance_salary
          (employee_id, amount, reason, monthly_emi, total_installments,
-          approval_chain, current_approver_code, status)
-       VALUES($1,$2,$3,$4,$5,$6,$7,'pending')
+          approval_chain, current_approver_code, status, purpose)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8)
        RETURNING id`,
       [empId, amount, reason || null, emi, repayment_months || 1,
-       JSON.stringify(chain), chain[0]]
+       JSON.stringify(chain), chain[0], String(amount)]
     );
 
     await client.query('COMMIT');
@@ -200,9 +200,11 @@ exports.action = async (req, res) => {
     }
 
     // Manager can override the approved amount (reduce if employee asked too much)
+    let amountWasOverridden = false;
+    const originalAmount = parseFloat(advance.amount);
     if (req.body.approved_amount) {
       const overrideAmt = parseFloat(req.body.approved_amount);
-      if (!isNaN(overrideAmt) && overrideAmt > 0 && overrideAmt <= parseFloat(advance.amount)) {
+      if (!isNaN(overrideAmt) && overrideAmt > 0 && overrideAmt < originalAmount) {
         const newEmi = advance.total_installments
           ? Math.ceil(overrideAmt / parseInt(advance.total_installments))
           : overrideAmt;
@@ -210,6 +212,17 @@ exports.action = async (req, res) => {
           `UPDATE advance_salary SET amount=$1, monthly_emi=$2, balance_remaining=$3, updated_at=NOW() WHERE id=$4`,
           [overrideAmt, newEmi, overrideAmt, id]
         );
+        amountWasOverridden = true;
+        // Notify employee immediately that their amount was revised
+        const approverName = (req.user.first_name + ' ' + req.user.last_name).trim();
+        const lvlLabel = currentLevel === 1 ? 'Manager' : currentLevel === 2 ? 'COO' : currentLevel === 3 ? 'MD' : 'Approver';
+        try {
+          await client.query(
+            `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'⚠️ Advance Amount Revised',$2,'advance')`,
+            [advance.employee_id,
+             `Your advance request of Rs.${originalAmount.toLocaleString('en-IN')} was revised to Rs.${overrideAmt.toLocaleString('en-IN')} by ${approverName} (${lvlLabel}).${remarks ? ' Remarks: ' + remarks : ''}`]
+          );
+        } catch (_) {}
       }
     }
 
@@ -422,6 +435,7 @@ exports.getAll = async (req, res) => {
 
     const result = await db.query(
       `SELECT a.*,
+              COALESCE(NULLIF(a.purpose,''), a.amount::text)::numeric AS original_requested_amount,
               CONCAT(e.first_name,' ',e.last_name) AS employee_name,
               e.employee_code, d.name AS department_name
        FROM advance_salary a
