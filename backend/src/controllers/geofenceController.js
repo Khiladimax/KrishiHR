@@ -23,7 +23,36 @@ exports.getLocations = async (req, res) => {
     let q, params = [];
     if (['admin','super_admin','hr'].includes(role)) {
       q = `SELECT ol.*,
-                  COUNT(DISTINCT eg.employee_id) AS assigned_count,
+                  -- Count employees from employee_geofence (office/universal assignments)
+                  -- PLUS employees from employee_buffer_rules whose district/state matches
+                  -- the location name (district/state zone assignments).
+                  (
+                    COUNT(DISTINCT eg.employee_id)
+                    +
+                    -- District match: location name contains the district keyword
+                    (SELECT COUNT(DISTINCT ebr.employee_id)
+                     FROM employee_buffer_rules ebr
+                     JOIN employees emp ON emp.id = ebr.employee_id AND emp.is_active = TRUE
+                     WHERE ebr.rule_type = 'district'
+                       AND LOWER(ol.name) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
+                       AND NOT EXISTS (
+                         SELECT 1 FROM employee_geofence eg2
+                         WHERE eg2.employee_id = ebr.employee_id AND eg2.office_location_id = ol.id
+                       )
+                    )
+                    +
+                    -- State match: location name contains the state keyword (and rule is state-level)
+                    (SELECT COUNT(DISTINCT ebr.employee_id)
+                     FROM employee_buffer_rules ebr
+                     JOIN employees emp ON emp.id = ebr.employee_id AND emp.is_active = TRUE
+                     WHERE ebr.rule_type = 'state'
+                       AND LOWER(ol.name) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
+                       AND NOT EXISTS (
+                         SELECT 1 FROM employee_geofence eg2
+                         WHERE eg2.employee_id = ebr.employee_id AND eg2.office_location_id = ol.id
+                       )
+                    )
+                  ) AS assigned_count,
                   CONCAT(e.first_name,' ',e.last_name) AS created_by_name
            FROM office_locations ol
            LEFT JOIN employee_geofence eg ON ol.id = eg.office_location_id
@@ -597,6 +626,38 @@ exports.getEmployeesForLocation = async (req, res) => {
        WHERE ebr.rule_type = 'universal'
          AND e.is_active = TRUE
          AND e.id NOT IN (SELECT employee_id FROM employee_geofence WHERE office_location_id = $1)
+       UNION
+       -- Employees assigned to this district via buffer_rules (district rule, district name matches location name)
+       SELECT e.id, e.employee_code,
+              CONCAT(e.first_name,' ',e.last_name) AS full_name,
+              d.name AS department_name, e.role, e.city,
+              FALSE AS is_universal,
+              TRUE AS is_assigned_here,
+              $2::text AS assigned_location_name,
+              'District' AS buffer_type
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       LEFT JOIN departments d ON d.id = e.department_id
+       WHERE ebr.rule_type = 'district'
+         AND e.is_active = TRUE
+         AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
+         AND e.id NOT IN (SELECT employee_id FROM employee_geofence WHERE office_location_id = $1)
+       UNION
+       -- Employees assigned to this state zone via buffer_rules (state rule, state name matches location name)
+       SELECT e.id, e.employee_code,
+              CONCAT(e.first_name,' ',e.last_name) AS full_name,
+              d.name AS department_name, e.role, e.city,
+              FALSE AS is_universal,
+              TRUE AS is_assigned_here,
+              $2::text AS assigned_location_name,
+              'State' AS buffer_type
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       LEFT JOIN departments d ON d.id = e.department_id
+       WHERE ebr.rule_type = 'state'
+         AND e.is_active = TRUE
+         AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
+         AND e.id NOT IN (SELECT employee_id FROM employee_geofence WHERE office_location_id = $1)
        ORDER BY full_name`,
       [locationId, loc.name]
     );
@@ -884,12 +945,9 @@ exports.upsertBufferRule = async (req, res) => {
       await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
     } else if (rule_type === 'state' || rule_type === 'district') {
       await db.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
-      // FIX: Remove stale location-based geofence assignment so employee no longer
-      // appears under the old location card. District/state employees use polygon
-      // boundaries, not office_location rows, so the geofence row is no longer needed.
-      await db.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [employee_id]);
-    } else if (rule_type === 'universal') {
-      // Universal employees don't need a specific location pin either
+      // Remove any stale office_location-based geofence row so the employee stops
+      // appearing under the old office/district location card.
+      // The new district assignment is tracked purely via employee_buffer_rules.
       await db.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [employee_id]);
     }
     // universal → do NOT change employee_type (keep onsite/offsite/wfh as-is)
