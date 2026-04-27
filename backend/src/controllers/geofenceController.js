@@ -76,18 +76,23 @@ exports.getLocations = async (req, res) => {
     }
 
     const r = await db.query(q, params);
-    // Count universal-rule employees who have NO employee_geofence row
-    // (those with employee_geofence rows are already counted in per-location assigned_count)
-    const univRes = await db.query(
-      `SELECT COUNT(*) AS cnt
-       FROM employee_buffer_rules ebr
-       WHERE ebr.rule_type = 'universal'
-         AND NOT EXISTS (
-           SELECT 1 FROM employee_geofence eg WHERE eg.employee_id = ebr.employee_id
-         )`
+
+    // True global distinct count — summing per-location counts double-counts
+    // employees who appear under multiple location cards.
+    const globalRes = await db.query(
+      `SELECT COUNT(DISTINCT emp_id) AS cnt FROM (
+         SELECT eg.employee_id AS emp_id
+         FROM employee_geofence eg
+         JOIN employees e ON e.id = eg.employee_id AND e.is_active = TRUE
+         UNION
+         SELECT ebr.employee_id AS emp_id
+         FROM employee_buffer_rules ebr
+         JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE
+         WHERE ebr.rule_type IN ('district','state','universal')
+       ) sub`
     );
-    const universalCount = parseInt(univRes.rows[0]?.cnt || 0);
-    res.json({ success: true, data: r.rows, universal_employee_count: universalCount });
+    const globalAssignedCount = parseInt(globalRes.rows[0]?.cnt || 0);
+    res.json({ success: true, data: r.rows, global_assigned_count: globalAssignedCount });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
