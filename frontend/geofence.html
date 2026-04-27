@@ -1856,7 +1856,7 @@ function empTableRow(e) {
   // Current assignment label
   let assignLabel = '—';
   if (rt === 'office') {
-    assignLabel = 'See location card';
+    assignLabel = rule?.office_location_name || 'See location card';
   } else if (rt === 'district') {
     assignLabel = rule?.district ? `${rule.district}, ${rule.state}` : '—';
   } else if (rt === 'state') {
@@ -1865,9 +1865,11 @@ function empTableRow(e) {
     assignLabel = 'Anywhere';
   }
 
+  // Pre-select the currently assigned office in the dropdown
+  const currentOfficeId = rule?.office_location_id || '';
   const officeOptions = _allLocations
     .filter(l => l.radius_meters < 10000 && l.is_active)
-    .map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    .map(l => `<option value="${l.id}" ${l.id == currentOfficeId ? 'selected' : ''}>${l.name}</option>`).join('');
 
   return `<tr id="etr-${e.id}" style="border-bottom:1px solid var(--g-border);transition:background .1s">
     <td style="padding:10px 14px">
@@ -1897,6 +1899,7 @@ function empTableRow(e) {
           <option value="">— select office —</option>
           ${officeOptions}
         </select>
+        ${rt==='office' && currentOfficeId ? `<div style="font-size:10px;color:var(--g-green);margin-top:2px">✓ Currently: ${rule.office_location_name||''}</div>` : ''}
         <!-- State picker -->
         <select class="g-loc-select" id="et-ssel-${e.id}" onchange="onEmpTabStateChange(${e.id})" style="display:${(rt==='state'||rt==='district')?'block':'none'}">
           <option value="">— select state —</option>
