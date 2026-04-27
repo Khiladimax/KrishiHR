@@ -884,6 +884,13 @@ exports.upsertBufferRule = async (req, res) => {
       await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
     } else if (rule_type === 'state' || rule_type === 'district') {
       await db.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
+      // FIX: Remove stale location-based geofence assignment so employee no longer
+      // appears under the old location card. District/state employees use polygon
+      // boundaries, not office_location rows, so the geofence row is no longer needed.
+      await db.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [employee_id]);
+    } else if (rule_type === 'universal') {
+      // Universal employees don't need a specific location pin either
+      await db.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [employee_id]);
     }
     // universal → do NOT change employee_type (keep onsite/offsite/wfh as-is)
 
