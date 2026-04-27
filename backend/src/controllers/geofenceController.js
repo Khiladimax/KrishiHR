@@ -184,14 +184,61 @@ exports.deleteLocation = async (req, res) => {
 exports.getLocationEmployees = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Get location name so we can match district/state employees from buffer_rules
+    const locRes = await db.query(
+      `SELECT id, name FROM office_locations WHERE id = $1`, [id]
+    );
+    if (!locRes.rows.length)
+      return res.status(404).json({ success: false, message: 'Location not found' });
+
+    const locName = locRes.rows[0].name;
+
     const result = await db.query(
-      `SELECT e.id, e.employee_code, e.first_name, e.last_name,
-              d.name AS department_name, eg.is_universal
+      `-- Employees directly assigned via employee_geofence (office/universal)
+       SELECT e.id, e.employee_code, e.first_name, e.last_name,
+              d.name AS department_name, eg.is_universal,
+              ebr.rule_type, ebr.district, ebr.state
        FROM employee_geofence eg
        JOIN employees e ON e.id = eg.employee_id
        LEFT JOIN departments d ON d.id = e.department_id
+       LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
        WHERE eg.office_location_id = $1 AND e.is_active = TRUE
-       ORDER BY e.first_name`, [id]
+
+       UNION
+
+       -- District employees: buffer_rules has district that matches this location name
+       SELECT e.id, e.employee_code, e.first_name, e.last_name,
+              d.name AS department_name, FALSE AS is_universal,
+              ebr.rule_type, ebr.district, ebr.state
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       LEFT JOIN departments d ON d.id = e.department_id
+       WHERE ebr.rule_type = 'district'
+         AND e.is_active = TRUE
+         AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
+         AND e.id NOT IN (
+           SELECT employee_id FROM employee_geofence WHERE office_location_id = $1
+         )
+
+       UNION
+
+       -- State employees: buffer_rules has state that matches this location name
+       SELECT e.id, e.employee_code, e.first_name, e.last_name,
+              d.name AS department_name, FALSE AS is_universal,
+              ebr.rule_type, ebr.district, ebr.state
+       FROM employee_buffer_rules ebr
+       JOIN employees e ON e.id = ebr.employee_id
+       LEFT JOIN departments d ON d.id = e.department_id
+       WHERE ebr.rule_type = 'state'
+         AND e.is_active = TRUE
+         AND LOWER($2) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
+         AND e.id NOT IN (
+           SELECT employee_id FROM employee_geofence WHERE office_location_id = $1
+         )
+
+       ORDER BY first_name`,
+      [id, locName]
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
