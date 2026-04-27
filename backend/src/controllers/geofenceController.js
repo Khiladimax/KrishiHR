@@ -1002,6 +1002,61 @@ exports.upsertBufferRule = async (req, res) => {
       // appearing under the old office/district location card.
       // The new district assignment is tracked purely via employee_buffer_rules.
       await db.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [employee_id]);
+
+      // ── Auto-create the location card if it doesn't exist yet ────────────────
+      // e.g. "District – Fatehabad, Haryana" or "State – Karnataka"
+      // This ensures the Geofence page always has a card to display the employee under.
+      if (rule_type === 'district' && state && district) {
+        const locName = `District – ${district}, ${state.charAt(0) + state.slice(1).toLowerCase()}`;
+        const existingLoc = await db.query(
+          `SELECT id FROM office_locations WHERE LOWER(name) = LOWER($1)`,
+          [locName]
+        );
+        if (!existingLoc.rows.length) {
+          // Get lat/lng from district boundaries JSON
+          const stateKey = state.toUpperCase();
+          const stateDistricts = DISTRICT_BOUNDARIES[stateKey] || [];
+          const districtData = stateDistricts.find(
+            d => d.district.toLowerCase() === district.toLowerCase()
+          );
+          const lat = districtData?.lat || 20.5937;
+          const lng = districtData?.lng || 78.9629;
+          const radius = districtData?.radius_m || 999999;
+          await db.query(
+            `INSERT INTO office_locations (name, latitude, longitude, radius_meters, address, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT DO NOTHING`,
+            [
+              locName, lat, lng, radius,
+              `${district} District, ${state.charAt(0) + state.slice(1).toLowerCase()}, India`,
+              req.user.id
+            ]
+          );
+        }
+      } else if (rule_type === 'state' && state) {
+        const locName = `State – ${state.charAt(0) + state.slice(1).toLowerCase()}`;
+        const existingLoc = await db.query(
+          `SELECT id FROM office_locations WHERE LOWER(name) = LOWER($1)`,
+          [locName]
+        );
+        if (!existingLoc.rows.length) {
+          const stateKey = state.toUpperCase();
+          const stateDistricts = DISTRICT_BOUNDARIES[stateKey] || [];
+          // Use centroid of first district as approximate state center
+          const lat = stateDistricts[0]?.lat || 20.5937;
+          const lng = stateDistricts[0]?.lng || 78.9629;
+          await db.query(
+            `INSERT INTO office_locations (name, latitude, longitude, radius_meters, address, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT DO NOTHING`,
+            [
+              locName, lat, lng, 999999,
+              `${state.charAt(0) + state.slice(1).toLowerCase()}, India`,
+              req.user.id
+            ]
+          );
+        }
+      }
     }
     // universal → do NOT change employee_type (keep onsite/offsite/wfh as-is)
 
