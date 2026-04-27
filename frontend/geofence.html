@@ -498,10 +498,20 @@
 
     <!-- ── UNIFIED TABLE CARD ──────────────────────────────── -->
     <div class="g-card">
-      <div class="g-card-header">
-        <div>
-          <div class="g-card-title">All Locations &amp; Employees</div>
-          <div class="g-card-sub">Expand any location to view &amp; edit employee buffers and rules inline</div>
+      <div class="g-card-header" style="flex-wrap:wrap;gap:10px">
+        <!-- Tab switcher -->
+        <div style="display:flex;gap:0;border:1.5px solid var(--g-border);border-radius:var(--r-sm);overflow:hidden;flex-shrink:0">
+          <button id="tab-locations" onclick="switchTab('locations')"
+            style="padding:7px 16px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;background:var(--g-green);color:#fff">
+            🏢 Locations
+          </button>
+          <button id="tab-employees" onclick="switchTab('employees')"
+            style="padding:7px 16px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;background:var(--g-surface);color:var(--g-muted)">
+            👥 All Employees
+          </button>
+        </div>
+        <div id="tab-subtitle" style="font-size:12px;color:var(--g-muted);flex:1;min-width:160px">
+          Expand any location to view &amp; edit employee buffers and rules inline
         </div>
         <button class="g-refresh-btn" onclick="loadAll()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
@@ -509,41 +519,84 @@
         </button>
       </div>
 
-      <!-- Toolbar -->
-      <div class="g-toolbar">
-        <div class="g-search-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="g-search" id="loc-search" placeholder="Search locations…" oninput="renderLocTable()">
+      <!-- ── LOCATIONS TAB ───────────────────────────────────── -->
+      <div id="view-locations">
+        <!-- Toolbar -->
+        <div class="g-toolbar">
+          <div class="g-search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="g-search" id="loc-search" placeholder="Search locations…" oninput="renderLocTable()">
+          </div>
+          <select class="g-filter-sel" id="filter-type" onchange="renderLocTable()">
+            <option value="">All types</option>
+            <option value="office">Office only</option>
+            <option value="global">Global zones</option>
+          </select>
+          <button class="g-ghost-btn" onclick="expandAll()">Expand All</button>
+          <button class="g-ghost-btn" onclick="collapseAll()">Collapse All</button>
+          <span class="g-count" id="loc-count"></span>
         </div>
-        <select class="g-filter-sel" id="filter-type" onchange="renderLocTable()">
-          <option value="">All types</option>
-          <option value="office">Office only</option>
-          <option value="global">Global zones</option>
-        </select>
-        <button class="g-ghost-btn" onclick="expandAll()">Expand All</button>
-        <button class="g-ghost-btn" onclick="collapseAll()">Collapse All</button>
-        <span class="g-count" id="loc-count"></span>
+
+        <!-- Table -->
+        <div style="overflow-x:auto">
+          <table class="g-table" id="loc-table">
+            <thead>
+              <tr>
+                <th style="width:46px"></th>
+                <th>Location</th>
+                <th>Type</th>
+                <th>Buffer / Zone</th>
+                <th>Employees</th>
+                <th>Status</th>
+                <th style="text-align:center;width:140px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="loc-tbody">
+              <tr><td colspan="7" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Table -->
-      <div style="overflow-x:auto">
-        <table class="g-table" id="loc-table">
-          <thead>
-            <tr>
-              <th style="width:46px"></th>
-              <th>Location</th>
-              <th>Type</th>
-              <th>Buffer / Zone</th>
-              <th>Employees</th>
-              <th>Status</th>
-              <th style="text-align:center;width:140px">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="loc-tbody">
-            <tr><td colspan="7" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr>
-          </tbody>
-        </table>
+      <!-- ── EMPLOYEES TAB ───────────────────────────────────── -->
+      <div id="view-employees" style="display:none">
+        <!-- Toolbar -->
+        <div class="g-toolbar">
+          <div class="g-search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="g-search" id="emp-search" placeholder="Search employees…" oninput="renderEmpTable()">
+          </div>
+          <select class="g-filter-sel" id="emp-filter-rule" onchange="renderEmpTable()">
+            <option value="">All rules</option>
+            <option value="office">🏢 Office</option>
+            <option value="state">🗺 State</option>
+            <option value="district">📍 District</option>
+            <option value="universal">🌍 Universal</option>
+            <option value="none">⚠️ Unassigned</option>
+          </select>
+          <span class="g-count" id="emp-count"></span>
+        </div>
+
+        <!-- Employee Table -->
+        <div style="overflow-x:auto">
+          <table class="g-table" id="emp-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Dept</th>
+                <th>Current Rule</th>
+                <th>Assignment</th>
+                <th style="min-width:320px">Change Rule</th>
+                <th style="text-align:center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="emp-tbody">
+              <tr><td colspan="6" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
     </div>
 
   </div><!-- /content -->
@@ -1741,6 +1794,211 @@ function updateBufSliderBg(slider) {
   const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
   slider.style.background = `linear-gradient(90deg, var(--g-green) ${pct}%, var(--g-border) ${pct}%)`;
 }
+
+// ══════════════════════════════════════════════════════════════
+//  EMPLOYEE TAB — flat list with inline rule editing
+// ══════════════════════════════════════════════════════════════
+
+let _activeTab = 'locations';
+
+function switchTab(tab) {
+  _activeTab = tab;
+  const isLoc = tab === 'locations';
+  document.getElementById('view-locations').style.display = isLoc ? '' : 'none';
+  document.getElementById('view-employees').style.display = isLoc ? 'none' : '';
+  document.getElementById('tab-locations').style.background = isLoc ? 'var(--g-green)' : 'var(--g-surface)';
+  document.getElementById('tab-locations').style.color      = isLoc ? '#fff' : 'var(--g-muted)';
+  document.getElementById('tab-employees').style.background = isLoc ? 'var(--g-surface)' : 'var(--g-green)';
+  document.getElementById('tab-employees').style.color      = isLoc ? 'var(--g-muted)' : '#fff';
+  document.getElementById('tab-subtitle').textContent = isLoc
+    ? 'Expand any location to view & edit employee buffers and rules inline'
+    : 'All employees — change geofence rule directly from here';
+  if (!isLoc) renderEmpTable();
+}
+
+function renderEmpTable() {
+  const q      = (document.getElementById('emp-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('emp-filter-rule')?.value || '';
+
+  const emps = _allEmployees.filter(e => {
+    const rule = _allRules.find(r => r.id === e.id);
+    const rt   = rule?.rule_type || 'none';
+    if (filter && filter !== rt) return false;
+    const name = (e.first_name + ' ' + e.last_name + ' ' + e.employee_code + ' ' + (e.city || '')).toLowerCase();
+    if (q && !name.includes(q)) return false;
+    return true;
+  });
+
+  document.getElementById('emp-count').textContent = emps.length + ' employees';
+
+  if (!emps.length) {
+    document.getElementById('emp-tbody').innerHTML =
+      '<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--g-muted)">No employees found</td></tr>';
+    return;
+  }
+
+  document.getElementById('emp-tbody').innerHTML = emps.map(e => empTableRow(e)).join('');
+}
+
+function empTableRow(e) {
+  const rule = _allRules.find(r => r.id === e.id);
+  const rt   = rule?.rule_type || '';
+
+  // Current rule badge
+  const ruleBadgeMap = {
+    office:    ['gbadge-office',   '🏢 Office'],
+    state:     ['gbadge-state',    '🗺️ State'],
+    district:  ['gbadge-district', '📍 District'],
+    universal: ['gbadge-univ',     '🌍 Universal'],
+  };
+  const [badgeCls, badgeTxt] = ruleBadgeMap[rt] || ['gbadge-none', '⚠️ None'];
+
+  // Current assignment label
+  let assignLabel = '—';
+  if (rt === 'office') {
+    assignLabel = 'See location card';
+  } else if (rt === 'district') {
+    assignLabel = rule?.district ? `${rule.district}, ${rule.state}` : '—';
+  } else if (rt === 'state') {
+    assignLabel = rule?.state || '—';
+  } else if (rt === 'universal') {
+    assignLabel = 'Anywhere';
+  }
+
+  const officeOptions = _allLocations
+    .filter(l => l.radius_meters < 10000 && l.is_active)
+    .map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+
+  return `<tr id="etr-${e.id}" style="border-bottom:1px solid var(--g-border);transition:background .1s">
+    <td style="padding:10px 14px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <div class="g-avatar">${(e.first_name?.[0]||'?').toUpperCase()}</div>
+        <div>
+          <div style="font-weight:700;font-size:13px;color:var(--g-slate)">${e.first_name} ${e.last_name}</div>
+          <div style="font-size:10.5px;color:var(--g-muted)">${e.employee_code} · ${e.city||'—'}</div>
+        </div>
+      </div>
+    </td>
+    <td style="padding:10px 14px;font-size:12px;color:var(--g-muted)">${e.department_name||'—'}</td>
+    <td style="padding:10px 14px">
+      <span class="gbadge ${badgeCls}">${badgeTxt}</span>
+    </td>
+    <td style="padding:10px 14px;font-size:12px;color:var(--g-slate-2)">${assignLabel}</td>
+    <td style="padding:10px 14px">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <select class="g-rule-sel" id="et-rsel-${e.id}" onchange="onEmpTabRuleChange(${e.id})" style="font-size:12px">
+          <option value="office"    ${rt==='office'   ?'selected':''}>🏢 Office</option>
+          <option value="state"     ${rt==='state'    ?'selected':''}>🗺️ State</option>
+          <option value="district"  ${rt==='district' ?'selected':''}>📍 District</option>
+          <option value="universal" ${rt==='universal'?'selected':''}>🌍 Universal</option>
+        </select>
+        <!-- Office picker -->
+        <select class="g-loc-select" id="et-osel-${e.id}" style="display:${rt==='office'?'block':'none'}">
+          <option value="">— select office —</option>
+          ${officeOptions}
+        </select>
+        <!-- State picker -->
+        <select class="g-loc-select" id="et-ssel-${e.id}" onchange="onEmpTabStateChange(${e.id})" style="display:${(rt==='state'||rt==='district')?'block':'none'}">
+          <option value="">— select state —</option>
+          ${BR_STATES.map(s=>`<option value="${s}" ${rule?.state===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <!-- District picker -->
+        <select class="g-loc-select" id="et-dsel-${e.id}" style="display:${rt==='district'?'block':'none'}">
+          <option value="">— select district —</option>
+          ${rule?.state && BR_DISTRICTS[rule.state] ? BR_DISTRICTS[rule.state].map(d=>`<option value="${d}" ${rule?.district===d?'selected':''}>${d}</option>`).join('') : ''}
+        </select>
+      </div>
+    </td>
+    <td style="padding:10px 14px;text-align:center">
+      <button class="g-apply-btn" onclick="saveEmpRuleFromTable(${e.id})">✓ Apply</button>
+    </td>
+  </tr>`;
+}
+
+function onEmpTabRuleChange(empId) {
+  const rt = document.getElementById(`et-rsel-${empId}`)?.value;
+  const osel = document.getElementById(`et-osel-${empId}`);
+  const ssel = document.getElementById(`et-ssel-${empId}`);
+  const dsel = document.getElementById(`et-dsel-${empId}`);
+  if (osel) osel.style.display = rt === 'office'    ? 'block' : 'none';
+  if (ssel) ssel.style.display = (rt === 'state' || rt === 'district') ? 'block' : 'none';
+  if (dsel) dsel.style.display = rt === 'district'  ? 'block' : 'none';
+}
+
+function onEmpTabStateChange(empId) {
+  const ssel = document.getElementById(`et-ssel-${empId}`);
+  const dsel = document.getElementById(`et-dsel-${empId}`);
+  if (!ssel || !dsel) return;
+  const state = ssel.value;
+  dsel.innerHTML = '<option value="">— select district —</option>';
+  if (state && BR_DISTRICTS[state]) {
+    BR_DISTRICTS[state].forEach(d => {
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d;
+      dsel.appendChild(o);
+    });
+  }
+}
+
+async function saveEmpRuleFromTable(empId) {
+  const rsel = document.getElementById(`et-rsel-${empId}`);
+  const osel = document.getElementById(`et-osel-${empId}`);
+  const ssel = document.getElementById(`et-ssel-${empId}`);
+  const dsel = document.getElementById(`et-dsel-${empId}`);
+  if (!rsel) return;
+
+  const rt   = rsel.value;
+  let body   = { employee_id: empId, rule_type: rt };
+
+  if (rt === 'office') {
+    const officeId = parseInt(osel?.value);
+    if (!officeId) { toast('Please select an office location', 'error'); return; }
+    body.office_location_id = officeId;
+  } else if (rt === 'state') {
+    const state = ssel?.value;
+    if (!state) { toast('Please select a state', 'error'); return; }
+    body.state = state;
+  } else if (rt === 'district') {
+    const state = ssel?.value;
+    const dist  = dsel?.value;
+    if (!state) { toast('Please select a state', 'error'); return; }
+    if (!dist)  { toast('Please select a district', 'error'); return; }
+    body.state = state; body.district = dist;
+  } else if (rt === 'universal') {
+    body.state = null; body.district = null;
+  }
+
+  // If switching to office: also call bulk-assign so employee_geofence is created
+  if (rt === 'office' && body.office_location_id) {
+    const assignRes = await api('POST', '/geofence/bulk-assign', {
+      employee_ids: [empId],
+      office_location_id: body.office_location_id,
+      is_universal: false
+    });
+    if (!assignRes?.success) { toast(assignRes?.message || 'Failed to assign to office', 'error'); return; }
+    toast('✓ Assigned to office & rule updated');
+  } else {
+    const r = await api('POST', '/geofence/buffer-rules', body);
+    if (!r?.success) { toast(r?.message || 'Failed', 'error'); return; }
+    toast(rt === 'district' ? `✓ Moved to ${body.district}, ${body.state}`
+        : rt === 'state'    ? `✓ Moved to ${body.state}`
+        : rt === 'universal'? '✓ Set to Universal'
+        : '✓ Rule saved');
+  }
+
+  // Reload data and re-render the employee tab
+  const [locData, ruleData] = await Promise.all([
+    api('GET', '/geofence/locations'),
+    api('GET', '/geofence/buffer-rules')
+  ]);
+  _allLocations = locData?.data || [];
+  _allRules     = ruleData?.data || [];
+  _globalAssignedCount = locData?.global_assigned_count ?? null;
+  _locEmployees = {};
+  updateStats();
+  renderEmpTable();
+}
+
 </script>
 </body>
 </html>
