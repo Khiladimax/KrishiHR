@@ -674,6 +674,7 @@ loadNotifBadge();
 // ── State ────────────────────────────────────────────────────
 let _map = null, _mapMarkers = [], _mapCircles = [], _geoInfoWin = null;
 let _allLocations = [], _allEmployees = [], _allRules = [];
+let _globalAssignedCount = null;
 let _expandedRows = new Set();   // location IDs currently expanded
 let _locEmployees = {};          // cache: locId → [employee, ...]
 let _assignLocId  = null;
@@ -704,6 +705,7 @@ async function loadAll() {
   _allLocations = locData?.data  || [];
   _allEmployees = empData?.data  || [];
   _allRules     = ruleData?.data || [];
+  _globalAssignedCount = locData?.global_assigned_count ?? null;
   _locEmployees = {}; // clear cache
   renderMapMarkers();
   updateStats();
@@ -714,7 +716,11 @@ function updateStats() {
   const locs    = _allLocations.filter(l => l.is_active);
   const offices = locs.filter(l => l.radius_meters < 10000);
   const global  = locs.filter(l => l.radius_meters >= 10000);
-  const totalAssigned = locs.reduce((s, l) => s + (parseInt(l.assigned_count) || 0), 0);
+  // Use backend global distinct count to avoid double-counting employees
+  // who appear under multiple location cards (e.g. stale geofence + buffer rule)
+  const totalAssigned = _globalAssignedCount !== null
+    ? _globalAssignedCount
+    : locs.reduce((s, l) => s + (parseInt(l.assigned_count) || 0), 0);
   document.getElementById('stat-total').textContent    = locs.length;
   document.getElementById('stat-offices').textContent  = offices.length;
   document.getElementById('stat-global').textContent   = global.length;
@@ -1208,6 +1214,7 @@ async function saveEmpRule(empId, locId) {
     ]);
     _allLocations = locData?.data || [];
     _allRules     = ruleData?.data || [];
+    _globalAssignedCount = locData?.global_assigned_count ?? null;
 
     // Keep the current row's location expanded if it still exists
     const stillExpanded = new Set();
