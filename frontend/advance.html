@@ -347,7 +347,8 @@ function pipelineHTML(adv) {
   const empCode      = adv.employee_code;
 
   let steps = [];
-  const chain = Array.isArray(adv.approval_chain) ? adv.approval_chain : [];
+  const chain = Array.isArray(adv.approval_chain) ? adv.approval_chain
+    : (() => { try { return JSON.parse(adv.approval_chain); } catch(_) { return []; } })();
 
   if (DIRECT_TO_COO.has(empCode) || chain.length === 3) {
     steps = [
@@ -403,8 +404,12 @@ function pipelineHTML(adv) {
   return `<div class="pipeline">${stepsHTML}</div>`;
 }
 
+// ── Advance lookup map (safe alternative to inline onclick with user data) ────
+const _advMap = {};
+
 // ── Advance card ──────────────────────────────────────────────────────────────
 function advanceCard(adv, showActions = false) {
+  _advMap[adv.id] = adv; // store for openApproveById
   const statusColor = {
     pending:   'var(--yellow)',
     approved:  'var(--green)',
@@ -459,10 +464,10 @@ function advanceCard(adv, showActions = false) {
         <div style="text-align:right;flex-shrink:0;margin-left:16px">
           <span class="badge" style="background:${statusColor}20;color:${statusColor};margin-bottom:8px;display:block">${adv.status.toUpperCase()}</span>
           <div style="font-size:10px;color:var(--muted);margin-bottom:8px">
-            Level ${adv.current_level || 1}/${(Array.isArray(adv.approval_chain) ? adv.approval_chain.length : 4)}
+            Level ${adv.current_level || 1}/${((Array.isArray(adv.approval_chain) ? adv.approval_chain : (() => { try { return JSON.parse(adv.approval_chain); } catch(_) { return []; } })()).length || 4)}
           </div>
           ${canAct ? `
-            <button class="btn btn-success btn-sm" onclick="openApprove(${adv.id},'${adv.employee_name}',${adv.amount},'${(adv.reason||'').replace(/'/g,"\\'")}',${adv.recover_from_month||'null'},${adv.recover_from_year||'null'},${currentLevel})">
+            <button class="btn btn-success btn-sm" data-adv-id="${adv.id}" onclick="openApproveById(this)">
               Review (L${currentLevel})
             </button>` : ''}
           ${isPaymentStage ? `
@@ -526,7 +531,7 @@ function myAdvanceCard(adv) {
         <div style="text-align:right;flex-shrink:0;margin-left:16px">
           <span class="badge" style="background:${statusColor}20;color:${statusColor};margin-bottom:8px;display:block">${displayStatus}</span>
           <div style="font-size:10px;color:var(--muted);margin-bottom:8px">
-            Level ${adv.current_level || 1}/${(Array.isArray(adv.approval_chain) ? adv.approval_chain.length : 4)}
+            Level ${adv.current_level || 1}/${((Array.isArray(adv.approval_chain) ? adv.approval_chain : (() => { try { return JSON.parse(adv.approval_chain); } catch(_) { return []; } })()).length || 4)}
           </div>
           ${canEdit ? `
             <button class="btn btn-outline btn-sm" style="margin-bottom:6px;width:100%" onclick="openEditModal(${adv.id},${adv.amount},'${(adv.reason||'').replace(/'/g,"\\'")}',${adv.total_installments||1})">
@@ -602,15 +607,26 @@ async function loadPending() {
   const el = document.getElementById('pending-list');
   el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
 
-  // Backend already filters to only what this user can act on
   const [pendingRes, approvedRes] = await Promise.all([
     api('GET', '/advance?status=pending'),
     api('GET', '/advance?status=approved'),
   ]);
 
-  // Filter out own requests on frontend as extra safety
-  const pending  = (pendingRes?.data  || []).filter(a => a.employee_id !== user.id);
-  const approved = (approvedRes?.data || []).filter(a => a.employee_id !== user.id);
+  // Strict frontend filter: only show what this user can actually act on RIGHT NOW
+  // pending: must be current_approver_code match (not just "in the chain somewhere")
+  const pending = (pendingRes?.data || []).filter(a =>
+    a.employee_id !== user.id &&
+    a.current_approver_code === user.employee_code
+  );
+
+  // approved (disbursement queue): only accounts role sees these
+  const approved = isAccounts
+    ? (approvedRes?.data || []).filter(a =>
+        a.employee_id !== user.id &&
+        a.current_approver_code === null
+      )
+    : [];
+
   const all = [...pending, ...approved];
 
   if (!all.length) {
@@ -655,6 +671,19 @@ async function submitRequest() {
   } else {
     toast(data?.message || 'Failed', 'error');
   }
+}
+
+// Safe bridge: reads advance data from _advMap instead of inline onclick args
+function openApproveById(btn) {
+  const id  = parseInt(btn.getAttribute('data-adv-id'));
+  const adv = _advMap[id];
+  if (!adv) { toast('Could not load request data', 'error'); return; }
+  const chain = Array.isArray(adv.approval_chain)
+    ? adv.approval_chain
+    : (() => { try { return JSON.parse(adv.approval_chain); } catch(_) { return []; } })();
+  const level = parseInt(adv.current_level) || 1;
+  openApprove(id, adv.employee_name, adv.amount, adv.reason,
+              adv.recover_from_month, adv.recover_from_year, level);
 }
 
 function openApprove(id, name, amount, reason, recMonth, recYear, level) {
