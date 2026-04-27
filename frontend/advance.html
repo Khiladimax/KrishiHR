@@ -166,24 +166,7 @@
         <label class="form-label">Reason *</label>
         <textarea id="req-reason" class="form-control" rows="3" placeholder="Explain why you need the advance…"></textarea>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Recover from Month</label>
-          <select id="req-month" class="form-control">
-            <option value="">Select month</option>
-            <option value="1">January</option><option value="2">February</option>
-            <option value="3">March</option><option value="4">April</option>
-            <option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option>
-            <option value="9">September</option><option value="10">October</option>
-            <option value="11">November</option><option value="12">December</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Recover from Year</label>
-          <input id="req-year" class="form-control" type="number" placeholder="2026">
-        </div>
-      </div>
+
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('req-modal')">Cancel</button>
@@ -458,7 +441,7 @@ function advanceCard(adv, showActions = false) {
           <div class="${showActions ? 'req-meta' : 'req-name'}" style="font-size:${showActions?'14':'16'}px;font-weight:700">${fmt.money(adv.amount)}</div>
           <div class="req-meta">Reason: ${adv.reason || '—'}</div>
           <div class="req-meta">Requested: ${fmt.date(adv.requested_at)}</div>
-          ${adv.recover_from_month ? `<div class="req-meta">Recovery: ${fmt.months[adv.recover_from_month-1]} ${adv.recover_from_year}</div>` : ''}
+
           ${pipelineHTML(adv)}
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:16px">
@@ -525,7 +508,7 @@ function myAdvanceCard(adv) {
           <div class="req-name" style="font-size:16px;font-weight:700">${fmt.money(adv.amount)}</div>
           <div class="req-meta">Reason: ${adv.reason || '—'}</div>
           <div class="req-meta">Requested: ${fmt.date(adv.requested_at)}</div>
-          ${adv.recover_from_month ? `<div class="req-meta">Recovery: ${fmt.months[adv.recover_from_month-1]} ${adv.recover_from_year}</div>` : ''}
+
           ${pipelineHTML(adv)}
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:16px">
@@ -651,21 +634,15 @@ async function loadAll() {
 async function submitRequest() {
   const amount = document.getElementById('req-amount').value;
   const reason = document.getElementById('req-reason').value.trim();
-  const month  = document.getElementById('req-month').value;
-  const year   = document.getElementById('req-year').value;
   if (!amount || !reason) { toast('Amount and reason required', 'error'); return; }
   const data = await api('POST', '/advance/apply', {
     amount: parseFloat(amount), reason,
-    recover_from_month: month || null,
-    recover_from_year:  year  || null
   });
   if (data?.success) {
     toast(data.message);
     closeModal('req-modal');
     document.getElementById('req-amount').value = '';
     document.getElementById('req-reason').value = '';
-    document.getElementById('req-month').value  = '';
-    document.getElementById('req-year').value   = '';
     loadMy();
     if (showStats) loadStats();
   } else {
@@ -678,36 +655,23 @@ function openApproveById(btn) {
   const id  = parseInt(btn.getAttribute('data-adv-id'));
   const adv = _advMap[id];
   if (!adv) { toast('Could not load request data', 'error'); return; }
-  const chain = Array.isArray(adv.approval_chain)
-    ? adv.approval_chain
-    : (() => { try { return JSON.parse(adv.approval_chain); } catch(_) { return []; } })();
   const level = parseInt(adv.current_level) || 1;
-  openApprove(id, adv.employee_name, adv.amount, adv.reason,
-              adv.recover_from_month, adv.recover_from_year, level);
+  openApprove(id, adv.employee_name, adv.amount, adv.reason, level);
 }
 
-function openApprove(id, name, amount, reason, recMonth, recYear, level) {
+function openApprove(id, name, amount, reason, level) {
   activeAdvId = id;
   document.getElementById('approve-modal-title').textContent = `Review — Level ${level} (${LEVELS[level]?.label || 'Approver'})`;
   document.getElementById('approve-content').innerHTML = `
     <div class="form-row">
       <div><div class="form-label">Employee</div><b>${name}</b></div>
-      <div><div class="form-label">Amount</div><b>${fmt.money(amount)}</b></div>
+      <div><div class="form-label">Requested Amount</div><b>${fmt.money(amount)}</b></div>
     </div>
     <div class="form-group mt-2"><div class="form-label">Reason</div>${reason || '—'}</div>
-    ${recMonth && recMonth !== 'null' ? `<div class="form-group"><div class="form-label">Recovery</div>${fmt.months[recMonth-1]} ${recYear}</div>` : ''}
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Recover from Month</label>
-        <select id="app-month" class="form-control">
-          <option value="">Select…</option>
-          ${fmt.months.map((m,i)=>`<option value="${i+1}" ${recMonth==i+1?'selected':''}>${m}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Recover from Year</label>
-        <input id="app-year" class="form-control" type="number" value="${recYear && recYear !== 'null' ? recYear : new Date().getFullYear()}">
-      </div>
+    <div class="form-group mt-2" style="background:var(--surface-raised,#f8f9fa);border:1.5px solid var(--color-primary,#4caf50);border-radius:8px;padding:12px">
+      <label class="form-label" style="color:var(--color-primary,#4caf50);font-weight:700">✏️ Approved Amount Override</label>
+      <small style="display:block;margin-bottom:6px;opacity:.75">Leave blank to approve full amount. Enter a lower value to partially approve.</small>
+      <input id="app-approved-amount" class="form-control" type="number" min="1" max="${amount}" placeholder="e.g. ${amount}" style="font-size:1.1rem;font-weight:600">
     </div>
     <div class="form-group mt-2">
       <label class="form-label">Remarks</label>
@@ -744,12 +708,18 @@ function openPayment(id, name, amount) {
 }
 
 async function actionAdvance(action) {
-  const remarks = document.getElementById('app-remarks')?.value || '';
-  const month   = document.getElementById('app-month')?.value  || null;
-  const year    = document.getElementById('app-year')?.value   || null;
-  const data = await api('POST', `/advance/${activeAdvId}/action`, {
-    action, remarks, recover_from_month: month, recover_from_year: year
-  });
+  const remarks  = document.getElementById('app-remarks')?.value || '';
+  const overrideRaw = document.getElementById('app-approved-amount')?.value;
+  const approved_amount = overrideRaw ? parseFloat(overrideRaw) : null;
+
+  if (action === 'approve' && approved_amount !== null && approved_amount <= 0) {
+    return toast('Approved amount must be greater than zero', 'error');
+  }
+
+  const payload = { action, remarks };
+  if (approved_amount) payload.approved_amount = approved_amount;
+
+  const data = await api('POST', `/advance/${activeAdvId}/action`, payload);
   if (data?.success) {
     toast(data.message);
     closeModal('approve-modal');
