@@ -568,22 +568,88 @@ exports.getTeamToday = async (req, res) => {
 // ── Get Punch Locations ───────────────────────────────────────────────────────
 exports.getPunchLocations = async (req, res) => {
   try {
-    const empId = req.user.id;
-    const { days = 30 } = req.query;
+    const userId = req.user.id;
+    const role   = req.user.role;
+    const date   = req.query.date || toLocalDateString(new Date());
+
+    // ── Scope: mirror getTeamToday role logic exactly ─────────────────────
+    let empCond = '';
+    const params = [date];
+
+    if (role === 'super_admin') {
+      empCond = `AND e.id != $2`;
+      params.push(userId);
+
+    } else if (role === 'hr' || role === 'accounts') {
+      empCond = `AND e.role != 'super_admin' AND e.id != $2`;
+      params.push(userId);
+
+    } else if (role === 'admin') {
+      // COO-level admin (reports to super_admin) sees everyone; AVP/manager-level sees only direct reports
+      const mgrCheck = await db.query(
+        `SELECT m.role FROM employees e
+         LEFT JOIN employees m ON e.reporting_manager_id = m.id
+         WHERE e.id = $1`, [userId]
+      );
+      const managerRole = mgrCheck.rows[0]?.role;
+      if (managerRole === 'super_admin') {
+        empCond = `AND e.role != 'super_admin' AND e.id != $2`;
+      } else {
+        empCond = `AND e.reporting_manager_id = $2 AND e.id != $2`;
+      }
+      params.push(userId);
+
+    } else if (role === 'manager' || role === 'tl') {
+      empCond = `AND e.reporting_manager_id = $2 AND e.id != $2`;
+      params.push(userId);
+
+    } else {
+      // Regular employee — show only themselves
+      empCond = `AND e.id = $2`;
+      params.push(userId);
+    }
 
     const result = await db.query(
-      `SELECT date, punch_in_location, punch_out_location,
-              location_lat, location_lng
-       FROM attendance
-       WHERE employee_id=$1
-         AND date >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
-         AND (location_lat IS NOT NULL OR punch_in_location IS NOT NULL)
-       ORDER BY date DESC`,
-      [empId]
+      `SELECT e.id AS employee_id,
+              e.employee_code,
+              CONCAT(e.first_name,' ',e.last_name) AS employee_name,
+              d.name  AS department_name,
+              des.title AS designation_title,
+              CASE
+                WHEN a.status IN ('present','late')
+                      AND a.punch_in IS NOT NULL
+                      AND a.punch_out IS NULL
+                      AND a.date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+                      AND EXTRACT(HOUR FROM CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') >= 21
+                 THEN 'missing_punch_out'
+                WHEN a.status IS NOT NULL THEN a.status
+                WHEN EXISTS (
+                  SELECT 1 FROM wfh_requests w
+                  WHERE w.employee_id = e.id
+                    AND w.status = 'approved'
+                    AND $1::date BETWEEN w.from_date AND COALESCE(w.to_date, w.from_date)
+                ) THEN 'wfh'
+                ELSE 'absent'
+              END AS status,
+              a.punch_in,
+              a.punch_out,
+              a.working_hours,
+              a.punch_in_location,
+              a.punch_out_location,
+              a.location_lat,
+              a.location_lng
+       FROM employees e
+       LEFT JOIN attendance a ON a.employee_id = e.id AND a.date = $1
+       LEFT JOIN departments  d   ON d.id  = e.department_id
+       LEFT JOIN designations des ON des.id = e.designation_id
+       WHERE e.is_active = true ${empCond}
+       ORDER BY e.first_name ASC`,
+      params
     );
 
     res.json({ success: true, data: result.rows });
   } catch (err) {
+    console.error('[getPunchLocations Error]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
