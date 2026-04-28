@@ -98,7 +98,7 @@ exports.getAll = async (req, res) => {
          e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
          e.gender, e.joining_date, e.role, e.is_active, e.employment_type,
          e.employee_category, e.provision_end_date, e.confirmed_date,
-         e.saturday_policy,
+         COALESCE(e.saturday_policy, '2nd_4th_off') AS saturday_policy,
          e.department_id, e.designation_id, e.reporting_manager_id, e.team_leader_id,
          e.basic_salary, e.ctc, e.city,
          e.profile_photo,
