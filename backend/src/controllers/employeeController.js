@@ -102,7 +102,7 @@ exports.getAll = async (req, res) => {
          e.department_id, e.designation_id, e.reporting_manager_id, e.team_leader_id,
          e.basic_salary, e.ctc, e.city,
          e.profile_photo,
-         TO_CHAR(e.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
+         TO_CHAR(e.date_of_birth AT TIME ZONE 'Asia/Kolkata','YYYY-MM-DD') AS date_of_birth,
          e.separation_date, e.separation_type, e.separation_reason,
          sep_active.last_working_date AS sep_last_working_date,
          d.name   AS department_name,
