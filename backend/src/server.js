@@ -40,6 +40,13 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
 });
 
+// ── Redirect HTML page requests to Vercel frontend ────────────────────────────
+// Mobile app navigates using backend URL — redirect to correct Vercel frontend
+const FRONTEND_URL = 'https://krishi-hr-mu.vercel.app';
+app.get('/*.html', (req, res) => {
+  res.redirect(301, FRONTEND_URL + req.path);
+});
+
 // 404 handler
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
