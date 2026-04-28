@@ -1768,13 +1768,16 @@ let _changeMgrEmpId = null;
 async function openChangeManager(empId, empName, currentMgrId) {
   _changeMgrEmpId = empId;
   document.getElementById('change-manager-title').textContent = `Change Manager — ${empName}`;
+  // Close detail modal immediately (before async) so the backdrop click handler
+  // cannot accidentally close the change-manager-modal once it opens
+  closeModal('emp-detail-modal');
+  const sel = document.getElementById('change-manager-select');
+  sel.innerHTML = '<option value="">Loading…</option>';
+  openModal('change-manager-modal');
   const res = await api('GET', '/employees');
   const emps = (res?.data || []).filter(e => e.id !== empId);
-  const sel = document.getElementById('change-manager-select');
   sel.innerHTML = '<option value="">— No Manager —</option>' +
     emps.map(e => `<option value="${e.id}" ${e.id === currentMgrId ? 'selected' : ''}>${e.first_name} ${e.last_name} (${e.employee_code}) — ${e.role}</option>`).join('');
-  closeModal('emp-detail-modal');
-  openModal('change-manager-modal');
 }
 
 async function saveChangeManager() {
