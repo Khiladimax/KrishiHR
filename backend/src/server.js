@@ -35,6 +35,10 @@ app.use((req, _res, next) => {
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', routes);
 
+// ── Serve frontend static files (for WebView access) ─────────────────────────
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../../frontend')));
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
