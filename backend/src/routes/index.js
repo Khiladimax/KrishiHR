@@ -552,35 +552,19 @@ router.get('/birthdays/upcoming', authenticate, async (req, res) => {
         des.title AS designation_title,
         TO_CHAR(e.date_of_birth,'MM-DD') AS birth_md,
         TO_CHAR(e.date_of_birth,'DD Mon') AS birth_display,
-        -- Simple days_until: 0 = today, 1-7 = upcoming. Cast to INT so JS === 0 works.
-        CASE
-          WHEN TO_CHAR(e.date_of_birth,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-          THEN 0
-          ELSE (
-            (TO_DATE(
-              EXTRACT(YEAR FROM NOW() AT TIME ZONE 'Asia/Kolkata')::TEXT || '-' ||
-              TO_CHAR(e.date_of_birth,'MM-DD'),
-              'YYYY-MM-DD'
-            ) - CURRENT_DATE)::INT
-          )
-        END AS days_until,
+        gs.offset_days AS days_until,
         COALESCE((SELECT COUNT(*) FROM birthday_likes  bl WHERE bl.birthday_emp_id=e.id AND bl.like_date=$1),0) AS like_count,
         COALESCE((SELECT COUNT(*) FROM birthday_wishes bw WHERE bw.birthday_emp_id=e.id AND bw.wish_date=$1),0) AS wish_count,
         COALESCE(EXISTS(SELECT 1 FROM birthday_likes  bl WHERE bl.birthday_emp_id=e.id AND bl.from_emp_id=$2 AND bl.like_date=$1),false) AS i_liked,
         COALESCE(EXISTS(SELECT 1 FROM birthday_wishes bw WHERE bw.birthday_emp_id=e.id AND bw.from_emp_id=$2 AND bw.wish_date=$1),false) AS i_wished
       FROM employees e
+      JOIN generate_series(0, 7) AS gs(offset_days)
+        ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata')::date + (gs.offset_days || ' days')::interval, 'MM-DD')
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
       WHERE e.is_active = TRUE
         AND e.date_of_birth IS NOT NULL
-        AND (
-          TO_CHAR(e.date_of_birth,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-          OR (
-            TO_CHAR(e.date_of_birth,'MMDD') > TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-            AND TO_CHAR(e.date_of_birth,'MMDD') <= TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata' + INTERVAL '7 days'),'MMDD')
-          )
-        )
-      ORDER BY days_until ASC, e.first_name ASC
+      ORDER BY gs.offset_days ASC, e.first_name ASC
     `, [today, empId]);
 
     res.json({ success: true, data: result.rows });
