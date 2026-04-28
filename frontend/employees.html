@@ -611,6 +611,14 @@
             </div>
             <div class="form-group" style="margin:0"><label class="form-label">Level</label><input id="edit-level" class="form-control" type="text" placeholder="L4, L5…"></div>
             <div class="form-group" style="margin:0"><label class="form-label">Probation End Date</label><input id="edit-probation" class="form-control" type="date"></div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Reporting Manager</label>
+              <select id="edit-manager" class="form-control"><option value="">Loading…</option></select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Team Leader</label>
+              <select id="edit-tl" class="form-control"><option value="">Loading…</option></select>
+            </div>
             <div class="form-group" style="margin:0;grid-column:1/-1" id="advance-chain-info" style="display:none">
               <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
                 ⚡ <b>Advance Chain:</b> <span id="advance-chain-label"></span>
@@ -1935,14 +1943,30 @@ function switchEditTab(tab) {
 
 async function openEditEmp(id) {
   _editEmpId = id;
-  // Fetch employee + salary structure in parallel
-  const [empRes, salRes] = await Promise.all([
+  // Close emp-detail-modal IMMEDIATELY (before any await) so the backdrop click
+  // handler cannot fire on the newly-opened edit modal
+  closeModal('emp-detail-modal');
+  // Fetch employee, salary structure, and all employees (for manager/TL dropdowns) in parallel
+  const [empRes, salRes, allEmpsRes] = await Promise.all([
     api('GET', `/employees/${id}`),
-    api('GET', `/payroll/salary-structure/${id}`).catch(() => null)
+    api('GET', `/payroll/salary-structure/${id}`).catch(() => null),
+    api('GET', '/employees')
   ]);
   if (!empRes?.success) { toast('Failed to load employee', 'error'); return; }
   const e = empRes.data;
   const s = salRes?.data || {};
+  const allEmps = (allEmpsRes?.data || []).filter(emp => emp.id !== id);
+
+  // Populate Reporting Manager dropdown
+  const mgrSel = document.getElementById('edit-manager');
+  mgrSel.innerHTML = '<option value="">— No Manager —</option>' +
+    allEmps.map(emp => `<option value="${emp.id}" ${emp.id === e.reporting_manager_id ? 'selected' : ''}>${emp.first_name} ${emp.last_name} (${emp.employee_code}) — ${emp.role}</option>`).join('');
+
+  // Populate Team Leader dropdown
+  const tlSel = document.getElementById('edit-tl');
+  tlSel.innerHTML = '<option value="">— No Team Leader —</option>' +
+    allEmps.filter(emp => ['tl','manager','admin','hr'].includes(emp.role))
+      .map(emp => `<option value="${emp.id}" ${emp.id === e.team_leader_id ? 'selected' : ''}>${emp.first_name} ${emp.last_name} (${emp.employee_code})</option>`).join('');
 
   document.getElementById('edit-emp-title').textContent = `Edit — ${e.first_name} ${e.last_name}`;
 
@@ -1997,7 +2021,6 @@ async function openEditEmp(id) {
 
   switchEditTab('info');
   recalcSalaryPreview();
-  closeModal('emp-detail-modal');
   openModal('edit-emp-modal');
 }
 
@@ -2102,6 +2125,8 @@ async function saveEmployeeEdit() {
     gratuity:            parseFloat(document.getElementById('edit-gratuity').value)     || 0,
     conveyance:          parseFloat(document.getElementById('edit-conveyance').value)   || 0,
     travel_allowance:    parseFloat(document.getElementById('edit-conveyance').value)   || 0,
+    reporting_manager_id: document.getElementById('edit-manager').value ? parseInt(document.getElementById('edit-manager').value) : null,
+    team_leader_id:       document.getElementById('edit-tl').value       ? parseInt(document.getElementById('edit-tl').value)      : null,
   };
 
   const empRes = await api('PATCH', `/employees/${_editEmpId}`, empBody);
