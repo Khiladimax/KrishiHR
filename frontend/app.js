@@ -369,7 +369,15 @@ async function markAllNotifsRead() {
 
 function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
-document.addEventListener('click', e => { if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open'); });
+document.addEventListener('click', e => {
+  // Only close the modal when clicking directly on the semi-transparent backdrop overlay,
+  // not when a button/link inside the modal fires and the event bubbles up to document.
+  // e.target is the exact element clicked; it will be the backdrop div only when the
+  // user clicks outside the white modal box.
+  if (e.target.classList.contains('modal-backdrop')) {
+    e.target.classList.remove('open');
+  }
+});
 
 // ── Sidebar mobile toggle ─────────────────────────────────────────
 function toggleSidebar() {
