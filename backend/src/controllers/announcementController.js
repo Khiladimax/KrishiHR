@@ -280,26 +280,18 @@ exports.getFeed = async (req, res) => {
     );
 
     // Birthdays — upcoming 7 days (handles month boundary correctly)
+    // Generate series of next 7 dates and match birthdays by MM-DD
     const bdResult = await db.query(
-      `SELECT id, first_name, last_name, employee_code, date_of_birth,
-              department_id,
-              TO_CHAR(date_of_birth,'DD-Mon') AS birth_day
-       FROM employees
-       WHERE is_active=true
-         AND date_of_birth IS NOT NULL
-         AND (
-           DATE(TO_CHAR(CURRENT_DATE,'YYYY') || '-' || TO_CHAR(date_of_birth,'MM-DD'))
-             BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
-           OR
-           DATE((EXTRACT(YEAR FROM CURRENT_DATE)::int + 1) || '-' || TO_CHAR(date_of_birth,'MM-DD'))
-             BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
-         )
-       ORDER BY
-         CASE
-           WHEN DATE(TO_CHAR(CURRENT_DATE,'YYYY') || '-' || TO_CHAR(date_of_birth,'MM-DD')) >= CURRENT_DATE
-           THEN DATE(TO_CHAR(CURRENT_DATE,'YYYY') || '-' || TO_CHAR(date_of_birth,'MM-DD'))
-           ELSE DATE((EXTRACT(YEAR FROM CURRENT_DATE)::int + 1) || '-' || TO_CHAR(date_of_birth,'MM-DD'))
-         END ASC`
+      `SELECT DISTINCT e.id, e.first_name, e.last_name, e.employee_code, e.date_of_birth,
+              e.department_id,
+              TO_CHAR(e.date_of_birth,'DD-Mon') AS birth_day
+       FROM employees e
+       JOIN generate_series(0, 7) AS gs(offset_days)
+         ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR(CURRENT_DATE + (gs.offset_days || ' days')::interval, 'MM-DD')
+       WHERE e.is_active=true
+         AND e.date_of_birth IS NOT NULL
+       ORDER BY TO_CHAR(e.date_of_birth,'MM-DD') = TO_CHAR(CURRENT_DATE,'MM-DD') DESC,
+                gs.offset_days ASC`
     );
 
     // Upcoming holidays (next 30 days) — filtered by employee's region
