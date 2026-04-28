@@ -60,7 +60,7 @@ exports.getAll = async (req, res) => {
     const empId    = req.user.id;
     const offset   = (parseInt(page) - 1) * parseInt(limit);
 
-    let conds = [`(a.expires_at IS NULL OR a.expires_at >= CURRENT_DATE)`, `a.is_active=true`,
+    let conds = [`(a.expires_at IS NULL OR a.expires_at >= NOW())`, `a.is_active=true`,
                  `(a.target_role='all' OR a.target_role=$1 OR $1 IN ('hr','admin','super_admin'))`,
                  `(a.department_id IS NULL OR a.department_id=$2)`];
     let params = [role, deptId || 0];
@@ -273,7 +273,7 @@ exports.getFeed = async (req, res) => {
        LEFT JOIN employees e      ON a.posted_by = e.id
        LEFT JOIN designations dsg ON e.designation_id = dsg.id
        WHERE a.is_active=true
-         AND (a.expires_at IS NULL OR a.expires_at >= $1)
+         AND (a.expires_at IS NULL OR a.expires_at >= NOW())
          AND a.type NOT IN ('thought','gk')
        ORDER BY a.created_at DESC LIMIT 10`,
       [todayStr, empId]
