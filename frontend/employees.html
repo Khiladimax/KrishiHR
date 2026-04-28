@@ -1265,7 +1265,8 @@ async function showEmpDetail(id) {
   const footer = document.getElementById('emp-detail-footer');
   // Build all buttons in ONE assignment — multiple innerHTML+= re-parses the DOM each time
   // which can cause button misalignment / double-firing issues
-  const hrButtons = Role.is('hr', 'accounts') ? `
+  const canManage = Role.is('hr', 'accounts');
+  const hrButtons = canManage ? `
     <button class="btn btn-outline btn-sm" id="btn-reset-pwd">🔑 Reset Password</button>
     <button class="btn btn-outline btn-sm" id="btn-toggle-wfh" style="${e.is_wfh_permanent ? 'background:#e0f2fe;color:#0369a1;border-color:#7dd3fc' : ''}">
       ${e.is_wfh_permanent ? '🏠 Disable Permanent WFH' : '🏠 Enable Permanent WFH'}
@@ -1277,7 +1278,7 @@ async function showEmpDetail(id) {
 
   // Attach event listeners directly — no inline onclick, no string injection
   footer.querySelector('#btn-close-detail').onclick = () => closeModal('emp-detail-modal');
-  if (Role.is('hr', 'accounts')) {
+  if (canManage) {
     footer.querySelector('#btn-reset-pwd').onclick    = () => resetPassword(e.id, e.email);
     footer.querySelector('#btn-toggle-wfh').onclick   = () => toggleWFH(e.id, e.is_wfh_permanent);
     footer.querySelector('#btn-change-mgr').onclick   = (ev) => { ev.stopPropagation(); openChangeManager(e.id, `${e.first_name} ${e.last_name}`, e.reporting_manager_id || null); };
