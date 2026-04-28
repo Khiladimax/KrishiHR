@@ -1271,7 +1271,6 @@ async function showEmpDetail(id) {
     <button class="btn btn-outline btn-sm" id="btn-toggle-wfh" style="${e.is_wfh_permanent ? 'background:#e0f2fe;color:#0369a1;border-color:#7dd3fc' : ''}">
       ${e.is_wfh_permanent ? '🏠 Disable Permanent WFH' : '🏠 Enable Permanent WFH'}
     </button>
-    <button class="btn btn-outline btn-sm" id="btn-change-mgr">👤 Change Manager</button>
     <button class="btn btn-primary btn-sm" id="btn-edit-emp">✏️ Edit Employee</button>
   ` : '';
   footer.innerHTML = `<button class="btn btn-outline" id="btn-close-detail">Close</button>${hrButtons}`;
@@ -1281,7 +1280,6 @@ async function showEmpDetail(id) {
   if (canManage) {
     footer.querySelector('#btn-reset-pwd').onclick    = () => resetPassword(e.id, e.email);
     footer.querySelector('#btn-toggle-wfh').onclick   = () => toggleWFH(e.id, e.is_wfh_permanent);
-    footer.querySelector('#btn-change-mgr').onclick   = (ev) => { ev.stopPropagation(); openChangeManager(e.id, `${e.first_name} ${e.last_name}`, e.reporting_manager_id || null); };
     footer.querySelector('#btn-edit-emp').onclick     = (ev) => { ev.stopPropagation(); openEditEmp(e.id); };
   }
   openModal('emp-detail-modal');
