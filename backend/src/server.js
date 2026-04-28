@@ -747,28 +747,25 @@ cron.schedule('58 23 31 12 *', async () => {
 start();
 
 // ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
-// ✅ FIX: Render free tier sleeps after ~50s of inactivity. Must ping every 25s.
+// ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
 const https = require('https');
-
 const PING_URL = 'https://krishihr-zuui.onrender.com/health';
-const INTERVAL_MS = 25 * 1000;      // ✅ 25 seconds (was 4 minutes — way too slow)
-const INITIAL_DELAY_MS = 10 * 1000; // 10 seconds after start
-
+const INTERVAL_MS = 5 * 60 * 1000;     // 5 minutes
+const INITIAL_DELAY_MS = 10 * 1000;    // 10 seconds after start
 function pingServer() {
   https.get(PING_URL, (res) => {
-    // Silent — no log spam at 25s intervals
+    // Silent
   }).on('error', (err) => {
     console.error(`[Keep-Alive] ⚠️ ping failed: ${err.message}`);
   });
 }
-
 setTimeout(() => {
   pingServer();
   setInterval(pingServer, INTERVAL_MS);
 }, INITIAL_DELAY_MS);
 
-// ── DB Keep-Alive — keeps pool warm every 25s ─────────────────────────────────
-const DB_PING_INTERVAL = 25 * 1000; // ✅ 25 seconds (was 4 minutes)
+// ── DB Keep-Alive — keeps Neon DB pool warm every 1 minute ───────────────────
+const DB_PING_INTERVAL = 1 * 60 * 1000; // 1 minute
 setInterval(async () => {
   try {
     await db.query('SELECT 1');
