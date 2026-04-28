@@ -22,7 +22,7 @@ const offerCtrl      = require('../controllers/offerLetterController');
 const itDeclCtrl     = require('../controllers/itDeclarationController');
 
 const ADMIN      = ['admin','super_admin'];
-const HR_ADMIN   = ['hr','admin','super_admin'];
+const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
 const EMP_MGMT   = ['hr','accounts'];
