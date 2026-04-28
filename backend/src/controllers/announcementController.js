@@ -279,7 +279,7 @@ exports.getFeed = async (req, res) => {
       [todayStr, empId]
     );
 
-    // Birthdays this month (upcoming 7 days)
+    // Birthdays — upcoming 7 days (handles month boundary correctly)
     const bdResult = await db.query(
       `SELECT id, first_name, last_name, employee_code, date_of_birth,
               department_id,
@@ -287,10 +287,19 @@ exports.getFeed = async (req, res) => {
        FROM employees
        WHERE is_active=true
          AND date_of_birth IS NOT NULL
-         AND TO_CHAR(date_of_birth,'MM-DD') BETWEEN
-             TO_CHAR(CURRENT_DATE,'MM-DD') AND
-             TO_CHAR(CURRENT_DATE + INTERVAL '7 days','MM-DD')
-       ORDER BY TO_CHAR(date_of_birth,'MM-DD')`
+         AND (
+           DATE(TO_CHAR(CURRENT_DATE,'YYYY') || '-' || TO_CHAR(date_of_birth,'MM-DD'))
+             BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+           OR
+           DATE((EXTRACT(YEAR FROM CURRENT_DATE)::int + 1) || '-' || TO_CHAR(date_of_birth,'MM-DD'))
+             BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+         )
+       ORDER BY
+         CASE
+           WHEN DATE(TO_CHAR(CURRENT_DATE,'YYYY') || '-' || TO_CHAR(date_of_birth,'MM-DD')) >= CURRENT_DATE
+           THEN DATE(TO_CHAR(CURRENT_DATE,'YYYY') || '-' || TO_CHAR(date_of_birth,'MM-DD'))
+           ELSE DATE((EXTRACT(YEAR FROM CURRENT_DATE)::int + 1) || '-' || TO_CHAR(date_of_birth,'MM-DD'))
+         END ASC`
     );
 
     // Upcoming holidays (next 30 days) — filtered by employee's region
