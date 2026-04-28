@@ -267,7 +267,7 @@ exports.getFeed = async (req, res) => {
               e.designation_id                     AS posted_by_designation_id,
               dsg.title                            AS designation_title,
               COALESCE((SELECT COUNT(*) FROM announcement_likes al WHERE al.announcement_id=a.id),0) AS like_count,
-              COALESCE(EXISTS(SELECT 1 FROM announcement_likes al WHERE al.announcement_id=a.id AND al.employee_id=$2),false) AS i_liked,
+              COALESCE(EXISTS(SELECT 1 FROM announcement_likes al WHERE al.announcement_id=a.id AND al.employee_id=$1),false) AS i_liked,
               COALESCE((SELECT COUNT(*) FROM announcement_comments ac WHERE ac.announcement_id=a.id),0) AS comment_count
        FROM announcements a
        LEFT JOIN employees e      ON a.posted_by = e.id
@@ -276,7 +276,7 @@ exports.getFeed = async (req, res) => {
          AND (a.expires_at IS NULL OR a.expires_at >= NOW())
          AND a.type NOT IN ('thought','gk')
        ORDER BY a.created_at DESC LIMIT 10`,
-      [todayStr, empId]
+      [empId]
     );
 
     // Birthdays — upcoming 7 days (handles month boundary correctly)
