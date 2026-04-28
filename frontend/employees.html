@@ -1174,92 +1174,172 @@ async function showEmpDetail(id) {
   ]);
   document.getElementById('emp-detail-title').textContent = `${e.first_name} ${e.last_name}`;
   document.getElementById('emp-detail-content').innerHTML = `
-    <div style="display:block;padding:20px;background:var(--bg)">
+    <div style="background:var(--bg)">
 
-      <!-- Header: Avatar + Name/Badges -->
-      <div style="display:flex;flex-direction:row;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
-        <div style="width:56px;height:56px;min-width:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff">${e.first_name?.[0]}${e.last_name?.[0] || ''}</div>
-        <div style="display:block;flex:1">
-          <div style="font-family:'DM Serif Display',serif;font-size:18px;font-weight:800;line-height:1.3">${e.first_name} ${e.last_name}</div>
-          <div style="font-size:13px;color:var(--muted);margin-top:3px">${e.designation_title || '—'} · ${e.department_name || '—'}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
-            <span class="badge badge-${e.role}">${e.role}</span>
-            ${(() => {
-              const cat = e.employee_category || 'permanent';
-              const catStyles = { permanent:'background:#dcfce7;color:#15803d;border:1px solid #86efac', provision:'background:#fef9c3;color:#92400e;border:1px solid #fde047', contractual:'background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd' };
-              const catLabels = { permanent:'✅ Permanent', provision:'⏳ Provision', contractual:'📋 Contractual' };
-              return `<span class="badge" style="${catStyles[cat]||catStyles.permanent}">${catLabels[cat]||cat}</span>`;
-            })()}
-            ${e.employee_category === 'provision' && e.provision_end_date ? `<span class="badge" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">🗓 Ends ${fmt.date(e.provision_end_date)}</span>` : ''}
-            ${(() => { if(e.employee_category!=='contractual'||!e.joining_date) return ''; const d=new Date(e.joining_date);d.setMonth(d.getMonth()+6);return new Date()<d?`<span class="badge" style="background:#fff8e1;color:#795548;border:1px solid #ffe082">⏳ Provisional until ${fmt.date(d.toISOString())}</span>`:''; })()}
-            ${e.employment_type && e.employment_type!=='Full-Time' ? `<span class="badge" style="background:var(--green-l);color:#059669">${e.employment_type}</span>` : ''}
-            ${e.saturday_policy==='all_working' ? `<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">🌾 Field</span>` : `<span class="badge" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe">🏢 Onsite</span>`}
-            ${e.is_wfh_permanent ? '<span class="badge" style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc">🏠 Permanent WFH</span>' : ''}
-            ${!e.is_active ? '<span class="badge badge-absent">Inactive</span>' : ''}
+      <!-- Header Banner -->
+      <div style="background:linear-gradient(135deg,#2e7d32,#4a8c1c);padding:20px 24px;display:flex;align-items:center;gap:16px">
+        <div style="width:52px;height:52px;min-width:52px;border-radius:14px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;letter-spacing:-1px">${e.first_name?.[0]}${e.last_name?.[0]||''}</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px">${e.first_name} ${e.last_name}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px">${e.designation_title||'—'} · ${e.department_name||'—'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+            <span style="background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:.3px;text-transform:uppercase">${e.role}</span>
+            ${e.saturday_policy==='all_working'?`<span style="background:rgba(255,220,100,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px">🌾 Field</span>`:`<span style="background:rgba(180,210,255,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px">🏢 Onsite</span>`}
+            ${e.is_wfh_permanent?`<span style="background:rgba(100,200,255,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px">🏠 WFH</span>`:''}
+            ${!e.is_active?`<span style="background:rgba(255,100,100,.3);color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px">Inactive</span>`:''}
           </div>
         </div>
-      </div>
-
-      <!-- Info Grid -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
-        <div><div class="form-label">Code</div><span class="font-mono">${e.employee_code}</span></div>
-        <div><div class="form-label">Email</div><span style="word-break:break-all">${e.email}</span></div>
-        <div><div class="form-label">Phone</div>${e.phone || '—'}</div>
-        <div><div class="form-label">Joining Date</div>${fmt.date(e.joining_date)}</div>
-        <div><div class="form-label">Reporting To</div>${e.manager_name || '—'}</div>
-        <div><div class="form-label">Location</div>${e.city || '—'}</div>
-        ${e.employee_category === 'provision' ? `
-        <div><div class="form-label">Category</div><span style="color:#92400e;font-weight:600">⏳ Provision</span></div>
-        <div><div class="form-label">Provision Ends</div><span style="color:#c2410c;font-weight:600">${fmt.date(e.provision_end_date)||'—'}</span></div>
-        <div><div class="form-label">Confirmation</div>${e.confirmation_status?`<span style="color:#6d28d9;font-weight:600">${e.confirmation_status}</span>`:'<span style="color:var(--muted)">Not initiated</span>'}</div>
-        ` : `<div><div class="form-label">Category</div>${e.employee_category==='contractual'?'<span style="color:#6d28d9;font-weight:600">📋 Contractual</span>':'<span style="color:#15803d;font-weight:600">✅ Permanent</span>'}</div>`}
-      </div>
-
-      <!-- Compensation -->
-      ${Role.canViewSalary() ? `
-      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;border:1px solid var(--border)">
-        <div class="section-title" style="margin-bottom:10px">Compensation</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-          <div><div class="form-label">Basic Salary</div><b style="color:var(--green)">${fmt.money(e.basic_salary)}</b></div>
-          <div><div class="form-label">CTC</div><b>${fmt.money(e.ctc)}</b></div>
-          <div><div class="form-label">Bank</div>${e.bank_name || '—'}</div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px">EMP CODE</div>
+          <div style="font-size:16px;font-weight:800;color:#fff;font-family:monospace">${e.employee_code}</div>
         </div>
-      </div>` : ''}
-
-      <!-- Leave Balance -->
-      <div class="section-title">Leave Balance — ${new Date().getFullYear()}</div>
-      <div style="display:flex;flex-direction:row;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-        ${(() => {
-          const isProvisional = e.employee_category === 'provision';
-          const contractualSixMonthMark = e.employee_category === 'contractual' && e.joining_date ? (() => { const d=new Date(e.joining_date);d.setMonth(d.getMonth()+6);return d; })() : null;
-          const isContractualProvisional = contractualSixMonthMark && new Date() < contractualSixMonthMark;
-          const allowedCodes = (isProvisional || isContractualProvisional) ? ['PL'] : ['EL','SL','CL'];
-          const filtered = (bal?.data || []).filter(b => allowedCodes.includes(b.code || b.leave_type_code || ''));
-          if (!filtered.length) return '<div class="text-muted">No leave data</div>';
-          return filtered.map(b => {
-            const code = b.code || b.leave_type_code || '?';
-            const avail = b.available ?? (parseFloat(b.allocated||0) - parseFloat(b.used||0));
-            const accentColor = code==='PL' ? 'var(--yellow)' : 'var(--accent)';
-            return `<div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:13px 16px;border:1px solid var(--border);min-width:80px">
-              <div style="font-size:10px;font-weight:800;color:${accentColor};letter-spacing:1px">${code}</div>
-              <div style="font-family:'DM Serif Display',serif;font-size:24px;font-weight:800;margin:4px 0">${fmt.num(avail)}</div>
-              <div class="text-muted" style="font-size:10px">Used: ${fmt.num(b.used||0)} / ${fmt.num(b.allocated||0)}</div>
-              ${(isProvisional||isContractualProvisional)?'<div class="text-muted" style="font-size:9px;margin-top:2px">Provision Leave</div>':''}
-            </div>`;
-          }).join('');
-        })()}
       </div>
 
-      <!-- Attendance -->
-      <div class="section-title">This Month's Attendance</div>
-      <div style="display:flex;flex-direction:row;gap:10px;flex-wrap:wrap">
-        ${att?.success ? [['Present',att.data.present,'var(--green)'],['Absent',att.data.absent,'var(--red)'],['Late',att.data.late,'var(--yellow)'],['Leave',att.data.on_leave,'var(--accent)']].map(([l,v,c]) =>
-          `<div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:11px 14px;border:1px solid var(--border);min-width:70px">
-            <div style="font-family:'DM Serif Display',serif;font-size:22px;font-weight:800;color:${c}">${v||0}</div>
-            <div class="text-muted" style="font-size:10px;margin-top:2px">${l}</div>
-          </div>`).join('') : '<div class="text-muted">No data</div>'}
-      </div>
+      <div style="padding:20px 24px">
 
+        <!-- Personal & Employment Info Table -->
+        <div style="background:#fff;border:1.5px solid #e2eed8;border-radius:12px;overflow:hidden;margin-bottom:16px">
+          <div style="background:#f4faf0;padding:10px 16px;border-bottom:1.5px solid #e2eed8;display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px">👤</span>
+            <span style="font-size:11px;font-weight:800;color:#2e7d32;letter-spacing:.6px;text-transform:uppercase">Employee Information</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <tbody>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;width:38%;background:#fafcf8">Email</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500">${e.email}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Phone</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500">${e.phone||'—'}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Joining Date</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500">${fmt.date(e.joining_date)}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Reporting To</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500">${e.manager_name||'—'}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Location</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500">${e.city||'—'}${e.state?', '+e.state:''}</td>
+              </tr>
+              <tr${e.employee_category==='provision'?` style="border-bottom:1px solid #f0f7eb"`:''}> 
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Category</td>
+                <td style="padding:10px 16px;font-size:13px;font-weight:600">
+                  ${e.employee_category==='provision'?`<span style="color:#92400e">⏳ Provision</span>`:e.employee_category==='contractual'?`<span style="color:#6d28d9">📋 Contractual</span>`:`<span style="color:#15803d">✅ Permanent</span>`}
+                </td>
+              </tr>
+              ${e.employee_category==='provision'?`
+              <tr>
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Provision Ends</td>
+                <td style="padding:10px 16px;font-size:13px;color:#c2410c;font-weight:600">${fmt.date(e.provision_end_date)||'—'}</td>
+              </tr>`:''}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Compensation -->
+        ${Role.canViewSalary()?`
+        <div style="background:#fff;border:1.5px solid #e2eed8;border-radius:12px;overflow:hidden;margin-bottom:16px">
+          <div style="background:#f4faf0;padding:10px 16px;border-bottom:1.5px solid #e2eed8;display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px">💰</span>
+            <span style="font-size:11px;font-weight:800;color:#2e7d32;letter-spacing:.6px;text-transform:uppercase">Compensation</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <tbody>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;width:38%;background:#fafcf8">Basic Salary</td>
+                <td style="padding:10px 16px;font-size:14px;font-weight:800;color:#15803d">${fmt.money(e.basic_salary)}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f0f7eb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">CTC (Annual)</td>
+                <td style="padding:10px 16px;font-size:14px;font-weight:800;color:#1e293b">${fmt.money(e.ctc)}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.4px;text-transform:uppercase;background:#fafcf8">Bank</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500">${e.bank_name||'—'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`:''}
+
+        <!-- Leave Balance -->
+        <div style="background:#fff;border:1.5px solid #e2eed8;border-radius:12px;overflow:hidden;margin-bottom:16px">
+          <div style="background:#f4faf0;padding:10px 16px;border-bottom:1.5px solid #e2eed8;display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px">🌿</span>
+            <span style="font-size:11px;font-weight:800;color:#2e7d32;letter-spacing:.6px;text-transform:uppercase">Leave Balance — ${new Date().getFullYear()}</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f9fcf6;border-bottom:1px solid #e8f0e0">
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:left">TYPE</th>
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">ALLOCATED</th>
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">USED</th>
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">AVAILABLE</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(() => {
+                const isProvisional = e.employee_category==='provision';
+                const contractualSixMonthMark = e.employee_category==='contractual'&&e.joining_date?(()=>{const d=new Date(e.joining_date);d.setMonth(d.getMonth()+6);return d;})():null;
+                const isContractualProvisional = contractualSixMonthMark&&new Date()<contractualSixMonthMark;
+                const allowedCodes = (isProvisional||isContractualProvisional)?['PL']:['EL','SL','CL'];
+                const filtered = (bal?.data||[]).filter(b=>allowedCodes.includes(b.code||b.leave_type_code||''));
+                if(!filtered.length) return `<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--muted);font-size:13px">No leave data</td></tr>`;
+                return filtered.map((b,i)=>{
+                  const code = b.code||b.leave_type_code||'?';
+                  const avail = b.available??(parseFloat(b.allocated||0)-parseFloat(b.used||0));
+                  const pct = b.allocated>0?Math.round((parseFloat(b.used||0)/parseFloat(b.allocated||1))*100):0;
+                  const barColor = pct>75?'#ef4444':pct>40?'#f59e0b':'#22c55e';
+                  return `<tr style="${i<filtered.length-1?'border-bottom:1px solid #f0f7eb':''}">
+                    <td style="padding:12px 16px">
+                      <span style="font-size:12px;font-weight:800;color:#2e7d32;background:#dcfce7;padding:3px 10px;border-radius:20px">${code}</span>
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;font-size:13px;font-weight:600;color:#475569">${fmt.num(b.allocated||0)}</td>
+                    <td style="padding:12px 16px;text-align:center;font-size:13px;font-weight:600;color:#ef4444">${fmt.num(b.used||0)}</td>
+                    <td style="padding:12px 16px;text-align:center">
+                      <span style="font-size:15px;font-weight:800;color:${avail<=0?'#ef4444':avail<=2?'#f59e0b':'#15803d'}">${fmt.num(avail)}</span>
+                      <div style="background:#e2e8f0;border-radius:4px;height:4px;margin-top:4px;overflow:hidden">
+                        <div style="background:${barColor};height:100%;width:${pct}%;border-radius:4px;transition:width .3s"></div>
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join('');
+              })()}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Attendance -->
+        <div style="background:#fff;border:1.5px solid #e2eed8;border-radius:12px;overflow:hidden">
+          <div style="background:#f4faf0;padding:10px 16px;border-bottom:1.5px solid #e2eed8;display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px">🕐</span>
+            <span style="font-size:11px;font-weight:800;color:#2e7d32;letter-spacing:.6px;text-transform:uppercase">This Month's Attendance</span>
+          </div>
+          ${att?.success?`
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f9fcf6;border-bottom:1px solid #e8f0e0">
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">PRESENT</th>
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">ABSENT</th>
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">LATE</th>
+                <th style="padding:8px 16px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-align:center">ON LEAVE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding:14px 16px;text-align:center"><span style="font-size:22px;font-weight:800;color:#15803d">${att.data.present||0}</span></td>
+                <td style="padding:14px 16px;text-align:center"><span style="font-size:22px;font-weight:800;color:#ef4444">${att.data.absent||0}</span></td>
+                <td style="padding:14px 16px;text-align:center"><span style="font-size:22px;font-weight:800;color:#f59e0b">${att.data.late||0}</span></td>
+                <td style="padding:14px 16px;text-align:center"><span style="font-size:22px;font-weight:800;color:#6366f1">${att.data.on_leave||0}</span></td>
+              </tr>
+            </tbody>
+          </table>`:`<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No attendance data</div>`}
+        </div>
+
+      </div>
     </div>`;
 
   const footer = document.getElementById('emp-detail-footer');
