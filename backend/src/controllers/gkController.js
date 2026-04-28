@@ -183,8 +183,8 @@ exports.submitAnswer = async (req, res) => {
           const emp = empR.rows[0];
           const empName = emp ? `${emp.first_name} ${emp.last_name}` : 'An employee';
           await db.query(
-            `INSERT INTO announcements (title, content, type, posted_by)
-             VALUES ($1, $2, 'achievement', $3)`,
+            `INSERT INTO announcements (title, content, type, posted_by, expires_at)
+             VALUES ($1, $2, 'achievement', $3, NOW() + INTERVAL '24 hours')`,
             [
               `🔥 ${streak}-Day GK Streak!`,
               `🎉 ${empName} has achieved a ${streak}-day correct answer streak in the Daily GK Quiz! Keep it up! 🏆`,
@@ -1017,7 +1017,7 @@ exports.announceTop5 = async (req, res) => {
     }
 
     await db.query(
-      `INSERT INTO announcements (title, content, type, posted_by) VALUES ($1, $2, 'achievement', $3)`,
+      `INSERT INTO announcements (title, content, type, posted_by, expires_at) VALUES ($1, $2, 'achievement', $3, NOW() + INTERVAL '24 hours')`,
       [title, content, postedBy]
     );
 
