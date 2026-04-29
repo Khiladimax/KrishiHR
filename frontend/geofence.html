@@ -2054,7 +2054,7 @@ function empCard(e) {
   const initials = ((e.first_name?.[0]||'') + (e.last_name?.[0]||'')).toUpperCase() || '?';
   const subtitle = [e.employee_code, assignment].filter(Boolean).join(' • ');
 
-  return `<div class="emp-card" onclick="openEmpDrawer(${e.id}, this)">
+  return `<div class="emp-card" onclick="openEmpDrawer(${e.id}, event)">
     <div class="ec-avatar">${initials}</div>
     <div class="ec-body">
       <div class="ec-top">
@@ -2067,7 +2067,7 @@ function empCard(e) {
   </div>`;
 }
 
-function openEmpDrawer(empId, triggerEl) {
+function openEmpDrawer(empId, event) {
   _drawerEmpId = empId;
   const e    = _allEmployees.find(x => x.id === empId);
   const rule = _allRules.find(r => r.id === empId);
@@ -2119,34 +2119,25 @@ function openEmpDrawer(empId, triggerEl) {
   // Show/hide pickers
   updateDrawerPickers(rt);
 
-  // Position popup anchored to the clicked card row
+  // Position popup right at the cursor click point
   const popup = document.getElementById('emp-drawer');
   const POPUP_W = 320, POPUP_H = 420;
   const vw = window.innerWidth, vh = window.innerHeight;
   const MARGIN = 8;
 
-  // Get the card row's position in the viewport
-  const rect = triggerEl ? triggerEl.getBoundingClientRect() : { left: vw/2, top: vh/2, right: vw/2, bottom: vh/2 };
+  // Use exact mouse position — always correct regardless of scroll or nesting
+  let left = (event ? event.clientX : vw / 2) + 12;
+  let top  = (event ? event.clientY : vh / 2) - 20;
 
-  // Try to open to the RIGHT of the card, vertically aligned with it
-  let left = rect.right + MARGIN;
-  let top  = rect.top;
+  // Flip left if popup would overflow right edge
+  if (left + POPUP_W + MARGIN > vw) left = (event ? event.clientX : vw / 2) - POPUP_W - 12;
 
-  // If not enough room on the right, open to the LEFT instead
-  if (left + POPUP_W + MARGIN > vw) {
-    left = rect.left - POPUP_W - MARGIN;
-  }
-
-  // If still off-screen left (very narrow viewport), fall back to right edge
-  if (left < MARGIN) {
-    left = MARGIN;
-  }
-
-  // Vertically: align top with card, but clamp so popup stays in viewport
-  if (top + POPUP_H + MARGIN > vh) {
-    top = vh - POPUP_H - MARGIN;
-  }
+  // Clamp vertically so popup never goes off bottom or top
+  if (top + POPUP_H + MARGIN > vh) top = vh - POPUP_H - MARGIN;
   if (top < MARGIN) top = MARGIN;
+
+  // Final clamp for left
+  if (left < MARGIN) left = MARGIN;
 
   popup.style.left = left + 'px';
   popup.style.top  = top  + 'px';
