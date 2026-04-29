@@ -453,54 +453,61 @@
 .ec-chevron { color: var(--g-border-h); font-size: 18px; flex-shrink: 0; margin-left: 4px; }
 
 /* ── EDIT DRAWER ──────────────────────────────────── */
-.emp-drawer-overlay {
-  position: fixed; inset: 0; z-index: 500;
-  background: rgba(15,23,42,.35);
+/* emp popup card — appears at click position */
+.emp-popup {
+  position: fixed; z-index: 600;
+  width: 320px;
+  background: var(--g-surface);
+  border: 1.5px solid var(--g-border);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,.15), 0 2px 8px rgba(0,0,0,.08);
+  display: flex; flex-direction: column;
   opacity: 0; pointer-events: none;
-  transition: opacity .2s;
+  transform: scale(.95) translateY(-4px);
+  transition: opacity .15s, transform .15s cubic-bezier(.4,0,.2,1);
+}
+.emp-popup.open {
+  opacity: 1; pointer-events: all;
+  transform: scale(1) translateY(0);
+}
+
+/* invisible full-screen click-away layer */
+.emp-drawer-overlay {
+  position: fixed; inset: 0; z-index: 599;
+  background: transparent;
+  opacity: 0; pointer-events: none;
 }
 .emp-drawer-overlay.open { opacity: 1; pointer-events: all; }
 
-.emp-drawer {
-  position: fixed; right: 0; top: 0; bottom: 0;
-  width: 380px; max-width: 96vw;
-  background: var(--g-surface); z-index: 501;
-  box-shadow: -4px 0 32px rgba(0,0,0,.13);
-  display: flex; flex-direction: column;
-  transform: translateX(100%);
-  transition: transform .25s cubic-bezier(.4,0,.2,1);
-}
-.emp-drawer.open { transform: translateX(0); }
-
 .emp-drawer-head {
-  display: flex; align-items: center; gap: 12px;
-  padding: 20px 20px 16px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 14px 12px;
   border-bottom: 1px solid var(--g-border);
   flex-shrink: 0;
 }
 .emp-drawer-avatar {
-  width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px; font-weight: 700;
+  font-size: 13px; font-weight: 700;
   color: var(--g-green); background: var(--g-green-l);
   border: 2px solid var(--g-green-m);
 }
 .emp-drawer-name {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px; font-weight: 800; color: var(--g-slate);
+  font-size: 13px; font-weight: 800; color: var(--g-slate);
 }
-.emp-drawer-meta { font-size: 12px; color: var(--g-muted); margin-top: 2px; }
+.emp-drawer-meta { font-size: 11px; color: var(--g-muted); margin-top: 1px; }
 .emp-drawer-close {
-  margin-left: auto; width: 30px; height: 30px; border-radius: 50%;
+  margin-left: auto; width: 26px; height: 26px; border-radius: 50%;
   border: 1.5px solid var(--g-border); background: var(--g-surface);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 14px; color: var(--g-muted); flex-shrink: 0;
+  font-size: 12px; color: var(--g-muted); flex-shrink: 0;
   transition: all .15s;
 }
 .emp-drawer-close:hover { background: var(--g-red-l); color: var(--g-red); border-color: var(--g-red); }
 
-.emp-drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+.emp-drawer-body { flex: 1; overflow-y: auto; padding: 14px; max-height: 340px; }
 
 .ed-section-label {
   font-size: 10px; font-weight: 800; color: var(--g-muted);
@@ -517,12 +524,12 @@
 .ed-select:focus { border-color: var(--g-green); box-shadow: 0 0 0 3px rgba(30,107,60,.09); }
 
 .emp-drawer-foot {
-  padding: 16px 20px;
+  padding: 10px 14px;
   border-top: 1px solid var(--g-border); flex-shrink: 0;
-  display: flex; gap: 10px;
+  display: flex; gap: 8px;
 }
 .ed-save-btn {
-  flex: 1; padding: 11px; font-size: 13px; font-weight: 700;
+  flex: 1; padding: 9px; font-size: 12px; font-weight: 700;
   background: var(--g-green); color: #fff; border: none;
   border-radius: var(--r-sm); cursor: pointer;
   font-family: 'DM Sans', sans-serif; transition: opacity .15s;
@@ -530,7 +537,7 @@
 .ed-save-btn:hover { opacity: .88; }
 .ed-save-btn:disabled { opacity: .55; cursor: not-allowed; }
 .ed-cancel-btn {
-  padding: 11px 18px; font-size: 13px; font-weight: 600;
+  padding: 9px 14px; font-size: 12px; font-weight: 600;
   border: 1.5px solid var(--g-border); border-radius: var(--r-sm);
   background: var(--g-surface); color: var(--g-muted); cursor: pointer;
   font-family: 'DM Sans', sans-serif; transition: all .15s;
@@ -727,7 +734,7 @@
 
       <!-- ── EDIT DRAWER (shared, one instance) ──────────────── -->
       <div class="emp-drawer-overlay" id="emp-drawer-overlay" onclick="closeEmpDrawer()"></div>
-      <div class="emp-drawer" id="emp-drawer">
+      <div class="emp-popup" id="emp-drawer">
         <div class="emp-drawer-head">
           <div class="emp-drawer-avatar" id="ed-avatar">?</div>
           <div>
@@ -2047,7 +2054,7 @@ function empCard(e) {
   const initials = ((e.first_name?.[0]||'') + (e.last_name?.[0]||'')).toUpperCase() || '?';
   const subtitle = [e.employee_code, assignment].filter(Boolean).join(' • ');
 
-  return `<div class="emp-card" onclick="openEmpDrawer(${e.id})">
+  return `<div class="emp-card" onclick="openEmpDrawer(${e.id}, event)">
     <div class="ec-avatar">${initials}</div>
     <div class="ec-body">
       <div class="ec-top">
@@ -2060,7 +2067,7 @@ function empCard(e) {
   </div>`;
 }
 
-function openEmpDrawer(empId) {
+function openEmpDrawer(empId, event) {
   _drawerEmpId = empId;
   const e    = _allEmployees.find(x => x.id === empId);
   const rule = _allRules.find(r => r.id === empId);
@@ -2112,9 +2119,32 @@ function openEmpDrawer(empId) {
   // Show/hide pickers
   updateDrawerPickers(rt);
 
+  // Position popup near the clicked element
+  const popup = document.getElementById('emp-drawer');
+  const POPUP_W = 320, POPUP_H = 420;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const MARGIN = 10;
+
+  let cx = event ? event.clientX : vw / 2;
+  let cy = event ? event.clientY : vh / 2;
+
+  // Prefer to open below+right of cursor; flip if near edges
+  let left = cx + 8;
+  let top  = cy + 8;
+
+  if (left + POPUP_W + MARGIN > vw) left = cx - POPUP_W - 8;
+  if (top  + POPUP_H + MARGIN > vh) top  = cy - POPUP_H - 8;
+
+  // Hard clamp inside viewport
+  left = Math.max(MARGIN, Math.min(left, vw - POPUP_W - MARGIN));
+  top  = Math.max(MARGIN, Math.min(top,  vh - POPUP_H - MARGIN));
+
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+
   // Open
   document.getElementById('emp-drawer-overlay').classList.add('open');
-  document.getElementById('emp-drawer').classList.add('open');
+  popup.classList.add('open');
 }
 
 function closeEmpDrawer() {
