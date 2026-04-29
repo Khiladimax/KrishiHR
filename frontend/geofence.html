@@ -732,63 +732,6 @@
         </div>
       </div>
 
-      <!-- ── EDIT DRAWER (shared, one instance) ──────────────── -->
-      <div class="emp-drawer-overlay" id="emp-drawer-overlay" onclick="closeEmpDrawer()"></div>
-      <div class="emp-popup" id="emp-drawer">
-        <div class="emp-drawer-head">
-          <div class="emp-drawer-avatar" id="ed-avatar">?</div>
-          <div>
-            <div class="emp-drawer-name" id="ed-name">—</div>
-            <div class="emp-drawer-meta" id="ed-meta">—</div>
-          </div>
-          <button class="emp-drawer-close" onclick="closeEmpDrawer()">✕</button>
-        </div>
-        <div class="emp-drawer-body">
-          <!-- Current assignment info -->
-          <div class="ed-current-info">
-            <div class="ed-current-label">Current assignment</div>
-            <div class="ed-current-val" id="ed-current-val">—</div>
-          </div>
-
-          <!-- Rule selector -->
-          <span class="ed-section-label">Change geofence rule</span>
-          <select class="ed-select" id="ed-rule-sel" onchange="onDrawerRuleChange()">
-            <option value="office">🏢 Office</option>
-            <option value="state">🗺️ State</option>
-            <option value="district">📍 District</option>
-            <option value="universal">🌍 Universal</option>
-          </select>
-
-          <!-- Office picker -->
-          <div id="ed-office-wrap" style="display:none">
-            <span class="ed-section-label">Office location</span>
-            <select class="ed-select" id="ed-office-sel">
-              <option value="">— select office —</option>
-            </select>
-          </div>
-
-          <!-- State picker -->
-          <div id="ed-state-wrap" style="display:none">
-            <span class="ed-section-label">State</span>
-            <select class="ed-select" id="ed-state-sel" onchange="onDrawerStateChange()">
-              <option value="">— select state —</option>
-            </select>
-          </div>
-
-          <!-- District picker -->
-          <div id="ed-district-wrap" style="display:none">
-            <span class="ed-section-label">District</span>
-            <select class="ed-select" id="ed-district-sel">
-              <option value="">— select district —</option>
-            </select>
-          </div>
-        </div>
-        <div class="emp-drawer-foot">
-          <button class="ed-cancel-btn" onclick="closeEmpDrawer()">Cancel</button>
-          <button class="ed-save-btn" id="ed-save-btn" onclick="saveDrawerRule()">Save changes</button>
-        </div>
-      </div>
-
     </div>
 
   </div><!-- /content -->
@@ -2237,5 +2180,53 @@ async function saveDrawerRule() {
 }
 
 </script>
+<!-- ── EMPLOYEE POPUP (must be direct child of body — no transformed ancestors) ── -->
+<div class="emp-drawer-overlay" id="emp-drawer-overlay" onclick="closeEmpDrawer()"></div>
+<div class="emp-popup" id="emp-drawer">
+  <div class="emp-drawer-head">
+    <div class="emp-drawer-avatar" id="ed-avatar">?</div>
+    <div>
+      <div class="emp-drawer-name" id="ed-name">—</div>
+      <div class="emp-drawer-meta" id="ed-meta">—</div>
+    </div>
+    <button class="emp-drawer-close" onclick="closeEmpDrawer()">✕</button>
+  </div>
+  <div class="emp-drawer-body">
+    <div class="ed-current-info">
+      <div class="ed-current-label">Current assignment</div>
+      <div class="ed-current-val" id="ed-current-val">—</div>
+    </div>
+    <span class="ed-section-label">Change geofence rule</span>
+    <select class="ed-select" id="ed-rule-sel" onchange="onDrawerRuleChange()">
+      <option value="office">🏢 Office</option>
+      <option value="state">🗺️ State</option>
+      <option value="district">📍 District</option>
+      <option value="universal">🌍 Universal</option>
+    </select>
+    <div id="ed-office-wrap" style="display:none">
+      <span class="ed-section-label">Office location</span>
+      <select class="ed-select" id="ed-office-sel">
+        <option value="">— select office —</option>
+      </select>
+    </div>
+    <div id="ed-state-wrap" style="display:none">
+      <span class="ed-section-label">State</span>
+      <select class="ed-select" id="ed-state-sel" onchange="onDrawerStateChange()">
+        <option value="">— select state —</option>
+      </select>
+    </div>
+    <div id="ed-district-wrap" style="display:none">
+      <span class="ed-section-label">District</span>
+      <select class="ed-select" id="ed-district-sel">
+        <option value="">— select district —</option>
+      </select>
+    </div>
+  </div>
+  <div class="emp-drawer-foot">
+    <button class="ed-cancel-btn" onclick="closeEmpDrawer()">Cancel</button>
+    <button class="ed-save-btn" id="ed-save-btn" onclick="saveDrawerRule()">Save changes</button>
+  </div>
+</div>
+
 </body>
 </html>
