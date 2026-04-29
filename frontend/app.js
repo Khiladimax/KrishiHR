@@ -105,6 +105,7 @@ const ICONS = {
   advance:      `💸`,
   provision:    `⏳`,
   geofence:     `📍`,
+  compoff:      `🔄`,
 };
 
 const NAV_GROUPS = [
@@ -119,6 +120,7 @@ const NAV_GROUPS = [
     items: [
       { href:'attendance.html',     icon: ICONS.attendance,   label:'Attendance',       always:true },
       { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
+      { href:'compoff.html',        icon: ICONS.compoff,      label:'Comp Off',         roles:['hr','admin','super_admin'] },
       { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl'] },
       { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    always:true },
     ]
