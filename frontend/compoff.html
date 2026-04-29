@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR - Comp Off Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div><div class="logo-sub">Krishi Care And Management</div></div>
+      <div class="logo-sub">Enterprise Edition</div>
+    </div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">Comp Off Management</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-primary btn-sm" id="grant-btn" style="display:none" onclick="openModal('grant-modal')">+ Grant Comp Off</button>
+      <button class="btn btn-outline btn-sm" id="bulk-btn" style="display:none" onclick="openModal('bulk-modal')">⚡ Bulk Grant</button>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+
+    <!-- SUMMARY CARDS (HR view) -->
+    <div id="summary-section" style="display:none;margin-bottom:20px">
+      <div class="section-title">Overview — <span id="summary-year"></span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:4px">
+        <div class="bal-card" style="border-color:#f59e0b">
+          <div class="bal-code" style="color:#92400e;background:#fef3c7">🔄 TOTAL CREDITED</div>
+          <div class="bal-val" style="color:#92400e" id="stat-total">—</div>
+          <div class="bal-meta">Days granted this year</div>
+        </div>
+        <div class="bal-card" style="border-color:#10b981">
+          <div class="bal-code" style="color:#065f46;background:#d1fae5">✅ AVAILABLE</div>
+          <div class="bal-val" style="color:#065f46" id="stat-available">—</div>
+          <div class="bal-meta">Unused comp off days</div>
+        </div>
+        <div class="bal-card" style="border-color:#6366f1">
+          <div class="bal-code" style="color:#3730a3;background:#e0e7ff">📋 USED</div>
+          <div class="bal-val" style="color:#3730a3" id="stat-used">—</div>
+          <div class="bal-meta">Availed this year</div>
+        </div>
+        <div class="bal-card" style="border-color:#94a3b8">
+          <div class="bal-code" style="color:#475569;background:#f1f5f9">👥 EMPLOYEES</div>
+          <div class="bal-val" style="color:#475569" id="stat-emps">—</div>
+          <div class="bal-meta">With comp off credits</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY COMP OFF BALANCE (Employee view) -->
+    <div id="my-balance-section" style="display:none;margin-bottom:20px">
+      <div class="section-title">My Comp Off Balance</div>
+      <div id="my-balance-card" style="background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:20px 24px;max-width:420px">
+        <div style="font-size:13px;color:#92400e;font-weight:700;margin-bottom:8px">🔄 Compensatory Off</div>
+        <div style="font-size:42px;font-weight:800;color:#92400e;line-height:1" id="my-avail">—</div>
+        <div style="font-size:13px;color:#92400e;margin-top:6px">days available</div>
+        <div style="margin-top:12px;font-size:12px;color:#78350f">
+          Total Earned: <b id="my-total">—</b> &nbsp;·&nbsp; Used: <b id="my-used">—</b>
+        </div>
+        <div style="margin-top:14px;background:#fde68a;border-radius:6px;padding:8px 12px;font-size:12px;color:#78350f">
+          💡 To avail comp off, go to <a href="leaves.html" style="color:#92400e;font-weight:700">Leaves</a> → Apply Leave → Category: <b>Comp Off</b>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('credits')" id="tab-btn-credits">📋 Credit History</button>
+      <button class="tab-btn" onclick="switchTab('myview')" id="tab-btn-myview" style="display:none">👤 My Credits</button>
+    </div>
+
+    <!-- CREDIT HISTORY TABLE (HR) -->
+    <div id="tab-credits">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">📋</span>Comp Off Credits</div>
+          <div class="flex gap-2">
+            <select id="filter-status" class="form-control" style="width:140px" onchange="loadCredits()">
+              <option value="">All Status</option>
+              <option value="available">Available</option>
+              <option value="used">Used</option>
+              <option value="expired">Expired</option>
+            </select>
+            <select id="filter-type" class="form-control" style="width:140px" onchange="loadCredits()">
+              <option value="">All Types</option>
+              <option value="holiday">Holiday</option>
+              <option value="weekend">Weekend</option>
+            </select>
+            <div class="input-with-icon" style="width:200px">
+              <span class="input-icon">🔍</span>
+              <input id="search-emp" class="form-control" placeholder="Search employee…" oninput="filterCredits()">
+            </div>
+          </div>
+        </div>
+        <div id="credits-list"><div class="loader"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- MY CREDITS (Employee view) -->
+    <div id="tab-myview" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">🔄</span>My Comp Off History</div>
+        </div>
+        <div id="my-credits-list"><div class="loader"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- GRANT MODAL (single employee) -->
+<div class="modal-backdrop" id="grant-modal">
+  <div class="modal" style="width:500px">
+    <div class="modal-header">
+      <div class="modal-title">Grant Comp Off</div>
+      <button class="modal-close" onclick="closeModal('grant-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Employee <span style="color:red">*</span></label>
+        <select id="g-employee" class="form-control">
+          <option value="">Select employee…</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date Worked <span style="color:red">*</span></label>
+          <input id="g-date" type="date" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Days to Credit <span style="color:red">*</span></label>
+          <select id="g-days" class="form-control">
+            <option value="0.5">0.5 — Half Day</option>
+            <option value="1" selected>1.0 — Full Day</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Work Type <span style="color:red">*</span></label>
+        <select id="g-type" class="form-control">
+          <option value="holiday">🗓 Public Holiday</option>
+          <option value="weekend">📅 Weekend (Sat/Sun)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Holiday / Occasion Name</label>
+        <input id="g-holiday-name" class="form-control" placeholder="e.g. Diwali, Republic Day, Sunday">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date <span style="color:#94a3b8;font-weight:400">(optional)</span></label>
+        <input id="g-expiry" type="date" class="form-control">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Leave blank for no expiry. Set a date after which unused comp off lapses.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Remarks</label>
+        <textarea id="g-remarks" class="form-control" rows="2" placeholder="Optional note…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('grant-modal')">Cancel</button>
+      <button class="btn btn-primary" id="grant-submit-btn" onclick="grantCompoff()">Grant Comp Off</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK GRANT MODAL -->
+<div class="modal-backdrop" id="bulk-modal">
+  <div class="modal" style="width:540px">
+    <div class="modal-header">
+      <div class="modal-title">⚡ Bulk Grant Comp Off</div>
+      <button class="modal-close" onclick="closeModal('bulk-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--accent-l);border:1px solid rgba(67,97,238,.15);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--accent)">
+        ℹ Select multiple employees who worked on the same date — all will get the same comp off credit.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Employees <span style="color:red">*</span></label>
+        <div style="border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;padding:8px">
+          <div style="margin-bottom:6px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--accent);font-weight:600">
+              <input type="checkbox" id="bulk-select-all" onchange="toggleSelectAll()"> Select All
+            </label>
+          </div>
+          <div id="bulk-emp-list" style="display:flex;flex-direction:column;gap:4px">
+            <div class="loader"><div class="spinner" style="width:20px;height:20px"></div></div>
+          </div>
+        </div>
+        <div id="bulk-selected-count" style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date Worked <span style="color:red">*</span></label>
+          <input id="b-date" type="date" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Days to Credit</label>
+          <select id="b-days" class="form-control">
+            <option value="0.5">0.5 — Half Day</option>
+            <option value="1" selected>1.0 — Full Day</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Work Type <span style="color:red">*</span></label>
+        <select id="b-type" class="form-control">
+          <option value="holiday">🗓 Public Holiday</option>
+          <option value="weekend">📅 Weekend (Sat/Sun)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Holiday / Occasion Name</label>
+        <input id="b-holiday-name" class="form-control" placeholder="e.g. Diwali, Republic Day">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Remarks</label>
+        <textarea id="b-remarks" class="form-control" rows="2" placeholder="Optional note…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('bulk-modal')">Cancel</button>
+      <button class="btn btn-primary" id="bulk-submit-btn" onclick="bulkGrant()">⚡ Grant to Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVOKE CONFIRM MODAL -->
+<div class="modal-backdrop" id="revoke-modal">
+  <div class="modal" style="width:400px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:#dc2626">⚠ Revoke Comp Off</div>
+      <button class="modal-close" onclick="closeModal('revoke-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fef2f2;border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:12px 14px;font-size:13px;color:#dc2626;margin-bottom:16px">
+        This will remove the comp off credit and reduce the employee's balance. This cannot be undone.
+      </div>
+      <div id="revoke-detail" style="font-size:13px;color:var(--text2)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('revoke-modal')">Cancel</button>
+      <button class="btn btn-danger" id="revoke-confirm-btn" onclick="confirmRevoke()">Revoke Credit</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+Auth.guard();
+buildSidebar('compoff.html');
+loadNotifBadge();
+
+const user    = Auth.getUser();
+const isHR    = Role.is('hr', 'admin', 'super_admin');
+let allCredits = [];
+let allEmps    = [];
+let revokeId   = null;
+
+// Show/hide HR controls
+if (isHR) {
+  document.getElementById('grant-btn').style.display = '';
+  document.getElementById('bulk-btn').style.display  = '';
+  document.getElementById('summary-section').style.display = '';
+  document.getElementById('summary-year').textContent = new Date().getFullYear();
+} else {
+  // Employee view: show my balance + my tab
+  document.getElementById('my-balance-section').style.display = '';
+  document.getElementById('tab-btn-myview').style.display      = '';
+  switchTab('myview');
+  loadMyBalance();
+  loadMyCredits();
+}
+
+document.getElementById('tab-credits').style.display = isHR ? '' : 'none';
+
+// Init
+Promise.all([
+  isHR ? loadEmployees() : Promise.resolve(),
+  isHR ? loadCredits()   : Promise.resolve(),
+]);
+
+// ── Load employees for dropdowns ─────────────────────────────────────────────
+async function loadEmployees() {
+  const res = await api('GET', '/employees');
+  if (!res?.success) return;
+  allEmps = res.data;
+
+  // Single grant dropdown
+  const sel = document.getElementById('g-employee');
+  sel.innerHTML = '<option value="">Select employee…</option>' +
+    allEmps.map(e => `<option value="${e.id}">${e.first_name} ${e.last_name} (${e.employee_code})</option>`).join('');
+
+  // Bulk checkboxes
+  const bulkList = document.getElementById('bulk-emp-list');
+  bulkList.innerHTML = allEmps.map(e => `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 0;font-size:13px">
+      <input type="checkbox" class="bulk-emp-cb" value="${e.id}"
+        onchange="updateBulkCount()">
+      ${e.first_name} ${e.last_name}
+      <span style="color:var(--muted);font-size:11px">${e.employee_code}</span>
+    </label>`).join('');
+}
+
+// ── Load all credits (HR) ─────────────────────────────────────────────────────
+async function loadCredits() {
+  const el     = document.getElementById('credits-list');
+  el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+
+  const res = await api('GET', '/compoff/credits');
+  if (!res?.success) {
+    el.innerHTML = '<div style="text-align:center;color:#e53935;padding:24px">⚠ Could not load credits.</div>';
+    return;
+  }
+  allCredits = res.data;
+  updateStats();
+  filterCredits();
+}
+
+function updateStats() {
+  let total = 0, avail = 0, used = 0, empSet = new Set();
+  allCredits.forEach(c => {
+    total += parseFloat(c.days_credited || 0);
+    if (c.status === 'available') avail += parseFloat(c.days_credited || 0);
+    if (c.status === 'used')      used  += parseFloat(c.days_credited || 0);
+    empSet.add(c.employee_id);
+  });
+  document.getElementById('stat-total').textContent     = fmt.num(total);
+  document.getElementById('stat-available').textContent = fmt.num(avail);
+  document.getElementById('stat-used').textContent      = fmt.num(used);
+  document.getElementById('stat-emps').textContent      = empSet.size;
+}
+
+function filterCredits() {
+  const q       = document.getElementById('search-emp').value.toLowerCase();
+  const status  = document.getElementById('filter-status').value;
+  const type    = document.getElementById('filter-type').value;
+
+  const filtered = allCredits.filter(c => {
+    if (status && c.status !== status) return false;
+    if (type   && c.worked_type !== type) return false;
+    if (q && !`${c.first_name} ${c.last_name} ${c.employee_code}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const el = document.getElementById('credits-list');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔄</div><p>No comp off credits found.</p></div>';
+    return;
+  }
+
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Employee</th>
+      <th>Worked Date</th>
+      <th>Type</th>
+      <th>Occasion</th>
+      <th>Days</th>
+      <th>Status</th>
+      <th>Expiry</th>
+      <th>Granted By</th>
+      <th>Action</th>
+    </tr></thead>
+    <tbody>
+      ${filtered.map(c => `<tr>
+        <td>
+          <div style="font-weight:600">${c.first_name} ${c.last_name}</div>
+          <div style="font-size:11px;color:var(--muted)">${c.employee_code}</div>
+        </td>
+        <td>${fmtDate(c.worked_date)}</td>
+        <td>
+          <span class="badge" style="${c.worked_type === 'holiday'
+            ? 'background:#fef3c7;color:#92400e'
+            : 'background:#e0e7ff;color:#3730a3'}">
+            ${c.worked_type === 'holiday' ? '🗓 Holiday' : '📅 Weekend'}
+          </span>
+        </td>
+        <td style="color:var(--text2)">${c.holiday_name || '—'}</td>
+        <td style="font-weight:700;font-size:15px;color:var(--accent)">${c.days_credited}</td>
+        <td>
+          <span class="badge badge-${c.status === 'available' ? 'approved' : c.status === 'used' ? 'pending' : 'rejected'}">
+            ${c.status}
+          </span>
+        </td>
+        <td style="font-size:12px;color:var(--muted)">${c.expiry_date ? fmtDate(c.expiry_date) : '—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${c.granted_by_name || '—'}</td>
+        <td>
+          ${c.status === 'available'
+            ? `<button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;font-size:11px"
+                onclick="openRevoke(${c.id}, '${c.first_name} ${c.last_name}', '${fmtDate(c.worked_date)}')">
+                Revoke
+               </button>`
+            : '<span style="color:var(--muted);font-size:12px">—</span>'
+          }
+        </td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+// ── Grant single ──────────────────────────────────────────────────────────────
+async function grantCompoff() {
+  const empId      = document.getElementById('g-employee').value;
+  const workedDate = document.getElementById('g-date').value;
+  const days       = document.getElementById('g-days').value;
+  const type       = document.getElementById('g-type').value;
+  const name       = document.getElementById('g-holiday-name').value.trim();
+  const expiry     = document.getElementById('g-expiry').value;
+  const remarks    = document.getElementById('g-remarks').value.trim();
+
+  if (!empId)      { toast('Please select an employee', 'error'); return; }
+  if (!workedDate) { toast('Please select the date worked', 'error'); return; }
+
+  const btn = document.getElementById('grant-submit-btn');
+  btn.disabled = true; btn.textContent = 'Granting…';
+
+  const res = await api('POST', '/compoff/grant', {
+    employee_id:  parseInt(empId),
+    worked_date:  workedDate,
+    worked_type:  type,
+    holiday_name: name || null,
+    days_credited: parseFloat(days),
+    expiry_date:  expiry || null,
+    remarks:      remarks || null,
+  });
+
+  btn.disabled = false; btn.textContent = 'Grant Comp Off';
+
+  if (res?.success) {
+    toast('✅ Comp off granted successfully!', 'success');
+    closeModal('grant-modal');
+    resetGrantForm();
+    loadCredits();
+  } else {
+    toast(res?.message || 'Failed to grant comp off', 'error');
+  }
+}
+
+function resetGrantForm() {
+  ['g-employee','g-date','g-holiday-name','g-expiry','g-remarks'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('g-days').value = '1';
+  document.getElementById('g-type').value = 'holiday';
+}
+
+// ── Bulk grant ────────────────────────────────────────────────────────────────
+function toggleSelectAll() {
+  const checked = document.getElementById('bulk-select-all').checked;
+  document.querySelectorAll('.bulk-emp-cb').forEach(cb => cb.checked = checked);
+  updateBulkCount();
+}
+
+function updateBulkCount() {
+  const count = document.querySelectorAll('.bulk-emp-cb:checked').length;
+  document.getElementById('bulk-selected-count').textContent =
+    count ? `${count} employee(s) selected` : '';
+}
+
+async function bulkGrant() {
+  const empIds = [...document.querySelectorAll('.bulk-emp-cb:checked')].map(cb => parseInt(cb.value));
+  const date   = document.getElementById('b-date').value;
+  const days   = document.getElementById('b-days').value;
+  const type   = document.getElementById('b-type').value;
+  const name   = document.getElementById('b-holiday-name').value.trim();
+  const remarks= document.getElementById('b-remarks').value.trim();
+
+  if (!empIds.length) { toast('Please select at least one employee', 'error'); return; }
+  if (!date)          { toast('Please select the date worked', 'error'); return; }
+
+  const btn = document.getElementById('bulk-submit-btn');
+  btn.disabled = true; btn.textContent = 'Processing…';
+
+  const res = await api('POST', '/compoff/bulk-grant', {
+    employee_ids:  empIds,
+    worked_date:   date,
+    worked_type:   type,
+    holiday_name:  name || null,
+    days_credited: parseFloat(days),
+    remarks:       remarks || null,
+  });
+
+  btn.disabled = false; btn.textContent = '⚡ Grant to Selected';
+
+  if (res?.success) {
+    toast('✅ ' + res.message, 'success');
+    closeModal('bulk-modal');
+    document.getElementById('bulk-select-all').checked = false;
+    document.querySelectorAll('.bulk-emp-cb').forEach(cb => cb.checked = false);
+    updateBulkCount();
+    loadCredits();
+  } else {
+    toast(res?.message || 'Bulk grant failed', 'error');
+  }
+}
+
+// ── Revoke ────────────────────────────────────────────────────────────────────
+function openRevoke(id, empName, date) {
+  revokeId = id;
+  document.getElementById('revoke-detail').innerHTML =
+    `Revoking comp off credit for <strong>${empName}</strong> — worked on <strong>${date}</strong>.`;
+  openModal('revoke-modal');
+}
+
+async function confirmRevoke() {
+  if (!revokeId) return;
+  const btn = document.getElementById('revoke-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Revoking…';
+
+  const res = await api('DELETE', `/compoff/${revokeId}/revoke`);
+  btn.disabled = false; btn.textContent = 'Revoke Credit';
+
+  if (res?.success) {
+    toast('Credit revoked and balance adjusted', 'success');
+    closeModal('revoke-modal');
+    revokeId = null;
+    loadCredits();
+  } else {
+    toast(res?.message || 'Failed to revoke', 'error');
+  }
+}
+
+// ── Employee: my balance ──────────────────────────────────────────────────────
+async function loadMyBalance() {
+  const res = await api('GET', '/compoff/balance');
+  if (!res?.success) return;
+  const d = res.data;
+  document.getElementById('my-avail').textContent = fmt.num(d.available || 0);
+  document.getElementById('my-total').textContent = fmt.num(d.total_credited || 0);
+  document.getElementById('my-used').textContent  = fmt.num(d.used || 0);
+}
+
+// ── Employee: my credits ──────────────────────────────────────────────────────
+async function loadMyCredits() {
+  const el  = document.getElementById('my-credits-list');
+  const res = await api('GET', '/compoff/credits');
+  if (!res?.success || !res.data.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🔄</div>
+      <p>No comp off credits yet.</p>
+      <p style="font-size:12px;color:var(--muted)">Credits are granted by HR when you work on a holiday or weekend.</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Worked Date</th><th>Type</th><th>Occasion</th>
+      <th>Days Credited</th><th>Status</th><th>Expiry</th>
+    </tr></thead>
+    <tbody>
+      ${res.data.map(c => `<tr>
+        <td style="font-weight:600">${fmtDate(c.worked_date)}</td>
+        <td>
+          <span class="badge" style="${c.worked_type === 'holiday'
+            ? 'background:#fef3c7;color:#92400e'
+            : 'background:#e0e7ff;color:#3730a3'}">
+            ${c.worked_type === 'holiday' ? '🗓 Holiday' : '📅 Weekend'}
+          </span>
+        </td>
+        <td>${c.holiday_name || '—'}</td>
+        <td style="font-weight:700;color:var(--accent)">${c.days_credited}</td>
+        <td><span class="badge badge-${c.status === 'available' ? 'approved' : c.status === 'used' ? 'pending' : 'rejected'}">${c.status}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${c.expiry_date ? fmtDate(c.expiry_date) : 'No expiry'}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function switchTab(name) {
+  ['credits','myview'].forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = t === name ? '' : 'none';
+    const btn = document.getElementById('tab-btn-' + t);
+    if (btn) btn.classList.toggle('active', t === name);
+  });
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+</body>
+</html>
