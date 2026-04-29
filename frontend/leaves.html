@@ -48,7 +48,7 @@
     <div id="bal-section" style="margin-bottom:6px">
       <div class="section-title">Leave Balance — <span id="bal-year"></span></div>
       <div id="balance-cards" class="bal-grid">
-        <div class="loader" style="grid-column:span 3"><div class="spinner"></div></div>
+        <div class="loader" style="grid-column:span 4"><div class="spinner"></div></div>
       </div>
     </div>
 
@@ -327,7 +327,7 @@ async function loadBalance() {
 
   if (!data?.success) {
     document.getElementById('balance-cards').innerHTML =
-      '<div style="grid-column:span 3;text-align:center;color:#e53935;padding:24px">⚠ Could not load leave balances. Please refresh.</div>';
+      '<div style="grid-column:span 4;text-align:center;color:#e53935;padding:24px">⚠ Could not load leave balances. Please refresh.</div>';
     return;
   }
   balanceData = data.data;
@@ -336,7 +336,7 @@ async function loadBalance() {
   // Show provisional banner for contractual employees still under 6 months
   if (data.is_provisional && data.provision_ends) {
     const banner = document.createElement('div');
-    banner.style.cssText = 'grid-column:span 3;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;margin-bottom:8px;color:#795548;font-size:13px;';
+    banner.style.cssText = 'grid-column:span 4;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;margin-bottom:8px;color:#795548;font-size:13px;';
     banner.innerHTML = `⏳ <strong>Provisional Period</strong> — You are on provisional leave (PL only) until <strong>${data.provision_ends}</strong>. EL, CL &amp; SL will be available once your 6-month period is complete.`;
     el.parentNode.insertBefore(banner, el);
   }
@@ -381,7 +381,7 @@ async function loadBalance() {
   }
 
   if (!cardsHtml) {
-    el.innerHTML = `<div style="grid-column:span 3;text-align:center;color:var(--muted);padding:24px">
+    el.innerHTML = `<div style="grid-column:span 4;text-align:center;color:var(--muted);padding:24px">
       No leave balances yet. Balances are credited automatically on the 1st of every month.
     </div>`;
     return;
