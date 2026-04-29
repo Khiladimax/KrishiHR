@@ -1984,6 +1984,20 @@ function updateBufSliderBg(slider) {
 //  COMPACT EMPLOYEE TAB — card list + slide-in drawer
 // ══════════════════════════════════════════════════════════════
 
+function switchTab(tab) {
+  const isLoc = tab === 'locations';
+  document.getElementById('view-locations').style.display = isLoc ? '' : 'none';
+  document.getElementById('view-employees').style.display = isLoc ? 'none' : '';
+  document.getElementById('tab-locations').style.background = isLoc ? 'var(--g-green)' : 'var(--g-surface)';
+  document.getElementById('tab-locations').style.color      = isLoc ? '#fff' : 'var(--g-muted)';
+  document.getElementById('tab-employees').style.background = isLoc ? 'var(--g-surface)' : 'var(--g-green)';
+  document.getElementById('tab-employees').style.color      = isLoc ? 'var(--g-muted)' : '#fff';
+  document.getElementById('tab-subtitle').textContent = isLoc
+    ? 'Expand any location to view & edit employee buffers and rules inline'
+    : 'All employees — tap any card to change their geofence rule';
+  if (!isLoc) renderEmpTable();
+}
+
 let _drawerEmpId = null;
 
 function renderEmpTable() {
