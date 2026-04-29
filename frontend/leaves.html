@@ -55,6 +55,7 @@
     <!-- TABS -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('my-leaves')">📋 My Leaves</button>
+      <button class="tab-btn" onclick="switchTab('compoff-credits')">🔄 My Comp Off</button>
       <button class="tab-btn" id="approvals-tab" style="display:none" onclick="switchTab('approvals')">✅ Approvals</button>
       <button class="tab-btn" id="all-tab"        style="display:none" onclick="switchTab('all-leaves')">📂 All Applications</button>
       <!-- Accrual tab removed — runs automatically via cron on 1st of every month -->
@@ -78,6 +79,39 @@
     </div>
 
     <!-- PENDING APPROVALS -->
+    <!-- COMP OFF CREDITS TAB -->
+    <div id="tab-compoff-credits" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">🔄</span>My Comp Off Credits</div>
+          <div style="font-size:12px;color:var(--muted)">Auto-credited when you work on holidays or weekends</div>
+        </div>
+        <!-- Balance summary strip -->
+        <div id="co-balance-strip" style="display:flex;gap:16px;padding:16px 20px;background:#fffbeb;border-bottom:1px solid #fde68a;flex-wrap:wrap">
+          <div style="text-align:center;min-width:80px">
+            <div style="font-size:22px;font-weight:700;color:#92400e" id="co-avail-big">—</div>
+            <div style="font-size:11px;color:#b45309;font-weight:600">AVAILABLE</div>
+          </div>
+          <div style="text-align:center;min-width:80px">
+            <div style="font-size:22px;font-weight:700;color:#065f46" id="co-earned-big">—</div>
+            <div style="font-size:11px;color:#065f46;font-weight:600">TOTAL EARNED</div>
+          </div>
+          <div style="text-align:center;min-width:80px">
+            <div style="font-size:22px;font-weight:700;color:#6b7280" id="co-used-big">—</div>
+            <div style="font-size:11px;color:#6b7280;font-weight:600">USED</div>
+          </div>
+          <div style="margin-left:auto;align-self:center;font-size:12px;color:#92400e;background:#fef3c7;border-radius:6px;padding:6px 12px;line-height:1.5">
+            💡 Comp Off is auto-credited when you punch out after working<br>
+            <strong>4+ hours</strong> on a public holiday or weekend (Sat/Sun).<br>
+            Apply it as leave from the <strong>+ Apply Leave</strong> button → <em>Comp Off</em>.
+          </div>
+        </div>
+        <div id="co-credits-list" style="padding:8px 0">
+          <div style="text-align:center;color:var(--muted);padding:40px">Loading…</div>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-approvals" style="display:none">
       <div class="card">
         <div class="card-header">
@@ -757,14 +791,82 @@ async function revokeLeave(id, fromDate) {
 // runAccrual removed — handled by cron automatically
 
 function switchTab(name) {
-  ['my-leaves','approvals','all-leaves'].forEach(t => {
+  ['my-leaves','compoff-credits','approvals','all-leaves'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===name?'':'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   event?.target?.classList.add('active');
   if (name==='approvals' && document.getElementById('approvals-list').innerHTML.includes('spinner')) loadApprovals();
   if (name==='all-leaves') loadAllLeaves();
+  if (name==='compoff-credits') loadCompOffCredits();
 }
+
+async function loadCompOffCredits() {
+  const [balRes, credRes] = await Promise.all([
+    api('GET', '/compoff/balance').catch(() => null),
+    api('GET', '/compoff/credits').catch(() => null)
+  ]);
+
+  // Update balance strip
+  if (balRes?.success) {
+    const d = balRes.data;
+    const avail  = parseFloat(d.available       || 0);
+    const earned = parseFloat(d.total_credited   || 0);
+    const used   = parseFloat(d.used             || 0);
+    document.getElementById('co-avail-big').textContent  = avail.toFixed(1);
+    document.getElementById('co-earned-big').textContent = earned.toFixed(1);
+    document.getElementById('co-used-big').textContent   = used.toFixed(1);
+  }
+
+  // Render credits table
+  const el = document.getElementById('co-credits-list');
+  if (!credRes?.success || !credRes.data.length) {
+    el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted)">
+      <div style="font-size:40px;margin-bottom:12px">🔄</div>
+      <div style="font-weight:600;margin-bottom:6px">No comp off credits yet</div>
+      <div style="font-size:13px">Work on a holiday or weekend and punch out — comp off is auto-credited when you complete 4+ hours.</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="background:#f9fafb;text-align:left">
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Date Worked</th>
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Type</th>
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Occasion</th>
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Days</th>
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Status</th>
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Expiry</th>
+      <th style="padding:10px 16px;color:var(--muted);font-weight:600">Remarks</th>
+    </tr></thead>
+    <tbody>
+      ${credRes.data.map(c => `<tr style="border-top:1px solid #f3f4f6">
+        <td style="padding:10px 16px;font-weight:600">${fmtDateCo(c.worked_date)}</td>
+        <td style="padding:10px 16px">
+          <span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;${c.worked_type==='holiday'?'background:#fef3c7;color:#92400e':'background:#e0e7ff;color:#3730a3'}">
+            ${c.worked_type==='holiday'?'🗓 Holiday':'📅 Weekend'}
+          </span>
+        </td>
+        <td style="padding:10px 16px;color:var(--muted)">${c.holiday_name||'—'}</td>
+        <td style="padding:10px 16px;font-weight:700;color:#92400e">${parseFloat(c.days_credited).toFixed(1)}</td>
+        <td style="padding:10px 16px">
+          <span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;${
+            c.status==='available'?'background:#dcfce7;color:#166534':
+            c.status==='used'?'background:#f3f4f6;color:#6b7280':'background:#fee2e2;color:#991b1b'}">
+            ${c.status.charAt(0).toUpperCase()+c.status.slice(1)}
+          </span>
+        </td>
+        <td style="padding:10px 16px;font-size:12px;color:var(--muted)">${c.expiry_date?fmtDateCo(c.expiry_date):'No expiry'}</td>
+        <td style="padding:10px 16px;font-size:12px;color:var(--muted)">${c.remarks||'—'}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function fmtDateCo(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+
 
 function onCategoryChange() {
   const cat = document.getElementById('apply-category').value;
