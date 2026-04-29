@@ -251,6 +251,90 @@ exports.punchOut = async (req, res) => {
       }
     }
 
+    // ── Auto Comp Off Grant ───────────────────────────────────────────────────
+    // If employee punched out with >= 4 hours on a holiday or weekend → auto-grant compoff
+    if (hoursWorked >= 4) {
+      try {
+        const todayDate  = new Date(today);
+        const dayOfWeek  = todayDate.getDay(); // 0=Sun, 6=Sat
+
+        // Check if today is a public holiday
+        const holRes = await db.query(
+          `SELECT name FROM holidays
+           WHERE date=$1 AND (region='all' OR region=(
+             SELECT COALESCE(
+               (SELECT region FROM geofence_locations gl
+                JOIN geofence_employee_buffers geb ON geb.location_id=gl.id
+                WHERE geb.employee_id=$2 LIMIT 1),
+               'all'
+             )
+           ))
+           LIMIT 1`,
+          [today, empId]
+        );
+        const isHoliday = holRes.rows.length > 0;
+        const holidayName = holRes.rows[0]?.name || null;
+
+        // Check if Saturday (weekend off) — any Sat counts as weekend for compoff
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sun or Sat
+
+        if (isHoliday || isWeekend) {
+          const workedType  = isHoliday ? 'holiday' : 'weekend';
+          const daysToGrant = hoursWorked >= 8 ? 1 : 0.5;
+
+          // Check not already credited for this date
+          const alreadyCredited = await db.query(
+            `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`,
+            [empId, today]
+          );
+
+          if (!alreadyCredited.rows.length) {
+            // Get COMPOFF leave type id
+            const compoffType = await db.query(
+              `SELECT id FROM leave_types WHERE code='COMPOFF' LIMIT 1`
+            );
+
+            if (compoffType.rows.length) {
+              const ltId = compoffType.rows[0].id;
+              const year = todayDate.getFullYear();
+
+              // Insert credit record
+              await db.query(
+                `INSERT INTO compoff_credits
+                   (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, remarks, status)
+                 VALUES ($1,$2,$3,$4,$5,$1,$6,'available')`,
+                [empId, today, workedType, holidayName,
+                 daysToGrant,
+                 `Auto-granted: worked ${hoursWorked.toFixed(1)}h on ${workedType}`]
+              );
+
+              // Update leave_balances
+              await db.query(
+                `INSERT INTO leave_balances (employee_id, leave_type_id, year, allocated)
+                 VALUES ($1,$2,$3,$4)
+                 ON CONFLICT (employee_id, leave_type_id, year)
+                 DO UPDATE SET allocated = leave_balances.allocated + $4`,
+                [empId, ltId, year, daysToGrant]
+              );
+
+              // Notify employee
+              const occasion = isHoliday ? `${holidayName || 'holiday'} (${today})` : `weekend (${today})`;
+              await db.query(
+                `INSERT INTO notifications(employee_id, type, title, message)
+                 VALUES($1,'leave',$2,$3)`,
+                [empId,
+                 '🔄 Comp Off Credited!',
+                 `${daysToGrant} Comp Off day${daysToGrant < 1 ? '' : '(s)'} auto-credited for working on ${occasion}. You can use it as leave anytime.`]
+              );
+            }
+          }
+        }
+      } catch (compoffErr) {
+        // Non-blocking — don't fail punch-out if compoff grant fails
+        console.error('[AutoCompOff Error]', compoffErr.message);
+      }
+    }
+
     res.json({ success: true, message: `Punched out at ${punchOutTime.slice(0,5)} · ${hoursWorked.toFixed(1)}h worked` });
   } catch (err) {
     console.error(err);
