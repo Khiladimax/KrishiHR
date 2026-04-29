@@ -744,6 +744,34 @@ cron.schedule('58 23 31 12 *', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
+// ── Comp Off Auto-Grant Cron — runs at 11:30 PM IST every day ─────────────────
+// Scans today's attendance and grants COMPOFF to eligible employees
+cron.schedule('30 23 * * *', async () => {
+  try {
+    const compoffCtrl = require('./controllers/compoffController');
+    const istDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const dateStr = istDate.toISOString().split('T')[0];
+    console.log(`[CRON] 🗓️  Running COMPOFF auto-grant for ${dateStr}...`);
+    const result = await compoffCtrl.autoGrantForDate(dateStr);
+    console.log(`[CRON] ✅ COMPOFF auto-grant done — granted: ${result.granted}, skipped: ${result.skipped}`);
+  } catch (err) {
+    console.error('❌ COMPOFF auto-grant cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Comp Off Expiry Cron — runs at 12:05 AM IST every day ────────────────────
+// Marks credits past their 30-day expiry as 'expired' and reduces leave_balances
+cron.schedule('5 0 * * *', async () => {
+  try {
+    const compoffCtrl = require('./controllers/compoffController');
+    console.log('[CRON] ⏳ Running COMPOFF expiry check...');
+    await compoffCtrl.expireOldCredits();
+    console.log('[CRON] ✅ COMPOFF expiry check done');
+  } catch (err) {
+    console.error('❌ COMPOFF expiry cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
 start();
 
 // ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
