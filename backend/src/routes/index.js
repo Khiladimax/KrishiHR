@@ -20,6 +20,7 @@ const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
 const offerCtrl      = require('../controllers/offerLetterController');
 const itDeclCtrl     = require('../controllers/itDeclarationController');
+const compoffCtrl    = require('../controllers/compoffController');
 
 const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
@@ -173,6 +174,13 @@ router.put ('/leave/balance',         authenticate, authorize(...HR_ADMIN), leav
 router.post('/leave/monthly-accrual',        authenticate, authorize(...HR_ADMIN), leaveCtrl.monthlyAccrual);
 router.post('/leave/recalculate/:id',        authenticate, authorize(...HR_ADMIN), leaveCtrl.recalculateEmployee);
 router.get ('/leave/report',                 authenticate,                        leaveCtrl.getLeaveReport);
+
+// ── Comp Off ──────────────────────────────────────────────────────────────────
+router.post  ('/compoff/grant',        authenticate, authorize('hr','admin','super_admin'), compoffCtrl.grantCredit);
+router.post  ('/compoff/bulk-grant',   authenticate, authorize('hr','admin','super_admin'), compoffCtrl.bulkGrant);
+router.get   ('/compoff/credits',      authenticate,                                        compoffCtrl.listCredits);
+router.get   ('/compoff/balance',      authenticate,                                        compoffCtrl.getBalance);
+router.delete('/compoff/:id/revoke',   authenticate, authorize('hr','admin','super_admin'), compoffCtrl.revokeCredit);
 
 // ── Advance Salary ────────────────────────────────────────────────────────────
 router.post('/advance/apply',                authenticate, advCtrl.apply);
