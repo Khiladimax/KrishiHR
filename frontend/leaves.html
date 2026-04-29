@@ -369,14 +369,14 @@ async function loadBalance() {
     const coTotal = parseFloat(compoffData?.data?.total_credited || 0);
     const coUsed  = parseFloat(compoffData?.data?.used || 0);
     const coPct = coTotal > 0 ? Math.max(0, Math.min(100, (coUsed / coTotal) * 100)) : 0;
-    cardsHtml += `<div class="bal-card" style="border-color:#f59e0b;outline:2px solid #fde68a;">
-      <div class="bal-code" style="color:#92400e;background:#fef3c7">🔄 COMPOFF</div>
-      <div class="bal-val" style="color:#92400e">${fmt.num(coAvail)}</div>
+    cardsHtml += `<div class="bal-card">
+      <div class="bal-code">COMPOFF</div>
+      <div class="bal-val">${fmt.num(coAvail)}</div>
       <div class="bal-meta">Compensatory Off</div>
       <div class="bal-meta" style="margin-top:3px">
         <span style="color:var(--green)">Used: ${fmt.num(coUsed)}</span> / Earned: ${fmt.num(coTotal)}
       </div>
-      <div class="bal-bar"><div class="bal-fill" style="width:${coPct}%;background:#f59e0b"></div></div>
+      <div class="bal-bar"><div class="bal-fill" style="width:${coPct}%"></div></div>
     </div>`;
   }
 
