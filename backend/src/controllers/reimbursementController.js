@@ -1,533 +1,1047 @@
-// src/controllers/reimbursementController.js
-// Approval chain: same logic as advance (Manager → COO → MD → Accounts)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Reimbursement – KrishiHR</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+/* ── Reimbursement page styles ── */
+.summary-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.scard{flex:1;min-width:140px;background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.07);text-align:center}
+.scard .val{font-size:26px;font-weight:800;margin-bottom:4px}
+.scard .lbl{font-size:11px;color:#666;font-weight:500}
+.c-green{color:#2e7d32}.c-orange{color:#e65100}.c-blue{color:#1565c0}.c-red{color:#c62828}
 
-const db       = require('../config/db');
-const emailSvc = require('../config/emailService');
-const multer   = require('multer');
+/* ── Reimbursement cards ── */
+.reimb-list{display:flex;flex-direction:column;gap:14px}
+.reimb-card{background:#fff;border-radius:14px;box-shadow:0 1px 6px rgba(0,0,0,.08);overflow:hidden}
+.reimb-card-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f0f0f0;gap:8px;flex-wrap:wrap}
+.reimb-title{font-size:15px;font-weight:700;color:#1b4332}
+.reimb-meta{font-size:12px;color:#777;margin-top:2px}
+.status-pill{padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:capitalize}
+.pill-pending{background:#fff3e0;color:#e65100}
+.pill-approved{background:#e8f5e9;color:#2e7d32}
+.pill-rejected{background:#fce4ec;color:#c62828}
+.pill-disbursed{background:#e3f2fd;color:#1565c0}
+.reimb-card-body{padding:14px 18px}
 
-const COO_CODE      = 'KC718';
-const MD_CODE       = 'KC01';
-const ACCOUNTS_CODE = 'KC7708';
+/* ── Items table ── */
+.items-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.items-table th{background:#f5f5f5;padding:7px 10px;text-align:left;font-weight:600;color:#444}
+.items-table td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.items-table tr:last-child td{border-bottom:none}
+.cat-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.cat-travel{background:#e3f2fd;color:#1565c0}
+.cat-food{background:#fff3e0;color:#e65100}
+.cat-accommodation{background:#e8f5e9;color:#2e7d32}
+.cat-miscellaneous{background:#f3e5f5;color:#6a1b9a}
 
-// ── File upload middleware (same as IT declaration — base64 in DB) ─────────────
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg','image/png','image/gif','image/webp',
-                     'application/pdf'];
-    cb(null, allowed.includes(file.mimetype));
+/* ── Action row on card ── */
+.action-row{display:flex;gap:8px;padding:10px 18px;background:#fafafa;border-top:1px solid #f0f0f0;flex-wrap:wrap;align-items:center}
+
+/* ── Apply form ── */
+.form-section{background:#fff;border-radius:14px;box-shadow:0 1px 6px rgba(0,0,0,.08);padding:24px}
+.form-section h2{font-size:17px;font-weight:700;margin-bottom:18px;color:#1b4332}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px}
+.form-control{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;outline:none;transition:.2s}
+.form-control:focus{border-color:#2d6a4f}
+select.form-control{background:#fff}
+
+/* ── Expense item block ── */
+.expense-item{background:#f9fafb;border:1.5px solid #e0e0e0;border-radius:12px;padding:16px;margin-bottom:14px;position:relative}
+.expense-item .item-num{font-size:12px;font-weight:700;color:#2d6a4f;margin-bottom:10px}
+.expense-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.expense-grid{grid-template-columns:1fr}}
+.remove-item-btn{position:absolute;top:12px;right:12px;background:none;border:none;color:#c62828;font-size:18px;cursor:pointer;line-height:1}
+
+/* ── Attachment preview ── */
+.attach-preview{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:8px;font-size:12px;color:#2e7d32;cursor:pointer}
+.attach-preview svg{flex-shrink:0}
+
+/* ── Revision modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;width:min(640px,95vw);max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.modal-box h3{font-size:17px;font-weight:700;margin-bottom:16px;color:#1b4332}
+.modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:#888;margin-top:-4px}
+.revision-item-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0}
+.revision-item-row:last-child{border-bottom:none}
+.revision-item-row .desc{font-size:13px;color:#333}
+.revision-item-row .orig{font-size:12px;color:#888}
+
+/* ── Viewer modal ── */
+.viewer-frame{width:100%;height:70vh;border:none;border-radius:8px;background:#f0f0f0}
+
+/* ── Empty state ── */
+.empty-state{text-align:center;padding:48px 24px;color:#aaa}
+.empty-state svg{margin-bottom:12px;opacity:.4}
+.empty-state p{font-size:14px}
+
+/* ── Approval timeline ── */
+.timeline{padding:12px 0;font-size:12px}
+.timeline-step{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start}
+.timeline-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px}
+.dot-done{background:#e8f5e9}
+.dot-current{background:#fff3e0}
+.dot-wait{background:#f5f5f5}
+.timeline-text .name{font-weight:600;color:#333}
+.timeline-text .sub{color:#888;margin-top:1px}
+
+.loader{text-align:center;padding:40px;color:#888;font-size:14px}
+
+/* ── Approval Pipeline ── */
+.approval-pipeline{display:flex;align-items:flex-start;gap:0;margin-top:16px;padding-top:14px;border-top:1px solid #f0f0f0;flex-wrap:wrap;gap:4px}
+.appr-step{display:flex;flex-direction:column;align-items:center;min-width:90px;position:relative}
+.appr-step:not(:last-child)::after{content:'→';position:absolute;right:-10px;top:13px;color:#ccc;font-size:14px}
+.appr-bubble{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #ddd;background:#f9f9f9;color:#999;margin-bottom:4px;flex-shrink:0}
+.appr-bubble.done{background:#d1fae5;border-color:#2e7d32;color:#2e7d32}
+.appr-bubble.active{background:#fef9c3;border-color:#f59e0b;color:#b45309;animation:pulse-ring 1.8s infinite}
+.appr-bubble.rejected{background:#fee2e2;border-color:#c62828;color:#c62828}
+.appr-bubble.disbursed{background:#ede9fe;border-color:#7c3aed;color:#7c3aed}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0)}}
+.appr-label{font-size:10px;font-weight:700;color:#555;text-align:center;line-height:1.2}
+.appr-sub{font-size:9px;color:#aaa;text-align:center;margin-top:2px}
+.appr-you{font-size:9px;background:#fef9c3;color:#b45309;padding:1px 5px;border-radius:10px;font-weight:700;margin-top:2px}
+
+/* ── Approval Timeline Modal ── */
+.tl-list{display:flex;flex-direction:column}
+.tl-step{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.tl-step:last-child{border-bottom:none}
+.tl-bubble{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;border:2px solid #ddd;background:#f9f9f9;color:#aaa}
+.dot-done{background:#d1fae5!important;border-color:#2e7d32!important;color:#2e7d32!important}
+.dot-current{background:#fef9c3!important;border-color:#f59e0b!important;color:#b45309!important;box-shadow:0 0 0 5px rgba(245,158,11,.15)}
+.dot-rejected{background:#fee2e2!important;border-color:#c62828!important;color:#c62828!important}
+.dot-disbursed{background:#ede9fe!important;border-color:#7c3aed!important;color:#7c3aed!important}
+.dot-ready{background:#e3f2fd!important;border-color:#1565c0!important;color:#1565c0!important}
+.dot-wait{background:#f5f5f5;border-color:#ddd;color:#bbb}
+.tl-info{flex:1;padding-top:4px}
+.tl-name{font-size:14px;font-weight:700;color:#222;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.tl-actor{font-size:12px;font-weight:400;color:#777}
+.tl-you{font-size:10px;background:#fef9c3;color:#b45309;padding:1px 7px;border-radius:10px;font-weight:700;margin-left:4px}
+.tl-sub{font-size:12px;color:#666;margin-top:4px;line-height:1.5}
+.tl-approved{color:#2e7d32;font-weight:600}
+.tl-rejected-txt{color:#c62828;font-weight:600}
+.tl-waiting{color:#b45309;font-weight:600}
+.tl-remark{font-style:italic;color:#888;margin-top:4px;padding:4px 8px;background:#fafafa;border-left:3px solid #ddd;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark"><svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+    <div><div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div><div class="logo-sub">Krishi Care And Management</div></div><div class="logo-sub">Enterprise Edition</div></div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">🧾 Reimbursements</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-primary btn-sm" onclick="showTab('apply')">+ New Request</button>
+      <button id="exportBtn" class="btn btn-outline btn-sm" onclick="openExportModal()" style="display:none">⬇ Export Excel</button>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-my"      onclick="showTab('my')">My Requests</button>
+      <button class="tab-btn"        id="tab-pending" onclick="showTab('pending')">Pending My Approval</button>
+      <button class="tab-btn"        id="tab-all"     onclick="showTab('all')">All Requests</button>
+      <button class="tab-btn"        id="tab-apply"   onclick="showTab('apply')">+ Apply</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-row" id="summaryRow" style="display:none">
+      <div class="scard"><div class="val c-orange" id="sPending">0</div><div class="lbl">Pending</div></div>
+      <div class="scard"><div class="val c-green"  id="sApproved">0</div><div class="lbl">Approved</div></div>
+      <div class="scard"><div class="val c-blue"   id="sDisbursed">0</div><div class="lbl">Disbursed</div></div>
+      <div class="scard"><div class="val c-red"    id="sRejected">0</div><div class="lbl">Rejected</div></div>
+      <div class="scard"><div class="val c-green"  id="sTotal">₹0</div><div class="lbl">Total Approved</div></div>
+    </div>
+
+    <!-- Content Area -->
+    <div id="contentArea"></div>
+  </div>
+</div>
+
+</div><!-- /.main -->
+
+<!-- ── Revision / Approve Modal ── -->
+<div class="modal-overlay" id="revisionModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('revisionModal')">×</button>
+    <h3 id="revisionModalTitle">Review Reimbursement</h3>
+    <div id="revisionModalBody"></div>
+  </div>
+</div>
+
+<!-- ── Attachment Viewer Modal ── -->
+<div class="modal-overlay" id="viewerModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('viewerModal')">×</button>
+    <h3 id="viewerTitle">Attachment</h3>
+    <div id="viewerBody"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let currentTab  = 'my';
+let allData     = [];
+
+Auth.guard();
+buildSidebar('reimbursement.html');
+loadNotifBadge();
+const currentUser = Auth.getUser();
+
+// ── Approver code → human label map (mirrors advance.html) ──────────────────
+const CODE_TO_LABEL = {
+  'KC718':  { label: 'COO',      icon: '🏢' },
+  'KC01':   { label: 'MD',       icon: '👑' },
+  'KC7708': { label: 'Accounts', icon: '💸' },
+};
+function codeLabel(code) {
+  return CODE_TO_LABEL[code] || { label: code, icon: '👤' };
+}
+
+// Show tabs based on role
+const canSeeAll = ['hr','super_admin','admin','accounts'].includes(currentUser.role);
+if (!canSeeAll) document.getElementById('tab-all').style.display = 'none';
+
+showTab('my');
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('tab-' + tab);
+  if (el) el.classList.add('active');
+
+  document.getElementById('summaryRow').style.display = (tab !== 'apply') ? 'flex' : 'none';
+
+  if (tab === 'apply') {
+    renderApplyForm();
+  } else {
+    loadReimbursements(tab);
   }
-});
-exports.uploadMiddleware = upload.single('attachment');
-
-// ── Shared: same chain logic as advance ───────────────────────────────────────
-async function getChain(employeeId) {
-  const emp = await db.query(
-    `SELECT e.employee_code, e.role,
-            m.employee_code AS manager_code
-     FROM employees e
-     LEFT JOIN employees m ON e.reporting_manager_id = m.id
-     WHERE e.id=$1`, [employeeId]
-  );
-  if (!emp.rows.length) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
-  const { employee_code, role, manager_code } = emp.rows[0];
-
-  if (employee_code === COO_CODE)      return [MD_CODE, ACCOUNTS_CODE];
-  if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
-  if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
-  if (['admin','hr'].includes(role))   return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
-
-  const hasMgr = manager_code &&
-    ![COO_CODE, MD_CODE, ACCOUNTS_CODE].includes(manager_code);
-  return hasMgr
-    ? [manager_code, COO_CODE, MD_CODE, ACCOUNTS_CODE]
-    : [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 }
 
-// ── Notify helper ─────────────────────────────────────────────────────────────
-async function notifyEmployee(employeeId, title, message) {
-  await db.query(
-    `INSERT INTO notifications(employee_id,title,message,type) VALUES($1,$2,$3,'reimbursement')`,
-    [employeeId, title, message]
-  ).catch(() => {});
-}
-async function notifyByCode(code, title, message) {
-  const rows = await db.query(
-    `SELECT id FROM employees WHERE employee_code=$1 AND is_active=true`, [code]
-  ).catch(() => ({ rows: [] }));
-  for (const r of rows.rows) await notifyEmployee(r.id, title, message);
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// APPLY — POST /reimbursement/apply  (multipart, one item at a time OR JSON list)
-// ══════════════════════════════════════════════════════════════════════════════
-exports.apply = async (req, res) => {
-  const client = await db.getClient();
+// ── Load list ─────────────────────────────────────────────────────────────────
+async function loadReimbursements(tab) {
+  document.getElementById('contentArea').innerHTML = '<div class="loader">Loading…</div>';
   try {
-    await client.query('BEGIN');
-    const empId = req.user.id;
-    const { title, items } = req.body;          // items = JSON string array
+    // 'my' tab: only my requests. 'pending'/'all': fetch all visible to this user
+    let url = '/reimbursement';
+    if (tab === 'my') url += `?employee_id=${currentUser.id}`;
 
-    if (!title || !title.trim())
-      return res.status(400).json({ success: false, message: 'Title is required' });
+    const res = await api('GET', url);
+    const data = res?.data || [];
+    allData = data;
 
-    let parsedItems = [];
-    try { parsedItems = typeof items === 'string' ? JSON.parse(items) : (items || []); }
-    catch (_) { return res.status(400).json({ success: false, message: 'Invalid items JSON' }); }
+    // Stats always from full dataset
+    let pending=0,approved=0,disbursed=0,rejected=0,totalAmt=0;
+    data.forEach(d => {
+      if (d.status==='pending')   pending++;
+      if (d.status==='approved')  { approved++; totalAmt += parseFloat(d.approved_amount||0); }
+      if (d.status==='disbursed') { disbursed++; totalAmt += parseFloat(d.approved_amount||0); }
+      if (d.status==='rejected')  rejected++;
+    });
+    document.getElementById('sPending').textContent   = pending;
+    document.getElementById('sApproved').textContent  = approved;
+    document.getElementById('sDisbursed').textContent = disbursed;
+    document.getElementById('sRejected').textContent  = rejected;
+    document.getElementById('sTotal').textContent     = '₹' + totalAmt.toLocaleString('en-IN');
 
-    if (!parsedItems.length)
-      return res.status(400).json({ success: false, message: 'At least one expense item is required' });
-
-    const chain = await getChain(empId);
-    const total = parsedItems.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
-
-    const result = await client.query(
-      `INSERT INTO reimbursements
-         (employee_id, title, total_amount, approved_amount, approval_chain,
-          current_approver_code, current_level, status)
-       VALUES($1,$2,$3,$3,$4,$5,1,'pending') RETURNING id`,
-      [empId, title.trim(), total, JSON.stringify(chain), chain[0]]
-    );
-    const reimbId = result.rows[0].id;
-
-    for (const item of parsedItems) {
-      await client.query(
-        `INSERT INTO reimbursement_items
-           (reimbursement_id, category, description, amount, expense_date,
-            attachment_data, attachment_name, attachment_mime, attachment_size)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [reimbId, item.category, item.description,
-         parseFloat(item.amount), item.expense_date,
-         item.attachment_data   || null,
-         item.attachment_name   || null,
-         item.attachment_mime   || null,
-         item.attachment_size   || null]
+    // Filter for 'pending my approval': records where it's literally MY turn to act
+    let filtered = data;
+    if (tab === 'pending') {
+      filtered = data.filter(d =>
+        d.status === 'pending' &&
+        d.current_approver_code === currentUser.employee_code
       );
     }
 
-    await client.query('COMMIT');
-
-    // Notify first approver
-    const empInfo = await db.query(
-      `SELECT CONCAT(first_name,' ',last_name) AS name FROM employees WHERE id=$1`, [empId]
-    );
-    const empName = empInfo.rows[0]?.name || 'An employee';
-    await notifyByCode(chain[0], '🧾 Reimbursement Request',
-      `${empName} submitted a reimbursement of ₹${total.toLocaleString('en-IN')} — "${title}". Awaiting your approval.`);
-
-    res.status(201).json({ success: true, message: 'Reimbursement submitted', data: { id: reimbId, total, chain } });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('[reimbursement.apply]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  } finally { client.release(); }
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-// UPLOAD ATTACHMENT — POST /reimbursement/item/:id/attachment
-// ══════════════════════════════════════════════════════════════════════════════
-exports.uploadAttachment = async (req, res) => {
-  try {
-    const file = req.file;
-    const { id } = req.params;
-    if (!file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-
-    const base64 = file.buffer.toString('base64');
-    await db.query(
-      `UPDATE reimbursement_items
-       SET attachment_data=$1, attachment_name=$2, attachment_mime=$3, attachment_size=$4
-       WHERE id=$5`,
-      [base64, file.originalname, file.mimetype, file.size, id]
-    );
-    res.json({ success: true, message: 'Attachment saved' });
-  } catch (err) {
-    console.error('[reimbursement.uploadAttachment]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    renderList(filtered, tab);
+  } catch(e) {
+    document.getElementById('contentArea').innerHTML = '<div class="loader">Failed to load. Please try again.</div>';
+    console.error(e);
   }
-};
+}
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET ATTACHMENT — GET /reimbursement/item/:id/attachment
-// ══════════════════════════════════════════════════════════════════════════════
-exports.getAttachment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const r = await db.query(
-      `SELECT attachment_data, attachment_name, attachment_mime FROM reimbursement_items WHERE id=$1`, [id]
-    );
-    if (!r.rows.length || !r.rows[0].attachment_data)
-      return res.status(404).json({ success: false, message: 'No attachment found' });
-
-    const { attachment_data, attachment_name, attachment_mime } = r.rows[0];
-    const buffer = Buffer.from(attachment_data, 'base64');
-    res.setHeader('Content-Type', attachment_mime || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${attachment_name || 'attachment'}"`);
-    res.send(buffer);
-  } catch (err) {
-    console.error('[reimbursement.getAttachment]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+// ── Render list ───────────────────────────────────────────────────────────────
+function renderList(data, tab) {
+  if (!data.length) {
+    document.getElementById('contentArea').innerHTML = `
+      <div class="empty-state">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <p>No reimbursement requests found</p>
+      </div>`;
+    return;
   }
-};
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET ALL — GET /reimbursement  (same visibility rules as advance)
-// ══════════════════════════════════════════════════════════════════════════════
-exports.getAll = async (req, res) => {
-  try {
-    const userId   = req.user.id;
-    const userRole = req.user.role;
-    const userCode = req.user.employee_code;
-    const { employee_id, status } = req.query;
+  const html = data.map(r => renderCard(r, tab)).join('');
+  document.getElementById('contentArea').innerHTML = `<div class="reimb-list">${html}</div>`;
+}
 
-    let conds = [], params = [], idx = 1;
+function catBadge(cat) {
+  return `<span class="cat-badge cat-${cat}">${cat.charAt(0).toUpperCase()+cat.slice(1)}</span>`;
+}
 
-    if (employee_id) {
-      conds.push(`r.employee_id=$${idx++}`); params.push(employee_id);
-    } else if (userRole === 'hr') {
-      // see all
-    } else if (userRole === 'super_admin') {
-      conds.push(`(r.current_approver_code=$${idx++} OR (r.approval_chain::text LIKE $${idx++} AND EXISTS(SELECT 1 FROM reimbursement_approvals ra WHERE ra.reimbursement_id=r.id AND ra.approver_id=$${idx++} AND ra.action='approve')) OR r.employee_id=$${idx++})`);
-      params.push(userCode, `%"${userCode}"%`, userId, userId);
-    } else if (userRole === 'accounts') {
-      conds.push(`(r.current_approver_code=$${idx++} OR (r.status='approved' AND r.current_approver_code IS NULL) OR r.employee_id=$${idx++})`);
-      params.push(userCode, userId);
-    } else if (userRole === 'admin') {
-      conds.push(`(r.current_approver_code=$${idx++} OR (r.approval_chain::text LIKE $${idx++} AND EXISTS(SELECT 1 FROM reimbursement_approvals ra WHERE ra.reimbursement_id=r.id AND ra.level_label=$${idx++} AND ra.action='approve')) OR r.employee_id=$${idx++})`);
-      params.push(userCode, `%"${userCode}"%`, userCode, userId);
-    } else if (['manager','tl'].includes(userRole)) {
-      conds.push(`(r.current_approver_code=$${idx++} OR (r.approval_chain::text LIKE $${idx++} AND EXISTS(SELECT 1 FROM reimbursement_approvals ra WHERE ra.reimbursement_id=r.id AND ra.level_label=$${idx++} AND ra.action='approve')) OR r.employee_id=$${idx++} OR EXISTS(SELECT 1 FROM employees sub WHERE sub.id=r.employee_id AND (sub.reporting_manager_id=$${idx++} OR sub.team_leader_id=$${idx++})))`);
-      params.push(userCode, `%"${userCode}"%`, userCode, userId, userId, userId);
+// ── Approval Pipeline Builder ─────────────────────────────────────────────────
+function buildPipeline(r) {
+  let chain = [];
+  try { chain = JSON.parse(r.approval_chain || '[]'); } catch(_) {}
+  if (!chain.length) return '';
+
+  const steps = chain.map(code => {
+    const isCurrent  = r.status === 'pending' && code === r.current_approver_code;
+    const isDone     = r.status !== 'pending' || chain.indexOf(code) < chain.indexOf(r.current_approver_code);
+    const isRejected = r.status === 'rejected' && code === r.current_approver_code;
+    const isDisbursed= r.status === 'disbursed' && code === r.current_approver_code;
+    const isYou      = code === currentUser.employee_code;
+
+    let bubbleClass, icon;
+    if (r.status === 'approved' || r.status === 'disbursed') {
+      // All chain steps done (disbursed = fully approved + paid)
+      bubbleClass = r.status === 'disbursed' ? 'disbursed' : 'done';
+      icon = r.status === 'disbursed' ? '💰' : '✅';
+    } else if (isRejected) {
+      bubbleClass = 'rejected'; icon = '❌';
+    } else if (isDone) {
+      bubbleClass = 'done'; icon = '✅';
+    } else if (isCurrent) {
+      bubbleClass = 'active'; icon = '⏳';
     } else {
-      conds.push(`r.employee_id=$${idx++}`); params.push(userId);
+      bubbleClass = ''; icon = '⬜';
     }
 
-    if (status) { conds.push(`r.status=$${idx++}`); params.push(status); }
+    return `
+    <div class="appr-step">
+      <div class="appr-bubble ${bubbleClass}">${icon}</div>
+      <div class="appr-label">${escHtml(code)}</div>
+      ${isCurrent && r.status==='pending' ? `<div class="appr-sub">Awaiting</div>` : ''}
+      ${isDone && r.status!=='approved' && r.status!=='disbursed' ? `<div class="appr-sub">Approved</div>` : ''}
+      ${isYou ? `<div class="appr-you">You</div>` : ''}
+    </div>`;
+  });
 
-    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  // Add Accounts / Disburse as final step if not already in chain
+  const lastStep = r.status === 'disbursed'
+    ? `<div class="appr-step"><div class="appr-bubble disbursed">💰</div><div class="appr-label">Disbursed</div></div>`
+    : `<div class="appr-step"><div class="appr-bubble ${r.status==='approved'?'done':''}">
+        ${r.status==='approved'?'🏦':'🏦'}</div>
+        <div class="appr-label">Accounts</div>
+        <div class="appr-sub">${r.status==='approved'?'Ready':'Pending'}</div></div>`;
 
-    const result = await db.query(
-      `SELECT r.*,
-              CONCAT(e.first_name,' ',e.last_name) AS employee_name,
-              e.employee_code, d.name AS department_name
-       FROM reimbursements r
-       JOIN employees e ON r.employee_id=e.id
-       LEFT JOIN departments d ON e.department_id=d.id
-       ${where}
-       ORDER BY r.requested_at DESC`,
-      params
-    );
+  return `<div class="approval-pipeline">${steps.join('')}${lastStep}</div>`;
+}
 
-    // Attach items to each reimbursement
-    const ids = result.rows.map(r => r.id);
-    let itemsMap = {};
-    if (ids.length) {
-      const itemsRes = await db.query(
-        `SELECT id, reimbursement_id, category, description, amount, expense_date,
-                attachment_name, attachment_mime, attachment_size, approved_amount,
-                CASE WHEN attachment_data IS NOT NULL THEN true ELSE false END AS has_attachment
-         FROM reimbursement_items
-         WHERE reimbursement_id = ANY($1)
-         ORDER BY id`, [ids]
-      );
-      for (const item of itemsRes.rows) {
-        if (!itemsMap[item.reimbursement_id]) itemsMap[item.reimbursement_id] = [];
-        itemsMap[item.reimbursement_id].push(item);
-      }
-    }
 
-    const data = result.rows.map(r => ({ ...r, items: itemsMap[r.id] || [] }));
-    res.json({ success: true, data });
-  } catch (err) {
-    console.error('[reimbursement.getAll]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+function renderCard(r, tab) {
+  const pillClass = `pill-${r.status}`;
+  const isApprover = r.status === 'pending' &&
+                     r.current_approver_code === currentUser?.employee_code;
+  const isOwner    = r.employee_id === currentUser?.id;
+  const isAccounts = currentUser?.role === 'accounts';
+
+  // Items table
+  const itemRows = (r.items || []).map((item, i) => `
+    <tr>
+      <td>${catBadge(item.category)}</td>
+      <td>${item.description}</td>
+      <td>${formatDate(item.expense_date)}</td>
+      <td>₹${parseFloat(item.amount).toLocaleString('en-IN')}</td>
+      <td>${item.approved_amount != null ? '<s style="color:#aaa">₹'+parseFloat(item.amount).toLocaleString('en-IN')+'</s> ₹'+parseFloat(item.approved_amount).toLocaleString('en-IN') : '—'}</td>
+      <td>
+        ${item.has_attachment
+          ? `<button class="btn btn-outline btn-sm" onclick="viewAttachment(${item.id},'${escHtml(item.attachment_name||'file')}','${item.attachment_mime||''}')">👁 View</button>`
+          : '<span style="color:#aaa;font-size:12px">None</span>'}
+      </td>
+    </tr>`).join('');
+
+  const approvedAmt = parseFloat(r.approved_amount || r.total_amount || 0);
+  const totalAmt    = parseFloat(r.total_amount || 0);
+  const amtRevised  = approvedAmt !== totalAmt;
+
+  let actionButtons = '';
+  if (isApprover) {
+    actionButtons = `
+      <button class="btn btn-success btn-sm" onclick="openRevisionModal(${r.id})">✅ Review & Approve</button>
+      <button class="btn btn-danger  btn-sm" onclick="rejectReimb(${r.id})">❌ Reject</button>`;
   }
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ACTION — POST /reimbursement/:id/action  (approve / reject + optional revise)
-// ══════════════════════════════════════════════════════════════════════════════
-exports.action = async (req, res) => {
-  const client = await db.getClient();
-  try {
-    await client.query('BEGIN');
-    const { id } = req.params;
-    const { action, remarks, revised_amount, item_revisions } = req.body;
-    // item_revisions = [{ item_id, approved_amount }] — optional per-item revision
-    const actorCode = req.user.employee_code;
-    const actorRole = req.user.role;
-
-    if (!['approve','reject'].includes(action))
-      return res.status(400).json({ success: false, message: 'action must be approve or reject' });
-
-    const rRow = await client.query(`SELECT * FROM reimbursements WHERE id=$1 FOR UPDATE`, [id]);
-    if (!rRow.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
-    const reimb = rRow.rows[0];
-
-    if (reimb.status !== 'pending')
-      return res.status(400).json({ success: false, message: `Already ${reimb.status}` });
-
-    let chain;
-    try { chain = Array.isArray(reimb.approval_chain) ? reimb.approval_chain : JSON.parse(reimb.approval_chain); }
-    catch (_) { chain = []; }
-
-    const isSuperAdmin      = actorRole === 'super_admin';
-    const isCurrentApprover = actorCode === reimb.current_approver_code;
-    if (!isSuperAdmin && !isCurrentApprover)
-      return res.status(403).json({ success: false, message: 'You are not the current approver' });
-    if (reimb.employee_id === req.user.id)
-      return res.status(403).json({ success: false, message: 'Cannot approve your own request' });
-
-    const currentIdx   = chain.indexOf(reimb.current_approver_code);
-    const currentLevel = currentIdx + 1;
-
-    // ── Handle amount revision (per item or total) ─────────────────────────
-    let finalApprovedAmount = parseFloat(reimb.total_amount);
-    let amountRevised       = false;
-    const originalAmount    = parseFloat(reimb.total_amount);
-
-    // Per-item revisions
-    if (item_revisions && Array.isArray(item_revisions) && item_revisions.length) {
-      for (const rev of item_revisions) {
-        await client.query(
-          `UPDATE reimbursement_items SET approved_amount=$1 WHERE id=$2 AND reimbursement_id=$3`,
-          [parseFloat(rev.approved_amount), rev.item_id, id]
-        );
-      }
-      // Recalculate total approved from items
-      const sumRes = await client.query(
-        `SELECT COALESCE(SUM(COALESCE(approved_amount, amount)),0) AS total
-         FROM reimbursement_items WHERE reimbursement_id=$1`, [id]
-      );
-      finalApprovedAmount = parseFloat(sumRes.rows[0].total);
-      amountRevised = finalApprovedAmount !== originalAmount;
-    } else if (revised_amount && parseFloat(revised_amount) !== originalAmount) {
-      // Top-level revision
-      finalApprovedAmount = parseFloat(revised_amount);
-      amountRevised       = true;
-    }
-
-    if (amountRevised) {
-      await client.query(
-        `UPDATE reimbursements SET approved_amount=$1, updated_at=NOW() WHERE id=$2`,
-        [finalApprovedAmount, id]
-      );
-      // Notify employee of revision
-      const approverName = `${req.user.first_name} ${req.user.last_name}`.trim();
-      await notifyEmployee(reimb.employee_id, '⚠️ Reimbursement Amount Revised',
-        `Your reimbursement "${reimb.title}" was revised from ₹${originalAmount.toLocaleString('en-IN')} to ₹${finalApprovedAmount.toLocaleString('en-IN')} by ${approverName}.${remarks ? ' Remarks: ' + remarks : ''}`
-      );
-      // Also notify all other approvers in chain about the revision
-      for (const code of chain) {
-        if (code !== actorCode) {
-          await notifyByCode(code, '⚠️ Reimbursement Revised',
-            `${approverName} revised reimbursement "${reimb.title}" (Employee ID: ${reimb.employee_id}) amount to ₹${finalApprovedAmount.toLocaleString('en-IN')}.`
-          );
-        }
-      }
-    }
-
-    // Log this step
-    await client.query(
-      `INSERT INTO reimbursement_approvals
-         (reimbursement_id, level, level_label, approver_id, action, original_amount, revised_amount, remarks)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, currentLevel, reimb.current_approver_code, req.user.id,
-       action, originalAmount, amountRevised ? finalApprovedAmount : null, remarks || null]
-    );
-
-    if (action === 'reject') {
-      await client.query(
-        `UPDATE reimbursements SET status='rejected', remarks=$1, updated_at=NOW() WHERE id=$2`,
-        [remarks || null, id]
-      );
-      await client.query('COMMIT');
-      // Notify employee
-      await notifyEmployee(reimb.employee_id, '❌ Reimbursement Rejected',
-        `Your reimbursement "${reimb.title}" was rejected.${remarks ? ' Reason: ' + remarks : ''}`);
-      // Notify all chain members
-      const empName = (await db.query(`SELECT CONCAT(first_name,' ',last_name) AS n FROM employees WHERE id=$1`, [reimb.employee_id])).rows[0]?.n;
-      for (const code of chain) {
-        if (code !== actorCode) {
-          await notifyByCode(code, '❌ Reimbursement Rejected',
-            `${empName}'s reimbursement "${reimb.title}" was rejected by ${req.user.employee_code}.`);
-        }
-      }
-      return res.json({ success: true, message: 'Reimbursement rejected' });
-    }
-
-    // Approve — advance chain
-    const nextCode = chain[currentIdx + 1] || null;
-    if (nextCode) {
-      await client.query(
-        `UPDATE reimbursements SET current_approver_code=$1, current_level=$2, updated_at=NOW() WHERE id=$3`,
-        [nextCode, currentIdx + 2, id]
-      );
-      await client.query('COMMIT');
-      // Notify next approver
-      const empName = (await db.query(`SELECT CONCAT(first_name,' ',last_name) AS n FROM employees WHERE id=$1`, [reimb.employee_id])).rows[0]?.n;
-      await notifyByCode(nextCode, '🧾 Reimbursement Request',
-        `${empName}'s reimbursement "${reimb.title}" of ₹${finalApprovedAmount.toLocaleString('en-IN')} is awaiting your approval.`);
-      return res.json({ success: true, message: 'Approved. Forwarded to next approver.' });
-    }
-
-    // Final approval
-    await client.query(
-      `UPDATE reimbursements
-       SET status='approved', approved_amount=$1, approved_at=NOW(),
-           current_approver_code=NULL, updated_at=NOW()
-       WHERE id=$2`,
-      [finalApprovedAmount, id]
-    );
-    await client.query('COMMIT');
-
-    // Notify employee — fully approved
-    await notifyEmployee(reimb.employee_id, '✅ Reimbursement Approved',
-      `Your reimbursement "${reimb.title}" of ₹${finalApprovedAmount.toLocaleString('en-IN')} has been fully approved.`);
-    // Notify all chain members
-    const empN = (await db.query(`SELECT CONCAT(first_name,' ',last_name) AS n FROM employees WHERE id=$1`, [reimb.employee_id])).rows[0]?.n;
-    for (const code of chain) {
-      if (code !== actorCode) {
-        await notifyByCode(code, '✅ Reimbursement Approved',
-          `${empN}'s reimbursement "${reimb.title}" has been fully approved. Approved amount: ₹${finalApprovedAmount.toLocaleString('en-IN')}.`);
-      }
-    }
-
-    res.json({ success: true, message: 'Reimbursement fully approved' });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('[reimbursement.action]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  } finally { client.release(); }
-};
-
-// ── Process disbursement (Accounts) — POST /reimbursement/:id/disburse ────────
-exports.disburse = async (req, res) => {
-  const client = await db.getClient();
-  try {
-    await client.query('BEGIN');
-    const { id } = req.params;
-    const { payment_date, payment_mode, remarks } = req.body;
-    if (!remarks) return res.status(400).json({ success: false, message: 'Remarks required' });
-
-    const r = await client.query(`SELECT * FROM reimbursements WHERE id=$1 FOR UPDATE`, [id]);
-    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
-    if (r.rows[0].status !== 'approved')
-      return res.status(400).json({ success: false, message: 'Only approved reimbursements can be disbursed' });
-
-    await client.query(
-      `UPDATE reimbursements SET status='disbursed', disbursed_at=NOW(), disbursed_by=$1, remarks=$2, updated_at=NOW() WHERE id=$3`,
-      [req.user.id, remarks, id]
-    );
-    await client.query(
-      `INSERT INTO reimbursement_approvals(reimbursement_id,level,level_label,approver_id,action,remarks)
-       VALUES($1,99,'Accounts',$2,'disbursed',$3)`,
-      [id, req.user.id, remarks]
-    );
-    await client.query('COMMIT');
-
-    const reimb = r.rows[0];
-    await notifyEmployee(reimb.employee_id, '💰 Reimbursement Disbursed',
-      `Your reimbursement "${reimb.title}" of ₹${parseFloat(reimb.approved_amount).toLocaleString('en-IN')} has been disbursed.${remarks ? ' Note: ' + remarks : ''}`);
-
-    res.json({ success: true, message: 'Disbursed successfully' });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('[reimbursement.disburse]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  } finally { client.release(); }
-};
-
-// ── Revoke (employee cancels pending) ─────────────────────────────────────────
-exports.revoke = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const empId = req.user.id;
-    const r = await db.query(`SELECT * FROM reimbursements WHERE id=$1`, [id]);
-    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
-    if (r.rows[0].employee_id !== empId)
-      return res.status(403).json({ success: false, message: 'Not your request' });
-    if (r.rows[0].status !== 'pending')
-      return res.status(400).json({ success: false, message: 'Can only revoke pending requests' });
-    await db.query(`UPDATE reimbursements SET status='rejected', remarks='Revoked by employee', updated_at=NOW() WHERE id=$1`, [id]);
-    res.json({ success: true, message: 'Revoked' });
-  } catch (err) {
-    console.error('[reimbursement.revoke]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+  if (isOwner && r.status === 'pending') {
+    actionButtons += `<button class="btn btn-outline btn-sm" onclick="revokeReimb(${r.id})">↩ Revoke</button>`;
   }
-};
+  if (isAccounts && r.status === 'approved') {
+    actionButtons += `<button class="btn btn-primary btn-sm" onclick="disburseReimb(${r.id})">💰 Disburse</button>`;
+  }
+  actionButtons += `<button class="btn btn-outline btn-sm" onclick="viewTimeline(${r.id})">📋 Timeline</button>`;
 
-// ══════════════════════════════════════════════════════════════════════════════
-// EXPORT — GET /reimbursement/export?from=YYYY-MM-DD&to=YYYY-MM-DD&status=all
-// Accounts/HR/super_admin only — returns JSON for client-side Excel generation
-// ══════════════════════════════════════════════════════════════════════════════
-exports.exportData = async (req, res) => {
+  return `
+  <div class="reimb-card" id="card-${r.id}">
+    <div class="reimb-card-header">
+      <div>
+        <div class="reimb-title">${escHtml(r.title)}</div>
+        <div class="reimb-meta">
+          ${r.employee_name ? `<b>${escHtml(r.employee_name)}</b> (${r.employee_code}) &nbsp;•&nbsp;` : ''}
+          ${r.department_name ? escHtml(r.department_name) + ' &nbsp;•&nbsp;' : ''}
+          ${formatDate(r.requested_at)}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:800;color:#1b4332">
+            ₹${approvedAmt.toLocaleString('en-IN')}
+            ${amtRevised ? `<span style="font-size:11px;color:#888;font-weight:400;display:block"><s>₹${totalAmt.toLocaleString('en-IN')}</s> revised</span>` : ''}
+          </div>
+        </div>
+        <span class="status-pill ${pillClass}">${r.status}</span>
+      </div>
+    </div>
+    <div class="reimb-card-body">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Category</th><th>Description</th><th>Date</th>
+            <th>Amount</th><th>Approved</th><th>Attachment</th>
+          </tr>
+        </thead>
+        <tbody>${itemRows || '<tr><td colspan="6" style="color:#aaa;text-align:center;padding:12px">No items</td></tr>'}</tbody>
+      </table>
+
+      <!-- ── Approval Pipeline ── -->
+      ${buildPipeline(r)}
+    </div>
+    ${actionButtons ? `<div class="action-row">${actionButtons}</div>` : ''}
+  </div>`;
+}
+
+// ── Apply Form ────────────────────────────────────────────────────────────────
+let itemCount = 0;
+let itemAttachments = {}; // { itemIndex: { data, name, mime, size } }
+
+function renderApplyForm() {
+  itemCount = 0;
+  itemAttachments = {};
+  document.getElementById('contentArea').innerHTML = `
+  <div class="form-section">
+    <h2>New Reimbursement Request</h2>
+    <div class="form-group">
+      <label>Request Title *</label>
+      <input id="reimbTitle" class="form-control" placeholder="e.g. Mumbai Client Visit – April 2026"/>
+    </div>
+    <div id="itemsContainer"></div>
+    <button class="btn btn-outline" style="margin-bottom:20px" onclick="addItem()">+ Add Expense Item</button>
+    <br/>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="submitReimb()">Submit Request</button>
+      <button class="btn btn-outline" onclick="showTab('my')">Cancel</button>
+    </div>
+  </div>`;
+  addItem(); // Start with one item
+}
+
+function addItem() {
+  const idx = itemCount++;
+  const container = document.getElementById('itemsContainer');
+  const div = document.createElement('div');
+  div.className = 'expense-item';
+  div.id = `item-${idx}`;
+  div.innerHTML = `
+    <div class="item-num">Expense #${idx + 1}</div>
+    ${idx > 0 ? `<button class="remove-item-btn" onclick="removeItem(${idx})" title="Remove">×</button>` : ''}
+    <div class="expense-grid">
+      <div class="form-group">
+        <label>Category *</label>
+        <select class="form-control" id="cat-${idx}">
+          <option value="travel">🚗 Travel</option>
+          <option value="food">🍽 Food</option>
+          <option value="accommodation">🏨 Accommodation</option>
+          <option value="miscellaneous">📦 Miscellaneous</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Expense Date *</label>
+        <input type="date" class="form-control" id="date-${idx}" value="${new Date().toISOString().slice(0,10)}"/>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Description *</label>
+        <input class="form-control" id="desc-${idx}" placeholder="e.g. Cab from office to airport"/>
+      </div>
+      <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" class="form-control" id="amt-${idx}" placeholder="0.00" min="0" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label>Attachment (Image/PDF)</label>
+        <input type="file" class="form-control" id="file-${idx}"
+               accept="image/*,application/pdf"
+               onchange="handleFileSelect(${idx}, this)"/>
+        <div id="filePreview-${idx}"></div>
+      </div>
+    </div>`;
+  container.appendChild(div);
+}
+
+function removeItem(idx) {
+  const el = document.getElementById(`item-${idx}`);
+  if (el) el.remove();
+  delete itemAttachments[idx];
+}
+
+function handleFileSelect(idx, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const base64 = e.target.result.split(',')[1];
+    itemAttachments[idx] = {
+      data: base64,
+      name: file.name,
+      mime: file.type,
+      size: file.size
+    };
+    const preview = document.getElementById(`filePreview-${idx}`);
+    preview.innerHTML = `<div class="attach-preview">📎 ${file.name} (${(file.size/1024).toFixed(1)} KB)</div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitReimb() {
+  const title = document.getElementById('reimbTitle')?.value?.trim();
+  if (!title) return alert('Please enter a request title');
+
+  const items = [];
+  let valid = true;
+  let i = 0;
+  while (i < itemCount) {
+    const itemEl = document.getElementById(`item-${i}`);
+    if (!itemEl) { i++; continue; }
+    const cat  = document.getElementById(`cat-${i}`)?.value;
+    const desc = document.getElementById(`desc-${i}`)?.value?.trim();
+    const amt  = parseFloat(document.getElementById(`amt-${i}`)?.value);
+    const date = document.getElementById(`date-${i}`)?.value;
+    if (!desc || !amt || amt <= 0 || !date) { valid = false; break; }
+    const att = itemAttachments[i] || {};
+    items.push({
+      category: cat, description: desc, amount: amt, expense_date: date,
+      attachment_data: att.data || null,
+      attachment_name: att.name || null,
+      attachment_mime: att.mime || null,
+      attachment_size: att.size || null
+    });
+    i++;
+  }
+
+  if (!valid || !items.length)
+    return alert('Please fill all expense item fields (description, amount, date)');
+
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
   try {
-    const { from, to, status } = req.query;
-    if (!from || !to)
-      return res.status(400).json({ success: false, message: 'from and to dates are required' });
-
-    let conds = [`r.requested_at::date >= $1`, `r.requested_at::date <= $2`];
-    let params = [from, to];
-    let idx = 3;
-
-    if (status && status !== 'all') {
-      conds.push(`r.status=$${idx++}`);
-      params.push(status);
+    const res = await api('POST', '/reimbursement/apply', { title, items: JSON.stringify(items) });
+    if (res?.success) {
+      alert('✅ Reimbursement submitted successfully!');
+      showTab('my');
+    } else {
+      alert('Error: ' + (res?.message || 'Failed'));
+      btn.disabled = false; btn.textContent = 'Submit Request';
     }
+  } catch {
+    alert('Network error'); btn.disabled = false; btn.textContent = 'Submit Request';
+  }
+}
 
-    const result = await db.query(
-      `SELECT
-         r.id, r.title, r.status, r.total_amount, r.approved_amount,
-         r.requested_at, r.approved_at, r.disbursed_at, r.remarks,
-         CONCAT(e.first_name,' ',e.last_name) AS employee_name,
-         e.employee_code, e.designation, e.mobile,
-         d.name AS department_name
-       FROM reimbursements r
-       JOIN employees e ON r.employee_id = e.id
-       LEFT JOIN departments d ON e.department_id = d.id
-       WHERE ${conds.join(' AND ')}
-       ORDER BY r.requested_at DESC`,
-      params
-    );
+// ── Review & Approve Modal ────────────────────────────────────────────────────
+function openRevisionModal(id) {
+  const reimb = allData.find(r => r.id === id);
+  if (!reimb) return;
 
-    // For each reimbursement, fetch its items (with attachment flag + item id for URL)
-    const ids = result.rows.map(r => r.id);
-    let itemsMap = {};
-    if (ids.length) {
-      const itemsRes = await db.query(
-        `SELECT id, reimbursement_id, category, description, amount, expense_date,
-                approved_amount, attachment_name, attachment_mime,
-                CASE WHEN attachment_data IS NOT NULL THEN true ELSE false END AS has_attachment
-         FROM reimbursement_items
-         WHERE reimbursement_id = ANY($1)
-         ORDER BY id`, [ids]
-      );
-      for (const item of itemsRes.rows) {
-        if (!itemsMap[item.reimbursement_id]) itemsMap[item.reimbursement_id] = [];
-        itemsMap[item.reimbursement_id].push(item);
+  const itemsHtml = (reimb.items || []).map((item, i) => `
+    <div class="revision-item-row">
+      <div>
+        <div class="desc">${catBadge(item.category)} ${escHtml(item.description)}</div>
+        <div class="orig">${formatDate(item.expense_date)} &nbsp;•&nbsp;
+          ${item.has_attachment
+            ? `<a href="#" onclick="viewAttachment(${item.id},'${escHtml(item.attachment_name||'file')}','${item.attachment_mime||''}');return false" style="color:#2d6a4f">📎 View Attachment</a>`
+            : 'No attachment'}
+        </div>
+      </div>
+      <div class="orig">₹${parseFloat(item.amount).toLocaleString('en-IN')}</div>
+      <div>
+        <input type="number" class="form-control" style="width:110px"
+               id="rev-item-${item.id}"
+               value="${parseFloat(item.amount)}"
+               min="0" step="0.01"
+               title="Approved amount (edit to revise)"/>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('revisionModalTitle').textContent =
+    `Review: ${reimb.title}`;
+  document.getElementById('revisionModalBody').innerHTML = `
+    <p style="font-size:13px;color:#666;margin-bottom:14px">
+      Employee: <b>${escHtml(reimb.employee_name||'')}</b> &nbsp;•&nbsp;
+      Requested: <b>₹${parseFloat(reimb.total_amount).toLocaleString('en-IN')}</b>
+    </p>
+    <div style="font-size:12px;font-weight:600;color:#555;display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:6px 0;border-bottom:2px solid #eee;margin-bottom:4px">
+      <span>Item</span><span>Requested</span><span>Approve ₹</span>
+    </div>
+    ${itemsHtml}
+    <div class="form-group" style="margin-top:16px">
+      <label>Remarks (optional)</label>
+      <input class="form-control" id="revRemarks" placeholder="Any notes for the employee"/>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-success" onclick="submitApproval(${id},'approve')">✅ Approve</button>
+      <button class="btn btn-danger"  onclick="submitApproval(${id},'reject')">❌ Reject</button>
+      <button class="btn btn-outline" onclick="closeModal('revisionModal')">Cancel</button>
+    </div>`;
+
+  document.getElementById('revisionModal').classList.add('open');
+}
+
+async function submitApproval(id, action) {
+  const reimb = allData.find(r => r.id === id);
+  if (!reimb) return;
+
+  const remarks = document.getElementById('revRemarks')?.value?.trim() || '';
+  const item_revisions = (reimb.items || []).map(item => ({
+    item_id: item.id,
+    approved_amount: parseFloat(document.getElementById(`rev-item-${item.id}`)?.value || item.amount)
+  }));
+
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Processing…';
+
+  try {
+    const res2 = await api('POST', `/reimbursement/${id}/action`,
+      { action, remarks, item_revisions });
+    const data = res2;
+    if (data?.success) {
+      closeModal('revisionModal');
+      alert('✅ ' + data.message);
+      loadReimbursements(currentTab);
+    } else {
+      alert('Error: ' + (data.message || 'Failed'));
+      btn.disabled = false; btn.textContent = action === 'approve' ? '✅ Approve' : '❌ Reject';
+    }
+  } catch {
+    alert('Network error'); btn.disabled = false;
+  }
+}
+
+// ── Reject quick ──────────────────────────────────────────────────────────────
+async function rejectReimb(id) {
+  const remarks = prompt('Reason for rejection (optional):') ?? null;
+  if (remarks === null) return;
+  try {
+    const res = await api('POST', `/reimbursement/${id}/action`, { action:'reject', remarks });
+    const d = res;
+    alert(d?.success ? '✅ Rejected' : 'Error: ' + d?.message);
+    loadReimbursements(currentTab);
+  } catch { alert('Network error'); }
+}
+
+// ── Revoke ────────────────────────────────────────────────────────────────────
+async function revokeReimb(id) {
+  if (!confirm('Revoke this reimbursement request?')) return;
+  try {
+    const res = await api('POST', `/reimbursement/${id}/revoke`);
+    const d = res;
+    alert(d.success ? '✅ Revoked' : 'Error: ' + d.message);
+    loadReimbursements(currentTab);
+  } catch { alert('Network error'); }
+}
+
+// ── Disburse ──────────────────────────────────────────────────────────────────
+async function disburseReimb(id) {
+  const remarks = prompt('Disbursement note (required):');
+  if (!remarks) return;
+  try {
+    const res = await api('POST', `/reimbursement/${id}/disburse`,
+      { remarks, payment_date: new Date().toISOString().slice(0,10) });
+    const d = res;
+    alert(d?.success ? '✅ Disbursed!' : 'Error: ' + d?.message);
+    loadReimbursements(currentTab);
+  } catch { alert('Network error'); }
+}
+
+// ── Approval Timeline ─────────────────────────────────────────────────────────
+async function viewTimeline(id) {
+  const reimb = allData.find(r => r.id === id);
+  if (!reimb) return;
+
+  // Show modal immediately with loading state
+  document.getElementById('revisionModalTitle').textContent = '📋 Approval Timeline';
+  document.getElementById('revisionModalBody').innerHTML = `
+    <p style="font-size:13px;color:#666;margin-bottom:16px">
+      <b>${escHtml(reimb.title)}</b> &nbsp;•&nbsp;
+      <span class="status-pill pill-${reimb.status}" style="font-size:11px">${reimb.status}</span>
+    </p>
+    <div style="text-align:center;padding:20px;color:#aaa">Loading…</div>`;
+  document.getElementById('revisionModal').classList.add('open');
+
+  try {
+    const res   = await api('GET', `/reimbursement/${id}/approvals`);
+    const doneSteps = res?.data || [];   // steps already acted on
+
+    // Parse approval_chain — may be array or JSON string
+    let chain = [];
+    if (Array.isArray(reimb.approval_chain)) chain = reimb.approval_chain;
+    else { try { chain = JSON.parse(reimb.approval_chain || '[]'); } catch(_){} }
+
+    const isRejected  = reimb.status === 'rejected';
+    const isDisbursed = reimb.status === 'disbursed';
+    const isApproved  = reimb.status === 'approved';
+    const currentLevel= parseInt(reimb.current_level) || 1;
+
+    const stepsHTML = chain.map((code, i) => {
+      const lvl      = i + 1;
+      const info     = codeLabel(code);
+      // Match done step by level index
+      const done     = doneSteps.find(s => s.level === lvl || s.level_label === code);
+      const isCurrent= !done && !isRejected && reimb.current_approver_code === code;
+
+      let bubbleClass = 'dot-wait', icon = String(lvl);
+      if (done) {
+        bubbleClass = done.action === 'approve' ? 'dot-done' : 'dot-rejected';
+        icon = done.action === 'approve' ? '✓' : '✗';
+      } else if (isCurrent) {
+        bubbleClass = 'dot-current';
+        icon = '⏳';
       }
+
+      const isYou = code === currentUser.employee_code;
+
+      return `
+      <div class="tl-step">
+        <div class="tl-connector ${i === 0 ? 'invisible' : ''}"></div>
+        <div class="tl-bubble ${bubbleClass}">${icon}</div>
+        <div class="tl-info">
+          <div class="tl-name">
+            ${info.icon} ${info.label}
+            ${isYou ? '<span class="tl-you">You</span>' : ''}
+            ${done ? `<span class="tl-actor">— ${escHtml(done.approver_name || code)}</span>` : ''}
+          </div>
+          <div class="tl-sub">
+            ${done
+              ? `<span class="tl-action ${done.action === 'approve' ? 'tl-approved' : 'tl-rejected-txt'}">
+                   ${done.action === 'approve' ? '✅ Approved' : '❌ Rejected'}
+                 </span>
+                 &nbsp;•&nbsp; ${formatDate(done.acted_at)}
+                 ${done.revised_amount && done.original_amount !== done.revised_amount
+                   ? ` &nbsp;•&nbsp; Revised ₹${parseFloat(done.original_amount).toLocaleString('en-IN')} → ₹${parseFloat(done.revised_amount).toLocaleString('en-IN')}`
+                   : ''}
+                 ${done.remarks ? `<div class="tl-remark">"${escHtml(done.remarks)}"</div>` : ''}`
+              : isCurrent
+                ? '<span class="tl-waiting">⏳ Awaiting approval</span>'
+                : '<span style="color:#bbb">Pending</span>'}
+          </div>
+        </div>
+      </div>`;
+    });
+
+    // Add final Accounts/Disburse step if not already last in chain
+    const lastCode = chain[chain.length - 1];
+    if (lastCode !== 'KC7708') {
+      const disbDone = isDisbursed;
+      stepsHTML.push(`
+      <div class="tl-step">
+        <div class="tl-connector"></div>
+        <div class="tl-bubble ${isDisbursed ? 'dot-disbursed' : isApproved ? 'dot-ready' : 'dot-wait'}">
+          ${isDisbursed ? '💰' : isApproved ? '🏦' : '🏦'}
+        </div>
+        <div class="tl-info">
+          <div class="tl-name">💸 Accounts &nbsp;<span class="tl-actor">— Disbursement</span></div>
+          <div class="tl-sub">
+            ${isDisbursed
+              ? '<span class="tl-approved">✅ Disbursed</span>'
+              : isApproved
+                ? '<span class="tl-waiting">Ready to disburse</span>'
+                : '<span style="color:#bbb">Pending</span>'}
+          </div>
+        </div>
+      </div>`);
     }
 
-    const data = result.rows.map(r => ({ ...r, items: itemsMap[r.id] || [] }));
-    res.json({ success: true, data, exported_at: new Date().toISOString() });
-  } catch (err) {
-    console.error('[reimbursement.exportData]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
+    document.getElementById('revisionModalBody').innerHTML = `
+      <p style="font-size:13px;color:#555;margin-bottom:18px">
+        <b>${escHtml(reimb.title)}</b>
+        &nbsp;•&nbsp;
+        ${reimb.employee_name ? escHtml(reimb.employee_name) + ' (' + (reimb.employee_code||'') + ')' : ''}
+        &nbsp;•&nbsp;
+        <span class="status-pill pill-${reimb.status}" style="font-size:11px">${reimb.status}</span>
+      </p>
+      <div class="tl-list">
+        ${stepsHTML.length ? stepsHTML.join('') : '<p style="color:#aaa;text-align:center;padding:20px">No approval chain found</p>'}
+      </div>
+      <div style="margin-top:18px">
+        <button class="btn btn-outline" onclick="closeModal('revisionModal')">Close</button>
+      </div>`;
 
-// ── Get approval log ──────────────────────────────────────────────────────────
-exports.getApprovals = async (req, res) => {
-  try {
-    const r = await db.query(
-      `SELECT ra.*, CONCAT(e.first_name,' ',e.last_name) AS approver_name
-       FROM reimbursement_approvals ra
-       JOIN employees e ON ra.approver_id=e.id
-       WHERE ra.reimbursement_id=$1 ORDER BY ra.level`, [req.params.id]
-    );
-    res.json({ success: true, data: r.rows });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+  } catch(err) {
+    document.getElementById('revisionModalBody').innerHTML =
+      `<p style="color:#c62828">Failed to load timeline.<br><small>${err.message}</small></p>
+       <button class="btn btn-outline" style="margin-top:12px" onclick="closeModal('revisionModal')">Close</button>`;
   }
-};
+}
+
+// ── Attachment Viewer ─────────────────────────────────────────────────────────
+async function viewAttachment(itemId, name, mime) {
+  document.getElementById('viewerTitle').textContent = '📎 ' + (name || 'Attachment');
+  document.getElementById('viewerBody').innerHTML = '<div style="text-align:center;padding:30px;color:#888">Loading…</div>';
+  document.getElementById('viewerModal').classList.add('open');
+
+  const url   = `${API_BASE}/reimbursement/item/${itemId}/attachment`;
+  const token = Auth.getToken();  // ← correct key: 'krishihr_token'
+
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob   = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const actualMime = blob.type || mime || '';
+
+    if (actualMime.startsWith('image/')) {
+      document.getElementById('viewerBody').innerHTML =
+        `<img src="${blobUrl}" style="max-width:100%;max-height:72vh;border-radius:8px;display:block;margin:0 auto" alt="${escHtml(name)}"/>
+         <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-outline btn-sm" style="margin-top:10px;display:inline-block">⬇ Download</a>`;
+    } else if (actualMime === 'application/pdf') {
+      document.getElementById('viewerBody').innerHTML =
+        `<iframe class="viewer-frame" src="${blobUrl}" style="width:100%;height:72vh;border:none;border-radius:8px"></iframe>
+         <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-outline btn-sm" style="margin-top:8px;display:inline-block">⬇ Download</a>`;
+    } else {
+      document.getElementById('viewerBody').innerHTML =
+        `<p style="color:#555;margin-bottom:12px">Cannot preview <b>${escHtml(name)}</b> in browser.</p>
+         <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-primary btn-sm">⬇ Download File</a>`;
+    }
+  } catch(err) {
+    document.getElementById('viewerBody').innerHTML =
+      `<p style="color:#c62828">Failed to load attachment. Please try again.<br><small>${err.message}</small></p>`;
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatDate(d) {
+  if (!d) return '—';
+  // Date-only strings like "2026-04-30" must NOT be parsed as UTC midnight
+  // (which would shift to previous day in IST). Treat them as local.
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(d));
+  const dt = isDateOnly ? new Date(d + 'T00:00:00') : new Date(d);
+  return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+</script>
+
+<!-- ── Export Modal ─────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="export-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>⬇ Export Reimbursements to Excel</h3>
+      <button class="modal-close" onclick="closeModal('export-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="form-label">From Date</label>
+          <input type="date" id="exp-from" class="form-control">
+        </div>
+        <div>
+          <label class="form-label">To Date</label>
+          <input type="date" id="exp-to" class="form-control">
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Status Filter</label>
+        <select id="exp-status" class="form-control">
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="disbursed">Disbursed</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:#666;margin:0;line-height:1.5">
+        Excel will contain two sheets: <strong>Summary</strong> (one row per reimbursement with employee details)
+        and <strong>Line Items</strong> (one row per expense item, with a direct attachment download link for each receipt/file).
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('export-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="runExport()" id="exp-go-btn">⬇ Download Excel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ── Show export button for privileged roles ───────────────────────────────────
+(function() {
+  if (['accounts','hr','super_admin'].includes(currentUser?.role)) {
+    const btn = document.getElementById('exportBtn');
+    if (btn) btn.style.display = '';
+  }
+})();
+
+// ── Open export modal with sensible defaults ──────────────────────────────────
+function openExportModal() {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  const today = now.toISOString().slice(0,10);
+  document.getElementById('exp-from').value   = firstOfMonth;
+  document.getElementById('exp-to').value     = today;
+  document.getElementById('exp-status').value = 'all';
+  document.getElementById('export-modal').classList.add('open');
+}
+
+// ── Run the export ────────────────────────────────────────────────────────────
+async function runExport() {
+  const from   = document.getElementById('exp-from').value;
+  const to     = document.getElementById('exp-to').value;
+  const status = document.getElementById('exp-status').value;
+
+  if (!from || !to) { alert('Please select both From and To dates.'); return; }
+  if (from > to)    { alert('"From" date must be before "To" date.'); return; }
+
+  const btn = document.getElementById('exp-go-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Preparing…';
+
+  try {
+    const res = await api('GET', `/reimbursement/export?from=${from}&to=${to}&status=${status}`);
+    if (!res?.success) throw new Error(res?.message || 'Export failed');
+    buildExcel(res.data, from, to, status);
+    closeModal('export-modal');
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ Download Excel';
+  }
+}
+
+// ── Build Excel with SheetJS (two sheets) ────────────────────────────────────
+function buildExcel(data, from, to, statusFilter) {
+  const wb      = XLSX.utils.book_new();
+  const baseUrl = window.location.origin;
+
+  // ── Sheet 1: Summary ─────────────────────────────────────────────────────
+  const summaryRows = data.map(r => ({
+    'Reimbursement ID'   : r.id,
+    'Employee Name'      : r.employee_name,
+    'Employee Code'      : r.employee_code,
+    'Department'         : r.department_name || '—',
+    'Designation'        : r.designation     || '—',
+    'Mobile'             : r.mobile          || '—',
+    'Title'              : r.title,
+    'Status'             : r.status,
+    'Requested Date'     : r.requested_at  ? new Date(r.requested_at).toLocaleDateString('en-IN')  : '—',
+    'Approved Date'      : r.approved_at   ? new Date(r.approved_at).toLocaleDateString('en-IN')   : '—',
+    'Disbursed Date'     : r.disbursed_at  ? new Date(r.disbursed_at).toLocaleDateString('en-IN')  : '—',
+    'Total Amount (₹)'   : parseFloat(r.total_amount    || 0),
+    'Approved Amount (₹)': parseFloat(r.approved_amount || 0),
+    'Remarks'            : r.remarks || '',
+    'No. of Items'       : (r.items || []).length,
+  }));
+
+  const ws1 = XLSX.utils.json_to_sheet(summaryRows.length ? summaryRows : [{ Note: 'No records found for the selected period.' }]);
+  ws1['!cols'] = [
+    {wch:7},{wch:24},{wch:14},{wch:20},{wch:20},{wch:14},
+    {wch:30},{wch:12},{wch:16},{wch:16},{wch:16},
+    {wch:16},{wch:20},{wch:30},{wch:6}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+  // ── Sheet 2: Line Items ───────────────────────────────────────────────────
+  const itemRows = [];
+  for (const r of data) {
+    const items = r.items || [];
+    if (!items.length) {
+      // still include the reimbursement even with no items
+      itemRows.push({
+        'Reimbursement ID': r.id, 'Employee Name': r.employee_name,
+        'Employee Code': r.employee_code, 'Department': r.department_name || '—',
+        'Designation': r.designation || '—', 'Mobile': r.mobile || '—',
+        'Reimbursement Title': r.title, 'Status': r.status,
+        'Category': '', 'Description': '', 'Expense Date': '',
+        'Item Amount (₹)': '', 'Approved Item Amt (₹)': '',
+        'Attachment File': '', 'Attachment Link': '',
+        'Requested Date': r.requested_at ? new Date(r.requested_at).toLocaleDateString('en-IN') : '—',
+      });
+      continue;
+    }
+    for (const item of items) {
+      itemRows.push({
+        'Reimbursement ID'     : r.id,
+        'Employee Name'        : r.employee_name,
+        'Employee Code'        : r.employee_code,
+        'Department'           : r.department_name || '—',
+        'Designation'          : r.designation     || '—',
+        'Mobile'               : r.mobile          || '—',
+        'Reimbursement Title'  : r.title,
+        'Status'               : r.status,
+        'Category'             : item.category     || '—',
+        'Description'          : item.description  || '',
+        'Expense Date'         : item.expense_date  ? new Date(item.expense_date).toLocaleDateString('en-IN') : '—',
+        'Item Amount (₹)'      : parseFloat(item.amount           || 0),
+        'Approved Item Amt (₹)': parseFloat(item.approved_amount  ?? item.amount ?? 0),
+        'Attachment File'      : item.attachment_name || '',
+        'Attachment Link'      : item.has_attachment
+                                   ? `${baseUrl}/reimbursement/item/${item.id}/attachment`
+                                   : '',
+        'Requested Date'       : r.requested_at ? new Date(r.requested_at).toLocaleDateString('en-IN') : '—',
+      });
+    }
+  }
+
+  const ws2 = XLSX.utils.json_to_sheet(itemRows.length ? itemRows : [{ Note: 'No items found for the selected period.' }]);
+  ws2['!cols'] = [
+    {wch:7},{wch:24},{wch:14},{wch:20},{wch:20},{wch:14},
+    {wch:30},{wch:12},{wch:14},{wch:34},{wch:14},
+    {wch:16},{wch:22},{wch:24},{wch:60},{wch:16}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Line Items');
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  const statusLabel = statusFilter === 'all'
+    ? 'All'
+    : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+  const filename = `KrishiHR_Reimbursements_${statusLabel}_${from}_to_${to}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  toast(`✅ Excel downloaded — ${data.length} reimbursement(s), ${itemRows.length} line item(s)`);
+}
+</script>
+</body>
+</html>
