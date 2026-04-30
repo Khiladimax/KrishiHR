@@ -1066,7 +1066,6 @@ function buildExcel(data, from, to, statusFilter) {
         'Original Amount (₹)': a.original_amount ? parseFloat(a.original_amount) : '—',
         'Revised Amount (₹)' : a.revised_amount  ? parseFloat(a.revised_amount)  : '—',
         'Remarks'            : a.remarks || '',
-        'Action Date & Time' : fmtDateTime(a.created_at),
       });
     }
     if (!(r.approvals || []).length) {
