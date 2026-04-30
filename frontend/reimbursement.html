@@ -152,6 +152,7 @@ select.form-control{background:#fff}
     </div>
     <div class="topbar-right">
       <button class="btn btn-primary btn-sm" onclick="showTab('apply')">+ New Request</button>
+      <button id="exportBtn" class="btn btn-outline btn-sm" onclick="openExportModal()" style="display:none">⬇ Export Excel</button>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
       <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
@@ -858,6 +859,185 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
 
+</script>
+
+<!-- ── Export Modal ─────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="export-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>⬇ Export Reimbursements to Excel</h3>
+      <button class="modal-close" onclick="closeModal('export-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="form-label">From Date</label>
+          <input type="date" id="exp-from" class="form-control">
+        </div>
+        <div>
+          <label class="form-label">To Date</label>
+          <input type="date" id="exp-to" class="form-control">
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Status Filter</label>
+        <select id="exp-status" class="form-control">
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="disbursed">Disbursed</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:#666;margin:0;line-height:1.5">
+        Excel will contain two sheets: <strong>Summary</strong> (one row per reimbursement with employee details)
+        and <strong>Line Items</strong> (one row per expense item, with a direct attachment download link for each receipt/file).
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('export-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="runExport()" id="exp-go-btn">⬇ Download Excel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ── Show export button for privileged roles ───────────────────────────────────
+(function() {
+  if (['accounts','hr','super_admin'].includes(currentUser?.role)) {
+    const btn = document.getElementById('exportBtn');
+    if (btn) btn.style.display = '';
+  }
+})();
+
+// ── Open export modal with sensible defaults ──────────────────────────────────
+function openExportModal() {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  const today = now.toISOString().slice(0,10);
+  document.getElementById('exp-from').value   = firstOfMonth;
+  document.getElementById('exp-to').value     = today;
+  document.getElementById('exp-status').value = 'all';
+  document.getElementById('export-modal').classList.add('open');
+}
+
+// ── Run the export ────────────────────────────────────────────────────────────
+async function runExport() {
+  const from   = document.getElementById('exp-from').value;
+  const to     = document.getElementById('exp-to').value;
+  const status = document.getElementById('exp-status').value;
+
+  if (!from || !to) { alert('Please select both From and To dates.'); return; }
+  if (from > to)    { alert('"From" date must be before "To" date.'); return; }
+
+  const btn = document.getElementById('exp-go-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Preparing…';
+
+  try {
+    const res = await api('GET', `/reimbursement/export?from=${from}&to=${to}&status=${status}`);
+    if (!res?.success) throw new Error(res?.message || 'Export failed');
+    buildExcel(res.data, from, to, status);
+    closeModal('export-modal');
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ Download Excel';
+  }
+}
+
+// ── Build Excel with SheetJS (two sheets) ────────────────────────────────────
+function buildExcel(data, from, to, statusFilter) {
+  const wb      = XLSX.utils.book_new();
+  const baseUrl = window.location.origin;
+
+  // ── Sheet 1: Summary ─────────────────────────────────────────────────────
+  const summaryRows = data.map(r => ({
+    'Reimbursement ID'   : r.id,
+    'Employee Name'      : r.employee_name,
+    'Employee Code'      : r.employee_code,
+    'Department'         : r.department_name || '—',
+    'Designation'        : r.designation     || '—',
+    'Mobile'             : r.mobile          || '—',
+    'Title'              : r.title,
+    'Status'             : r.status,
+    'Requested Date'     : r.requested_at  ? new Date(r.requested_at).toLocaleDateString('en-IN')  : '—',
+    'Approved Date'      : r.approved_at   ? new Date(r.approved_at).toLocaleDateString('en-IN')   : '—',
+    'Disbursed Date'     : r.disbursed_at  ? new Date(r.disbursed_at).toLocaleDateString('en-IN')  : '—',
+    'Total Amount (₹)'   : parseFloat(r.total_amount    || 0),
+    'Approved Amount (₹)': parseFloat(r.approved_amount || 0),
+    'Remarks'            : r.remarks || '',
+    'No. of Items'       : (r.items || []).length,
+  }));
+
+  const ws1 = XLSX.utils.json_to_sheet(summaryRows.length ? summaryRows : [{ Note: 'No records found for the selected period.' }]);
+  ws1['!cols'] = [
+    {wch:7},{wch:24},{wch:14},{wch:20},{wch:20},{wch:14},
+    {wch:30},{wch:12},{wch:16},{wch:16},{wch:16},
+    {wch:16},{wch:20},{wch:30},{wch:6}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+  // ── Sheet 2: Line Items ───────────────────────────────────────────────────
+  const itemRows = [];
+  for (const r of data) {
+    const items = r.items || [];
+    if (!items.length) {
+      // still include the reimbursement even with no items
+      itemRows.push({
+        'Reimbursement ID': r.id, 'Employee Name': r.employee_name,
+        'Employee Code': r.employee_code, 'Department': r.department_name || '—',
+        'Designation': r.designation || '—', 'Mobile': r.mobile || '—',
+        'Reimbursement Title': r.title, 'Status': r.status,
+        'Category': '', 'Description': '', 'Expense Date': '',
+        'Item Amount (₹)': '', 'Approved Item Amt (₹)': '',
+        'Attachment File': '', 'Attachment Link': '',
+        'Requested Date': r.requested_at ? new Date(r.requested_at).toLocaleDateString('en-IN') : '—',
+      });
+      continue;
+    }
+    for (const item of items) {
+      itemRows.push({
+        'Reimbursement ID'     : r.id,
+        'Employee Name'        : r.employee_name,
+        'Employee Code'        : r.employee_code,
+        'Department'           : r.department_name || '—',
+        'Designation'          : r.designation     || '—',
+        'Mobile'               : r.mobile          || '—',
+        'Reimbursement Title'  : r.title,
+        'Status'               : r.status,
+        'Category'             : item.category     || '—',
+        'Description'          : item.description  || '',
+        'Expense Date'         : item.expense_date  ? new Date(item.expense_date).toLocaleDateString('en-IN') : '—',
+        'Item Amount (₹)'      : parseFloat(item.amount           || 0),
+        'Approved Item Amt (₹)': parseFloat(item.approved_amount  ?? item.amount ?? 0),
+        'Attachment File'      : item.attachment_name || '',
+        'Attachment Link'      : item.has_attachment
+                                   ? `${baseUrl}/reimbursement/item/${item.id}/attachment`
+                                   : '',
+        'Requested Date'       : r.requested_at ? new Date(r.requested_at).toLocaleDateString('en-IN') : '—',
+      });
+    }
+  }
+
+  const ws2 = XLSX.utils.json_to_sheet(itemRows.length ? itemRows : [{ Note: 'No items found for the selected period.' }]);
+  ws2['!cols'] = [
+    {wch:7},{wch:24},{wch:14},{wch:20},{wch:20},{wch:14},
+    {wch:30},{wch:12},{wch:14},{wch:34},{wch:14},
+    {wch:16},{wch:22},{wch:24},{wch:60},{wch:16}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Line Items');
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  const statusLabel = statusFilter === 'all'
+    ? 'All'
+    : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+  const filename = `KrishiHR_Reimbursements_${statusLabel}_${from}_to_${to}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  toast(`✅ Excel downloaded — ${data.length} reimbursement(s), ${itemRows.length} line item(s)`);
+}
 </script>
 </body>
 </html>
