@@ -402,6 +402,65 @@ exports.action = async (req, res) => {
   } finally { client.release(); }
 };
 
+// ── Edit & Resubmit (employee edits a pending request) ───────────────────────
+exports.edit = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const { id } = req.params;
+    const empId = req.user.id;
+    const { title, items } = req.body;
+
+    const r = await client.query(`SELECT * FROM reimbursements WHERE id=$1`, [id]);
+    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+    if (r.rows[0].employee_id !== empId)
+      return res.status(403).json({ success: false, message: 'Not your request' });
+    if (r.rows[0].status !== 'pending')
+      return res.status(400).json({ success: false, message: 'Can only edit pending requests' });
+
+    if (!title || !title.trim())
+      return res.status(400).json({ success: false, message: 'Title is required' });
+
+    let parsedItems = [];
+    try { parsedItems = typeof items === 'string' ? JSON.parse(items) : (items || []); }
+    catch (_) { return res.status(400).json({ success: false, message: 'Invalid items JSON' }); }
+    if (!parsedItems.length)
+      return res.status(400).json({ success: false, message: 'At least one expense item is required' });
+
+    const total = parsedItems.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+
+    // Update header
+    await client.query(
+      `UPDATE reimbursements SET title=$1, total_amount=$2, approved_amount=$2, updated_at=NOW() WHERE id=$3`,
+      [title.trim(), total, id]
+    );
+
+    // Replace all items
+    await client.query(`DELETE FROM reimbursement_items WHERE reimbursement_id=$1`, [id]);
+    for (const item of parsedItems) {
+      await client.query(
+        `INSERT INTO reimbursement_items
+           (reimbursement_id, category, description, amount, expense_date,
+            attachment_data, attachment_name, attachment_mime, attachment_size)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [id, item.category, item.description,
+         parseFloat(item.amount), item.expense_date,
+         item.attachment_data || null,
+         item.attachment_name || null,
+         item.attachment_mime || null,
+         item.attachment_size || null]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Reimbursement updated successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[reimbursement.edit]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally { client.release(); }
+};
+
 // ── Process disbursement (Accounts) — POST /reimbursement/:id/disburse ────────
 exports.disburse = async (req, res) => {
   const client = await db.getClient();
