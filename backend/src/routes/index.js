@@ -192,6 +192,17 @@ router.post('/advance/:id/edit',             authenticate, advCtrl.edit);
 router.post('/advance/:id/process-payment',  authenticate, authorize('accounts'), advCtrl.processPayment);
 router.get ('/advance/:id/approvals',        authenticate, advCtrl.getApprovals);
 
+// ── Reimbursement ─────────────────────────────────────────────────────────────
+const reimbCtrl = require('../controllers/reimbursementController');
+router.post  ('/reimbursement/apply',               authenticate, reimbCtrl.apply);
+router.get   ('/reimbursement',                     authenticate, reimbCtrl.getAll);
+router.post  ('/reimbursement/:id/action',          authenticate, reimbCtrl.action);
+router.post  ('/reimbursement/:id/revoke',          authenticate, reimbCtrl.revoke);
+router.post  ('/reimbursement/:id/disburse',        authenticate, authorize('accounts'), reimbCtrl.disburse);
+router.get   ('/reimbursement/:id/approvals',       authenticate, reimbCtrl.getApprovals);
+router.post  ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.uploadMiddleware, reimbCtrl.uploadAttachment);
+router.get   ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.getAttachment);
+
 // ── Payroll ───────────────────────────────────────────────────────────────────
 router.get ('/payroll',              authenticate,                     payCtrl.getPayroll);
 router.get ('/payroll/payslip',      authenticate,                     payCtrl.getPayslip);
