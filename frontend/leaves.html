@@ -87,23 +87,52 @@
           <div style="font-size:12px;color:var(--muted)">Auto-credited when you work on holidays or weekends</div>
         </div>
         <!-- Balance summary strip -->
-        <div id="co-balance-strip" style="display:flex;gap:16px;padding:16px 20px;background:#fffbeb;border-bottom:1px solid #fde68a;flex-wrap:wrap">
-          <div style="text-align:center;min-width:80px">
-            <div style="font-size:22px;font-weight:700;color:#92400e" id="co-avail-big">—</div>
-            <div style="font-size:11px;color:#b45309;font-weight:600">AVAILABLE</div>
+        <div id="co-balance-strip" style="padding:20px 24px;background:linear-gradient(135deg,#fffbeb 0%,#fef9ec 100%);border-bottom:1px solid #fde68a">
+          <!-- Stats row -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+            <div style="flex:1;min-width:100px;background:#fff;border-radius:12px;padding:16px 20px;border:1.5px solid #fde68a;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+              <div style="font-size:28px;font-weight:800;color:#d97706;line-height:1" id="co-avail-big">—</div>
+              <div style="font-size:11px;color:#b45309;font-weight:700;margin-top:4px;letter-spacing:0.5px">AVAILABLE</div>
+            </div>
+            <div style="flex:1;min-width:100px;background:#fff;border-radius:12px;padding:16px 20px;border:1.5px solid #a7f3d0;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+              <div style="font-size:28px;font-weight:800;color:#059669;line-height:1" id="co-earned-big">—</div>
+              <div style="font-size:11px;color:#065f46;font-weight:700;margin-top:4px;letter-spacing:0.5px">TOTAL EARNED</div>
+            </div>
+            <div style="flex:1;min-width:100px;background:#fff;border-radius:12px;padding:16px 20px;border:1.5px solid #e5e7eb;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+              <div style="font-size:28px;font-weight:800;color:#6b7280;line-height:1" id="co-used-big">—</div>
+              <div style="font-size:11px;color:#6b7280;font-weight:700;margin-top:4px;letter-spacing:0.5px">USED</div>
+            </div>
           </div>
-          <div style="text-align:center;min-width:80px">
-            <div style="font-size:22px;font-weight:700;color:#065f46" id="co-earned-big">—</div>
-            <div style="font-size:11px;color:#065f46;font-weight:600">TOTAL EARNED</div>
-          </div>
-          <div style="text-align:center;min-width:80px">
-            <div style="font-size:22px;font-weight:700;color:#6b7280" id="co-used-big">—</div>
-            <div style="font-size:11px;color:#6b7280;font-weight:600">USED</div>
-          </div>
-          <div style="margin-left:auto;align-self:center;font-size:12px;color:#92400e;background:#fef3c7;border-radius:6px;padding:6px 12px;line-height:1.5">
-            💡 Comp Off is auto-credited when you punch out on a public holiday or weekend (Sat/Sun).<br>
-            <strong>8+ hrs</strong> = 1 full day &nbsp;|&nbsp; <strong>4–7.99 hrs</strong> = 0.5 day &nbsp;|&nbsp; <strong>&lt;4 hrs</strong> = no credit.<br>
-            Apply it as leave from the <strong>+ Apply Leave</strong> button → <em>Comp Off</em>.
+          <!-- Rules row -->
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 14px;border:1px solid #fde68a">
+              <span style="font-size:20px">🌟</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#92400e">Full Day</div>
+                <div style="font-size:11px;color:#b45309">8+ hours worked</div>
+              </div>
+            </div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 14px;border:1px solid #fde68a">
+              <span style="font-size:20px">✨</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#92400e">Half Day</div>
+                <div style="font-size:11px;color:#b45309">4 – 7.99 hours worked</div>
+              </div>
+            </div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 14px;border:1px solid #fde68a">
+              <span style="font-size:20px">❌</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#92400e">No Credit</div>
+                <div style="font-size:11px;color:#b45309">Under 4 hours</div>
+              </div>
+            </div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 14px;border:1px solid #fde68a">
+              <span style="font-size:20px">📅</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#92400e">Expires In</div>
+                <div style="font-size:11px;color:#b45309">30 days from work date</div>
+              </div>
+            </div>
           </div>
         </div>
         <div id="co-credits-list" style="padding:8px 0">
@@ -815,10 +844,10 @@ async function loadCompOffCredits() {
   // Render credits table
   const el = document.getElementById('co-credits-list');
   if (!credRes?.success || !credRes.data.length) {
-    el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted)">
-      <div style="font-size:40px;margin-bottom:12px">🔄</div>
-      <div style="font-weight:600;margin-bottom:6px">No comp off credits yet</div>
-      <div style="font-size:13px">Work on a holiday or weekend and punch out — <strong>8+ hrs</strong> earns 1 full day, <strong>4–7.99 hrs</strong> earns 0.5 day, under 4 hrs gets no credit.</div>
+    el.innerHTML = `<div style="text-align:center;padding:48px 24px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">🗓️</div>
+      <div style="font-weight:700;font-size:15px;color:#374151;margin-bottom:6px">No comp off credits yet</div>
+      <div style="font-size:13px;color:#6b7280;max-width:340px;margin:0 auto;line-height:1.6">Work on a holiday or weekend — <strong>8+ hrs</strong> earns 1 full day, <strong>4–7.99 hrs</strong> earns 0.5 day. Credits are auto-added after you punch out.</div>
     </div>`;
     return;
   }
