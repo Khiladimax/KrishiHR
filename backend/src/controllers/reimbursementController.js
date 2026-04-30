@@ -457,6 +457,66 @@ exports.revoke = async (req, res) => {
   }
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT — GET /reimbursement/export?from=YYYY-MM-DD&to=YYYY-MM-DD&status=all
+// Accounts/HR/super_admin only — returns JSON for client-side Excel generation
+// ══════════════════════════════════════════════════════════════════════════════
+exports.exportData = async (req, res) => {
+  try {
+    const { from, to, status } = req.query;
+    if (!from || !to)
+      return res.status(400).json({ success: false, message: 'from and to dates are required' });
+
+    let conds = [`r.requested_at::date >= $1`, `r.requested_at::date <= $2`];
+    let params = [from, to];
+    let idx = 3;
+
+    if (status && status !== 'all') {
+      conds.push(`r.status=$${idx++}`);
+      params.push(status);
+    }
+
+    const result = await db.query(
+      `SELECT
+         r.id, r.title, r.status, r.total_amount, r.approved_amount,
+         r.requested_at, r.approved_at, r.disbursed_at, r.remarks,
+         CONCAT(e.first_name,' ',e.last_name) AS employee_name,
+         e.employee_code, e.designation, e.mobile,
+         d.name AS department_name
+       FROM reimbursements r
+       JOIN employees e ON r.employee_id = e.id
+       LEFT JOIN departments d ON e.department_id = d.id
+       WHERE ${conds.join(' AND ')}
+       ORDER BY r.requested_at DESC`,
+      params
+    );
+
+    // For each reimbursement, fetch its items (with attachment flag + item id for URL)
+    const ids = result.rows.map(r => r.id);
+    let itemsMap = {};
+    if (ids.length) {
+      const itemsRes = await db.query(
+        `SELECT id, reimbursement_id, category, description, amount, expense_date,
+                approved_amount, attachment_name, attachment_mime,
+                CASE WHEN attachment_data IS NOT NULL THEN true ELSE false END AS has_attachment
+         FROM reimbursement_items
+         WHERE reimbursement_id = ANY($1)
+         ORDER BY id`, [ids]
+      );
+      for (const item of itemsRes.rows) {
+        if (!itemsMap[item.reimbursement_id]) itemsMap[item.reimbursement_id] = [];
+        itemsMap[item.reimbursement_id].push(item);
+      }
+    }
+
+    const data = result.rows.map(r => ({ ...r, items: itemsMap[r.id] || [] }));
+    res.json({ success: true, data, exported_at: new Date().toISOString() });
+  } catch (err) {
+    console.error('[reimbursement.exportData]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── Get approval log ──────────────────────────────────────────────────────────
 exports.getApprovals = async (req, res) => {
   try {
