@@ -519,7 +519,6 @@ exports.exportData = async (req, res) => {
       const appRes = await db.query(
         `SELECT ra.reimbursement_id, ra.level, ra.level_label,
                 ra.action, ra.remarks, ra.original_amount, ra.revised_amount,
-                ra.created_at,
                 CONCAT(e.first_name,' ',e.last_name) AS approver_name,
                 e.employee_code AS approver_code
          FROM reimbursement_approvals ra
