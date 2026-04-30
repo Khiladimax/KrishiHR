@@ -772,6 +772,37 @@ cron.schedule('5 0 * * *', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
+// ── Reimbursement Auto-Delete Cron ───────────────────────────────────────────
+// Rejected: deleted after 24 hours | Approved: deleted after 6 months
+cron.schedule('0 * * * *', async () => {
+  console.log('⏰ Running reimbursement auto-cleanup...');
+  try {
+    // Delete rejected reimbursements older than 24 hours
+    const rejectedResult = await db.query(`
+      DELETE FROM reimbursements
+      WHERE status = 'rejected'
+        AND updated_at < NOW() - INTERVAL '24 hours'
+      RETURNING id
+    `);
+
+    // Delete approved reimbursements older than 6 months
+    const approvedResult = await db.query(`
+      DELETE FROM reimbursements
+      WHERE status = 'approved'
+        AND approved_at < NOW() - INTERVAL '6 months'
+      RETURNING id
+    `);
+
+    const rCount = rejectedResult.rowCount;
+    const aCount = approvedResult.rowCount;
+    if (rCount > 0) console.log(`🗑️ Deleted ${rCount} rejected reimbursement(s) (>24h old)`);
+    if (aCount > 0) console.log(`🗑️ Deleted ${aCount} approved reimbursement(s) (>6 months old)`);
+    if (rCount === 0 && aCount === 0) console.log('✅ No reimbursements to clean up');
+  } catch (err) {
+    console.error('❌ Reimbursement auto-cleanup cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
 start();
 
 // ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
