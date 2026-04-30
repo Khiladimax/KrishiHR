@@ -264,9 +264,10 @@ exports.autoGrantForDate = async (dateStr) => {
   // get it as a holiday bonus — but actually both policies get holiday COMPOFF regardless
   // So saturdayPolicyFilter stays null for holidays (both policies eligible)
 
-  // Get all active employees who punched in on this date
+  // Get all active employees who punched in on this date, including hours worked
   let query = `
-    SELECT a.employee_id, e.saturday_policy
+    SELECT a.employee_id, e.saturday_policy,
+           COALESCE(a.working_hours, 0) AS working_hours
     FROM attendance a
     JOIN employees e ON a.employee_id = e.id
     WHERE a.date = $1
@@ -294,10 +295,29 @@ exports.autoGrantForDate = async (dateStr) => {
   const expiryDate = new Date(date);
   expiryDate.setDate(expiryDate.getDate() + 30); // 30-day expiry
 
-  let granted = 0, skipped = 0;
+  let granted = 0, skipped = 0, insufficient = 0;
 
   for (const row of attendees.rows) {
-    const empId = row.employee_id;
+    const empId       = row.employee_id;
+    const hoursWorked = parseFloat(row.working_hours) || 0;
+
+    // ── Determine days to credit based on hours worked ────────────────────────
+    // < 4 hours  → no compoff
+    // 4–7.99 hrs → 0.5 day (half day)
+    // 8+ hours   → 1.0 day (full day)
+    let daysToCredit = 0;
+    let hoursLabel   = '';
+    if (hoursWorked >= 8) {
+      daysToCredit = 1.00;
+      hoursLabel   = 'full day';
+    } else if (hoursWorked >= 4) {
+      daysToCredit = 0.50;
+      hoursLabel   = 'half day';
+    } else {
+      console.log(`[COMPOFF CRON] emp ${empId} worked only ${hoursWorked}h on ${dateStr} — no compoff`);
+      insufficient++;
+      continue;
+    }
 
     // Skip if already credited for this date (UNIQUE constraint guard)
     const exists = await db.query(
@@ -310,25 +330,29 @@ exports.autoGrantForDate = async (dateStr) => {
     await db.query(
       `INSERT INTO compoff_credits
          (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, expiry_date, remarks, status)
-       VALUES ($1, $2, $3, $4, 1.00, NULL, $5, 'Auto-granted by system', 'available')`,
-      [empId, dateStr, workedType, holidayName, expiryDate.toISOString().split('T')[0]]
+       VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, 'available')`,
+      [
+        empId, dateStr, workedType, holidayName, daysToCredit,
+        expiryDate.toISOString().split('T')[0],
+        `Auto-granted by system (${hoursWorked.toFixed(2)}h worked = ${hoursLabel})`
+      ]
     );
 
     // Update leave_balances so the existing leave apply flow works
     if (ltId) {
       await db.query(
         `INSERT INTO leave_balances (employee_id, leave_type_id, year, allocated)
-         VALUES ($1, $2, $3, 1)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT (employee_id, leave_type_id, year)
-         DO UPDATE SET allocated = leave_balances.allocated + 1`,
-        [empId, ltId, year]
+         DO UPDATE SET allocated = leave_balances.allocated + $4`,
+        [empId, ltId, year, daysToCredit]
       );
     }
 
     granted++;
   }
 
-  console.log(`[COMPOFF CRON] ${dateStr} (${workedType}${holidayName ? ': ' + holidayName : ''}) — granted: ${granted}, skipped: ${skipped}`);
+  console.log(`[COMPOFF CRON] ${dateStr} (${workedType}${holidayName ? ': ' + holidayName : ''}) — granted: ${granted}, skipped: ${skipped}, insufficient hours: ${insufficient}`);
   return { granted, skipped };
 };
 
