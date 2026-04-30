@@ -50,11 +50,16 @@
 select.form-control{background:#fff}
 
 /* ── Expense item block ── */
-.expense-item{background:#f9fafb;border:1.5px solid #e0e0e0;border-radius:12px;padding:16px;margin-bottom:14px;position:relative}
-.expense-item .item-num{font-size:12px;font-weight:700;color:#2d6a4f;margin-bottom:10px}
-.expense-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.expense-item{background:#f9fafb;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 12px;margin-bottom:8px;position:relative}
+.expense-item .item-num{font-size:11px;font-weight:700;color:#2d6a4f;margin-bottom:6px}
+.expense-grid{display:grid;grid-template-columns:140px 130px 1fr 110px 170px 24px;gap:8px;align-items:end}
+@media(max-width:900px){.expense-grid{grid-template-columns:1fr 1fr;gap:10px}}
 @media(max-width:600px){.expense-grid{grid-template-columns:1fr}}
-.remove-item-btn{position:absolute;top:12px;right:12px;background:none;border:none;color:#c62828;font-size:18px;cursor:pointer;line-height:1}
+.expense-grid .form-group{margin-bottom:0}
+.expense-grid .form-group label{display:none}
+.expense-grid .form-control{padding:6px 8px;font-size:13px;height:34px}
+.expense-grid select.form-control{padding:6px 4px}
+.remove-item-btn{background:none;border:none;color:#c62828;font-size:20px;cursor:pointer;line-height:1;padding:0 0 4px 0;align-self:end}
 
 /* ── Attachment preview ── */
 .attach-preview{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:8px;font-size:12px;color:#2e7d32;cursor:pointer}
@@ -450,8 +455,16 @@ function renderApplyForm() {
       <label>Request Title *</label>
       <input id="reimbTitle" class="form-control" placeholder="e.g. Mumbai Client Visit – April 2026"/>
     </div>
+    <div style="display:grid;grid-template-columns:140px 130px 1fr 110px 170px 24px;gap:8px;padding:0 12px;margin-bottom:4px" id="itemsHeader">
+      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Category</div>
+      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Date</div>
+      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Description</div>
+      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Amount (₹)</div>
+      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Attachment</div>
+      <div></div>
+    </div>
     <div id="itemsContainer"></div>
-    <button class="btn btn-outline" style="margin-bottom:20px" onclick="addItem()">+ Add Expense Item</button>
+    <button class="btn btn-outline" style="margin-bottom:20px;margin-top:4px" onclick="addItem()">+ Add Row</button>
     <br/>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="submitReimb()">Submit Request</button>
@@ -468,8 +481,6 @@ function addItem() {
   div.className = 'expense-item';
   div.id = `item-${idx}`;
   div.innerHTML = `
-    <div class="item-num">Expense #${idx + 1}</div>
-    ${idx > 0 ? `<button class="remove-item-btn" onclick="removeItem(${idx})" title="Remove">×</button>` : ''}
     <div class="expense-grid">
       <div class="form-group">
         <label>Category *</label>
@@ -481,10 +492,10 @@ function addItem() {
         </select>
       </div>
       <div class="form-group">
-        <label>Expense Date *</label>
+        <label>Date *</label>
         <input type="date" class="form-control" id="date-${idx}" value="${new Date().toISOString().slice(0,10)}"/>
       </div>
-      <div class="form-group" style="grid-column:1/-1">
+      <div class="form-group">
         <label>Description *</label>
         <input class="form-control" id="desc-${idx}" placeholder="e.g. Cab from office to airport"/>
       </div>
@@ -493,12 +504,13 @@ function addItem() {
         <input type="number" class="form-control" id="amt-${idx}" placeholder="0.00" min="0" step="0.01"/>
       </div>
       <div class="form-group">
-        <label>Attachment (Image/PDF)</label>
-        <input type="file" class="form-control" id="file-${idx}"
+        <label>Attachment</label>
+        <input type="file" class="form-control" id="file-${idx}" style="height:34px;padding:4px 6px;font-size:11px"
                accept="image/*,application/pdf"
                onchange="handleFileSelect(${idx}, this)"/>
-        <div id="filePreview-${idx}"></div>
+        <div id="filePreview-${idx}" style="margin-top:2px"></div>
       </div>
+      ${idx > 0 ? `<button class="remove-item-btn" onclick="removeItem(${idx})" title="Remove row">×</button>` : '<div></div>'}
     </div>`;
   container.appendChild(div);
 }
