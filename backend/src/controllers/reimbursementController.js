@@ -468,13 +468,12 @@ exports.exportData = async (req, res) => {
     if (!from || !to)
       return res.status(400).json({ success: false, message: 'from and to dates are required' });
 
-    let conds = [`r.requested_at >= $1::date`, `r.requested_at < ($2::date + INTERVAL '1 day')`];
-    let params = [from, to];
-    let idx = 3;
-
+    // Build params and conditions
+    const params = [from, to];
+    let statusCond = '';
     if (status && status !== 'all') {
-      conds.push(`r.status=$${idx++}`);
       params.push(status);
+      statusCond = `AND r.status = $3`;
     }
 
     const result = await db.query(
@@ -487,7 +486,8 @@ exports.exportData = async (req, res) => {
        FROM reimbursements r
        JOIN employees e ON r.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
-       WHERE ${conds.join(' AND ')}
+       WHERE r.requested_at::date BETWEEN $1 AND $2
+       ${statusCond}
        ORDER BY r.requested_at DESC`,
       params
     );
@@ -515,7 +515,7 @@ exports.exportData = async (req, res) => {
     res.json({ success: true, data, exported_at: new Date().toISOString() });
   } catch (err) {
     console.error('[reimbursement.exportData]', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 };
 
