@@ -114,6 +114,7 @@ select.form-control{background:#fff}
 </style>
 </head>
 <body>
+<script src="app.js"></script>
 
 <!-- ── Navigation injected by app.js ── -->
 <div id="nav-placeholder"></div>
@@ -165,47 +166,17 @@ select.form-control{background:#fff}
 </div>
 
 <script>
-const API = '/api';
-let currentUser = null;
 let currentTab  = 'my';
 let allData     = [];
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-async function apiCall(method, path, body = null, isFormData = false) {
-  const token = localStorage.getItem('token');
-  const opts  = {
-    method,
-    headers: { 'Authorization': 'Bearer ' + token }
-  };
-  if (body && !isFormData) {
-    opts.headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(body);
-  } else if (body && isFormData) {
-    opts.body = body; // FormData
-  }
-  const res = await fetch(API + path, opts);
-  return res;
-}
+Auth.guard();
+const currentUser = Auth.getUser();
 
-async function init() {
-  const token = localStorage.getItem('token');
-  if (!token) return location.href = 'login.html';
-  try {
-    const r = await apiCall('GET', '/auth/me');
-    if (!r.ok) throw new Error();
-    currentUser = (await r.json()).data;
-  } catch {
-    localStorage.removeItem('token');
-    location.href = 'login.html';
-    return;
-  }
+// Show tabs based on role
+const canSeeAll = ['hr','super_admin','admin','accounts'].includes(currentUser.role);
+if (!canSeeAll) document.getElementById('tab-all').style.display = 'none';
 
-  // Show tabs based on role
-  const canSeeAll = ['hr','super_admin','admin','accounts'].includes(currentUser.role);
-  if (!canSeeAll) document.getElementById('tab-all').style.display = 'none';
-
-  showTab('my');
-}
+showTab('my');
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function showTab(tab) {
@@ -229,8 +200,8 @@ async function loadReimbursements(tab) {
   try {
     let url = '/reimbursement';
     if (tab === 'my') url += `?employee_id=${currentUser.id}`;
-    const r = await apiCall('GET', url);
-    const data = (await r.json()).data || [];
+    const res = await api('GET', url);
+    const data = res?.data || [];
 
     allData = data;
 
@@ -484,13 +455,12 @@ async function submitReimb() {
   btn.disabled = true; btn.textContent = 'Submitting…';
 
   try {
-    const r = await apiCall('POST', '/reimbursement/apply', { title, items: JSON.stringify(items) });
-    const data = await r.json();
-    if (data.success) {
+    const res = await api('POST', '/reimbursement/apply', { title, items: JSON.stringify(items) });
+    if (res?.success) {
       alert('✅ Reimbursement submitted successfully!');
       showTab('my');
     } else {
-      alert('Error: ' + (data.message || 'Failed'));
+      alert('Error: ' + (res?.message || 'Failed'));
       btn.disabled = false; btn.textContent = 'Submit Request';
     }
   } catch {
@@ -561,10 +531,10 @@ async function submitApproval(id, action) {
   btn.disabled = true; btn.textContent = 'Processing…';
 
   try {
-    const r = await apiCall('POST', `/reimbursement/${id}/action`,
+    const res2 = await api('POST', `/reimbursement/${id}/action`,
       { action, remarks, item_revisions });
-    const data = await r.json();
-    if (data.success) {
+    const data = res2;
+    if (data?.success) {
       closeModal('revisionModal');
       alert('✅ ' + data.message);
       loadReimbursements(currentTab);
@@ -582,9 +552,9 @@ async function rejectReimb(id) {
   const remarks = prompt('Reason for rejection (optional):') ?? null;
   if (remarks === null) return;
   try {
-    const r = await apiCall('POST', `/reimbursement/${id}/action`, { action:'reject', remarks });
-    const d = await r.json();
-    alert(d.success ? '✅ Rejected' : 'Error: ' + d.message);
+    const res = await api('POST', `/reimbursement/${id}/action`, { action:'reject', remarks });
+    const d = res;
+    alert(d?.success ? '✅ Rejected' : 'Error: ' + d?.message);
     loadReimbursements(currentTab);
   } catch { alert('Network error'); }
 }
@@ -593,8 +563,8 @@ async function rejectReimb(id) {
 async function revokeReimb(id) {
   if (!confirm('Revoke this reimbursement request?')) return;
   try {
-    const r = await apiCall('POST', `/reimbursement/${id}/revoke`);
-    const d = await r.json();
+    const res = await api('POST', `/reimbursement/${id}/revoke`);
+    const d = res;
     alert(d.success ? '✅ Revoked' : 'Error: ' + d.message);
     loadReimbursements(currentTab);
   } catch { alert('Network error'); }
@@ -605,10 +575,10 @@ async function disburseReimb(id) {
   const remarks = prompt('Disbursement note (required):');
   if (!remarks) return;
   try {
-    const r = await apiCall('POST', `/reimbursement/${id}/disburse`,
+    const res = await api('POST', `/reimbursement/${id}/disburse`,
       { remarks, payment_date: new Date().toISOString().slice(0,10) });
-    const d = await r.json();
-    alert(d.success ? '✅ Disbursed!' : 'Error: ' + d.message);
+    const d = res;
+    alert(d?.success ? '✅ Disbursed!' : 'Error: ' + d?.message);
     loadReimbursements(currentTab);
   } catch { alert('Network error'); }
 }
@@ -617,8 +587,8 @@ async function disburseReimb(id) {
 async function viewTimeline(id) {
   const reimb = allData.find(r => r.id === id);
   try {
-    const r = await apiCall('GET', `/reimbursement/${id}/approvals`);
-    const steps = (await r.json()).data || [];
+    const res = await api('GET', `/reimbursement/${id}/approvals`);
+    const steps = res?.data || [];
 
     let chain = [];
     try { chain = JSON.parse(reimb.approval_chain || '[]'); } catch(_){}
@@ -698,7 +668,6 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
 
-init();
 </script>
 </body>
 </html>
