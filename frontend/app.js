@@ -103,6 +103,7 @@ const ICONS = {
   separation:   `🚪`,
   payroll:      `💰`,
   advance:      `💸`,
+  reimbursement:`🧾`,
   provision:    `⏳`,
   geofence:     `📍`,
   compoff:      `🔄`,
@@ -144,7 +145,8 @@ const NAV_GROUPS = [
     label: 'Finance',
     items: [
       { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['super_admin','hr','accounts'] },
-      { href:'advance.html',        icon: ICONS.advance,      label:'Advance Salary',   always:true },
+      { href:'advance.html',        icon: ICONS.advance,        label:'Advance Salary',   always:true },
+      { href:'reimbursement.html',  icon: ICONS.reimbursement,  label:'Reimbursement',    always:true },
       { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
     ]
   },
