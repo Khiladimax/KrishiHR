@@ -104,6 +104,27 @@ select.form-control{background:#fff}
 .appr-label{font-size:10px;font-weight:700;color:#555;text-align:center;line-height:1.2}
 .appr-sub{font-size:9px;color:#aaa;text-align:center;margin-top:2px}
 .appr-you{font-size:9px;background:#fef9c3;color:#b45309;padding:1px 5px;border-radius:10px;font-weight:700;margin-top:2px}
+
+/* ── Approval Timeline Modal ── */
+.tl-list{display:flex;flex-direction:column}
+.tl-step{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.tl-step:last-child{border-bottom:none}
+.tl-bubble{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;border:2px solid #ddd;background:#f9f9f9;color:#aaa}
+.dot-done{background:#d1fae5!important;border-color:#2e7d32!important;color:#2e7d32!important}
+.dot-current{background:#fef9c3!important;border-color:#f59e0b!important;color:#b45309!important;box-shadow:0 0 0 5px rgba(245,158,11,.15)}
+.dot-rejected{background:#fee2e2!important;border-color:#c62828!important;color:#c62828!important}
+.dot-disbursed{background:#ede9fe!important;border-color:#7c3aed!important;color:#7c3aed!important}
+.dot-ready{background:#e3f2fd!important;border-color:#1565c0!important;color:#1565c0!important}
+.dot-wait{background:#f5f5f5;border-color:#ddd;color:#bbb}
+.tl-info{flex:1;padding-top:4px}
+.tl-name{font-size:14px;font-weight:700;color:#222;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.tl-actor{font-size:12px;font-weight:400;color:#777}
+.tl-you{font-size:10px;background:#fef9c3;color:#b45309;padding:1px 7px;border-radius:10px;font-weight:700;margin-left:4px}
+.tl-sub{font-size:12px;color:#666;margin-top:4px;line-height:1.5}
+.tl-approved{color:#2e7d32;font-weight:600}
+.tl-rejected-txt{color:#c62828;font-weight:600}
+.tl-waiting{color:#b45309;font-weight:600}
+.tl-remark{font-style:italic;color:#888;margin-top:4px;padding:4px 8px;background:#fafafa;border-left:3px solid #ddd;border-radius:3px}
 </style>
 </head>
 <body>
@@ -188,6 +209,16 @@ Auth.guard();
 buildSidebar('reimbursement.html');
 loadNotifBadge();
 const currentUser = Auth.getUser();
+
+// ── Approver code → human label map (mirrors advance.html) ──────────────────
+const CODE_TO_LABEL = {
+  'KC718':  { label: 'COO',      icon: '🏢' },
+  'KC01':   { label: 'MD',       icon: '👑' },
+  'KC7708': { label: 'Accounts', icon: '💸' },
+};
+function codeLabel(code) {
+  return CODE_TO_LABEL[code] || { label: code, icon: '👤' };
+}
 
 // Show tabs based on role
 const canSeeAll = ['hr','super_admin','admin','accounts'].includes(currentUser.role);
@@ -658,43 +689,121 @@ async function disburseReimb(id) {
 // ── Approval Timeline ─────────────────────────────────────────────────────────
 async function viewTimeline(id) {
   const reimb = allData.find(r => r.id === id);
+  if (!reimb) return;
+
+  // Show modal immediately with loading state
+  document.getElementById('revisionModalTitle').textContent = '📋 Approval Timeline';
+  document.getElementById('revisionModalBody').innerHTML = `
+    <p style="font-size:13px;color:#666;margin-bottom:16px">
+      <b>${escHtml(reimb.title)}</b> &nbsp;•&nbsp;
+      <span class="status-pill pill-${reimb.status}" style="font-size:11px">${reimb.status}</span>
+    </p>
+    <div style="text-align:center;padding:20px;color:#aaa">Loading…</div>`;
+  document.getElementById('revisionModal').classList.add('open');
+
   try {
-    const res = await api('GET', `/reimbursement/${id}/approvals`);
-    const steps = res?.data || [];
+    const res   = await api('GET', `/reimbursement/${id}/approvals`);
+    const doneSteps = res?.data || [];   // steps already acted on
 
+    // Parse approval_chain — may be array or JSON string
     let chain = [];
-    try { chain = JSON.parse(reimb.approval_chain || '[]'); } catch(_){}
+    if (Array.isArray(reimb.approval_chain)) chain = reimb.approval_chain;
+    else { try { chain = JSON.parse(reimb.approval_chain || '[]'); } catch(_){} }
 
-    const doneSet = new Set(steps.map(s => s.level_label));
-    const timelineHtml = chain.map((code, i) => {
-      const step = steps.find(s => s.level === i+1);
-      const isDone    = !!step;
-      const isCurrent = !isDone && reimb.current_approver_code === code;
-      const dotClass  = isDone ? 'dot-done' : isCurrent ? 'dot-current' : 'dot-wait';
-      const icon      = isDone ? (step.action==='approve'?'✅':'❌') : isCurrent ? '⏳' : '⬜';
+    const isRejected  = reimb.status === 'rejected';
+    const isDisbursed = reimb.status === 'disbursed';
+    const isApproved  = reimb.status === 'approved';
+    const currentLevel= parseInt(reimb.current_level) || 1;
+
+    const stepsHTML = chain.map((code, i) => {
+      const lvl      = i + 1;
+      const info     = codeLabel(code);
+      // Match done step by level index
+      const done     = doneSteps.find(s => s.level === lvl || s.level_label === code);
+      const isCurrent= !done && !isRejected && reimb.current_approver_code === code;
+
+      let bubbleClass = 'dot-wait', icon = String(lvl);
+      if (done) {
+        bubbleClass = done.action === 'approve' ? 'dot-done' : 'dot-rejected';
+        icon = done.action === 'approve' ? '✓' : '✗';
+      } else if (isCurrent) {
+        bubbleClass = 'dot-current';
+        icon = '⏳';
+      }
+
+      const isYou = code === currentUser.employee_code;
+
       return `
-        <div class="timeline-step">
-          <div class="timeline-dot ${dotClass}">${icon}</div>
-          <div class="timeline-text">
-            <div class="name">${code}${step ? ' – ' + escHtml(step.approver_name||'') : ''}</div>
-            <div class="sub">
-              ${step ? `${step.action.charAt(0).toUpperCase()+step.action.slice(1)} • ${formatDate(step.acted_at)}
-                ${step.revised_amount && step.original_amount !== step.revised_amount
-                  ? ` • Revised ₹${parseFloat(step.original_amount).toLocaleString('en-IN')} → ₹${parseFloat(step.revised_amount).toLocaleString('en-IN')}` : ''}
-                ${step.remarks ? ' • ' + escHtml(step.remarks) : ''}`
-              : isCurrent ? 'Awaiting approval' : 'Pending'}
-            </div>
+      <div class="tl-step">
+        <div class="tl-connector ${i === 0 ? 'invisible' : ''}"></div>
+        <div class="tl-bubble ${bubbleClass}">${icon}</div>
+        <div class="tl-info">
+          <div class="tl-name">
+            ${info.icon} ${info.label}
+            ${isYou ? '<span class="tl-you">You</span>' : ''}
+            ${done ? `<span class="tl-actor">— ${escHtml(done.approver_name || code)}</span>` : ''}
           </div>
-        </div>`;
-    }).join('');
+          <div class="tl-sub">
+            ${done
+              ? `<span class="tl-action ${done.action === 'approve' ? 'tl-approved' : 'tl-rejected-txt'}">
+                   ${done.action === 'approve' ? '✅ Approved' : '❌ Rejected'}
+                 </span>
+                 &nbsp;•&nbsp; ${formatDate(done.acted_at)}
+                 ${done.revised_amount && done.original_amount !== done.revised_amount
+                   ? ` &nbsp;•&nbsp; Revised ₹${parseFloat(done.original_amount).toLocaleString('en-IN')} → ₹${parseFloat(done.revised_amount).toLocaleString('en-IN')}`
+                   : ''}
+                 ${done.remarks ? `<div class="tl-remark">"${escHtml(done.remarks)}"</div>` : ''}`
+              : isCurrent
+                ? '<span class="tl-waiting">⏳ Awaiting approval</span>'
+                : '<span style="color:#bbb">Pending</span>'}
+          </div>
+        </div>
+      </div>`;
+    });
 
-    document.getElementById('revisionModalTitle').textContent = 'Approval Timeline';
+    // Add final Accounts/Disburse step if not already last in chain
+    const lastCode = chain[chain.length - 1];
+    if (lastCode !== 'KC7708') {
+      const disbDone = isDisbursed;
+      stepsHTML.push(`
+      <div class="tl-step">
+        <div class="tl-connector"></div>
+        <div class="tl-bubble ${isDisbursed ? 'dot-disbursed' : isApproved ? 'dot-ready' : 'dot-wait'}">
+          ${isDisbursed ? '💰' : isApproved ? '🏦' : '🏦'}
+        </div>
+        <div class="tl-info">
+          <div class="tl-name">💸 Accounts &nbsp;<span class="tl-actor">— Disbursement</span></div>
+          <div class="tl-sub">
+            ${isDisbursed
+              ? '<span class="tl-approved">✅ Disbursed</span>'
+              : isApproved
+                ? '<span class="tl-waiting">Ready to disburse</span>'
+                : '<span style="color:#bbb">Pending</span>'}
+          </div>
+        </div>
+      </div>`);
+    }
+
     document.getElementById('revisionModalBody').innerHTML = `
-      <p style="font-size:13px;color:#666;margin-bottom:12px">${escHtml(reimb.title)} — <b>${reimb.status}</b></p>
-      <div class="timeline">${timelineHtml || '<p style="color:#aaa">No steps yet</p>'}</div>
-      <button class="btn btn-outline" style="margin-top:12px" onclick="closeModal('revisionModal')">Close</button>`;
-    document.getElementById('revisionModal').classList.add('open');
-  } catch { alert('Failed to load timeline'); }
+      <p style="font-size:13px;color:#555;margin-bottom:18px">
+        <b>${escHtml(reimb.title)}</b>
+        &nbsp;•&nbsp;
+        ${reimb.employee_name ? escHtml(reimb.employee_name) + ' (' + (reimb.employee_code||'') + ')' : ''}
+        &nbsp;•&nbsp;
+        <span class="status-pill pill-${reimb.status}" style="font-size:11px">${reimb.status}</span>
+      </p>
+      <div class="tl-list">
+        ${stepsHTML.length ? stepsHTML.join('') : '<p style="color:#aaa;text-align:center;padding:20px">No approval chain found</p>'}
+      </div>
+      <div style="margin-top:18px">
+        <button class="btn btn-outline" onclick="closeModal('revisionModal')">Close</button>
+      </div>`;
+
+  } catch(err) {
+    document.getElementById('revisionModalBody').innerHTML =
+      `<p style="color:#c62828">Failed to load timeline.<br><small>${err.message}</small></p>
+       <button class="btn btn-outline" style="margin-top:12px" onclick="closeModal('revisionModal')">Close</button>`;
+  }
 }
 
 // ── Attachment Viewer ─────────────────────────────────────────────────────────
