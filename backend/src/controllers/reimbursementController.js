@@ -481,11 +481,13 @@ exports.exportData = async (req, res) => {
          r.id, r.title, r.status, r.total_amount, r.approved_amount,
          r.requested_at, r.approved_at, r.disbursed_at, r.remarks,
          CONCAT(e.first_name,' ',e.last_name) AS employee_name,
-         e.employee_code, e.designation, e.mobile,
-         d.name AS department_name
+         e.employee_code, e.mobile,
+         d.name AS department_name,
+         des.name AS designation
        FROM reimbursements r
        JOIN employees e ON r.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
+       LEFT JOIN designations des ON e.designation_id = des.id
        WHERE r.requested_at::date BETWEEN $1 AND $2
        ${statusCond}
        ORDER BY r.requested_at DESC`,
