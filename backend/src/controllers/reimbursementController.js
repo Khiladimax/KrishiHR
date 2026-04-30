@@ -468,7 +468,6 @@ exports.exportData = async (req, res) => {
     if (!from || !to)
       return res.status(400).json({ success: false, message: 'from and to dates are required' });
 
-    // Build params and conditions
     const params = [from, to];
     let statusCond = '';
     if (status && status !== 'all') {
@@ -479,7 +478,9 @@ exports.exportData = async (req, res) => {
     const result = await db.query(
       `SELECT
          r.id, r.title, r.status, r.total_amount, r.approved_amount,
-         r.requested_at, r.approved_at, r.disbursed_at, r.remarks,
+         r.requested_at, r.approved_at, r.disbursed_at,
+         r.remarks AS final_remarks,
+         r.approval_chain,
          CONCAT(e.first_name,' ',e.last_name) AS employee_name,
          e.employee_code, e.phone,
          d.name AS department_name,
@@ -494,10 +495,12 @@ exports.exportData = async (req, res) => {
       params
     );
 
-    // For each reimbursement, fetch its items (with attachment flag + item id for URL)
     const ids = result.rows.map(r => r.id);
     let itemsMap = {};
+    let approvalsMap = {};
+
     if (ids.length) {
+      // Fetch line items
       const itemsRes = await db.query(
         `SELECT id, reimbursement_id, category, description, amount,
                 TO_CHAR(expense_date, 'YYYY-MM-DD') AS expense_date,
@@ -511,9 +514,30 @@ exports.exportData = async (req, res) => {
         if (!itemsMap[item.reimbursement_id]) itemsMap[item.reimbursement_id] = [];
         itemsMap[item.reimbursement_id].push(item);
       }
+
+      // Fetch full approval log with approver names
+      const appRes = await db.query(
+        `SELECT ra.reimbursement_id, ra.level, ra.level_label,
+                ra.action, ra.remarks, ra.original_amount, ra.revised_amount,
+                ra.created_at,
+                CONCAT(e.first_name,' ',e.last_name) AS approver_name,
+                e.employee_code AS approver_code
+         FROM reimbursement_approvals ra
+         JOIN employees e ON ra.approver_id = e.id
+         WHERE ra.reimbursement_id = ANY($1)
+         ORDER BY ra.reimbursement_id, ra.level`, [ids]
+      );
+      for (const ap of appRes.rows) {
+        if (!approvalsMap[ap.reimbursement_id]) approvalsMap[ap.reimbursement_id] = [];
+        approvalsMap[ap.reimbursement_id].push(ap);
+      }
     }
 
-    const data = result.rows.map(r => ({ ...r, items: itemsMap[r.id] || [] }));
+    const data = result.rows.map(r => ({
+      ...r,
+      items: itemsMap[r.id] || [],
+      approvals: approvalsMap[r.id] || []
+    }));
     res.json({ success: true, data, exported_at: new Date().toISOString() });
   } catch (err) {
     console.error('[reimbursement.exportData]', err);
