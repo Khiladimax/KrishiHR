@@ -199,6 +199,7 @@ router.get   ('/reimbursement/export',              authenticate, reimbCtrl.expo
 router.get   ('/reimbursement',                     authenticate, reimbCtrl.getAll);
 router.post  ('/reimbursement/:id/action',          authenticate, reimbCtrl.action);
 router.post  ('/reimbursement/:id/revoke',          authenticate, reimbCtrl.revoke);
+router.put   ('/reimbursement/:id/edit',            authenticate, reimbCtrl.edit);
 router.post  ('/reimbursement/:id/disburse',        authenticate, authorize('accounts'), reimbCtrl.disburse);
 router.get   ('/reimbursement/:id/approvals',       authenticate, reimbCtrl.getApprovals);
 router.post  ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.uploadMiddleware, reimbCtrl.uploadAttachment);
