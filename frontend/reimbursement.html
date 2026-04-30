@@ -90,6 +90,20 @@ select.form-control{background:#fff}
 .timeline-text .sub{color:#888;margin-top:1px}
 
 .loader{text-align:center;padding:40px;color:#888;font-size:14px}
+
+/* ── Approval Pipeline ── */
+.approval-pipeline{display:flex;align-items:flex-start;gap:0;margin-top:16px;padding-top:14px;border-top:1px solid #f0f0f0;flex-wrap:wrap;gap:4px}
+.appr-step{display:flex;flex-direction:column;align-items:center;min-width:90px;position:relative}
+.appr-step:not(:last-child)::after{content:'→';position:absolute;right:-10px;top:13px;color:#ccc;font-size:14px}
+.appr-bubble{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #ddd;background:#f9f9f9;color:#999;margin-bottom:4px;flex-shrink:0}
+.appr-bubble.done{background:#d1fae5;border-color:#2e7d32;color:#2e7d32}
+.appr-bubble.active{background:#fef9c3;border-color:#f59e0b;color:#b45309;animation:pulse-ring 1.8s infinite}
+.appr-bubble.rejected{background:#fee2e2;border-color:#c62828;color:#c62828}
+.appr-bubble.disbursed{background:#ede9fe;border-color:#7c3aed;color:#7c3aed}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0)}}
+.appr-label{font-size:10px;font-weight:700;color:#555;text-align:center;line-height:1.2}
+.appr-sub{font-size:9px;color:#aaa;text-align:center;margin-top:2px}
+.appr-you{font-size:9px;background:#fef9c3;color:#b45309;padding:1px 5px;border-radius:10px;font-weight:700;margin-top:2px}
 </style>
 </head>
 <body>
@@ -201,14 +215,15 @@ function showTab(tab) {
 async function loadReimbursements(tab) {
   document.getElementById('contentArea').innerHTML = '<div class="loader">Loading…</div>';
   try {
+    // 'my' tab: only my requests. 'pending'/'all': fetch all visible to this user
     let url = '/reimbursement';
     if (tab === 'my') url += `?employee_id=${currentUser.id}`;
+
     const res = await api('GET', url);
     const data = res?.data || [];
-
     allData = data;
 
-    // Stats
+    // Stats always from full dataset
     let pending=0,approved=0,disbursed=0,rejected=0,totalAmt=0;
     data.forEach(d => {
       if (d.status==='pending')   pending++;
@@ -222,7 +237,7 @@ async function loadReimbursements(tab) {
     document.getElementById('sRejected').textContent  = rejected;
     document.getElementById('sTotal').textContent     = '₹' + totalAmt.toLocaleString('en-IN');
 
-    // Filter for pending-my-approval tab
+    // Filter for 'pending my approval': records where it's literally MY turn to act
     let filtered = data;
     if (tab === 'pending') {
       filtered = data.filter(d =>
@@ -233,7 +248,8 @@ async function loadReimbursements(tab) {
 
     renderList(filtered, tab);
   } catch(e) {
-    document.getElementById('contentArea').innerHTML = '<div class="loader">Failed to load.</div>';
+    document.getElementById('contentArea').innerHTML = '<div class="loader">Failed to load. Please try again.</div>';
+    console.error(e);
   }
 }
 
@@ -257,6 +273,56 @@ function renderList(data, tab) {
 function catBadge(cat) {
   return `<span class="cat-badge cat-${cat}">${cat.charAt(0).toUpperCase()+cat.slice(1)}</span>`;
 }
+
+// ── Approval Pipeline Builder ─────────────────────────────────────────────────
+function buildPipeline(r) {
+  let chain = [];
+  try { chain = JSON.parse(r.approval_chain || '[]'); } catch(_) {}
+  if (!chain.length) return '';
+
+  const steps = chain.map(code => {
+    const isCurrent  = r.status === 'pending' && code === r.current_approver_code;
+    const isDone     = r.status !== 'pending' || chain.indexOf(code) < chain.indexOf(r.current_approver_code);
+    const isRejected = r.status === 'rejected' && code === r.current_approver_code;
+    const isDisbursed= r.status === 'disbursed' && code === r.current_approver_code;
+    const isYou      = code === currentUser.employee_code;
+
+    let bubbleClass, icon;
+    if (r.status === 'approved' || r.status === 'disbursed') {
+      // All chain steps done (disbursed = fully approved + paid)
+      bubbleClass = r.status === 'disbursed' ? 'disbursed' : 'done';
+      icon = r.status === 'disbursed' ? '💰' : '✅';
+    } else if (isRejected) {
+      bubbleClass = 'rejected'; icon = '❌';
+    } else if (isDone) {
+      bubbleClass = 'done'; icon = '✅';
+    } else if (isCurrent) {
+      bubbleClass = 'active'; icon = '⏳';
+    } else {
+      bubbleClass = ''; icon = '⬜';
+    }
+
+    return `
+    <div class="appr-step">
+      <div class="appr-bubble ${bubbleClass}">${icon}</div>
+      <div class="appr-label">${escHtml(code)}</div>
+      ${isCurrent && r.status==='pending' ? `<div class="appr-sub">Awaiting</div>` : ''}
+      ${isDone && r.status!=='approved' && r.status!=='disbursed' ? `<div class="appr-sub">Approved</div>` : ''}
+      ${isYou ? `<div class="appr-you">You</div>` : ''}
+    </div>`;
+  });
+
+  // Add Accounts / Disburse as final step if not already in chain
+  const lastStep = r.status === 'disbursed'
+    ? `<div class="appr-step"><div class="appr-bubble disbursed">💰</div><div class="appr-label">Disbursed</div></div>`
+    : `<div class="appr-step"><div class="appr-bubble ${r.status==='approved'?'done':''}">
+        ${r.status==='approved'?'🏦':'🏦'}</div>
+        <div class="appr-label">Accounts</div>
+        <div class="appr-sub">${r.status==='approved'?'Ready':'Pending'}</div></div>`;
+
+  return `<div class="approval-pipeline">${steps.join('')}${lastStep}</div>`;
+}
+
 
 function renderCard(r, tab) {
   const pillClass = `pill-${r.status}`;
@@ -329,6 +395,9 @@ function renderCard(r, tab) {
         </thead>
         <tbody>${itemRows || '<tr><td colspan="6" style="color:#aaa;text-align:center;padding:12px">No items</td></tr>'}</tbody>
       </table>
+
+      <!-- ── Approval Pipeline ── -->
+      ${buildPipeline(r)}
     </div>
     ${actionButtons ? `<div class="action-row">${actionButtons}</div>` : ''}
   </div>`;
