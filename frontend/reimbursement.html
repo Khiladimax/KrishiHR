@@ -336,7 +336,7 @@ function renderCard(r, tab) {
     <tr>
       <td>${catBadge(item.category)}</td>
       <td>${item.description}</td>
-      <td>${item.expense_date || '—'}</td>
+      <td>${formatDate(item.expense_date)}</td>
       <td>₹${parseFloat(item.amount).toLocaleString('en-IN')}</td>
       <td>${item.approved_amount != null ? '<s style="color:#aaa">₹'+parseFloat(item.amount).toLocaleString('en-IN')+'</s> ₹'+parseFloat(item.approved_amount).toLocaleString('en-IN') : '—'}</td>
       <td>
@@ -698,29 +698,38 @@ async function viewTimeline(id) {
 }
 
 // ── Attachment Viewer ─────────────────────────────────────────────────────────
-function viewAttachment(itemId, name, mime) {
-  document.getElementById('viewerTitle').textContent = '📎 ' + name;
-  const url = `${API}/reimbursement/item/${itemId}/attachment`;
-  const token = localStorage.getItem('token');
-
-  if (mime.startsWith('image/')) {
-    document.getElementById('viewerBody').innerHTML =
-      `<img src="${url}?token=${token}" style="max-width:100%;max-height:70vh;border-radius:8px;display:block;margin:0 auto" alt="${escHtml(name)}"/>`;
-  } else if (mime === 'application/pdf') {
-    // Fetch as blob to attach auth header
-    fetch(url, { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.blob())
-      .then(blob => {
-        const blobUrl = URL.createObjectURL(blob);
-        document.getElementById('viewerBody').innerHTML =
-          `<iframe class="viewer-frame" src="${blobUrl}"></iframe>
-           <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-outline btn-sm" style="margin-top:8px;display:inline-block">⬇ Download</a>`;
-      });
-  } else {
-    document.getElementById('viewerBody').innerHTML =
-      `<p>Cannot preview this file type. <a href="${url}" target="_blank">Download</a></p>`;
-  }
+async function viewAttachment(itemId, name, mime) {
+  document.getElementById('viewerTitle').textContent = '📎 ' + (name || 'Attachment');
+  document.getElementById('viewerBody').innerHTML = '<div style="text-align:center;padding:30px;color:#888">Loading…</div>';
   document.getElementById('viewerModal').classList.add('open');
+
+  const url   = `/api/reimbursement/item/${itemId}/attachment`;
+  const token = Auth.getToken();  // ← correct key: 'krishihr_token'
+
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob   = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const actualMime = blob.type || mime || '';
+
+    if (actualMime.startsWith('image/')) {
+      document.getElementById('viewerBody').innerHTML =
+        `<img src="${blobUrl}" style="max-width:100%;max-height:72vh;border-radius:8px;display:block;margin:0 auto" alt="${escHtml(name)}"/>
+         <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-outline btn-sm" style="margin-top:10px;display:inline-block">⬇ Download</a>`;
+    } else if (actualMime === 'application/pdf') {
+      document.getElementById('viewerBody').innerHTML =
+        `<iframe class="viewer-frame" src="${blobUrl}" style="width:100%;height:72vh;border:none;border-radius:8px"></iframe>
+         <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-outline btn-sm" style="margin-top:8px;display:inline-block">⬇ Download</a>`;
+    } else {
+      document.getElementById('viewerBody').innerHTML =
+        `<p style="color:#555;margin-bottom:12px">Cannot preview <b>${escHtml(name)}</b> in browser.</p>
+         <a href="${blobUrl}" download="${escHtml(name)}" class="btn btn-primary btn-sm">⬇ Download File</a>`;
+    }
+  } catch(err) {
+    document.getElementById('viewerBody').innerHTML =
+      `<p style="color:#c62828">Failed to load attachment. Please try again.<br><small>${err.message}</small></p>`;
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
