@@ -468,7 +468,7 @@ exports.exportData = async (req, res) => {
     if (!from || !to)
       return res.status(400).json({ success: false, message: 'from and to dates are required' });
 
-    let conds = [`r.requested_at::date >= $1`, `r.requested_at::date <= $2`];
+    let conds = [`r.requested_at >= $1::date`, `r.requested_at < ($2::date + INTERVAL '1 day')`];
     let params = [from, to];
     let idx = 3;
 
