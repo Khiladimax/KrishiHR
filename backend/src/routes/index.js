@@ -195,6 +195,7 @@ router.get ('/advance/:id/approvals',        authenticate, advCtrl.getApprovals)
 // ── Reimbursement ─────────────────────────────────────────────────────────────
 const reimbCtrl = require('../controllers/reimbursementController');
 router.post  ('/reimbursement/apply',               authenticate, reimbCtrl.apply);
+router.get   ('/reimbursement/export',              authenticate, authorize('accounts','hr','super_admin'), reimbCtrl.exportData);
 router.get   ('/reimbursement',                     authenticate, reimbCtrl.getAll);
 router.post  ('/reimbursement/:id/action',          authenticate, reimbCtrl.action);
 router.post  ('/reimbursement/:id/revoke',          authenticate, reimbCtrl.revoke);
