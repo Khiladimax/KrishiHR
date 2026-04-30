@@ -50,16 +50,21 @@
 select.form-control{background:#fff}
 
 /* ── Expense item block ── */
-.expense-item{background:#f9fafb;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 12px;margin-bottom:8px;position:relative}
-.expense-item .item-num{font-size:11px;font-weight:700;color:#2d6a4f;margin-bottom:6px}
-.expense-grid{display:grid;grid-template-columns:140px 130px 1fr 110px 170px 24px;gap:8px;align-items:end}
-@media(max-width:900px){.expense-grid{grid-template-columns:1fr 1fr;gap:10px}}
-@media(max-width:600px){.expense-grid{grid-template-columns:1fr}}
-.expense-grid .form-group{margin-bottom:0}
-.expense-grid .form-group label{display:none}
-.expense-grid .form-control{padding:6px 8px;font-size:13px;height:34px}
-.expense-grid select.form-control{padding:6px 4px}
-.remove-item-btn{background:none;border:none;color:#c62828;font-size:20px;cursor:pointer;line-height:1;padding:0 0 4px 0;align-self:end}
+.excel-table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:0}
+.excel-table thead tr{background:#f0f4f0}
+.excel-table thead th{font-size:11px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:0.4px;padding:8px 10px;border:1px solid #d0d7d0;text-align:center;white-space:nowrap}
+.excel-table tbody tr{background:#fff}
+.excel-table tbody tr:nth-child(even){background:#f9fbf9}
+.excel-table tbody tr:hover{background:#f0f7f0}
+.excel-table tbody td{padding:5px 6px;border:1px solid #d0d7d0;vertical-align:middle}
+.excel-table tbody td .form-control{border:none;background:transparent;padding:4px 6px;font-size:13px;height:30px;width:100%;box-shadow:none;outline:none}
+.excel-table tbody td .form-control:focus{background:#fffde7;border-radius:3px}
+.excel-table tbody td select.form-control{padding:4px 2px}
+.excel-table tfoot tr{background:#f5f5f5}
+.excel-table tfoot td{padding:6px 10px;border:1px solid #d0d7d0}
+.del-row-btn{background:none;border:none;color:#c62828;font-size:16px;cursor:pointer;padding:0;display:block;margin:0 auto;line-height:1}
+.del-row-btn:hover{color:#e53935}
+.excel-wrap{border:1.5px solid #b0c4b0;border-radius:10px;overflow:hidden;margin-bottom:12px}
 
 /* ── Attachment preview ── */
 .attach-preview{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:8px;font-size:12px;color:#2e7d32;cursor:pointer}
@@ -455,16 +460,29 @@ function renderApplyForm() {
       <label>Request Title *</label>
       <input id="reimbTitle" class="form-control" placeholder="e.g. Mumbai Client Visit – April 2026"/>
     </div>
-    <div style="display:grid;grid-template-columns:140px 130px 1fr 110px 170px 24px;gap:8px;padding:0 12px;margin-bottom:4px" id="itemsHeader">
-      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Category</div>
-      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Date</div>
-      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Description</div>
-      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Amount (₹)</div>
-      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px">Attachment</div>
-      <div></div>
+    <div class="excel-wrap">
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th style="width:155px">#</th>
+            <th style="width:155px">Category</th>
+            <th style="width:120px">Date</th>
+            <th>Description</th>
+            <th style="width:115px">Amount (₹)</th>
+            <th style="width:160px">Attachment</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsContainer"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7">
+              <button class="btn btn-outline" style="font-size:12px;padding:4px 14px" onclick="addItem()">+ Add Row</button>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
-    <div id="itemsContainer"></div>
-    <button class="btn btn-outline" style="margin-bottom:20px;margin-top:4px" onclick="addItem()">+ Add Row</button>
     <br/>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="submitReimb()">Submit Request</button>
@@ -476,43 +494,41 @@ function renderApplyForm() {
 
 function addItem() {
   const idx = itemCount++;
-  const container = document.getElementById('itemsContainer');
-  const div = document.createElement('div');
-  div.className = 'expense-item';
-  div.id = `item-${idx}`;
-  div.innerHTML = `
-    <div class="expense-grid">
-      <div class="form-group">
-        <label>Category *</label>
-        <select class="form-control" id="cat-${idx}">
-          <option value="travel">🚗 Travel</option>
-          <option value="food">🍽 Food</option>
-          <option value="accommodation">🏨 Accommodation</option>
-          <option value="miscellaneous">📦 Miscellaneous</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Date *</label>
-        <input type="date" class="form-control" id="date-${idx}" value="${new Date().toISOString().slice(0,10)}"/>
-      </div>
-      <div class="form-group">
-        <label>Description *</label>
-        <input class="form-control" id="desc-${idx}" placeholder="e.g. Cab from office to airport"/>
-      </div>
-      <div class="form-group">
-        <label>Amount (₹) *</label>
-        <input type="number" class="form-control" id="amt-${idx}" placeholder="0.00" min="0" step="0.01"/>
-      </div>
-      <div class="form-group">
-        <label>Attachment</label>
-        <input type="file" class="form-control" id="file-${idx}" style="height:34px;padding:4px 6px;font-size:11px"
-               accept="image/*,application/pdf"
-               onchange="handleFileSelect(${idx}, this)"/>
-        <div id="filePreview-${idx}" style="margin-top:2px"></div>
-      </div>
-      ${idx > 0 ? `<button class="remove-item-btn" onclick="removeItem(${idx})" title="Remove row">×</button>` : '<div></div>'}
-    </div>`;
-  container.appendChild(div);
+  const tbody = document.getElementById('itemsContainer');
+  const tr = document.createElement('tr');
+  tr.id = `item-${idx}`;
+  const today = new Date().toISOString().slice(0,10);
+  tr.innerHTML = `
+    <td style="text-align:center;color:#aaa;font-size:12px;font-weight:600">${idx+1}</td>
+    <td>
+      <select class="form-control" id="cat-${idx}">
+        <option value="travel">🚗 Travel</option>
+        <option value="food">🍽️ Food & Beverages</option>
+        <option value="accommodation">🏨 Accommodation</option>
+        <option value="fuel">⛽ Fuel / Petrol</option>
+        <option value="transport">🚕 Local Transport</option>
+        <option value="train">🚆 Train / Bus Fare</option>
+        <option value="flight">✈️ Flight</option>
+        <option value="medical">💊 Medical</option>
+        <option value="stationery">📋 Stationery / Office</option>
+        <option value="internet">🌐 Internet / Phone</option>
+        <option value="client_entertainment">🤝 Client Entertainment</option>
+        <option value="printing">🖨️ Printing</option>
+        <option value="repair">🔧 Repair / Maintenance</option>
+        <option value="training">📚 Training / Course</option>
+        <option value="miscellaneous">📦 Miscellaneous</option>
+      </select>
+    </td>
+    <td><input type="date" class="form-control" id="date-${idx}" value="${today}"/></td>
+    <td><input class="form-control" id="desc-${idx}" placeholder="e.g. Cab from office to airport"/></td>
+    <td><input type="number" class="form-control" id="amt-${idx}" placeholder="0.00" min="0" step="0.01" style="text-align:right"/></td>
+    <td>
+      <input type="file" class="form-control" id="file-${idx}" style="font-size:11px;padding:2px 4px;height:28px"
+             accept="image/*,application/pdf" onchange="handleFileSelect(${idx}, this)"/>
+      <div id="filePreview-${idx}" style="font-size:10px;margin-top:2px"></div>
+    </td>
+    <td style="text-align:center">${idx > 0 ? `<button class="del-row-btn" onclick="removeItem(${idx})" title="Delete row">🗑</button>` : ''}</td>`;
+  tbody.appendChild(tr);
 }
 
 function removeItem(idx) {
