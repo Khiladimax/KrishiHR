@@ -501,23 +501,26 @@ function addItem() {
   tr.innerHTML = `
     <td style="text-align:center;color:#aaa;font-size:12px;font-weight:600">${idx+1}</td>
     <td>
-      <select class="form-control" id="cat-${idx}">
-        <option value="travel">🚗 Travel</option>
-        <option value="food">🍽️ Food & Beverages</option>
-        <option value="accommodation">🏨 Accommodation</option>
-        <option value="fuel">⛽ Fuel / Petrol</option>
-        <option value="transport">🚕 Local Transport</option>
-        <option value="train">🚆 Train / Bus Fare</option>
-        <option value="flight">✈️ Flight</option>
-        <option value="medical">💊 Medical</option>
-        <option value="stationery">📋 Stationery / Office</option>
-        <option value="internet">🌐 Internet / Phone</option>
-        <option value="client_entertainment">🤝 Client Entertainment</option>
-        <option value="printing">🖨️ Printing</option>
-        <option value="repair">🔧 Repair / Maintenance</option>
-        <option value="training">📚 Training / Course</option>
-        <option value="miscellaneous">📦 Miscellaneous</option>
-      </select>
+      <div id="catWrap-${idx}">
+        <select class="form-control" id="cat-${idx}" onchange="handleCatChange(${idx})">
+          <option value="travel">🚗 Travel</option>
+          <option value="food">🍽️ Food & Beverages</option>
+          <option value="accommodation">🏨 Accommodation</option>
+          <option value="fuel">⛽ Fuel / Petrol</option>
+          <option value="transport">🚕 Local Transport</option>
+          <option value="train">🚆 Train / Bus Fare</option>
+          <option value="flight">✈️ Flight</option>
+          <option value="medical">💊 Medical</option>
+          <option value="stationery">📋 Stationery / Office</option>
+          <option value="internet">🌐 Internet / Phone</option>
+          <option value="client_entertainment">🤝 Client Entertainment</option>
+          <option value="printing">🖨️ Printing</option>
+          <option value="repair">🔧 Repair / Maintenance</option>
+          <option value="training">📚 Training / Course</option>
+          <option value="miscellaneous">📦 Miscellaneous</option>
+          <option value="other">✏️ Other (specify)</option>
+        </select>
+      </div>
     </td>
     <td><input type="date" class="form-control" id="date-${idx}" value="${today}"/></td>
     <td><input class="form-control" id="desc-${idx}" placeholder="e.g. Cab from office to airport"/></td>
@@ -529,6 +532,46 @@ function addItem() {
     </td>
     <td style="text-align:center">${idx > 0 ? `<button class="del-row-btn" onclick="removeItem(${idx})" title="Delete row">🗑</button>` : ''}</td>`;
   tbody.appendChild(tr);
+}
+
+function handleCatChange(idx) {
+  const sel = document.getElementById(`cat-${idx}`);
+  const wrap = document.getElementById(`catWrap-${idx}`);
+  if (!sel || !wrap) return;
+  if (sel.value === 'other') {
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:4px">
+        <input class="form-control" id="cat-${idx}" data-custom="true"
+               placeholder="Specify category…" style="flex:1;min-width:0"/>
+        <button onclick="resetCatToDropdown(${idx})" title="Back to list"
+                style="background:none;border:none;cursor:pointer;color:#888;font-size:14px;padding:0 2px;line-height:1">✕</button>
+      </div>`;
+    document.getElementById(`cat-${idx}`).focus();
+  }
+}
+
+function resetCatToDropdown(idx) {
+  const wrap = document.getElementById(`catWrap-${idx}`);
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <select class="form-control" id="cat-${idx}" onchange="handleCatChange(${idx})">
+      <option value="travel">🚗 Travel</option>
+      <option value="food">🍽️ Food & Beverages</option>
+      <option value="accommodation">🏨 Accommodation</option>
+      <option value="fuel">⛽ Fuel / Petrol</option>
+      <option value="transport">🚕 Local Transport</option>
+      <option value="train">🚆 Train / Bus Fare</option>
+      <option value="flight">✈️ Flight</option>
+      <option value="medical">💊 Medical</option>
+      <option value="stationery">📋 Stationery / Office</option>
+      <option value="internet">🌐 Internet / Phone</option>
+      <option value="client_entertainment">🤝 Client Entertainment</option>
+      <option value="printing">🖨️ Printing</option>
+      <option value="repair">🔧 Repair / Maintenance</option>
+      <option value="training">📚 Training / Course</option>
+      <option value="miscellaneous">📦 Miscellaneous</option>
+      <option value="other">✏️ Other (specify)</option>
+    </select>`;
 }
 
 function removeItem(idx) {
@@ -565,7 +608,7 @@ async function submitReimb() {
   while (i < itemCount) {
     const itemEl = document.getElementById(`item-${i}`);
     if (!itemEl) { i++; continue; }
-    const cat  = document.getElementById(`cat-${i}`)?.value;
+    const catEl = document.getElementById(`cat-${i}`); const cat = (catEl?.dataset?.custom === 'true') ? (catEl?.value?.trim() || 'other') : catEl?.value;
     const desc = document.getElementById(`desc-${i}`)?.value?.trim();
     const amt  = parseFloat(document.getElementById(`amt-${i}`)?.value);
     const date = document.getElementById(`date-${i}`)?.value;
