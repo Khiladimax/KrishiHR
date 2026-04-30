@@ -389,7 +389,8 @@ function renderCard(r, tab) {
       <button class="btn btn-danger  btn-sm" onclick="rejectReimb(${r.id})">❌ Reject</button>`;
   }
   if (isOwner && r.status === 'pending') {
-    actionButtons += `<button class="btn btn-outline btn-sm" onclick="revokeReimb(${r.id})">↩ Revoke</button>`;
+    actionButtons += `<button class="btn btn-outline btn-sm" onclick="openEditModal(${r.id})">✏️ Edit</button>`;
+    actionButtons += `<button class="btn btn-outline btn-sm" style="color:#c62828;border-color:#c62828" onclick="revokeReimb(${r.id})">↩ Revoke</button>`;
   }
   if (isAccounts && r.status === 'approved') {
     actionButtons += `<button class="btn btn-primary btn-sm" onclick="disburseReimb(${r.id})">💰 Disburse</button>`;
@@ -842,6 +843,166 @@ async function viewAttachment(itemId, name, mime) {
   }
 }
 
+// ── Edit Reimbursement ───────────────────────────────────────────────────────
+let editItemCount = 0;
+let editAttachments = {}; // { idx: { data, name, mime, size, existing } }
+let editReimbId = null;
+
+function openEditModal(id) {
+  const reimb = allData.find(r => r.id === id);
+  if (!reimb) return;
+  editReimbId    = id;
+  editItemCount  = 0;
+  editAttachments = {};
+
+  document.getElementById('editModalBody').innerHTML = `
+    <div class="form-group">
+      <label>Request Title *</label>
+      <input id="editTitle" class="form-control" value="${escHtml(reimb.title)}" placeholder="Request title"/>
+    </div>
+    <div id="editItemsContainer"></div>
+    <button class="btn btn-outline" style="margin-bottom:16px" onclick="addEditItem()">+ Add Expense Item</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-primary" onclick="submitEdit(${id})">💾 Update Request</button>
+      <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+    </div>`;
+
+  // Pre-fill existing items
+  (reimb.items || []).forEach(item => {
+    addEditItem({
+      category:    item.category,
+      description: item.description || '',
+      amount:      item.amount,
+      date:        item.expense_date,
+      existingAttachName: item.has_attachment ? (item.attachment_name || 'attachment') : null,
+    });
+  });
+  if (!reimb.items || !reimb.items.length) addEditItem();
+
+  document.getElementById('editModal').classList.add('open');
+}
+
+function addEditItem(prefill = {}) {
+  const idx = editItemCount++;
+  const container = document.getElementById('editItemsContainer');
+  const div = document.createElement('div');
+  div.className = 'expense-item';
+  div.id = `edit-item-${idx}`;
+
+  const cats = ['travel','food','accommodation','miscellaneous'];
+  const catOptions = cats.map(c =>
+    `<option value="${c}" ${c === (prefill.category||'travel') ? 'selected' : ''}>${c.charAt(0).toUpperCase()+c.slice(1)}</option>`
+  ).join('');
+
+  const existingName = prefill.existingAttachName || null;
+
+  div.innerHTML = `
+    <div class="item-num">Expense #${idx + 1}</div>
+    <button class="remove-item-btn" onclick="removeEditItem(${idx})" title="Remove">×</button>
+    <div class="expense-grid">
+      <div class="form-group">
+        <label>Category *</label>
+        <select class="form-control" id="ecat-${idx}">${catOptions}</select>
+      </div>
+      <div class="form-group">
+        <label>Expense Date *</label>
+        <input type="date" class="form-control" id="edate-${idx}" value="${prefill.date || new Date().toISOString().slice(0,10)}"/>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Description *</label>
+        <input class="form-control" id="edesc-${idx}" value="${escHtml(prefill.description||'')}" placeholder="e.g. Cab fare"/>
+      </div>
+      <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" class="form-control" id="eamt-${idx}" value="${prefill.amount||''}" placeholder="0.00" min="0" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label>Attachment (Image/PDF)</label>
+        <input type="file" class="form-control" id="efile-${idx}" accept="image/*,application/pdf"
+               onchange="handleEditFile(${idx}, this)"/>
+        <div id="efilePreview-${idx}">
+          ${existingName
+            ? `<div class="attach-preview" style="background:#e8f5e9;color:#2e7d32">📎 ${escHtml(existingName)} <span style="font-size:10px;color:#888">(existing — upload new to replace)</span></div>`
+            : ''}
+        </div>
+      </div>
+    </div>`;
+
+  // Store existing attachment flag so we know to keep server-side if not replaced
+  if (existingName) editAttachments[idx] = { existing: true, name: existingName };
+  container.appendChild(div);
+}
+
+function removeEditItem(idx) {
+  const el = document.getElementById(`edit-item-${idx}`);
+  if (el) el.remove();
+  delete editAttachments[idx];
+}
+
+function handleEditFile(idx, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const base64 = e.target.result.split(',')[1];
+    editAttachments[idx] = { data: base64, name: file.name, mime: file.type, size: file.size };
+    const preview = document.getElementById(`efilePreview-${idx}`);
+    preview.innerHTML = `<div class="attach-preview">📎 ${escHtml(file.name)} (${(file.size/1024).toFixed(1)} KB) — <span style="color:#2e7d32">New file selected</span></div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitEdit(id) {
+  const title = document.getElementById('editTitle')?.value?.trim();
+  if (!title) return alert('Please enter a request title');
+
+  const items = [];
+  let valid = true;
+  for (let i = 0; i < editItemCount; i++) {
+    const itemEl = document.getElementById(`edit-item-${i}`);
+    if (!itemEl) continue;
+    const cat  = document.getElementById(`ecat-${i}`)?.value;
+    const desc = document.getElementById(`edesc-${i}`)?.value?.trim();
+    const amt  = parseFloat(document.getElementById(`eamt-${i}`)?.value);
+    const date = document.getElementById(`edate-${i}`)?.value;
+    if (!desc || !amt || amt <= 0 || !date) { valid = false; break; }
+    const att = editAttachments[i] || {};
+    items.push({
+      category:        cat,
+      description:     desc,
+      amount:          amt,
+      expense_date:    date,
+      // Only send attachment fields if a new file was picked (att.data exists)
+      // If existing=true but no new data, send nulls — backend keeps existing or clears
+      attachment_data: att.data  || null,
+      attachment_name: att.data  ? att.name : (att.existing ? att.name : null),
+      attachment_mime: att.data  ? att.mime : null,
+      attachment_size: att.data  ? att.size : null,
+    });
+  }
+
+  if (!valid || !items.length)
+    return alert('Please fill all expense item fields (description, amount, date)');
+
+  const btn = document.querySelector('#editModal .btn-primary');
+  btn.disabled = true; btn.textContent = 'Updating…';
+
+  try {
+    const res = await api('PUT', `/reimbursement/${id}/edit`, { title, items: JSON.stringify(items) });
+    if (res?.success) {
+      closeModal('editModal');
+      alert('✅ Reimbursement updated successfully!');
+      loadReimbursements(currentTab);
+    } else {
+      alert('Error: ' + (res?.message || 'Failed'));
+      btn.disabled = false; btn.textContent = '💾 Update Request';
+    }
+  } catch(e) {
+    alert('Network error: ' + e.message);
+    btn.disabled = false; btn.textContent = '💾 Update Request';
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
@@ -904,6 +1065,15 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
       <button class="btn btn-outline" onclick="closeModal('export-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="runExport()" id="exp-go-btn">⬇ Download Excel</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Edit Reimbursement Modal ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box" style="max-width:680px">
+    <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    <h3>✏️ Edit Reimbursement</h3>
+    <div id="editModalBody"></div>
   </div>
 </div>
 
