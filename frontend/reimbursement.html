@@ -581,7 +581,7 @@ function openRevisionModal(id) {
     <div class="revision-item-row">
       <div>
         <div class="desc">${catBadge(item.category)} ${escHtml(item.description)}</div>
-        <div class="orig">${item.expense_date} &nbsp;•&nbsp;
+        <div class="orig">${formatDate(item.expense_date)} &nbsp;•&nbsp;
           ${item.has_attachment
             ? `<a href="#" onclick="viewAttachment(${item.id},'${escHtml(item.attachment_name||'file')}','${item.attachment_mime||''}');return false" style="color:#2d6a4f">📎 View Attachment</a>`
             : 'No attachment'}
@@ -851,7 +851,13 @@ function escHtml(s) {
 }
 function formatDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const s = String(d);
+  // Full ISO timestamps (requested_at, approved_at etc) — use browser local timezone
+  if (s.length > 10) {
+    return new Date(s).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  }
+  // Date-only strings "YYYY-MM-DD" — parse as local midnight to avoid UTC day shift
+  return new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
 }
 
 // Close modals on overlay click
