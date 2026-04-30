@@ -703,7 +703,7 @@ async function viewAttachment(itemId, name, mime) {
   document.getElementById('viewerBody').innerHTML = '<div style="text-align:center;padding:30px;color:#888">Loading…</div>';
   document.getElementById('viewerModal').classList.add('open');
 
-  const url   = `/api/reimbursement/item/${itemId}/attachment`;
+  const url   = `${API_BASE}/reimbursement/item/${itemId}/attachment`;
   const token = Auth.getToken();  // ← correct key: 'krishihr_token'
 
   try {
