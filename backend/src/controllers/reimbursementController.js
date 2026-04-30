@@ -481,9 +481,9 @@ exports.exportData = async (req, res) => {
          r.id, r.title, r.status, r.total_amount, r.approved_amount,
          r.requested_at, r.approved_at, r.disbursed_at, r.remarks,
          CONCAT(e.first_name,' ',e.last_name) AS employee_name,
-         e.employee_code, e.mobile,
+         e.employee_code, e.phone,
          d.name AS department_name,
-         des.name AS designation
+         des.title AS designation
        FROM reimbursements r
        JOIN employees e ON r.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
