@@ -33,16 +33,26 @@ async function getChain(employeeId) {
   if (!emp.rows.length) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
   const { employee_code, role, manager_code } = emp.rows[0];
 
-  if (employee_code === COO_CODE)      return [MD_CODE, ACCOUNTS_CODE];
-  if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
-  if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
-  if (['admin','hr'].includes(role))   return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+  // COO applies → MD → Accounts (2 steps)
+  if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
 
+  // MD / super_admin applies → Accounts only (1 step)
+  if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
+
+  // Accounts applies → COO → MD (no self-loop)
+  if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
+
+  // Manager / TL / admin / hr → COO → MD → Accounts (3 steps)
+  // Managers skip the reporting-manager step — they start directly at COO
+  if (['manager', 'tl', 'admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+
+  // Regular employee → Reporting Manager → COO → MD → Accounts (4 steps)
   const hasMgr = manager_code &&
     ![COO_CODE, MD_CODE, ACCOUNTS_CODE].includes(manager_code);
-  return hasMgr
-    ? [manager_code, COO_CODE, MD_CODE, ACCOUNTS_CODE]
-    : [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+  if (hasMgr) return [manager_code, COO_CODE, MD_CODE, ACCOUNTS_CODE];
+
+  // Employee with no reporting manager set → start at COO
+  return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 }
 
 // ── Notify helper ─────────────────────────────────────────────────────────────
