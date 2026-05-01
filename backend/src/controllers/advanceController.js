@@ -139,13 +139,23 @@ exports.action = async (req, res) => {
   try {
     await client.query('BEGIN');
     const { id } = req.params;
-    const { action, remarks, payment_date } = req.body;
+    const { action, remarks, payment_date, project_id } = req.body;
     const actorCode = req.user.employee_code;
     const actorRole = req.user.role;
 
     if (!['approve','reject'].includes(action))
       return res.status(400).json({ success: false, message: 'action must be approve or reject' });
 
+    // If approver is redirecting to a different project, save it immediately
+    if (project_id) {
+      await client.query(
+        `ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`
+      ).catch(()=>{});
+      await client.query(
+        `UPDATE advance_salary SET project_id=$1 WHERE id=$2`,
+        [parseInt(project_id), req.params.id]
+      ).catch(()=>{});
+    }
     const adv = await client.query(
       `SELECT * FROM advance_salary WHERE id=$1 FOR UPDATE`, [id]
     );
