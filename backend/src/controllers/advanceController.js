@@ -253,9 +253,11 @@ exports.action = async (req, res) => {
       return res.json({ success: true, message: 'Advance rejected' });
     }
 
-    // Approve — advance chain
-    const currentIdx = chain.indexOf(currentCode);
+    // Approve — advance chain using current_level as index (more reliable than indexOf)
+    const currentIdx = parseInt(advance.current_level) - 1; // current_level is 1-based
     const nextCode   = chain[currentIdx + 1] || null;
+
+    console.log(`[advance.action] chain=${JSON.stringify(chain)} currentLevel=${advance.current_level} currentIdx=${currentIdx} nextCode=${nextCode} currentCode=${currentCode}`);
 
     if (nextCode) {
       await client.query(
