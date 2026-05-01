@@ -30,26 +30,27 @@ async function getAdvanceChain(employeeId) {
   if (!emp.rows.length) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
   const { employee_code, role, manager_code } = emp.rows[0];
 
-  // COO applies → MD → Accounts
+  // COO applies → MD → Accounts (2 steps)
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
 
-  // MD / super_admin applies → Accounts only
+  // MD / super_admin applies → Accounts only (1 step)
   if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
 
   // Accounts applies → COO → MD (no self-loop)
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
 
-  // admin / hr roles → skip reporting manager, go directly to COO → MD → Accounts
-  // This replaces the old hardcoded DIRECT_TO_COO set
-  // HR can assign admin/hr role to any employee in employees.html to give them this chain
-  if (['admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+  // Manager / TL / admin / hr → COO → MD → Accounts (3 steps)
+  // Managers skip the reporting-manager step — they start directly at COO
+  if (['manager', 'tl', 'admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 
-  // Everyone else (manager, TL, employee): Reporting Manager → COO → MD → Accounts
+  // Regular employee → Reporting Manager → COO → MD → Accounts (4 steps)
   const hasMgr = manager_code &&
     manager_code !== COO_CODE &&
     manager_code !== MD_CODE &&
     manager_code !== ACCOUNTS_CODE;
   if (hasMgr) return [manager_code, COO_CODE, MD_CODE, ACCOUNTS_CODE];
+
+  // Employee with no reporting manager set → start at COO
   return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 }
 
@@ -184,23 +185,6 @@ exports.action = async (req, res) => {
        VALUES($1,$2,$3,$4,$5,$6)`,
       [id, currentLevel, currentCode, req.user.id, action, remarks || null]
     );
-
-    // Self-correct chain for admin/hr employees whose old records had 4 levels
-    const empCheck = await client.query(
-      `SELECT e.employee_code, e.role FROM employees e WHERE e.id=$1`, [advance.employee_id]
-    );
-    const empCode = empCheck.rows[0]?.employee_code;
-    const empRole = empCheck.rows[0]?.role;
-    // admin/hr roles should have 3-level chain (COO→MD→Accounts), not 4
-    if (['admin','hr'].includes(empRole) && chain.length === 4) {
-      const correctedChain = [COO_CODE, MD_CODE, ACCOUNTS_CODE];
-      await client.query(
-        `UPDATE advance_salary SET approval_chain=$1, current_approver_code=$2, current_level=1 WHERE id=$3`,
-        [JSON.stringify(correctedChain), COO_CODE, id]
-      );
-      chain.splice(0, chain.length, ...correctedChain);
-      console.log(`[AUTO-FIX] Corrected chain for ${empCode} (${empRole}) advance #${id}: 4→3 levels`);
-    }
 
     // Manager can override the approved amount (reduce if employee asked too much)
     let amountWasOverridden = false;
