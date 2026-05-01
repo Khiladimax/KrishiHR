@@ -102,7 +102,7 @@
       <div class="topbar-title">💸 Advance Salary</div>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-primary btn-sm" onclick="openModal('req-modal')">+ Request Advance</button>
+      <button class="btn btn-primary btn-sm" onclick="openAdvanceModal()">+ Request Advance</button>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
       <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
@@ -161,6 +161,16 @@
       <div class="form-group">
         <label class="form-label">Amount (₹) *</label>
         <input id="req-amount" class="form-control" type="number" min="1000" placeholder="e.g. 10000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Repayment Months <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <input id="req-months" class="form-control" type="number" min="1" max="12" placeholder="e.g. 3 (blank = single deduction)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link to Project <span style="color:var(--muted);font-weight:400">(optional — Accounts can correct at payment)</span></label>
+        <select id="req-project" class="form-control">
+          <option value="">-- No Project --</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Reason *</label>
@@ -648,16 +658,42 @@ async function loadAll() {
   el.innerHTML = data.data.map(a => advanceCard(a, true)).join('');
 }
 
+async function openAdvanceModal() {
+  // Load active projects for employee to suggest
+  const sel = document.getElementById('req-project');
+  if (sel) {
+    sel.innerHTML = '<option value="">-- No Project --</option>';
+    api('GET', '/projects?status=active').then(r => {
+      if (!r?.success) return;
+      (r.data || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+        sel.appendChild(opt);
+      });
+    }).catch(()=>{});
+  }
+  openModal('req-modal');
+}
+
 async function submitRequest() {
-  const amount = document.getElementById('req-amount').value;
-  const reason = document.getElementById('req-reason').value.trim();
+  const amount     = document.getElementById('req-amount').value;
+  const reason     = document.getElementById('req-reason').value.trim();
+  const months     = document.getElementById('req-months')?.value;
+  const project_id = document.getElementById('req-project')?.value;
   if (!amount || !reason) { toast('Amount and reason required', 'error'); return; }
   const data = await api('POST', '/advance/apply', {
     amount: parseFloat(amount), reason,
+    repayment_months: months ? parseInt(months) : null,
+    project_id: project_id ? parseInt(project_id) : null,
   });
   if (data?.success) {
     toast(data.message);
     closeModal('req-modal');
+    document.getElementById('req-amount').value  = '';
+    document.getElementById('req-reason').value  = '';
+    if (document.getElementById('req-months'))  document.getElementById('req-months').value  = '';
+    if (document.getElementById('req-project')) document.getElementById('req-project').value = '';
     document.getElementById('req-amount').value = '';
     document.getElementById('req-reason').value = '';
     loadMy();
