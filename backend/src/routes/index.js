@@ -847,4 +847,22 @@ router.get   ('/it-declaration/:id',           authenticate, authorize('hr','acc
 router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
 router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
 
+// ── Project Budget Tracking ───────────────────────────────────────────────────
+const projCtrl = require('../controllers/projectController');
+
+router.get   ('/projects/summary',                  authenticate, authorize('accounts','super_admin','admin'), projCtrl.getSummary);
+router.get   ('/projects/pending-reports',          authenticate, projCtrl.pendingReports);
+router.get   ('/projects',                          authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.listProjects);
+router.post  ('/projects',                          authenticate, authorize('accounts','super_admin','admin'), projCtrl.createProject);
+router.get   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.getProject);
+router.put   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.updateProject);
+router.post  ('/projects/:id/assign',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.assignEmployee);
+router.delete('/projects/:id/employees/:empId',     authenticate, authorize('accounts','super_admin','admin'), projCtrl.removeEmployee);
+router.post  ('/projects/:id/expenditure',          authenticate, authorize('accounts','super_admin','admin'), projCtrl.addExpenditure);
+router.get   ('/projects/:id/expenditures',         authenticate, authorize('accounts','super_admin','admin','manager'), projCtrl.getExpenditures);
+router.get   ('/projects/:id/export',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.exportProjectExcel);
+router.get   ('/projects/:id/reports',              authenticate, projCtrl.listReports);
+router.post  ('/projects/:id/reports',              authenticate, projCtrl.submitReport);
+router.patch ('/projects/reports/:reportId',        authenticate, projCtrl.updateReport);
+
 module.exports = router;
