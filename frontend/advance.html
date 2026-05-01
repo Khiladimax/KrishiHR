@@ -167,6 +167,12 @@
         <input id="req-months" class="form-control" type="number" min="1" max="12" placeholder="e.g. 3 (leave blank for single deduction)">
       </div>
       <div class="form-group">
+        <label class="form-label">Link to Project <span style="color:var(--muted);font-weight:400">(optional — Accounts can correct at payment)</span></label>
+        <select id="req-project" class="form-control">
+          <option value="">-- No Project --</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label class="form-label">Reason *</label>
         <textarea id="req-reason" class="form-control" rows="3" placeholder="Explain why you need the advance…"></textarea>
       </div>
@@ -458,7 +464,7 @@ function advanceCard(adv, showActions = false) {
               Review (L${currentLevel})
             </button>` : ''}
           ${isPaymentStage ? `
-            <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount})">
+            <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount},${adv.project_id||'null'})">
               💸 Process Payment
             </button>` : ''}
           ${!canAct && !isPaymentStage && showActions && adv.status === 'pending' && alreadyActed ? `
@@ -645,24 +651,39 @@ async function loadAll() {
 }
 
 async function openAdvanceModal() {
+  // Load active projects for employee to suggest
+  const sel = document.getElementById('req-project');
+  sel.innerHTML = '<option value="">-- No Project --</option>';
+  api('GET', '/projects?status=active').then(r => {
+    if (!r?.success) return;
+    (r.data || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+      sel.appendChild(opt);
+    });
+  }).catch(()=>{});
   openModal('req-modal');
 }
 
 async function submitRequest() {
-  const amount  = document.getElementById('req-amount').value;
-  const reason  = document.getElementById('req-reason').value.trim();
-  const months  = document.getElementById('req-months').value;
+  const amount     = document.getElementById('req-amount').value;
+  const reason     = document.getElementById('req-reason').value.trim();
+  const months     = document.getElementById('req-months').value;
+  const project_id = document.getElementById('req-project').value;
   if (!amount || !reason) { toast('Amount and reason required', 'error'); return; }
   const data = await api('POST', '/advance/apply', {
     amount: parseFloat(amount), reason,
     repayment_months: months ? parseInt(months) : null,
+    project_id: project_id ? parseInt(project_id) : null,
   });
   if (data?.success) {
     toast(data.message);
     closeModal('req-modal');
-    document.getElementById('req-amount').value = '';
-    document.getElementById('req-reason').value = '';
-    document.getElementById('req-months').value = '';
+    document.getElementById('req-amount').value  = '';
+    document.getElementById('req-reason').value  = '';
+    document.getElementById('req-months').value  = '';
+    document.getElementById('req-project').value = '';
     loadMy();
     if (showStats) loadStats();
   } else {
@@ -712,7 +733,7 @@ function openApprove(id, name, amount, reason, level, originalAmount) {
   openModal('approve-modal');
 }
 
-function openPayment(id, name, amount) {
+function openPayment(id, name, amount, existingProjectId) {
   activeAdvId = id;
   document.getElementById('payment-content').innerHTML = `
     <div class="form-row">
@@ -733,7 +754,7 @@ function openPayment(id, name, amount) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">🗂 Link to Project <span style="color:#888;font-weight:400">(Accounts assigns — overrides employee selection)</span></label>
+      <label class="form-label">🗂 Project <span style="color:#888;font-weight:400">(Employee suggested — Accounts can correct)</span></label>
       <select id="pay-project" class="form-control">
         <option value="">-- No Project / Not billable --</option>
       </select>
@@ -743,7 +764,7 @@ function openPayment(id, name, amount) {
       <input id="pay-remarks" class="form-control" placeholder="e.g. NEFT Ref: 123456, Done">
     </div>`;
 
-  // Load active projects into dropdown
+  // Load active projects and pre-select employee's choice
   api('GET', '/projects?status=active').then(r => {
     if (!r?.success) return;
     const sel = document.getElementById('pay-project');
@@ -752,6 +773,7 @@ function openPayment(id, name, amount) {
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+      if (existingProjectId && p.id == existingProjectId) opt.selected = true;
       sel.appendChild(opt);
     });
   }).catch(()=>{});
