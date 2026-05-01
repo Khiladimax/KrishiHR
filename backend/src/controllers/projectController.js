@@ -28,9 +28,9 @@ exports.migrate = async () => {
         description      TEXT,
         start_date       DATE,
         end_date         DATE,
-        status           VARCHAR(30) DEFAULT 'active',   -- active/completed/on_hold
-        total_budget     NUMERIC(14,2) DEFAULT 0,        -- set by super_admin/accounts (client budget)
-        planned_cost     NUMERIC(14,2) DEFAULT 0,        -- planned expenditure set by org
+        status           VARCHAR(30) DEFAULT 'active',
+        total_budget     NUMERIC(14,2) DEFAULT 0,
+        planned_cost     NUMERIC(14,2) DEFAULT 0,
         project_manager_id INT REFERENCES employees(id),
         created_by       INT REFERENCES employees(id),
         created_at       TIMESTAMPTZ DEFAULT NOW(),
@@ -41,13 +41,13 @@ exports.migrate = async () => {
     // Employees assigned to a project
     await client.query(`
       CREATE TABLE IF NOT EXISTS project_employees (
-        id            SERIAL PRIMARY KEY,
-        project_id    INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        employee_id   INT NOT NULL REFERENCES employees(id),
+        id              SERIAL PRIMARY KEY,
+        project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        employee_id     INT NOT NULL REFERENCES employees(id),
         role_in_project VARCHAR(100),
-        assigned_at   TIMESTAMPTZ DEFAULT NOW(),
-        assigned_by   INT REFERENCES employees(id),
-        is_active     BOOLEAN DEFAULT true,
+        assigned_at     TIMESTAMPTZ DEFAULT NOW(),
+        assigned_by     INT REFERENCES employees(id),
+        is_active       BOOLEAN DEFAULT true,
         UNIQUE(project_id, employee_id)
       )
     `);
@@ -58,8 +58,8 @@ exports.migrate = async () => {
         id              SERIAL PRIMARY KEY,
         project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         employee_id     INT REFERENCES employees(id),
-        type            VARCHAR(30) NOT NULL,  -- salary / advance / reimbursement / other
-        reference_id    INT,                   -- payroll.id / advance_salary.id / reimbursement_requests.id
+        type            VARCHAR(30) NOT NULL,
+        reference_id    INT,
         amount          NUMERIC(12,2) NOT NULL,
         description     TEXT,
         month           INT,
@@ -76,21 +76,18 @@ exports.migrate = async () => {
         project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         period_start    DATE NOT NULL,
         period_end      DATE NOT NULL,
-        report_type     VARCHAR(20) DEFAULT 'biweekly',  -- biweekly / monthly
+        report_type     VARCHAR(20) DEFAULT 'biweekly',
         submitted_by    INT REFERENCES employees(id),
         submitted_at    TIMESTAMPTZ,
-        -- Retrospective fields (what was achieved)
         work_done       TEXT,
-        data_count      JSONB,               -- {"tickets_closed":5, "deliverables":2, ...}
+        data_count      JSONB,
         achievements    TEXT,
         challenges      TEXT,
-        -- Prospective fields (next 15 days plan)
         plan_next       TEXT,
         target_data     JSONB,
-        -- After 15 days — filled in next report
         actual_achieved TEXT,
-        achievement_pct NUMERIC(5,2),        -- % of target achieved
-        status          VARCHAR(20) DEFAULT 'pending',   -- pending/submitted/reviewed
+        achievement_pct NUMERIC(5,2),
+        status          VARCHAR(20) DEFAULT 'pending',
         manager_remarks TEXT,
         created_at      TIMESTAMPTZ DEFAULT NOW()
       )
@@ -294,16 +291,36 @@ exports.assignEmployee = async (req, res) => {
     if (!ADMIN_ROLES.includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const { id } = req.params;
-    const { employee_id, role_in_project } = req.body;
+    const projectId    = parseInt(req.params.id);
+    const employeeId   = parseInt(req.body.employee_id);
+    const { role_in_project } = req.body;
 
-    if (!employee_id)
-      return res.status(400).json({ success: false, message: 'employee_id required' });
+    if (!projectId  || isNaN(projectId))  return res.status(400).json({ success: false, message: 'Invalid project id' });
+    if (!employeeId || isNaN(employeeId)) return res.status(400).json({ success: false, message: 'Invalid employee_id — must be a number' });
+
+    // Auto-run migration if table doesn't exist yet
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS project_employees (
+        id              SERIAL PRIMARY KEY,
+        project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        employee_id     INT NOT NULL REFERENCES employees(id),
+        role_in_project VARCHAR(100),
+        assigned_at     TIMESTAMPTZ DEFAULT NOW(),
+        assigned_by     INT REFERENCES employees(id),
+        is_active       BOOLEAN DEFAULT true,
+        UNIQUE(project_id, employee_id)
+      )
+    `);
 
     // Check project exists
-    const proj = await db.query('SELECT id FROM projects WHERE id=$1', [id]);
+    const proj = await db.query('SELECT id FROM projects WHERE id=$1', [projectId]);
     if (!proj.rows.length)
       return res.status(404).json({ success: false, message: 'Project not found' });
+
+    // Check employee exists
+    const emp = await db.query('SELECT id FROM employees WHERE id=$1 AND is_active=true', [employeeId]);
+    if (!emp.rows.length)
+      return res.status(404).json({ success: false, message: 'Employee not found' });
 
     // Upsert (re-activate if previously removed)
     await db.query(`
@@ -311,12 +328,12 @@ exports.assignEmployee = async (req, res) => {
       VALUES ($1,$2,$3,$4,true)
       ON CONFLICT(project_id, employee_id) DO UPDATE SET
         is_active=true, role_in_project=$3, assigned_by=$4, assigned_at=NOW()
-    `, [id, employee_id, role_in_project||null, req.user.id]);
+    `, [projectId, employeeId, role_in_project||null, req.user.id]);
 
     res.json({ success: true, message: 'Employee assigned to project' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[assignEmployee]', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 };
 
@@ -765,4 +782,3 @@ exports.getSummary = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
-
