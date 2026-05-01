@@ -30,27 +30,26 @@ async function getAdvanceChain(employeeId) {
   if (!emp.rows.length) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
   const { employee_code, role, manager_code } = emp.rows[0];
 
-  // COO applies → MD → Accounts (2 steps)
+  // COO applies → MD → Accounts
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
 
-  // MD / super_admin applies → Accounts only (1 step)
+  // MD / super_admin applies → Accounts only
   if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
 
   // Accounts applies → COO → MD (no self-loop)
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
 
-  // Manager / TL / admin / hr → COO → MD → Accounts (3 steps)
-  // Managers skip the reporting-manager step — they start directly at COO
-  if (['manager', 'tl', 'admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+  // admin / hr roles → skip reporting manager, go directly to COO → MD → Accounts
+  // This replaces the old hardcoded DIRECT_TO_COO set
+  // HR can assign admin/hr role to any employee in employees.html to give them this chain
+  if (['admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 
-  // Regular employee → Reporting Manager → COO → MD → Accounts (4 steps)
+  // Everyone else (manager, TL, employee): Reporting Manager → COO → MD → Accounts
   const hasMgr = manager_code &&
     manager_code !== COO_CODE &&
     manager_code !== MD_CODE &&
     manager_code !== ACCOUNTS_CODE;
   if (hasMgr) return [manager_code, COO_CODE, MD_CODE, ACCOUNTS_CODE];
-
-  // Employee with no reporting manager set → start at COO
   return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 }
 
@@ -60,7 +59,7 @@ exports.apply = async (req, res) => {
   try {
     await client.query('BEGIN');
     const empId = req.user.id;
-    const { amount, reason, repayment_months, project_id } = req.body;
+    const { amount, reason, repayment_months } = req.body;
 
     if (!amount || amount <= 0)
       return res.status(400).json({ success: false, message: 'Valid amount required' });
@@ -81,20 +80,17 @@ exports.apply = async (req, res) => {
     if (existing.rows.length)
       return res.status(400).json({ success: false, message: 'You already have a pending advance request awaiting approval' });
 
-    // Ensure project_id column exists
-    await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id)`).catch(()=>{});
-
     const chain = await getAdvanceChain(empId);
     const emi   = repayment_months ? Math.ceil(amount / repayment_months) : amount;
 
     const result = await client.query(
       `INSERT INTO advance_salary
          (employee_id, amount, reason, monthly_emi, total_installments,
-          approval_chain, current_approver_code, status, purpose, project_id)
-       VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)
+          approval_chain, current_approver_code, status, purpose)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8)
        RETURNING id`,
       [empId, amount, reason || null, emi, repayment_months || 1,
-       JSON.stringify(chain), chain[0], String(amount), project_id ? parseInt(project_id) : null]
+       JSON.stringify(chain), chain[0], String(amount)]
     );
 
     await client.query('COMMIT');
@@ -185,6 +181,23 @@ exports.action = async (req, res) => {
        VALUES($1,$2,$3,$4,$5,$6)`,
       [id, currentLevel, currentCode, req.user.id, action, remarks || null]
     );
+
+    // Self-correct chain for admin/hr employees whose old records had 4 levels
+    const empCheck = await client.query(
+      `SELECT e.employee_code, e.role FROM employees e WHERE e.id=$1`, [advance.employee_id]
+    );
+    const empCode = empCheck.rows[0]?.employee_code;
+    const empRole = empCheck.rows[0]?.role;
+    // admin/hr roles should have 3-level chain (COO→MD→Accounts), not 4
+    if (['admin','hr'].includes(empRole) && chain.length === 4) {
+      const correctedChain = [COO_CODE, MD_CODE, ACCOUNTS_CODE];
+      await client.query(
+        `UPDATE advance_salary SET approval_chain=$1, current_approver_code=$2, current_level=1 WHERE id=$3`,
+        [JSON.stringify(correctedChain), COO_CODE, id]
+      );
+      chain.splice(0, chain.length, ...correctedChain);
+      console.log(`[AUTO-FIX] Corrected chain for ${empCode} (${empRole}) advance #${id}: 4→3 levels`);
+    }
 
     // Manager can override the approved amount (reduce if employee asked too much)
     let amountWasOverridden = false;
@@ -301,12 +314,14 @@ exports.action = async (req, res) => {
   } finally { client.release(); }
 };
 
-// ── Get MY advances — no role logic, always own requests only ────────────────
+// ── Get Advances ──────────────────────────────────────────────────────────────
+// Visibility rules:
+//   super_admin / hr  → see ALL requests
+// ── Get MY advances — simple, no role logic, just own requests ───────────────
 exports.getMine = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT a.*,
-              COALESCE(NULLIF(a.purpose,''), a.amount::text)::numeric AS original_requested_amount,
               CONCAT(e.first_name,' ',e.last_name) AS employee_name,
               e.employee_code, d.name AS department_name
        FROM advance_salary a
@@ -318,14 +333,11 @@ exports.getMine = async (req, res) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[getMine]', err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ── Get Advances ──────────────────────────────────────────────────────────────
-// Visibility rules:
-//   super_admin / hr  → see ALL requests
 //   accounts          → see requests where they are current_approver OR fully approved (status=approved) OR own requests
 //   admin (COO etc.)  → see requests where they are current_approver OR already passed through them (approval_chain contains their code) OR own requests
 //   manager / tl      → see requests where they are current_approver OR own requests
@@ -371,15 +383,12 @@ exports.getAll = async (req, res) => {
 
     } else if (userRole === 'accounts') {
       // Accounts sees:
-      //   1. Requests where they are the current approver (their turn to approve in chain)
-      //   2. ALL fully approved requests (status=approved) — disbursement queue
-      //      regardless of current_approver_code — some chains end at MD, some go to Accounts
-      //   3. Already disbursed (for history)
-      //   4. Their own requests
+      //   1. Requests where they are the current approver (pending, awaiting their action)
+      //   2. Requests that are fully approved (disbursement queue — status=approved, no pending approver)
+      //   3. Their own requests
       conds.push(`(
         a.current_approver_code = $${idx++}
-        OR a.status = 'approved'
-        OR a.status = 'disbursed'
+        OR (a.status = 'approved' AND a.current_approver_code IS NULL)
         OR a.employee_id = $${idx++}
       )`);
       params.push(userCode, userId);
@@ -494,12 +503,8 @@ exports.getStats = async (req, res) => {
 
     if (userRole === 'hr') {
       // HR sees all for oversight
-    } else if (userRole === 'accounts') {
-      // Accounts sees all approved (disbursement queue) + disbursed history + where they're approver + own
-      scopeFilter = `WHERE (status='approved' OR status='disbursed' OR current_approver_code=$1 OR employee_id=$2)`;
-      params = [userCode, userId];
-    } else if (['super_admin', 'admin'].includes(userRole)) {
-      // COO/MD: stats scoped to requests where it's their turn OR they already acted OR their own
+    } else if (['super_admin', 'admin', 'accounts'].includes(userRole)) {
+      // COO/MD/Accounts: stats scoped to requests where it's their turn OR they already acted OR their own
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2 OR EXISTS (
         SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2
       ))`;
@@ -658,7 +663,7 @@ exports.processPayment = async (req, res) => {
   try {
     await client.query('BEGIN');
     const { id } = req.params;
-    const { payment_date, payment_mode, remarks, project_id } = req.body;
+    const { payment_date, payment_mode, remarks } = req.body;
 
     if (!payment_date || !remarks)
       return res.status(400).json({ success: false, message: 'payment_date and remarks are required' });
@@ -671,11 +676,6 @@ exports.processPayment = async (req, res) => {
 
     if (adv.rows[0].status !== 'approved')
       return res.status(400).json({ success: false, message: 'Only fully approved advances can be processed for payment' });
-
-    // Accounts can override/set project_id at payment time (final authority)
-    const finalProjectId = project_id ? parseInt(project_id) : (adv.rows[0].project_id || null);
-    await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(()=>{});
-    await client.query(`UPDATE advance_salary SET project_id=$1 WHERE id=$2`, [finalProjectId, id]).catch(()=>{});
 
     try {
       await client.query(
@@ -701,17 +701,6 @@ exports.processPayment = async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'Payment processed successfully' });
-
-    // ── Auto-record in project_expenditures using Accounts-confirmed project ──
-    try {
-      if (finalProjectId) {
-        const projCtrl = require('./projectController');
-        await projCtrl.hookFinanceExpenditure(
-          adv.rows[0].employee_id, adv.rows[0].amount, 'advance',
-          parseInt(id), finalProjectId, `Advance disbursed`
-        );
-      }
-    } catch(hookErr) { console.error('[advance.processPayment hook]', hookErr.message); }
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
