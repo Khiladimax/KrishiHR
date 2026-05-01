@@ -1040,8 +1040,18 @@ function searchEmployees() {
 
   const el = document.getElementById('emp-search-result');
   if (!results.length) { el.style.display='none'; return; }
+
+  // Auto-select if only one result
+  if (results.length === 1) {
+    const e = results[0];
+    selectEmployee(e.id, `${e.first_name} ${e.last_name}`, e.employee_code, e.role||'');
+    el.style.display = 'none';
+    return;
+  }
+
   el.style.display = 'block';
-  el.innerHTML = results.map(e => `
+  el.innerHTML = `<div style="font-size:10.5px;color:var(--muted);padding:6px 14px;font-weight:600;background:var(--bg)">👆 TAP TO SELECT</div>` +
+    results.map(e => `
     <div class="emp-search-item" onclick="selectEmployee(${e.id}, '${e.first_name} ${e.last_name}', '${e.employee_code}', '${e.role||''}')">
       <div class="emp-avatar" style="width:28px;height:28px;font-size:11px">${(e.first_name||'?')[0]}${(e.last_name||'?')[0]}</div>
       <div>
@@ -1061,8 +1071,8 @@ function selectEmployee(id, name, code, role) {
 }
 
 async function assignEmployee() {
-  if (!_selectedEmpId) { toast('Please select an employee', 'error'); return; }
-  if (!_currentProjId) return;
+  if (!_selectedEmpId) { toast('Please tap an employee from the search results first', 'error'); return; }
+  if (!_currentProjId) { toast('No project selected — please close and reopen the panel', 'error'); return; }
 
   const r = await api('POST', `/projects/${_currentProjId}/assign`, {
     employee_id:     _selectedEmpId,
@@ -1070,7 +1080,7 @@ async function assignEmployee() {
   });
 
   if (!r?.success) { toast(r?.message || 'Failed to assign', 'error'); return; }
-  toast('Employee assigned', 'success');
+  toast('Employee assigned successfully!', 'success');
   closeModal('assign-modal');
   openProjPanel(_currentProjId);
 }
