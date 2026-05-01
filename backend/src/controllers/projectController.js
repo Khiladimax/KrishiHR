@@ -281,6 +281,29 @@ exports.updateProject = async (req, res) => {
   }
 };
 
+// DELETE /projects/:id — delete project (accounts/super_admin only)
+exports.deleteProject = async (req, res) => {
+  try {
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const { id } = req.params;
+
+    // Check project exists
+    const proj = await db.query('SELECT id, name FROM projects WHERE id=$1', [id]);
+    if (!proj.rows.length)
+      return res.status(404).json({ success: false, message: 'Project not found' });
+
+    // Delete project — CASCADE will remove project_employees, project_expenditures, project_progress_reports
+    await db.query('DELETE FROM projects WHERE id=$1', [id]);
+
+    res.json({ success: true, message: `Project "${proj.rows[0].name}" deleted successfully` });
+  } catch (err) {
+    console.error('[deleteProject]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // EMPLOYEE ASSIGNMENT
 // ══════════════════════════════════════════════════════════════════════════════
