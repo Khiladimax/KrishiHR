@@ -460,6 +460,12 @@ function renderApplyForm() {
       <label>Request Title *</label>
       <input id="reimbTitle" class="form-control" placeholder="e.g. Mumbai Client Visit – April 2026"/>
     </div>
+    <div class="form-group">
+      <label>Link to Project <span style="color:#999;font-weight:400">(optional — Accounts can correct at disbursement)</span></label>
+      <select id="reimbProject" class="form-control">
+        <option value="">-- No Project --</option>
+      </select>
+    </div>
     <div class="excel-wrap">
       <table class="excel-table">
         <thead>
@@ -490,6 +496,19 @@ function renderApplyForm() {
     </div>
   </div>`;
   addItem(); // Start with one item
+
+  // Load active projects for employee to suggest
+  api('GET', '/projects?status=active').then(r => {
+    if (!r?.success) return;
+    const sel = document.getElementById('reimbProject');
+    if (!sel) return;
+    (r.data || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+      sel.appendChild(opt);
+    });
+  }).catch(()=>{});
 }
 
 function addItem() {
@@ -599,7 +618,8 @@ function handleFileSelect(idx, input) {
 }
 
 async function submitReimb() {
-  const title = document.getElementById('reimbTitle')?.value?.trim();
+  const title      = document.getElementById('reimbTitle')?.value?.trim();
+  const project_id = document.getElementById('reimbProject')?.value || null;
   if (!title) return alert('Please enter a request title');
 
   const items = [];
@@ -633,7 +653,8 @@ async function submitReimb() {
   try {
     const res = await api('POST', '/reimbursement/apply', {
       title,
-      items: JSON.stringify(items)
+      items: JSON.stringify(items),
+      project_id: project_id ? parseInt(project_id) : null
     });
     if (res?.success) {
       alert('✅ Reimbursement submitted successfully!');
