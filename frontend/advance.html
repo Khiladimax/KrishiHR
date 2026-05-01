@@ -167,12 +167,6 @@
         <input id="req-months" class="form-control" type="number" min="1" max="12" placeholder="e.g. 3 (leave blank for single deduction)">
       </div>
       <div class="form-group">
-        <label class="form-label">Link to Project <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-        <select id="req-project" class="form-control">
-          <option value="">-- No Project --</option>
-        </select>
-      </div>
-      <div class="form-group">
         <label class="form-label">Reason *</label>
         <textarea id="req-reason" class="form-control" rows="3" placeholder="Explain why you need the advance…"></textarea>
       </div>
@@ -651,41 +645,24 @@ async function loadAll() {
 }
 
 async function openAdvanceModal() {
-  // Load active projects into dropdown
-  const sel = document.getElementById('req-project');
-  sel.innerHTML = '<option value="">-- No Project --</option>';
-  try {
-    const r = await api('GET', '/projects?status=active');
-    if (r?.success && r.data?.length) {
-      r.data.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
-        sel.appendChild(opt);
-      });
-    }
-  } catch(_) {}
   openModal('req-modal');
 }
 
 async function submitRequest() {
-  const amount     = document.getElementById('req-amount').value;
-  const reason     = document.getElementById('req-reason').value.trim();
-  const project_id = document.getElementById('req-project').value;
-  const months     = document.getElementById('req-months').value;
+  const amount  = document.getElementById('req-amount').value;
+  const reason  = document.getElementById('req-reason').value.trim();
+  const months  = document.getElementById('req-months').value;
   if (!amount || !reason) { toast('Amount and reason required', 'error'); return; }
   const data = await api('POST', '/advance/apply', {
     amount: parseFloat(amount), reason,
     repayment_months: months ? parseInt(months) : null,
-    project_id: project_id ? parseInt(project_id) : null,
   });
   if (data?.success) {
     toast(data.message);
     closeModal('req-modal');
-    document.getElementById('req-amount').value  = '';
-    document.getElementById('req-reason').value  = '';
-    document.getElementById('req-months').value  = '';
-    document.getElementById('req-project').value = '';
+    document.getElementById('req-amount').value = '';
+    document.getElementById('req-reason').value = '';
+    document.getElementById('req-months').value = '';
     loadMy();
     if (showStats) loadStats();
   } else {
@@ -756,9 +733,29 @@ function openPayment(id, name, amount) {
       </select>
     </div>
     <div class="form-group">
+      <label class="form-label">🗂 Link to Project <span style="color:#888;font-weight:400">(Accounts assigns — overrides employee selection)</span></label>
+      <select id="pay-project" class="form-control">
+        <option value="">-- No Project / Not billable --</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Remarks / Reference *</label>
       <input id="pay-remarks" class="form-control" placeholder="e.g. NEFT Ref: 123456, Done">
     </div>`;
+
+  // Load active projects into dropdown
+  api('GET', '/projects?status=active').then(r => {
+    if (!r?.success) return;
+    const sel = document.getElementById('pay-project');
+    if (!sel) return;
+    (r.data || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+      sel.appendChild(opt);
+    });
+  }).catch(()=>{});
+
   openModal('payment-modal');
 }
 
@@ -786,12 +783,14 @@ async function actionAdvance(action) {
 }
 
 async function processPayment() {
-  const date    = document.getElementById('pay-date')?.value;
-  const mode    = document.getElementById('pay-mode')?.value;
-  const remarks = document.getElementById('pay-remarks')?.value?.trim();
+  const date       = document.getElementById('pay-date')?.value;
+  const mode       = document.getElementById('pay-mode')?.value;
+  const remarks    = document.getElementById('pay-remarks')?.value?.trim();
+  const project_id = document.getElementById('pay-project')?.value || null;
   if (!date || !remarks) { toast('Payment date and remarks are required', 'error'); return; }
   const data = await api('POST', `/advance/${activeAdvId}/process-payment`, {
-    payment_date: date, payment_mode: mode, remarks
+    payment_date: date, payment_mode: mode, remarks,
+    project_id: project_id ? parseInt(project_id) : null,
   });
   if (data?.success) {
     toast(data.message);
