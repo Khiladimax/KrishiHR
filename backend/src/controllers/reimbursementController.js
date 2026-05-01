@@ -407,6 +407,20 @@ exports.action = async (req, res) => {
       }
     }
 
+    // ── Auto-record in project_expenditures when reimbursement is fully approved ──
+    // This ensures the project budget reflects the cost immediately upon accounts approval,
+    // not just when disbursement is processed later.
+    try {
+      const finalProjectId = reimb.project_id || null;
+      if (finalProjectId) {
+        const projCtrl = require('./projectController');
+        await projCtrl.hookFinanceExpenditure(
+          reimb.employee_id, finalApprovedAmount, 'reimbursement',
+          parseInt(id), finalProjectId, `Reimbursement approved: ${reimb.title}`
+        );
+      }
+    } catch (hookErr) { console.error('[reimb.approval hook]', hookErr.message); }
+
     res.json({ success: true, message: 'Reimbursement fully approved' });
   } catch (err) {
     await client.query('ROLLBACK');
