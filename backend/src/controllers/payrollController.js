@@ -347,6 +347,19 @@ exports.uploadPayroll = async (req, res) => {
         );
       }
 
+      // ── Auto-record salary in project_expenditures for assigned employees ──
+      try {
+        const projCtrl = require('./projectController');
+        // Get the payroll row id we just upserted
+        const payRow = await client.query(
+          `SELECT id FROM payroll WHERE employee_id=$1 AND month=$2 AND year=$3`,
+          [empId, monthNum, yearNum]
+        );
+        if (payRow.rows.length) {
+          await projCtrl.hookPayrollExpenditure(empId, netPay, monthNum, yearNum, payRow.rows[0].id);
+        }
+      } catch(hookErr) { console.error('[payroll.hook]', hookErr.message); }
+
       processed++;
     }
 
