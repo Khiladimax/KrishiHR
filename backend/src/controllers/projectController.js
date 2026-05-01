@@ -294,6 +294,11 @@ exports.deleteProject = async (req, res) => {
     if (!proj.rows.length)
       return res.status(404).json({ success: false, message: 'Project not found' });
 
+    // Nullify project_id on any advance_salary / reimbursements rows that reference this project.
+    // These tables may have an FK without ON DELETE CASCADE, so we must clear them first.
+    await db.query(`UPDATE advance_salary    SET project_id = NULL WHERE project_id = $1`, [id]).catch(() => {});
+    await db.query(`UPDATE reimbursements    SET project_id = NULL WHERE project_id = $1`, [id]).catch(() => {});
+
     // Delete project — CASCADE will remove project_employees, project_expenditures, project_progress_reports
     await db.query('DELETE FROM projects WHERE id=$1', [id]);
 
