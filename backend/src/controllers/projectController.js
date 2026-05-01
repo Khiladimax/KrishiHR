@@ -605,8 +605,8 @@ exports.pendingReports = async (req, res) => {
 // GET /projects/:id/export — Excel export for accounts
 exports.exportProjectExcel = async (req, res) => {
   try {
-    if (!ADMIN_ROLES.includes(req.user.role))
-      return res.status(403).json({ success: false, message: 'Accounts/Admin only' });
+    if (req.user.role !== 'accounts' && req.user.role !== 'super_admin')
+      return res.status(403).json({ success: false, message: 'Only Accounts can download Excel reports' });
 
     const { id } = req.params;
 
