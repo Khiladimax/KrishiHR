@@ -460,12 +460,6 @@ function renderApplyForm() {
       <label>Request Title *</label>
       <input id="reimbTitle" class="form-control" placeholder="e.g. Mumbai Client Visit – April 2026"/>
     </div>
-    <div class="form-group">
-      <label>Link to Project <span style="color:#999;font-weight:400">(optional)</span></label>
-      <select id="reimbProject" class="form-control">
-        <option value="">-- No Project --</option>
-      </select>
-    </div>
     <div class="excel-wrap">
       <table class="excel-table">
         <thead>
@@ -496,19 +490,6 @@ function renderApplyForm() {
     </div>
   </div>`;
   addItem(); // Start with one item
-
-  // Load active projects into dropdown
-  api('GET', '/projects?status=active').then(r => {
-    if (!r?.success) return;
-    const sel = document.getElementById('reimbProject');
-    if (!sel) return;
-    (r.data || []).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
-      sel.appendChild(opt);
-    });
-  }).catch(()=>{});
 }
 
 function addItem() {
@@ -618,8 +599,7 @@ function handleFileSelect(idx, input) {
 }
 
 async function submitReimb() {
-  const title      = document.getElementById('reimbTitle')?.value?.trim();
-  const project_id = document.getElementById('reimbProject')?.value || null;
+  const title = document.getElementById('reimbTitle')?.value?.trim();
   if (!title) return alert('Please enter a request title');
 
   const items = [];
@@ -653,8 +633,7 @@ async function submitReimb() {
   try {
     const res = await api('POST', '/reimbursement/apply', {
       title,
-      items: JSON.stringify(items),
-      project_id: project_id ? parseInt(project_id) : null
+      items: JSON.stringify(items)
     });
     if (res?.success) {
       alert('✅ Reimbursement submitted successfully!');
@@ -772,15 +751,79 @@ async function revokeReimb(id) {
 
 // ── Disburse ──────────────────────────────────────────────────────────────────
 async function disburseReimb(id) {
-  const remarks = prompt('Disbursement note (required):');
-  if (!remarks) return;
+  // Build a proper modal instead of prompt() so Accounts can set project
+  const existing = allData.find(r => r.id === id);
+  const existingProjId = existing?.project_id || '';
+
+  // Inject disburse modal if not present
+  if (!document.getElementById('disburse-modal')) {
+    const m = document.createElement('div');
+    m.id = 'disburse-modal';
+    m.className = 'modal-overlay';
+    m.style.display = 'flex';
+    m.innerHTML = `
+      <div class="modal-box" style="max-width:440px;width:100%">
+        <button class="modal-close" onclick="document.getElementById('disburse-modal').style.display='none'">×</button>
+        <h3>💰 Disburse Reimbursement</h3>
+        <div id="disburse-body"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-outline" onclick="document.getElementById('disburse-modal').style.display='none'">Cancel</button>
+          <button class="btn btn-primary" onclick="confirmDisburse()">Confirm Disbursement</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+  } else {
+    document.getElementById('disburse-modal').style.display = 'flex';
+  }
+
+  window._disburseId = id;
+  document.getElementById('disburse-body').innerHTML = `
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px">
+        🗂 Link to Project <span style="color:#888;font-weight:400">(Accounts assigns — overrides employee selection)</span>
+      </label>
+      <select id="disburse-project" class="form-control">
+        <option value="">-- No Project / Not billable --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px">Remarks / Reference *</label>
+      <input id="disburse-remarks" class="form-control" placeholder="e.g. NEFT Ref: 123456">
+    </div>`;
+
+  // Load projects
+  api('GET', '/projects?status=active').then(r => {
+    if (!r?.success) return;
+    const sel = document.getElementById('disburse-project');
+    if (!sel) return;
+    (r.data || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+      if (p.id == existingProjId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }).catch(()=>{});
+}
+
+async function confirmDisburse() {
+  const remarks    = document.getElementById('disburse-remarks')?.value?.trim();
+  const project_id = document.getElementById('disburse-project')?.value || null;
+  if (!remarks) { alert('Remarks are required'); return; }
   try {
-    const res = await api('POST', `/reimbursement/${id}/disburse`,
-      { remarks, payment_date: new Date().toISOString().slice(0,10) });
-    const d = res;
-    alert(d?.success ? '✅ Disbursed!' : 'Error: ' + d?.message);
-    loadReimbursements(currentTab);
-  } catch { alert('Network error'); }
+    const res = await api('POST', `/reimbursement/${window._disburseId}/disburse`, {
+      remarks,
+      payment_date: new Date().toISOString().slice(0,10),
+      project_id: project_id ? parseInt(project_id) : null,
+    });
+    document.getElementById('disburse-modal').style.display = 'none';
+    if (res?.success) {
+      toast('✅ Disbursed successfully!', 'success');
+      loadReimbursements(currentTab);
+    } else {
+      toast('Error: ' + (res?.message || 'Failed'), 'error');
+    }
+  } catch { toast('Network error', 'error'); }
 }
 
 // ── Approval Timeline ─────────────────────────────────────────────────────────
