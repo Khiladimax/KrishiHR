@@ -276,6 +276,11 @@ exports.action = async (req, res) => {
     }
 
     // Final approval
+    // Ensure the project_id column and disbursed status exist before we touch the row
+    await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(() => {});
+    await client.query(`ALTER TABLE advance_salary DROP CONSTRAINT IF EXISTS advance_salary_status_check`).catch(() => {});
+    await client.query(`ALTER TABLE advance_salary ADD CONSTRAINT advance_salary_status_check CHECK (status IN ('pending','approved','rejected','recovered','disbursed','cleared'))`).catch(() => {});
+
     const emi = Math.ceil(parseFloat(advance.amount) / (parseInt(advance.total_installments) || 1));
     const now = new Date();
     await client.query(
@@ -302,8 +307,10 @@ exports.action = async (req, res) => {
     // ── Auto-record in project_expenditures when advance is fully approved ──
     // This ensures the project budget reflects the cost immediately upon accounts approval,
     // not just when disbursement is processed later.
+    // Re-fetch the row so we get the latest project_id (approver may have set it during this action).
     try {
-      const finalProjectId = advance.project_id || null;
+      const freshAdv = await db.query(`SELECT project_id, employee_id, amount FROM advance_salary WHERE id=$1`, [id]);
+      const finalProjectId = freshAdv.rows[0]?.project_id || null;
       if (finalProjectId) {
         const projCtrl = require('./projectController');
         await projCtrl.hookFinanceExpenditure(
