@@ -645,7 +645,7 @@ exports.processPayment = async (req, res) => {
   try {
     await client.query('BEGIN');
     const { id } = req.params;
-    const { payment_date, payment_mode, remarks } = req.body;
+    const { payment_date, payment_mode, remarks, project_id } = req.body;
 
     if (!payment_date || !remarks)
       return res.status(400).json({ success: false, message: 'payment_date and remarks are required' });
@@ -658,6 +658,11 @@ exports.processPayment = async (req, res) => {
 
     if (adv.rows[0].status !== 'approved')
       return res.status(400).json({ success: false, message: 'Only fully approved advances can be processed for payment' });
+
+    // Accounts can override/set project_id at payment time (final authority)
+    const finalProjectId = project_id ? parseInt(project_id) : (adv.rows[0].project_id || null);
+    await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(()=>{});
+    await client.query(`UPDATE advance_salary SET project_id=$1 WHERE id=$2`, [finalProjectId, id]).catch(()=>{});
 
     try {
       await client.query(
@@ -684,15 +689,13 @@ exports.processPayment = async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true, message: 'Payment processed successfully' });
 
-    // ── Auto-record in project expenditures if project_id is set ──
+    // ── Auto-record in project_expenditures using Accounts-confirmed project ──
     try {
-      const advRow = await db.query(`SELECT employee_id, amount, project_id FROM advance_salary WHERE id=$1`, [id]);
-      const adv2 = advRow.rows[0];
-      if (adv2?.project_id) {
+      if (finalProjectId) {
         const projCtrl = require('./projectController');
         await projCtrl.hookFinanceExpenditure(
-          adv2.employee_id, adv2.amount, 'advance', parseInt(id),
-          adv2.project_id, `Advance disbursed`
+          adv.rows[0].employee_id, adv.rows[0].amount, 'advance',
+          parseInt(id), finalProjectId, `Advance disbursed`
         );
       }
     } catch(hookErr) { console.error('[advance.processPayment hook]', hookErr.message); }
