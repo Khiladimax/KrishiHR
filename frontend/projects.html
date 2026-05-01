@@ -1062,7 +1062,7 @@ function searchEmployees() {
 }
 
 function selectEmployee(id, name, code, role) {
-  _selectedEmpId = id;
+  _selectedEmpId = parseInt(id);  // always int
   document.getElementById('emp-search').value         = name;
   document.getElementById('emp-search-result').style.display = 'none';
   document.getElementById('selected-emp-display').style.display = '';
