@@ -470,13 +470,18 @@ exports.disburse = async (req, res) => {
   try {
     await client.query('BEGIN');
     const { id } = req.params;
-    const { payment_date, payment_mode, remarks } = req.body;
+    const { payment_date, payment_mode, remarks, project_id } = req.body;
     if (!remarks) return res.status(400).json({ success: false, message: 'Remarks required' });
 
     const r = await client.query(`SELECT * FROM reimbursements WHERE id=$1 FOR UPDATE`, [id]);
     if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     if (r.rows[0].status !== 'approved')
       return res.status(400).json({ success: false, message: 'Only approved reimbursements can be disbursed' });
+
+    // Accounts can override/set project_id at disbursement time (final authority)
+    const finalProjectId = project_id ? parseInt(project_id) : (r.rows[0].project_id || null);
+    await client.query(`ALTER TABLE reimbursements ADD COLUMN IF NOT EXISTS project_id INT`).catch(()=>{});
+    await client.query(`UPDATE reimbursements SET project_id=$1 WHERE id=$2`, [finalProjectId, id]).catch(()=>{});
 
     await client.query(
       `UPDATE reimbursements SET status='disbursed', disbursed_at=NOW(), disbursed_by=$1, remarks=$2, updated_at=NOW() WHERE id=$3`,
@@ -493,13 +498,13 @@ exports.disburse = async (req, res) => {
     await notifyEmployee(reimb.employee_id, '💰 Reimbursement Disbursed',
       `Your reimbursement "${reimb.title}" of ₹${parseFloat(reimb.approved_amount).toLocaleString('en-IN')} has been disbursed.${remarks ? ' Note: ' + remarks : ''}`);
 
-    // ── Auto-record in project expenditures if project_id is set ──
+    // ── Auto-record in project_expenditures using Accounts-confirmed project ──
     try {
-      if (reimb.project_id) {
+      if (finalProjectId) {
         const projCtrl = require('./projectController');
         await projCtrl.hookFinanceExpenditure(
           reimb.employee_id, reimb.approved_amount, 'reimbursement',
-          parseInt(id), reimb.project_id, `Reimbursement: ${reimb.title}`
+          parseInt(id), finalProjectId, `Reimbursement: ${reimb.title}`
         );
       }
     } catch(hookErr) { console.error('[reimb.disburse hook]', hookErr.message); }
