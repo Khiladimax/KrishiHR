@@ -365,12 +365,15 @@ exports.getAll = async (req, res) => {
 
     } else if (userRole === 'accounts') {
       // Accounts sees:
-      //   1. Requests where they are the current approver (pending, awaiting their action)
-      //   2. Requests that are fully approved (disbursement queue — status=approved, no pending approver)
-      //   3. Their own requests
+      //   1. Requests where they are the current approver (their turn to approve in chain)
+      //   2. ALL fully approved requests (status=approved) — disbursement queue
+      //      regardless of current_approver_code — some chains end at MD, some go to Accounts
+      //   3. Already disbursed (for history)
+      //   4. Their own requests
       conds.push(`(
         a.current_approver_code = $${idx++}
-        OR (a.status = 'approved' AND a.current_approver_code IS NULL)
+        OR a.status = 'approved'
+        OR a.status = 'disbursed'
         OR a.employee_id = $${idx++}
       )`);
       params.push(userCode, userId);
@@ -485,8 +488,12 @@ exports.getStats = async (req, res) => {
 
     if (userRole === 'hr') {
       // HR sees all for oversight
-    } else if (['super_admin', 'admin', 'accounts'].includes(userRole)) {
-      // COO/MD/Accounts: stats scoped to requests where it's their turn OR they already acted OR their own
+    } else if (userRole === 'accounts') {
+      // Accounts sees all approved (disbursement queue) + disbursed history + where they're approver + own
+      scopeFilter = `WHERE (status='approved' OR status='disbursed' OR current_approver_code=$1 OR employee_id=$2)`;
+      params = [userCode, userId];
+    } else if (['super_admin', 'admin'].includes(userRole)) {
+      // COO/MD: stats scoped to requests where it's their turn OR they already acted OR their own
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2 OR EXISTS (
         SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2
       ))`;
