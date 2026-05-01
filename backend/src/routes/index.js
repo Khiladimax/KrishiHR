@@ -857,6 +857,7 @@ router.get   ('/projects',                          authenticate, authorize('acc
 router.post  ('/projects',                          authenticate, authorize('accounts','super_admin','admin'), projCtrl.createProject);
 router.get   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.getProject);
 router.put   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.updateProject);
+router.delete('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.deleteProject);
 router.post  ('/projects/:id/assign',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.assignEmployee);
 router.delete('/projects/:id/employees/:empId',     authenticate, authorize('accounts','super_admin','admin'), projCtrl.removeEmployee);
 router.post  ('/projects/:id/expenditure',          authenticate, authorize('accounts','super_admin','admin'), projCtrl.addExpenditure);
