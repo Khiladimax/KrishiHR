@@ -427,9 +427,11 @@ function advanceCard(adv, showActions = false) {
     }
   }
 
-  // Payment stage — ONLY accounts processes disbursement (not super_admin)
-  if (showActions && adv.status === 'approved' && adv.current_approver_code === null &&
-      isAccountsUser) {
+  // Payment stage — ONLY accounts processes disbursement
+  // Show for accounts when status=approved, whether current_approver_code is their code OR null
+  // (chains ending at MD set code=null; chains with Accounts last set code=KC7708)
+  if (showActions && adv.status === 'approved' && isAccountsUser &&
+      adv.employee_id !== user.id) {
     isPaymentStage = true;
   }
 
@@ -614,19 +616,17 @@ async function loadPending() {
     api('GET', '/advance?status=approved'),
   ]);
 
-  // Strict frontend filter: only show what this user can actually act on RIGHT NOW
-  // pending: must be current_approver_code match (not just "in the chain somewhere")
+  // Pending approvals: must be current_approver_code match
   const pending = (pendingRes?.data || []).filter(a =>
     a.employee_id !== user.id &&
     a.current_approver_code === user.employee_code
   );
 
-  // approved (disbursement queue): only accounts role sees these
+  // Disbursement queue for Accounts:
+  // Show ALL approved advances — whether current_approver_code is their code OR null
+  // (some chains end at MD so current_approver_code becomes null after final approval)
   const approved = isAccounts
-    ? (approvedRes?.data || []).filter(a =>
-        a.employee_id !== user.id &&
-        a.current_approver_code === null
-      )
+    ? (approvedRes?.data || []).filter(a => a.employee_id !== user.id)
     : [];
 
   const all = [...pending, ...approved];
