@@ -481,30 +481,19 @@ async function loadMy() {
   const el = document.getElementById('my-list');
   el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
 
-  // Fetch all statuses explicitly so nothing gets missed
-  const [pendingRes, approvedRes, rejectedRes, disbursedRes] = await Promise.all([
-    api('GET', '/advance?status=pending&employee_id='  + user.id),
-    api('GET', '/advance?status=approved&employee_id=' + user.id),
-    api('GET', '/advance?status=rejected&employee_id=' + user.id),
-    api('GET', '/advance?status=disbursed&employee_id='+ user.id),
-  ]);
-
-  const all = [
-    ...(pendingRes?.data   || []),
-    ...(approvedRes?.data  || []),
-    ...(rejectedRes?.data  || []),
-    ...(disbursedRes?.data || []),
-  ];
-
-  // Deduplicate by id (safety)
-  const seen = new Set();
-  const deduped = all.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
-
+  const data = await api('GET', '/advance/mine');
+  if (!data?.success) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load. Please refresh.</p></div>';
+    return;
+  }
+  if (!data?.data?.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No advance salary requests yet.</p></div>';
+    return;
+  }
   // Filter out revoked (dismissed are already deleted from DB)
-  const visible = deduped.filter(a =>
+  const visible = data.data.filter(a =>
     !(a.status === 'rejected' && (a.remarks || '').toLowerCase().includes('revoked by employee'))
   );
-
   if (!visible.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No advance salary requests yet.</p></div>';
     return;
