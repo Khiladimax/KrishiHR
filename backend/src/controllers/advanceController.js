@@ -298,6 +298,21 @@ exports.action = async (req, res) => {
         [advance.employee_id, `Your advance salary request of ₹${advance.amount} has been fully approved.`]
       );
     } catch (_) {}
+
+    // ── Auto-record in project_expenditures when advance is fully approved ──
+    // This ensures the project budget reflects the cost immediately upon accounts approval,
+    // not just when disbursement is processed later.
+    try {
+      const finalProjectId = advance.project_id || null;
+      if (finalProjectId) {
+        const projCtrl = require('./projectController');
+        await projCtrl.hookFinanceExpenditure(
+          advance.employee_id, advance.amount, 'advance',
+          parseInt(id), finalProjectId, 'Advance approved'
+        );
+      }
+    } catch (hookErr) { console.error('[advance.approval hook]', hookErr.message); }
+
     res.json({ success: true, message: 'Advance fully approved' });
   } catch (err) {
     await client.query('ROLLBACK');
