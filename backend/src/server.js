@@ -648,6 +648,9 @@ async function start() {
         await attCtrl.fixWrongAbsents();
         await attCtrl.fixMissingPunchOuts();
         await attCtrl.fixTimezoneShiftedLeaves(); // can be slow on large data — runs in background
+        // ── Project Budget Tracking tables ──
+        const projCtrl = require('./controllers/projectController');
+        await projCtrl.migrate();
       } catch (err) {
         console.error('❌ Background startup fix failed:', err.message);
       }
