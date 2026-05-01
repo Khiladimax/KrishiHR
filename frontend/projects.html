@@ -241,6 +241,7 @@
     <div style="display:flex;gap:8px;align-items:center">
       <button id="panel-export-btn" class="btn btn-sm" onclick="exportProject()" title="Download Excel">⬇️ Excel</button>
       <button id="panel-edit-btn"   class="btn btn-sm" onclick="editCurrentProject()">✏️ Edit</button>
+      <button id="panel-delete-btn" class="btn btn-sm" style="background:var(--red,#e53935);color:#fff;border-color:var(--red,#e53935)" onclick="deleteCurrentProject()">🗑️ Delete</button>
       <button class="panel-close" onclick="closeProjPanel()">×</button>
     </div>
   </div>
@@ -772,6 +773,7 @@ async function openProjPanel(id) {
 
   // Show edit/export only for admin
   document.getElementById('panel-edit-btn').style.display   = IS_ADMIN ? '' : 'none';
+  document.getElementById('panel-delete-btn').style.display = IS_ADMIN ? '' : 'none';
   document.getElementById('panel-export-btn').style.display = IS_ACCOUNTS ? '' : 'none';
 }
 
@@ -999,6 +1001,21 @@ function editCurrentProject() {
   document.getElementById('f-start').value   = p.start_date ? p.start_date.slice(0,10) : '';
   document.getElementById('f-end').value     = p.end_date   ? p.end_date.slice(0,10)   : '';
   openModal('proj-modal');
+}
+
+async function deleteCurrentProject() {
+  if (!_currentProj) return;
+  const p = _currentProj;
+  const confirmed = confirm(`⚠️ Delete project "${p.name}"?\n\nThis will permanently remove the project and all its expenditure records, employee assignments, and progress reports.\n\nThis action cannot be undone.`);
+  if (!confirmed) return;
+  const r = await api('DELETE', `/projects/${p.id}`);
+  if (r?.success) {
+    toast(r.message || 'Project deleted', 'success');
+    closeProjPanel();
+    loadProjects();
+  } else {
+    toast(r?.message || 'Failed to delete project', 'error');
+  }
 }
 
 async function saveProject() {
