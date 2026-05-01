@@ -102,7 +102,7 @@
       <div class="topbar-title">💸 Advance Salary</div>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-primary btn-sm" onclick="openAdvanceModal()">+ Request Advance</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('req-modal')">+ Request Advance</button>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
       <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
@@ -161,16 +161,6 @@
       <div class="form-group">
         <label class="form-label">Amount (₹) *</label>
         <input id="req-amount" class="form-control" type="number" min="1000" placeholder="e.g. 10000">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Repayment Months</label>
-        <input id="req-months" class="form-control" type="number" min="1" max="12" placeholder="e.g. 3 (leave blank for single deduction)">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Link to Project <span style="color:var(--muted);font-weight:400">(optional — Accounts can correct at payment)</span></label>
-        <select id="req-project" class="form-control">
-          <option value="">-- No Project --</option>
-        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Reason *</label>
@@ -427,11 +417,9 @@ function advanceCard(adv, showActions = false) {
     }
   }
 
-  // Payment stage — ONLY accounts processes disbursement
-  // Show for accounts when status=approved, whether current_approver_code is their code OR null
-  // (chains ending at MD set code=null; chains with Accounts last set code=KC7708)
-  if (showActions && adv.status === 'approved' && isAccountsUser &&
-      adv.employee_id !== user.id) {
+  // Payment stage — ONLY accounts processes disbursement (not super_admin)
+  if (showActions && adv.status === 'approved' && adv.current_approver_code === null &&
+      isAccountsUser) {
     isPaymentStage = true;
   }
 
@@ -466,7 +454,7 @@ function advanceCard(adv, showActions = false) {
               Review (L${currentLevel})
             </button>` : ''}
           ${isPaymentStage ? `
-            <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount},${adv.project_id||'null'})">
+            <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount})">
               💸 Process Payment
             </button>` : ''}
           ${!canAct && !isPaymentStage && showActions && adv.status === 'pending' && alreadyActed ? `
@@ -480,7 +468,6 @@ function advanceCard(adv, showActions = false) {
 async function loadMy() {
   const el = document.getElementById('my-list');
   el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
-
   const data = await api('GET', '/advance/mine');
   if (!data?.success) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load. Please refresh.</p></div>';
@@ -490,10 +477,8 @@ async function loadMy() {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No advance salary requests yet.</p></div>';
     return;
   }
-  // Filter out revoked (dismissed are already deleted from DB)
-  const visible = data.data.filter(a =>
-    !(a.status === 'rejected' && (a.remarks || '').toLowerCase().includes('revoked by employee'))
-  );
+  // Filter out revoked requests
+  const visible = data.data.filter(a => !(a.status === 'rejected' && (a.remarks || '').toLowerCase().includes('revoked by employee')));
   if (!visible.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No advance salary requests yet.</p></div>';
     return;
@@ -504,7 +489,10 @@ async function loadMy() {
 // ── My Advance Card — with Revoke / Edit for pending requests ─────────────────
 function myAdvanceCard(adv) {
   const isRevoked = adv.status === 'rejected' && (adv.remarks || '').toLowerCase().includes('revoked by employee');
-  const displayStatus = isRevoked ? 'REVOKED' : adv.status === 'approved' ? '✅ APPROVED — Pending Disbursement' : adv.status.toUpperCase();
+  const displayStatus = isRevoked ? 'REVOKED'
+    : adv.status === 'approved'  ? '✅ APPROVED — Awaiting Disbursement'
+    : adv.status === 'disbursed' ? '💰 DISBURSED'
+    : adv.status.toUpperCase();
   const statusColor = {
     pending:   'var(--yellow)',
     approved:  'var(--green)',
@@ -624,17 +612,19 @@ async function loadPending() {
     api('GET', '/advance?status=approved'),
   ]);
 
-  // Pending approvals: must be current_approver_code match
+  // Strict frontend filter: only show what this user can actually act on RIGHT NOW
+  // pending: must be current_approver_code match (not just "in the chain somewhere")
   const pending = (pendingRes?.data || []).filter(a =>
     a.employee_id !== user.id &&
     a.current_approver_code === user.employee_code
   );
 
-  // Disbursement queue for Accounts:
-  // Show ALL approved advances — whether current_approver_code is their code OR null
-  // (some chains end at MD so current_approver_code becomes null after final approval)
+  // approved (disbursement queue): only accounts role sees these
   const approved = isAccounts
-    ? (approvedRes?.data || []).filter(a => a.employee_id !== user.id)
+    ? (approvedRes?.data || []).filter(a =>
+        a.employee_id !== user.id &&
+        a.current_approver_code === null
+      )
     : [];
 
   const all = [...pending, ...approved];
@@ -658,40 +648,18 @@ async function loadAll() {
   el.innerHTML = data.data.map(a => advanceCard(a, true)).join('');
 }
 
-async function openAdvanceModal() {
-  // Load active projects for employee to suggest
-  const sel = document.getElementById('req-project');
-  sel.innerHTML = '<option value="">-- No Project --</option>';
-  api('GET', '/projects?status=active').then(r => {
-    if (!r?.success) return;
-    (r.data || []).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
-      sel.appendChild(opt);
-    });
-  }).catch(()=>{});
-  openModal('req-modal');
-}
-
 async function submitRequest() {
-  const amount     = document.getElementById('req-amount').value;
-  const reason     = document.getElementById('req-reason').value.trim();
-  const months     = document.getElementById('req-months').value;
-  const project_id = document.getElementById('req-project').value;
+  const amount = document.getElementById('req-amount').value;
+  const reason = document.getElementById('req-reason').value.trim();
   if (!amount || !reason) { toast('Amount and reason required', 'error'); return; }
   const data = await api('POST', '/advance/apply', {
     amount: parseFloat(amount), reason,
-    repayment_months: months ? parseInt(months) : null,
-    project_id: project_id ? parseInt(project_id) : null,
   });
   if (data?.success) {
     toast(data.message);
     closeModal('req-modal');
-    document.getElementById('req-amount').value  = '';
-    document.getElementById('req-reason').value  = '';
-    document.getElementById('req-months').value  = '';
-    document.getElementById('req-project').value = '';
+    document.getElementById('req-amount').value = '';
+    document.getElementById('req-reason').value = '';
     loadMy();
     if (showStats) loadStats();
   } else {
@@ -741,7 +709,7 @@ function openApprove(id, name, amount, reason, level, originalAmount) {
   openModal('approve-modal');
 }
 
-function openPayment(id, name, amount, existingProjectId) {
+function openPayment(id, name, amount) {
   activeAdvId = id;
   document.getElementById('payment-content').innerHTML = `
     <div class="form-row">
@@ -762,30 +730,9 @@ function openPayment(id, name, amount, existingProjectId) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">🗂 Project <span style="color:#888;font-weight:400">(Employee suggested — Accounts can correct)</span></label>
-      <select id="pay-project" class="form-control">
-        <option value="">-- No Project / Not billable --</option>
-      </select>
-    </div>
-    <div class="form-group">
       <label class="form-label">Remarks / Reference *</label>
       <input id="pay-remarks" class="form-control" placeholder="e.g. NEFT Ref: 123456, Done">
     </div>`;
-
-  // Load active projects and pre-select employee's choice
-  api('GET', '/projects?status=active').then(r => {
-    if (!r?.success) return;
-    const sel = document.getElementById('pay-project');
-    if (!sel) return;
-    (r.data || []).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
-      if (existingProjectId && p.id == existingProjectId) opt.selected = true;
-      sel.appendChild(opt);
-    });
-  }).catch(()=>{});
-
   openModal('payment-modal');
 }
 
@@ -813,14 +760,12 @@ async function actionAdvance(action) {
 }
 
 async function processPayment() {
-  const date       = document.getElementById('pay-date')?.value;
-  const mode       = document.getElementById('pay-mode')?.value;
-  const remarks    = document.getElementById('pay-remarks')?.value?.trim();
-  const project_id = document.getElementById('pay-project')?.value || null;
+  const date    = document.getElementById('pay-date')?.value;
+  const mode    = document.getElementById('pay-mode')?.value;
+  const remarks = document.getElementById('pay-remarks')?.value?.trim();
   if (!date || !remarks) { toast('Payment date and remarks are required', 'error'); return; }
   const data = await api('POST', `/advance/${activeAdvId}/process-payment`, {
-    payment_date: date, payment_mode: mode, remarks,
-    project_id: project_id ? parseInt(project_id) : null,
+    payment_date: date, payment_mode: mode, remarks
   });
   if (data?.success) {
     toast(data.message);
