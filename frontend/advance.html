@@ -428,8 +428,9 @@ function advanceCard(adv, showActions = false) {
   }
 
   // Payment stage — ONLY accounts processes disbursement (not super_admin)
-  if (showActions && adv.status === 'approved' && adv.current_approver_code === null &&
-      isAccountsUser) {
+  // Payment stage — accounts sees Process Payment for ALL approved advances
+  if (showActions && adv.status === 'approved' && isAccountsUser &&
+      adv.employee_id !== user.id) {
     isPaymentStage = true;
   }
 
@@ -464,7 +465,7 @@ function advanceCard(adv, showActions = false) {
               Review (L${currentLevel})
             </button>` : ''}
           ${isPaymentStage ? `
-            <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount})">
+            <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount},${adv.project_id||'null'})">
               💸 Process Payment
             </button>` : ''}
           ${!canAct && !isPaymentStage && showActions && adv.status === 'pending' && alreadyActed ? `
@@ -623,18 +624,16 @@ async function loadPending() {
   ]);
 
   // Strict frontend filter: only show what this user can actually act on RIGHT NOW
-  // pending: must be current_approver_code match (not just "in the chain somewhere")
+  // pending: must be current_approver_code match
   const pending = (pendingRes?.data || []).filter(a =>
     a.employee_id !== user.id &&
     a.current_approver_code === user.employee_code
   );
 
-  // approved (disbursement queue): only accounts role sees these
+  // Disbursement queue for Accounts: ALL approved advances regardless of current_approver_code
+  // (can be NULL, empty string, or KC7708 depending on chain position)
   const approved = isAccounts
-    ? (approvedRes?.data || []).filter(a =>
-        a.employee_id !== user.id &&
-        a.current_approver_code === null
-      )
+    ? (approvedRes?.data || []).filter(a => a.employee_id !== user.id)
     : [];
 
   const all = [...pending, ...approved];
