@@ -149,7 +149,7 @@ const NAV_GROUPS = [
       { href:'advance.html',        icon: ICONS.advance,        label:'Advance Salary',   always:true },
       { href:'reimbursement.html',  icon: ICONS.reimbursement,  label:'Reimbursement',    always:true },
       { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
-      { href:'projects.html',       icon: ICONS.projects,     label:'Projects',         roles:['admin','super_admin','accounts','manager','tl','hr'] },
+      { href:'projects.html',       icon: ICONS.projects,     label:'Projects',         roles:['admin','super_admin','accounts'] },
     ]
   },
   {
