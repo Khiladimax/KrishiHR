@@ -343,6 +343,12 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
+        <label>Project *</label>
+        <select id="assign-proj-select" onchange="_currentProjId = parseInt(this.value)">
+          <option value="">-- Select Project --</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Search Employee</label>
         <input id="emp-search" type="text" placeholder="Search by name or code…" oninput="searchEmployees()">
         <div id="emp-search-result" class="emp-search-result" style="display:none"></div>
@@ -1021,12 +1027,25 @@ async function saveProject() {
 
 // ── Assign Employee ───────────────────────────────────────────────
 function openAssignModal(projId) {
-  if (projId) _currentProjId = projId;
+  if (projId) _currentProjId = parseInt(projId);
   _selectedEmpId = null;
   document.getElementById('emp-search').value = '';
   document.getElementById('emp-role').value = '';
   document.getElementById('emp-search-result').style.display = 'none';
   document.getElementById('selected-emp-display').style.display = 'none';
+
+  // Populate project dropdown
+  const sel = document.getElementById('assign-proj-select');
+  sel.innerHTML = '<option value="">-- Select Project --</option>' +
+    _allProjects.map(p =>
+      `<option value="${p.id}" ${p.id === _currentProjId ? 'selected' : ''}>${p.name}${p.code ? ' ('+p.code+')' : ''}</option>`
+    ).join('');
+
+  // Sync _currentProjId from dropdown in case it wasn't passed
+  if (!_currentProjId && _allProjects.length) {
+    _currentProjId = parseInt(sel.value) || null;
+  }
+
   openModal('assign-modal');
 }
 
@@ -1071,8 +1090,12 @@ function selectEmployee(id, name, code, role) {
 }
 
 async function assignEmployee() {
-  if (!_selectedEmpId) { toast('Please tap an employee from the search results first', 'error'); return; }
-  if (!_currentProjId) { toast('No project selected — please close and reopen the panel', 'error'); return; }
+  // Always read project from the dropdown — most reliable source
+  const projIdFromDropdown = parseInt(document.getElementById('assign-proj-select').value);
+  if (projIdFromDropdown) _currentProjId = projIdFromDropdown;
+
+  if (!_currentProjId) { toast('Please select a project', 'error'); return; }
+  if (!_selectedEmpId)  { toast('Please tap an employee from the search results first', 'error'); return; }
 
   const r = await api('POST', `/projects/${_currentProjId}/assign`, {
     employee_id:     _selectedEmpId,
