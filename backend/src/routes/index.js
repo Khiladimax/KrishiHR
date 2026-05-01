@@ -184,6 +184,7 @@ router.delete('/compoff/:id/revoke',   authenticate, authorize('hr','admin','sup
 
 // ── Advance Salary ────────────────────────────────────────────────────────────
 router.post('/advance/apply',                authenticate, advCtrl.apply);
+router.get ('/advance/mine',                 authenticate, advCtrl.getMine);
 router.get ('/advance',                      authenticate, advCtrl.getAll);
 router.post('/advance/:id/action',           authenticate, advCtrl.action);
 router.post('/advance/:id/revoke',           authenticate, advCtrl.revoke);
