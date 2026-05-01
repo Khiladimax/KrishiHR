@@ -59,7 +59,7 @@ exports.apply = async (req, res) => {
   try {
     await client.query('BEGIN');
     const empId = req.user.id;
-    const { amount, reason, repayment_months } = req.body;
+    const { amount, reason, repayment_months, project_id } = req.body;
 
     if (!amount || amount <= 0)
       return res.status(400).json({ success: false, message: 'Valid amount required' });
@@ -80,17 +80,20 @@ exports.apply = async (req, res) => {
     if (existing.rows.length)
       return res.status(400).json({ success: false, message: 'You already have a pending advance request awaiting approval' });
 
+    // Ensure project_id column exists
+    await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id)`).catch(()=>{});
+
     const chain = await getAdvanceChain(empId);
     const emi   = repayment_months ? Math.ceil(amount / repayment_months) : amount;
 
     const result = await client.query(
       `INSERT INTO advance_salary
          (employee_id, amount, reason, monthly_emi, total_installments,
-          approval_chain, current_approver_code, status, purpose)
-       VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8)
+          approval_chain, current_approver_code, status, purpose, project_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)
        RETURNING id`,
       [empId, amount, reason || null, emi, repayment_months || 1,
-       JSON.stringify(chain), chain[0], String(amount)]
+       JSON.stringify(chain), chain[0], String(amount), project_id ? parseInt(project_id) : null]
     );
 
     await client.query('COMMIT');
@@ -680,6 +683,19 @@ exports.processPayment = async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'Payment processed successfully' });
+
+    // ── Auto-record in project expenditures if project_id is set ──
+    try {
+      const advRow = await db.query(`SELECT employee_id, amount, project_id FROM advance_salary WHERE id=$1`, [id]);
+      const adv2 = advRow.rows[0];
+      if (adv2?.project_id) {
+        const projCtrl = require('./projectController');
+        await projCtrl.hookFinanceExpenditure(
+          adv2.employee_id, adv2.amount, 'advance', parseInt(id),
+          adv2.project_id, `Advance disbursed`
+        );
+      }
+    } catch(hookErr) { console.error('[advance.processPayment hook]', hookErr.message); }
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
