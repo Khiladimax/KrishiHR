@@ -514,7 +514,11 @@ const _user = Auth.getUser();
 const _role = _user?.role?.toLowerCase().trim();
 const _code = _user?.employee_code;
 const IS_ADMIN    = ['super_admin','admin','accounts'].includes(_role);
-const IS_MANAGER  = ['super_admin','admin','accounts','manager','tl','hr'].includes(_role);
+const IS_ACCOUNTS = _role === 'accounts';
+const IS_SUPER    = ['super_admin','admin'].includes(_role);
+
+// Hard-gate: only accounts/admin/super_admin can see this page
+if (!IS_ADMIN) { window.location.href = 'dashboard.html'; }
 
 let _allProjects  = [];
 let _allEmployees = [];
@@ -768,7 +772,7 @@ async function openProjPanel(id) {
 
   // Show edit/export only for admin
   document.getElementById('panel-edit-btn').style.display   = IS_ADMIN ? '' : 'none';
-  document.getElementById('panel-export-btn').style.display = IS_ADMIN ? '' : 'none';
+  document.getElementById('panel-export-btn').style.display = IS_ACCOUNTS ? '' : 'none';
 }
 
 function closeProjPanel() {
