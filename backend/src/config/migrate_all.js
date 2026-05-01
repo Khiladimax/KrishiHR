@@ -393,7 +393,7 @@ async function runAllMigrations() {
       reason TEXT,
       requested_at TIMESTAMP DEFAULT NOW(),
       status VARCHAR(20) DEFAULT 'pending'
-        CHECK (status IN ('pending','approved','rejected','recovered')),
+        CHECK (status IN ('pending','approved','rejected','recovered','disbursed','cleared')),
       approved_by INT REFERENCES employees(id),
       approved_at TIMESTAMP,
       remarks TEXT,
@@ -402,6 +402,15 @@ async function runAllMigrations() {
       recovered_amount NUMERIC(12,2) DEFAULT 0,
       recovery_complete BOOLEAN DEFAULT FALSE,
       approval_chain JSONB,
+      current_approver_code VARCHAR(20),
+      current_level SMALLINT DEFAULT 1,
+      monthly_emi NUMERIC(12,2) DEFAULT 0,
+      total_installments INT DEFAULT 1,
+      balance_remaining NUMERIC(12,2) DEFAULT 0,
+      emi_start_month INT,
+      emi_start_year INT,
+      purpose TEXT,
+      project_id INT,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     )`);
