@@ -301,6 +301,28 @@ exports.action = async (req, res) => {
   } finally { client.release(); }
 };
 
+// ── Get MY advances — no role logic, always own requests only ────────────────
+exports.getMine = async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT a.*,
+              COALESCE(NULLIF(a.purpose,''), a.amount::text)::numeric AS original_requested_amount,
+              CONCAT(e.first_name,' ',e.last_name) AS employee_name,
+              e.employee_code, d.name AS department_name
+       FROM advance_salary a
+       JOIN employees e ON a.employee_id = e.id
+       LEFT JOIN departments d ON e.department_id = d.id
+       WHERE a.employee_id = $1
+       ORDER BY a.requested_at DESC`,
+      [req.user.id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── Get Advances ──────────────────────────────────────────────────────────────
 // Visibility rules:
 //   super_admin / hr  → see ALL requests
