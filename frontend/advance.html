@@ -478,15 +478,33 @@ function advanceCard(adv, showActions = false) {
 
 // ── My Requests — always scoped to current user only ─────────────────────────
 async function loadMy() {
-  const me = Auth.getUser();
-  const data = await api('GET', '/advance?employee_id=' + (me?.id || ''));
   const el = document.getElementById('my-list');
-  if (!data?.data?.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No advance salary requests yet.</p></div>';
-    return;
-  }
-  // Filter out revoked requests
-  const visible = data.data.filter(a => !(a.status === 'rejected' && (a.remarks || '').toLowerCase().includes('revoked by employee')));
+  el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+
+  // Fetch all statuses explicitly so nothing gets missed
+  const [pendingRes, approvedRes, rejectedRes, disbursedRes] = await Promise.all([
+    api('GET', '/advance?status=pending&employee_id='  + user.id),
+    api('GET', '/advance?status=approved&employee_id=' + user.id),
+    api('GET', '/advance?status=rejected&employee_id=' + user.id),
+    api('GET', '/advance?status=disbursed&employee_id='+ user.id),
+  ]);
+
+  const all = [
+    ...(pendingRes?.data   || []),
+    ...(approvedRes?.data  || []),
+    ...(rejectedRes?.data  || []),
+    ...(disbursedRes?.data || []),
+  ];
+
+  // Deduplicate by id (safety)
+  const seen = new Set();
+  const deduped = all.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
+
+  // Filter out revoked (dismissed are already deleted from DB)
+  const visible = deduped.filter(a =>
+    !(a.status === 'rejected' && (a.remarks || '').toLowerCase().includes('revoked by employee'))
+  );
+
   if (!visible.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No advance salary requests yet.</p></div>';
     return;
@@ -497,10 +515,11 @@ async function loadMy() {
 // ── My Advance Card — with Revoke / Edit for pending requests ─────────────────
 function myAdvanceCard(adv) {
   const isRevoked = adv.status === 'rejected' && (adv.remarks || '').toLowerCase().includes('revoked by employee');
-  const displayStatus = isRevoked ? 'REVOKED' : adv.status.toUpperCase();
+  const displayStatus = isRevoked ? 'REVOKED' : adv.status === 'approved' ? '✅ APPROVED — Pending Disbursement' : adv.status.toUpperCase();
   const statusColor = {
     pending:   'var(--yellow)',
     approved:  'var(--green)',
+    disbursed: 'var(--green)',
     rejected:  isRevoked ? 'var(--muted)' : 'var(--red)',
     recovered: 'var(--accent)',
   }[adv.status] || 'var(--muted)';
