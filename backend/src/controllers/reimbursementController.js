@@ -67,7 +67,7 @@ exports.apply = async (req, res) => {
   try {
     await client.query('BEGIN');
     const empId = req.user.id;
-    const { title, items } = req.body;          // items = JSON string array
+    const { title, items, project_id } = req.body;          // items = JSON string array
 
     if (!title || !title.trim())
       return res.status(400).json({ success: false, message: 'Title is required' });
@@ -79,15 +79,18 @@ exports.apply = async (req, res) => {
     if (!parsedItems.length)
       return res.status(400).json({ success: false, message: 'At least one expense item is required' });
 
+    // Ensure project_id column exists
+    await client.query(`ALTER TABLE reimbursements ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id)`).catch(()=>{});
+
     const chain = await getChain(empId);
     const total = parsedItems.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
 
     const result = await client.query(
       `INSERT INTO reimbursements
          (employee_id, title, total_amount, approved_amount, approval_chain,
-          current_approver_code, current_level, status)
-       VALUES($1,$2,$3,$3,$4,$5,1,'pending') RETURNING id`,
-      [empId, title.trim(), total, JSON.stringify(chain), chain[0]]
+          current_approver_code, current_level, status, project_id)
+       VALUES($1,$2,$3,$3,$4,$5,1,'pending',$6) RETURNING id`,
+      [empId, title.trim(), total, JSON.stringify(chain), chain[0], project_id ? parseInt(project_id) : null]
     );
     const reimbId = result.rows[0].id;
 
@@ -489,6 +492,17 @@ exports.disburse = async (req, res) => {
     const reimb = r.rows[0];
     await notifyEmployee(reimb.employee_id, '💰 Reimbursement Disbursed',
       `Your reimbursement "${reimb.title}" of ₹${parseFloat(reimb.approved_amount).toLocaleString('en-IN')} has been disbursed.${remarks ? ' Note: ' + remarks : ''}`);
+
+    // ── Auto-record in project expenditures if project_id is set ──
+    try {
+      if (reimb.project_id) {
+        const projCtrl = require('./projectController');
+        await projCtrl.hookFinanceExpenditure(
+          reimb.employee_id, reimb.approved_amount, 'reimbursement',
+          parseInt(id), reimb.project_id, `Reimbursement: ${reimb.title}`
+        );
+      }
+    } catch(hookErr) { console.error('[reimb.disburse hook]', hookErr.message); }
 
     res.json({ success: true, message: 'Disbursed successfully' });
   } catch (err) {
