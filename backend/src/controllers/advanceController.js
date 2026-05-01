@@ -87,8 +87,8 @@ exports.apply = async (req, res) => {
     const result = await client.query(
       `INSERT INTO advance_salary
          (employee_id, amount, reason, monthly_emi, total_installments,
-          approval_chain, current_approver_code, status, purpose, project_id)
-       VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)
+          approval_chain, current_approver_code, current_level, status, purpose, project_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,1,'pending',$8,$9)
        RETURNING id`,
       [empId, amount, reason || null, emi, repayment_months || 1,
        JSON.stringify(chain), chain[0], String(amount), project_id ? parseInt(project_id) : null]
@@ -138,16 +138,23 @@ exports.apply = async (req, res) => {
 exports.action = async (req, res) => {
   const client = await db.getClient();
   try {
-    await client.query('BEGIN');
     const { id } = req.params;
     const { action, remarks, payment_date, project_id } = req.body;
-    // Save project_id if approver sets it
+
+    // ── DDL + project_id save OUTSIDE the transaction ──────────────────────
+    // ALTER TABLE must never run inside BEGIN…COMMIT — a DDL failure aborts
+    // the whole transaction even with .catch(), breaking all subsequent queries.
+    // Run these on a plain db query (auto-committed) before we open our transaction.
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(() => {});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS current_level SMALLINT DEFAULT 1`).catch(() => {});
+    await db.query(`ALTER TABLE advance_salary DROP CONSTRAINT IF EXISTS advance_salary_status_check`).catch(() => {});
+    await db.query(`ALTER TABLE advance_salary ADD CONSTRAINT advance_salary_status_check CHECK (status IN ('pending','approved','rejected','recovered','disbursed','cleared'))`).catch(() => {});
+    // Persist project_id chosen by the approver before the transaction locks the row
     if (project_id) {
-      await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(()=>{})
-      await client.query(`ALTER TABLE advance_salary DROP CONSTRAINT IF EXISTS advance_salary_status_check`).catch(()=>{});
-      await client.query(`ALTER TABLE advance_salary ADD CONSTRAINT advance_salary_status_check CHECK (status IN ('pending','approved','rejected','recovered','disbursed'))`).catch(()=>{});
-      await client.query(`UPDATE advance_salary SET project_id=$1 WHERE id=$2`, [parseInt(project_id), req.params.id]).catch(()=>{});
+      await db.query(`UPDATE advance_salary SET project_id=$1 WHERE id=$2`, [parseInt(project_id), id]).catch(() => {});
     }
+
+    await client.query('BEGIN');
     const actorCode = req.user.employee_code;
     const actorRole = req.user.role;
 
@@ -678,12 +685,18 @@ exports.edit = async (req, res) => {
 exports.processPayment = async (req, res) => {
   const client = await db.getClient();
   try {
-    await client.query('BEGIN');
     const { id } = req.params;
     const { payment_date, payment_mode, remarks, project_id } = req.body;
 
     if (!payment_date || !remarks)
       return res.status(400).json({ success: false, message: 'payment_date and remarks are required' });
+
+    // DDL outside transaction — same reason as in action()
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(() => {});
+    await db.query(`ALTER TABLE advance_salary DROP CONSTRAINT IF EXISTS advance_salary_status_check`).catch(() => {});
+    await db.query(`ALTER TABLE advance_salary ADD CONSTRAINT advance_salary_status_check CHECK (status IN ('pending','approved','rejected','recovered','disbursed','cleared'))`).catch(() => {});
+
+    await client.query('BEGIN');
 
     const adv = await client.query(
       `SELECT * FROM advance_salary WHERE id=$1 FOR UPDATE`, [id]
@@ -696,8 +709,7 @@ exports.processPayment = async (req, res) => {
 
     // Accounts can override project_id at payment time
     const finalProjectId = project_id ? parseInt(project_id) : (adv.rows[0].project_id || null);
-    await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS project_id INT`).catch(()=>{});
-    if (finalProjectId) await client.query(`UPDATE advance_salary SET project_id=$1 WHERE id=$2`, [finalProjectId, id]).catch(()=>{});
+    if (finalProjectId) await client.query(`UPDATE advance_salary SET project_id=$1 WHERE id=$2`, [finalProjectId, id]).catch(() => {});
 
     try {
       await client.query(
