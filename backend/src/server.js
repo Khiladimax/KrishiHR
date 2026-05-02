@@ -730,22 +730,8 @@ cron.schedule('59 23 28-31 * *', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
-// ── GK Yearly Top 5 Announcement (Dec 31, 11:58 PM IST) ──────────────────────
-cron.schedule('58 23 31 12 *', async () => {
-  try {
-    console.log('[CRON] 📆 Posting yearly GK Top 5 announcement...');
-    const gkCtrl = require('./controllers/gkController');
-    const admin  = await db.query(`SELECT id FROM employees WHERE role IN ('admin','super_admin') AND is_active=true LIMIT 1`);
-    if (!admin.rows.length) return console.warn('[CRON] No admin found for GK yearly announcement');
+// ── GK Yearly Top 5 Announcement removed — only monthly winners are announced ──
 
-    await gkCtrl.announceTop5(
-      { body: { period: 'year' }, user: { id: admin.rows[0].id } },
-      { json: (d) => console.log('[CRON] Yearly Top5 result:', d.message) }
-    );
-  } catch (err) {
-    console.error('❌ GK yearly top5 cron failed:', err.message);
-  }
-}, { timezone: 'Asia/Kolkata' });
 
 // ── Comp Off Auto-Grant Cron — runs at 11:30 PM IST every day ─────────────────
 // Scans today's attendance and grants COMPOFF to eligible employees
