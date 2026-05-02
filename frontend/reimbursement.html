@@ -695,6 +695,20 @@ function openRevisionModal(id) {
 
   document.getElementById('revisionModalTitle').textContent =
     `Review: ${reimb.title}`;
+
+  // Show project selector only for Accounts (final approver) — they confirm project billing
+  const isAccountsUser = currentUser?.role === 'accounts';
+  const projectSelectorHtml = isAccountsUser ? `
+    <div class="form-group" style="margin-top:14px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
+      <label style="font-size:12px;font-weight:700;color:#166534;display:block;margin-bottom:6px">
+        🗂 Link to Project <span style="font-weight:400;color:#555">(Accounts final assignment — overrides employee selection)</span>
+      </label>
+      <select id="approvalProjectSel" class="form-control" style="font-size:13px">
+        <option value="">-- No Project / Not billable --</option>
+      </select>
+      <div style="font-size:11px;color:#888;margin-top:4px">Once approved, the expense will immediately appear in the selected project's budget.</div>
+    </div>` : '';
+
   document.getElementById('revisionModalBody').innerHTML = `
     <p style="font-size:13px;color:#666;margin-bottom:14px">
       Employee: <b>${escHtml(reimb.employee_name||'')}</b> &nbsp;•&nbsp;
@@ -708,11 +722,28 @@ function openRevisionModal(id) {
       <label>Remarks (optional)</label>
       <input class="form-control" id="revRemarks" placeholder="Any notes for the employee"/>
     </div>
+    ${projectSelectorHtml}
     <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn-success" onclick="submitApproval(${id},'approve')">✅ Approve</button>
       <button class="btn btn-danger"  onclick="submitApproval(${id},'reject')">❌ Reject</button>
       <button class="btn btn-outline" onclick="closeModal('revisionModal')">Cancel</button>
     </div>`;
+
+  // If Accounts, load active projects and pre-select employee's suggested project
+  if (isAccountsUser) {
+    const existingProjId = reimb.project_id || '';
+    api('GET', '/projects?status=active').then(r => {
+      const sel = document.getElementById('approvalProjectSel');
+      if (!sel || !r?.success) return;
+      (r.data || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+        if (p.id == existingProjId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }).catch(() => {});
+  }
 
   document.getElementById('revisionModal').classList.add('open');
 }
@@ -722,6 +753,7 @@ async function submitApproval(id, action) {
   if (!reimb) return;
 
   const remarks = document.getElementById('revRemarks')?.value?.trim() || '';
+  const project_id = document.getElementById('approvalProjectSel')?.value || null;
   const item_revisions = (reimb.items || []).map(item => ({
     item_id: item.id,
     approved_amount: parseFloat(document.getElementById(`rev-item-${item.id}`)?.value || item.amount)
@@ -732,7 +764,7 @@ async function submitApproval(id, action) {
 
   try {
     const res2 = await api('POST', `/reimbursement/${id}/action`,
-      { action, remarks, item_revisions });
+      { action, remarks, item_revisions, project_id: project_id ? parseInt(project_id) : null });
     const data = res2;
     if (data?.success) {
       closeModal('revisionModal');
