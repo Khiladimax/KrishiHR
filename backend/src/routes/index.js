@@ -853,6 +853,8 @@ const projCtrl = require('../controllers/projectController');
 
 router.get   ('/projects/summary',                  authenticate, authorize('accounts','super_admin','admin'), projCtrl.getSummary);
 router.get   ('/projects/pending-reports',          authenticate, projCtrl.pendingReports);
+router.get   ('/projects/employees/:empId/allocation', authenticate, authorize('accounts','super_admin','admin'), projCtrl.getEmployeeAllocation);
+router.put   ('/projects/employees/:empId/allocation', authenticate, authorize('accounts','super_admin','admin'), projCtrl.setSalaryAllocation);
 router.get   ('/projects',                          authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.listProjects);
 router.post  ('/projects',                          authenticate, authorize('accounts','super_admin','admin'), projCtrl.createProject);
 router.get   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.getProject);
