@@ -116,6 +116,10 @@
 /* Progress report form */
 .rpt-form { background:var(--bg); border-radius:var(--radius); padding:20px; margin-top:8px; }
 
+/* ── All modals must appear above the side panel (z-index:1200) ── */
+.modal-backdrop { z-index:1400 !important; }
+.modal          { z-index:1401 !important; }
+
 /* ── Assign employee modal specifics ── */
 .emp-search-result { max-height:200px; overflow-y:auto; border:1.5px solid var(--border); border-radius:var(--radius-sm); margin-top:6px; }
 .emp-search-item { padding:10px 14px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:background .12s; }
