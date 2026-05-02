@@ -264,15 +264,23 @@ exports.getAll = async (req, res) => {
 exports.action = async (req, res) => {
   const client = await db.getClient();
   try {
-    await client.query('BEGIN');
     const { id } = req.params;
-    const { action, remarks, revised_amount, item_revisions } = req.body;
+    const { action, remarks, revised_amount, item_revisions, project_id } = req.body;
     // item_revisions = [{ item_id, approved_amount }] — optional per-item revision
     const actorCode = req.user.employee_code;
     const actorRole = req.user.role;
 
     if (!['approve','reject'].includes(action))
       return res.status(400).json({ success: false, message: 'action must be approve or reject' });
+
+    // DDL + project_id save OUTSIDE the transaction (same pattern as advanceController)
+    await db.query(`ALTER TABLE reimbursements ADD COLUMN IF NOT EXISTS project_id INT`).catch(()=>{});
+    if (project_id) {
+      // Accounts (final approver) sets the project — save it now so hook can read it
+      await db.query(`UPDATE reimbursements SET project_id=$1 WHERE id=$2`, [parseInt(project_id), id]).catch(()=>{});
+    }
+
+    await client.query('BEGIN');
 
     const rRow = await client.query(`SELECT * FROM reimbursements WHERE id=$1 FOR UPDATE`, [id]);
     if (!rRow.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
@@ -408,10 +416,10 @@ exports.action = async (req, res) => {
     }
 
     // ── Auto-record in project_expenditures when reimbursement is fully approved ──
-    // This ensures the project budget reflects the cost immediately upon accounts approval,
-    // not just when disbursement is processed later.
+    // Re-fetch the row to get the latest project_id (Accounts may have set it during this action).
     try {
-      const finalProjectId = reimb.project_id || null;
+      const freshRow = await db.query(`SELECT project_id, employee_id FROM reimbursements WHERE id=$1`, [id]);
+      const finalProjectId = freshRow.rows[0]?.project_id || null;
       if (finalProjectId) {
         const projCtrl = require('./projectController');
         await projCtrl.hookFinanceExpenditure(
