@@ -370,7 +370,16 @@
   </div>
 </div>
 
-<!-- Add Expenditure Modal -->
+<!-- Salary Allocation Modal -->
+<div class="modal-backdrop" id="allocation-modal">
+  <div class="modal" style="max-width:560px;width:100%">
+    <div class="modal-header">
+      <div class="modal-title" id="allocation-title">Salary Allocation</div>
+      <button class="modal-close" onclick="closeModal('allocation-modal')">×</button>
+    </div>
+    <div id="allocation-body" style="padding:0 4px"></div>
+  </div>
+</div>
 <div class="modal-backdrop" id="expense-modal">
   <div class="modal" style="max-width:480px;width:100%">
     <div class="modal-header">
@@ -878,6 +887,7 @@ function renderPanelOverview(p) {
 
 function renderPanelTeam(p) {
   const emps = p.employees || [];
+  const isAccounts = ['accounts','super_admin','admin'].includes(_user?.role);
   document.getElementById('panel-team').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-weight:700;font-size:14px">Team Members (${emps.length})</div>
@@ -885,17 +895,130 @@ function renderPanelTeam(p) {
     </div>
     ${!emps.length ? '<div class="empty-state">No employees assigned yet</div>' :
       emps.map(e => `
-      <div class="emp-row">
+      <div class="emp-row" id="emp-row-${e.employee_id}">
         <div class="emp-avatar">${(e.first_name||'?')[0]}${(e.last_name||'?')[0]}</div>
-        <div class="emp-info">
+        <div class="emp-info" style="flex:1">
           <div class="emp-name">${e.first_name} ${e.last_name}</div>
           <div class="emp-meta">${e.employee_code} · ${e.designation_title||e.role||'—'} · ${e.department_name||'—'}</div>
           ${e.role_in_project ? `<div style="font-size:11px;color:var(--accent);font-weight:600">Role: ${e.role_in_project}</div>` : ''}
         </div>
+        ${isAccounts ? `
+        <button class="btn btn-sm" style="color:var(--accent);border-color:var(--accent);margin-right:6px"
+          onclick="openAllocationModal(${e.employee_id},'${e.first_name} ${e.last_name}')">
+          📊 Salary %
+        </button>` : ''}
         ${IS_ADMIN ? `<button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="removeEmployee(${e.employee_id})">Remove</button>` : ''}
       </div>`).join('')
     }
   `;
+}
+
+// ── Salary Allocation Modal ───────────────────────────────────────────────────
+let _allocEmpId = null;
+
+async function openAllocationModal(empId, empName) {
+  _allocEmpId = empId;
+  const modal = document.getElementById('allocation-modal');
+  const body  = document.getElementById('allocation-body');
+  const title = document.getElementById('allocation-title');
+  title.textContent = `Salary Allocation — ${empName}`;
+  body.innerHTML = `<div style="text-align:center;padding:20px;color:#888">Loading projects…</div>`;
+  modal.classList.add('open');
+
+  try {
+    const r = await api('GET', `/projects/employees/${empId}/allocation`);
+    if (!r?.success) { body.innerHTML = `<div style="color:red">Failed to load</div>`; return; }
+
+    const rows = r.data;
+    const totalPct = r.total_pct;
+    const isComplete = Math.abs(totalPct - 100) < 0.01;
+
+    body.innerHTML = `
+      <p style="font-size:13px;color:#555;margin-bottom:14px">
+        Set how this employee's salary is split across their projects. <b>Total must equal 100%.</b>
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#f5f5f5;font-weight:700">
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #eee">Project</th>
+            <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #eee">Status</th>
+            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #eee;width:120px">Salary %</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+          <tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:10px">
+              <div style="font-weight:600">${row.project_name}</div>
+              <div style="font-size:11px;color:#888">${row.project_code||''}</div>
+            </td>
+            <td style="padding:10px;text-align:center">
+              <span style="font-size:11px;background:${row.project_status==='active'?'#dcfce7':'#f3f4f6'};color:${row.project_status==='active'?'#166534':'#555'};padding:2px 8px;border-radius:12px">${row.project_status}</span>
+            </td>
+            <td style="padding:10px;text-align:right">
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px">
+                <input type="number" class="alloc-input" data-pid="${row.project_id}"
+                  value="${parseFloat(row.salary_pct||0)}"
+                  min="0" max="100" step="0.01"
+                  style="width:80px;text-align:right;padding:5px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px"
+                  oninput="updateAllocTotal()"/>
+                <span style="font-size:13px;color:#555">%</span>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="background:#f9fafb;font-weight:700">
+            <td colspan="2" style="padding:10px">Total</td>
+            <td style="padding:10px;text-align:right">
+              <span id="alloc-total" style="font-size:15px;color:${isComplete?'#166534':'#dc2626'}">${totalPct.toFixed(2)}%</span>
+              <span id="alloc-status" style="margin-left:6px;font-size:12px">${isComplete ? '✅' : '⚠️ Must be 100%'}</span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="closeModal('allocation-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAllocation()">💾 Save Allocation</button>
+      </div>
+    `;
+  } catch(e) {
+    body.innerHTML = `<div style="color:red">Error: ${e.message}</div>`;
+  }
+}
+
+function updateAllocTotal() {
+  const inputs = document.querySelectorAll('.alloc-input');
+  let total = 0;
+  inputs.forEach(inp => { total += parseFloat(inp.value || 0); });
+  total = parseFloat(total.toFixed(2));
+  const isOk = Math.abs(total - 100) < 0.01;
+  const el = document.getElementById('alloc-total');
+  const st = document.getElementById('alloc-status');
+  if (el) { el.textContent = total + '%'; el.style.color = isOk ? '#166534' : '#dc2626'; }
+  if (st) { st.textContent = isOk ? '✅' : '⚠️ Must be 100%'; }
+}
+
+async function saveAllocation() {
+  const inputs = document.querySelectorAll('.alloc-input');
+  const allocations = [];
+  let total = 0;
+  inputs.forEach(inp => {
+    const pct = parseFloat(inp.value || 0);
+    total += pct;
+    allocations.push({ project_id: parseInt(inp.dataset.pid), salary_pct: pct });
+  });
+  total = parseFloat(total.toFixed(2));
+  if (Math.abs(total - 100) > 0.01) {
+    toast(`Total must be 100%. Currently ${total}%`, 'error'); return;
+  }
+  const r = await api('PUT', `/projects/employees/${_allocEmpId}/allocation`, { allocations });
+  if (r?.success) {
+    toast('Salary allocation saved!', 'success');
+    closeModal('allocation-modal');
+  } else {
+    toast(r?.message || 'Failed to save', 'error');
+  }
 }
 
 function renderPanelExpenses(p) {
