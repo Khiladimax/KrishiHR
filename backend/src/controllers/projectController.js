@@ -884,12 +884,11 @@ exports.getSummary = async (req, res) => {
         COUNT(DISTINCT CASE WHEN p.status='active' THEN p.id END) AS active_projects,
         COALESCE(SUM(p.total_budget),0)        AS total_budget,
         COALESCE(SUM(p.planned_cost),0)        AS total_planned,
-        COALESCE(SUM(pe.amount),0)             AS total_actual,
-        COALESCE(SUM(CASE WHEN pe.type='salary'        THEN pe.amount ELSE 0 END),0) AS total_salary,
-        COALESCE(SUM(CASE WHEN pe.type='advance'       THEN pe.amount ELSE 0 END),0) AS total_advance,
-        COALESCE(SUM(CASE WHEN pe.type='reimbursement' THEN pe.amount ELSE 0 END),0) AS total_reimbursement
+        COALESCE((SELECT SUM(amount) FROM project_expenditures),0) AS total_actual,
+        COALESCE((SELECT SUM(amount) FROM project_expenditures WHERE type='salary'),0) AS total_salary,
+        COALESCE((SELECT SUM(amount) FROM project_expenditures WHERE type='advance'),0) AS total_advance,
+        COALESCE((SELECT SUM(amount) FROM project_expenditures WHERE type='reimbursement'),0) AS total_reimbursement
       FROM projects p
-      LEFT JOIN project_expenditures pe ON pe.project_id = p.id
     `);
 
     res.json({ success: true, data: result.rows[0] });
