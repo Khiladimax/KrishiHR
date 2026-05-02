@@ -719,7 +719,7 @@ function openApprove(id, name, amount, reason, level, originalAmount, approverCo
   const wasRevised = orig > curr;
 
   // Determine if current user is Accounts (final approver — project assignment is their authority)
-  const isAccountsFinalApprover = currentUser?.role === 'accounts' || currentUser?.role === 'super_admin';
+  const isAccountsFinalApprover = user?.role === 'accounts' || user?.role === 'super_admin';
 
   // Get existing project_id from stored advance
   const adv = _advMap[id] || {};
