@@ -152,52 +152,8 @@ exports.submitAnswer = async (req, res) => {
 
     await client.query('COMMIT');
 
-    // ── Check streak and post milestone announcement ──────────────────────
-    // Only check if answered correctly (not skip, not wrong)
-    if (is_correct) {
-      try {
-        const streakR = await db.query(
-          `WITH ranked AS (
-             SELECT
-               is_correct,
-               ROW_NUMBER() OVER (ORDER BY answered_at DESC) AS rn
-             FROM gk_daily_responses
-             WHERE employee_id = $1 AND answer != 'skip'
-           ),
-           first_wrong AS (
-             SELECT MIN(rn) AS wrong_rn FROM ranked WHERE is_correct = false
-           )
-           SELECT COUNT(*) AS streak
-           FROM ranked, first_wrong
-           WHERE ranked.is_correct = true
-             AND ranked.rn < COALESCE(first_wrong.wrong_rn, 999999)`,
-          [empId]
-        );
-        const streak = parseInt(streakR.rows[0]?.streak) || 0;
-
-        // Post announcement at 5, 10, 15, 20... day milestones
-        if (streak > 0 && streak % 5 === 0) {
-          const empR = await db.query(
-            `SELECT first_name, last_name FROM employees WHERE id = $1`, [empId]
-          );
-          const emp = empR.rows[0];
-          const empName = emp ? `${emp.first_name} ${emp.last_name}` : 'An employee';
-          await db.query(
-            `INSERT INTO announcements (title, content, type, posted_by, expires_at)
-             VALUES ($1, $2, 'achievement', $3, NOW() + INTERVAL '24 hours')`,
-            [
-              `🔥 ${streak}-Day GK Streak!`,
-              `🎉 ${empName} has achieved a ${streak}-day correct answer streak in the Daily GK Quiz! Keep it up! 🏆`,
-              empId
-            ]
-          );
-        }
-      } catch(streakErr) {
-        console.error('Streak milestone error:', streakErr);
-        // Don't fail the main response
-      }
-    }
-
+    // ── Streak is calculated but no streak announcements posted ──────────────
+    // Only monthly Top 5 winners are announced (at month end for 24 hours)
     res.json({
       success: true,
       data: {
