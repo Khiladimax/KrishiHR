@@ -718,6 +718,9 @@ function openApprove(id, name, amount, reason, level, originalAmount, approverCo
   const curr = parseFloat(amount);
   const wasRevised = orig > curr;
 
+  // Determine if current user is Accounts (final approver — project assignment is their authority)
+  const isAccountsFinalApprover = currentUser?.role === 'accounts' || currentUser?.role === 'super_admin';
+
   // Get existing project_id from stored advance
   const adv = _advMap[id] || {};
   const existingProjectId = adv.project_id || null;
@@ -746,8 +749,9 @@ function openApprove(id, name, amount, reason, level, originalAmount, approverCo
       <input id="app-approved-amount" class="form-control" type="number" min="1" max="${curr}" placeholder="e.g. ${curr}" style="font-size:1.1rem;font-weight:600">
     </div>
     <div class="form-group mt-2">
-      <label class="form-label">🗂 Redirect to Project <span style="color:#888;font-weight:400">(optional — override employee's selection)</span></label>
-      <select id="app-project" class="form-control">
+      <label class="form-label">🗂 ${isAccountsFinalApprover ? '<span style="color:#166534;font-weight:700">Link to Project <span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:4px">Accounts — Final Assignment</span></span>' : 'Redirect to Project <span style="color:#888;font-weight:400">(optional — override employee\'s selection)</span>'}</label>
+      ${isAccountsFinalApprover ? '<div style="font-size:11px;color:#555;margin-bottom:6px">The expense will immediately reflect in the project budget upon approval.</div>' : ''}
+      <select id="app-project" class="form-control" style="${isAccountsFinalApprover ? 'border-color:#16a34a;background:#f0fdf4' : ''}">
         <option value="">-- Keep existing / No Project --</option>
       </select>
     </div>
