@@ -445,7 +445,7 @@ exports.hookPayrollExpenditure = async (employeeId, amount, month, year, payroll
 // Called internally when advance/reimbursement approved & paid
 exports.hookFinanceExpenditure = async (employeeId, amount, type, referenceId, projectId, description) => {
   try {
-    if (!projectId) return; // No project linked — skip
+    if (!projectId) return;
     const exists = await db.query(
       `SELECT id FROM project_expenditures WHERE reference_id=$1 AND type=$2`,
       [referenceId, type]
@@ -454,8 +454,8 @@ exports.hookFinanceExpenditure = async (employeeId, amount, type, referenceId, p
       await db.query(`
         INSERT INTO project_expenditures
           (project_id, employee_id, type, reference_id, amount, description, recorded_by)
-        VALUES ($1,$2,$3,$4,$5,$6,0)
-      `, [projectId, employeeId, type, referenceId, parseFloat(amount), description||null]);
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `, [projectId, employeeId, type, referenceId, parseFloat(amount), description||null, employeeId]);
     }
   } catch (err) {
     console.error('[projectController.hookFinance]', err.message);
