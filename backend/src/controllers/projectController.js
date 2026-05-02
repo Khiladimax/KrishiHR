@@ -1,872 +1,900 @@
-// src/routes/index.js — COMPLETE (Updated with Announcements, WFH, Import)
-const express  = require('express');
-const router   = express.Router();
-const multer   = require('multer');
-const { authenticate, authorize } = require('../middleware/auth');
+// src/controllers/projectController.js
+// Project Budget Tracking — COMPLETE CONTROLLER
+// Tracks: salary, advance, reimbursement costs per project
+// Features: project CRUD, employee assignment, payroll auto-cost, biweekly progress reports, Excel export
 
-// ── Controllers ───────────────────────────────────────────────────────────────
-const authCtrl       = require('../controllers/authController');
-const empCtrl        = require('../controllers/employeeController');
-const attCtrl        = require('../controllers/attendanceController');
-const leaveCtrl      = require('../controllers/leaveController');
-const advCtrl        = require('../controllers/advanceController');
-const payCtrl        = require('../controllers/payrollController');
-const geoCtrl        = require('../controllers/geofenceController');
-const sepCtrl        = require('../controllers/separationController');
-const empImportCtrl  = require('../controllers/employeeImportController');
-const attImportCtrl  = require('../controllers/attendanceImportController');
-const annCtrl        = require('../controllers/announcementController');
-const gkCtrl         = require('../controllers/gkController');
-const provCtrl       = require('../controllers/provisionController');
-const offerCtrl      = require('../controllers/offerLetterController');
-const itDeclCtrl     = require('../controllers/itDeclarationController');
-const compoffCtrl    = require('../controllers/compoffController');
+const db   = require('../config/db');
+const XLSX = require('xlsx');
 
-const ADMIN      = ['admin','super_admin'];
-const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
-const ACCOUNTS   = ['accounts','super_admin'];
-const ADMIN_ONLY = ['admin','super_admin'];
-const EMP_MGMT   = ['hr','accounts'];
-const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
+// ── Role Helpers ──────────────────────────────────────────────────────────────
+const ADMIN_ROLES    = ['super_admin', 'admin', 'accounts'];
+const MANAGER_ROLES  = ['super_admin', 'admin', 'accounts', 'manager', 'tl'];
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-router.post('/auth/login',                      authCtrl.login);
-router.post('/auth/refresh',                    authCtrl.refreshToken);
-router.post('/auth/forgot-password/verify',     authCtrl.forgotVerify);
-router.post('/auth/forgot-password/verify-pan', authCtrl.forgotVerifyPAN);
-router.post('/auth/forgot-password/reset',      authCtrl.forgotReset);
-router.get ('/auth/me',          authenticate,  authCtrl.getMe);
-router.post('/auth/change-password', authenticate, authCtrl.changePassword);
-router.post('/auth/update-photo',     authenticate, authCtrl.updatePhoto);
-
-// ── Employees ─────────────────────────────────────────────────────────────────
-router.get   ('/employees',               authenticate,                          empCtrl.getAll);
-router.get   ('/employees/export',        authenticate, authorize(...EMP_MGMT), empCtrl.exportExcel || ((req,res) => res.status(501).json({success:false,message:'Not implemented'})));
-router.get   ('/employees/export-master',        authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
-router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin'), empCtrl.exportAttendanceRegister);
-router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
-router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
-router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
-router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
-router.patch ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
-router.post  ('/employees/reset-password',authenticate, authorize(...EMP_MGMT), empCtrl.resetPassword);
-router.post  ('/employees/:id/separate',  authenticate, authorize(...EMP_MGMT), (req,res)=>res.json({success:false,message:'Not implemented'}));
-
-// ── Provision Confirmation Workflow ───────────────────────────────────────────
-// Lists & details
-router.get ('/provision',                authenticate, authorize(...PROVISION_APPROVERS), provCtrl.listProvisionEmployees);
-router.get ('/provision/accrual-log',    authenticate, authorize('hr','admin','super_admin'), provCtrl.getAccrualLog);
-router.get ('/provision/:id/status',     authenticate, authorize(...PROVISION_APPROVERS), provCtrl.getConfirmationStatus);
-// Workflow actions
-router.post('/provision/:id/initiate',   authenticate, authorize('hr','admin','super_admin'), provCtrl.initiateConfirmation);
-router.post('/provision/:id/approve',    authenticate, authorize(...PROVISION_APPROVERS),    provCtrl.approveConfirmation);
-// Monthly accrual (run 1st of each month, or manually)
-router.post('/provision/monthly-accrual', authenticate, authorize('hr','admin','super_admin'), provCtrl.runMonthlyAccrual);
-
-// ── Employee Bulk Import (Excel) ──────────────────────────────────────────────
-router.post('/employees/import',
-  authenticate, authorize(...EMP_MGMT),
-  empImportCtrl.uploadMiddleware,
-  empImportCtrl.importEmployees
-);
-
-// ── Attendance ────────────────────────────────────────────────────────────────
-router.post('/attendance/punch-in',         authenticate, attCtrl.punchIn);
-router.post('/attendance/punch-out',        authenticate, attCtrl.punchOut);
-
-// ── Attendance Bulk Import — must be BEFORE generic GET /attendance ───────────
-router.post('/attendance/import',
-  authenticate, authorize(...['hr']),
-  (req, res, next) => {
-    attImportCtrl.uploadMiddleware(req, res, (err) => {
-      if (err) return res.status(400).json({ success: false, message: err.message || 'File upload error' });
-      next();
-    });
-  },
-  attImportCtrl.importAttendance
-);
-
-router.get ('/attendance',                  authenticate, attCtrl.get);
-router.get ('/attendance/summary',          authenticate, attCtrl.getSummary);
-router.get ('/attendance/team-today',       authenticate, attCtrl.getTeamToday);
-router.get ('/attendance/punch-locations',  authenticate, attCtrl.getPunchLocations);
-router.post('/attendance/regularize',       authenticate, attCtrl.requestRegularization);
-router.get ('/attendance/regularizations',  authenticate, attCtrl.getRegularizations);
-router.post('/attendance/regularize/action',authenticate, attCtrl.actionRegularization);
-
-// ── Attendance Bulk Import (Excel) — kept here for reference (defined above) ──
-
-router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
-
-// ── OD / WFH apply (all employees) ───────────────────────────────────────────
-router.post('/attendance/od',              authenticate, attCtrl.applyOD);
-router.get ('/attendance/od',              authenticate, attCtrl.getODRequests);
-router.post('/attendance/od/bulk-action',   authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.bulkActionOD);
-router.post('/attendance/od/:id/action',   authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionOD);
-router.post('/attendance/wfh',             authenticate, attCtrl.applyWFH);
-router.get ('/attendance/wfh',             authenticate, attCtrl.getWFHRequests);
-router.post('/attendance/wfh/:id/action',  authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionWFH);
-router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
-// KC718 / super_admin: mark own attendance for a date range without punch in/out
-router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
-
-// ── Movement Tracking ──────────────────────────────────────────────────────
-router.post('/attendance/movement/log',     authenticate, attCtrl.logMovement);
-router.get ('/attendance/movement/history', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementHistory);
-router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSummary);
-
-// ── WFH (Work From Home) ──────────────────────────────────────────────────────
-router.post('/wfh/apply',       authenticate, attImportCtrl.applyWFH);
-router.get ('/wfh',             authenticate, attImportCtrl.getWFH);
-router.post('/wfh/:id/action',  authenticate, attImportCtrl.actionWFH);
-
-// ── Leave ─────────────────────────────────────────────────────────────────────
-router.get('/leave-types', authenticate, async (req, res) => {
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRATIONS — call on server startup to create tables if not exist
+// ══════════════════════════════════════════════════════════════════════════════
+exports.migrate = async () => {
+  const client = await db.getClient();
   try {
-    const db = require('../config/db');
-    const empId = req.user.id;
+    await client.query('BEGIN');
 
-    // Determine if this employee is currently on provisional period
-    const empRes = await db.query(
-      `SELECT employee_category, provision_end_date, joining_date FROM employees WHERE id=$1`,
-      [empId]
-    );
-    const emp = empRes.rows[0];
-    const now = new Date();
+    // Projects master table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id               SERIAL PRIMARY KEY,
+        name             VARCHAR(200) NOT NULL,
+        code             VARCHAR(50)  UNIQUE,
+        client_name      VARCHAR(200),
+        description      TEXT,
+        start_date       DATE,
+        end_date         DATE,
+        status           VARCHAR(30) DEFAULT 'active',
+        total_budget     NUMERIC(14,2) DEFAULT 0,
+        planned_cost     NUMERIC(14,2) DEFAULT 0,
+        project_manager_id INT REFERENCES employees(id),
+        created_by       INT REFERENCES employees(id),
+        created_at       TIMESTAMPTZ DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
 
-    // Contractual: provisional if still within 6 months of joining
-    const joiningDate = emp?.joining_date ? new Date(emp.joining_date) : null;
-    const sixMonthMark = joiningDate
-      ? new Date(new Date(joiningDate).setMonth(joiningDate.getMonth() + 6))
-      : null;
-    const isContractualProvisional =
-      emp?.employee_category === 'contractual' && sixMonthMark && now < sixMonthMark;
+    // Employees assigned to a project
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_employees (
+        id              SERIAL PRIMARY KEY,
+        project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        employee_id     INT NOT NULL REFERENCES employees(id),
+        role_in_project VARCHAR(100),
+        salary_pct      NUMERIC(5,2) DEFAULT 0,
+        assigned_at     TIMESTAMPTZ DEFAULT NOW(),
+        assigned_by     INT REFERENCES employees(id),
+        is_active       BOOLEAN DEFAULT true,
+        UNIQUE(project_id, employee_id)
+      )
+    `);
+    // Add salary_pct to existing tables created before this migration
+    await client.query(`ALTER TABLE project_employees ADD COLUMN IF NOT EXISTS salary_pct NUMERIC(5,2) DEFAULT 0`).catch(()=>{});
 
-    // Provision category: provisional until provision_end_date passes
-    const provisionEndDate = emp?.provision_end_date ? new Date(emp.provision_end_date) : null;
-    const isProvisional =
-      isContractualProvisional ||
-      (emp?.employee_category === 'provision' && provisionEndDate && provisionEndDate > now);
+    // All expenditure transactions linked to a project
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_expenditures (
+        id              SERIAL PRIMARY KEY,
+        project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        employee_id     INT REFERENCES employees(id),
+        type            VARCHAR(30) NOT NULL,
+        reference_id    INT,
+        amount          NUMERIC(12,2) NOT NULL,
+        description     TEXT,
+        month           INT,
+        year            INT,
+        recorded_by     INT REFERENCES employees(id),
+        recorded_at     TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
 
-    // Provisional employees: only PL. Confirmed employees: everything except PL.
-    const codeFilter = isProvisional
-      ? `AND code = 'PL'`
-      : `AND code != 'PL'`;
+    // Biweekly progress reports
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_progress_reports (
+        id              SERIAL PRIMARY KEY,
+        project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        period_start    DATE NOT NULL,
+        period_end      DATE NOT NULL,
+        report_type     VARCHAR(20) DEFAULT 'biweekly',
+        submitted_by    INT REFERENCES employees(id),
+        submitted_at    TIMESTAMPTZ,
+        work_done       TEXT,
+        data_count      JSONB,
+        achievements    TEXT,
+        challenges      TEXT,
+        plan_next       TEXT,
+        target_data     JSONB,
+        actual_achieved TEXT,
+        achievement_pct NUMERIC(5,2),
+        status          VARCHAR(20) DEFAULT 'pending',
+        manager_remarks TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
 
-    const r = await db.query(
-      `SELECT id, name, code, days_allowed, monthly_accrual,
-              carry_forward, max_carry_forward, is_paid, applicable_gender, is_active
-       FROM leave_types WHERE is_active=true ${codeFilter} ORDER BY name`
-    );
-    res.json({ success: true, data: r.rows });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
+    await client.query('COMMIT');
+    console.log('[projectController] Tables migrated ✓');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[projectController] Migration failed:', err.message);
+  } finally {
+    client.release();
+  }
+};
 
-router.post('/leave/apply',           authenticate,                        leaveCtrl.apply);
-router.get ('/leave/requests',        authenticate,                        leaveCtrl.getRequests);
-router.get ('/leave/applications',    authenticate,                        leaveCtrl.getRequests);
-router.get ('/leave/balance',         authenticate,                        leaveCtrl.getBalance);
-router.post('/leave/:id/action',      authenticate,                        leaveCtrl.action);
-router.put ('/leave/:id/action',      authenticate,                        leaveCtrl.action);
-router.post('/leave/:id/cancel',      authenticate,                        leaveCtrl.cancel);
-router.post('/leave/:id/revoke',      authenticate,                        leaveCtrl.revoke);
-router.put ('/leave/balance',         authenticate, authorize(...HR_ADMIN), leaveCtrl.updateBalance);
-router.post('/leave/monthly-accrual',        authenticate, authorize(...HR_ADMIN), leaveCtrl.monthlyAccrual);
-router.post('/leave/recalculate/:id',        authenticate, authorize(...HR_ADMIN), leaveCtrl.recalculateEmployee);
-router.get ('/leave/report',                 authenticate,                        leaveCtrl.getLeaveReport);
+// ══════════════════════════════════════════════════════════════════════════════
+// PROJECTS CRUD
+// ══════════════════════════════════════════════════════════════════════════════
 
-// ── Comp Off ──────────────────────────────────────────────────────────────────
-router.post  ('/compoff/grant',        authenticate, authorize('hr','admin','super_admin'), compoffCtrl.grantCredit);
-router.post  ('/compoff/bulk-grant',   authenticate, authorize('hr','admin','super_admin'), compoffCtrl.bulkGrant);
-router.get   ('/compoff/credits',      authenticate,                                        compoffCtrl.listCredits);
-router.get   ('/compoff/balance',      authenticate,                                        compoffCtrl.getBalance);
-router.delete('/compoff/:id/revoke',   authenticate, authorize('hr','admin','super_admin'), compoffCtrl.revokeCredit);
-
-// ── Advance Salary ────────────────────────────────────────────────────────────
-router.post('/advance/apply',                authenticate, advCtrl.apply);
-router.get ('/advance/mine',                 authenticate, advCtrl.getMine);
-router.get ('/advance',                      authenticate, advCtrl.getAll);
-router.post('/advance/:id/action',           authenticate, advCtrl.action);
-router.post('/advance/:id/revoke',           authenticate, advCtrl.revoke);
-router.delete('/advance/:id/dismiss',        authenticate, advCtrl.dismiss);
-router.post('/advance/:id/edit',             authenticate, advCtrl.edit);
-router.post('/advance/:id/process-payment',  authenticate, authorize('accounts'), advCtrl.processPayment);
-router.get ('/advance/:id/approvals',        authenticate, advCtrl.getApprovals);
-
-// ── Reimbursement ─────────────────────────────────────────────────────────────
-const reimbCtrl = require('../controllers/reimbursementController');
-router.post  ('/reimbursement/apply',               authenticate, reimbCtrl.apply);
-router.get   ('/reimbursement/export',              authenticate, reimbCtrl.exportData);
-router.get   ('/reimbursement',                     authenticate, reimbCtrl.getAll);
-router.post  ('/reimbursement/:id/action',          authenticate, reimbCtrl.action);
-router.post  ('/reimbursement/:id/revoke',          authenticate, reimbCtrl.revoke);
-router.put   ('/reimbursement/:id/edit',            authenticate, reimbCtrl.edit);
-router.post  ('/reimbursement/:id/disburse',        authenticate, authorize('accounts'), reimbCtrl.disburse);
-router.get   ('/reimbursement/:id/approvals',       authenticate, reimbCtrl.getApprovals);
-router.post  ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.uploadMiddleware, reimbCtrl.uploadAttachment);
-router.get   ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.getAttachment);
-
-// ── Payroll ───────────────────────────────────────────────────────────────────
-router.get ('/payroll',              authenticate,                     payCtrl.getPayroll);
-router.get ('/payroll/payslip',      authenticate,                     payCtrl.getPayslip);
-router.get ('/my/payslip',           authenticate,                     payCtrl.getPayslip);
-router.get ('/my/payslip-months',    authenticate, async (req, res) => {
-  const db    = require('../config/db');
-  const empId = req.user.id;
-  const r     = await db.query(
-    `SELECT DISTINCT month, year, status FROM payroll WHERE employee_id=$1 ORDER BY year DESC, month DESC LIMIT 6`,
-    [empId]
-  );
-  res.json({ success: true, data: r.rows });
-});
-router.post('/payroll/process',      authenticate, authorize(...ACCOUNTS), async (req, res) => {
-  res.json({ success: true, message: 'Use /payroll/upload to process payroll via Excel upload.' });
-});
-router.get ('/payroll/uploads',                   authenticate, authorize(...ACCOUNTS), payCtrl.getUploads);
-router.get ('/payroll/salary-structures',         authenticate, authorize(...HR_ADMIN), payCtrl.getAllSalaryStructures);
-router.get ('/payroll/salary-structure/:employee_id', authenticate,                    payCtrl.getSalaryStructure);
-router.post('/payroll/salary-structure',          authenticate, authorize(...HR_ADMIN), payCtrl.upsertSalaryStructure);
-router.post('/payroll/upload',                    authenticate, authorize('accounts'), payCtrl.uploadMiddleware, payCtrl.uploadPayroll);
-router.get ('/payroll/form16/years',              authenticate,                        payCtrl.getForm16Years);
-router.get ('/payroll/form16',                    authenticate,                        payCtrl.getForm16);
-
-
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-router.get('/dashboard', authenticate, async (req, res) => {
+// GET /projects  — list all (with budget totals)
+exports.listProjects = async (req, res) => {
   try {
-    const db    = require('../config/db');
-    const empId = req.user.id;
-    // FIX: Use IST date — server runs UTC on Render
-    const istToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit'
-    }).format(new Date());
+    const { status } = req.query;
+    const role = req.user.role;
 
-    const attRes = await db.query(
-      `SELECT *,
-              TO_CHAR(punch_in::time,'HH12:MI AM')  AS punch_in_time,
-              TO_CHAR(punch_out::time,'HH12:MI AM') AS punch_out_time,
-              TO_CHAR(date,'YYYY-MM-DD')      AS date_str
-       FROM attendance WHERE employee_id=$1 AND date=$2`,
-      [empId, istToday]
-    );
+    let where = '';
+    const params = [];
+    if (status) { where = 'WHERE p.status=$1'; params.push(status); }
 
-    // ── Auto-mark KC718 / super_admin as Present if no record exists today ────
-    // They don't punch in/out; absence of a record = present on working days
-    let todayAtt = attRes.rows[0] || null;
-    const isSpecialUser = req.user.role === 'super_admin' || req.user.employee_code === 'KC718';
-    if (isSpecialUser && !todayAtt) {
-      // Only auto-present on working days (not Sunday, not 2nd/4th Saturday)
-      const todayDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-      const dow = todayDate.getDay();
-      const dayOfMonth = todayDate.getDate();
-      // Rough 2nd/4th Saturday check
-      const isSat = dow === 6;
-      const satNum = Math.ceil(dayOfMonth / 7);
-      const is2nd4thSat = isSat && (satNum === 2 || satNum === 4);
-      const isSun = dow === 0;
-      // Check if today is a public holiday
-      const holCheck = await db.query(
-        `SELECT 1 FROM holidays WHERE date=$1 AND (region='all' OR region='south_west' OR region='north') LIMIT 1`,
-        [istToday]
-      );
-      const isHoliday = holCheck.rows.length > 0;
+    const result = await db.query(`
+      SELECT p.*,
+             CONCAT(pm.first_name,' ',pm.last_name) AS project_manager_name,
+             CONCAT(cb.first_name,' ',cb.last_name)  AS created_by_name,
+             COALESCE(SUM(pe.amount),0)              AS actual_cost,
+             COALESCE(SUM(CASE WHEN pe.type='salary'        THEN pe.amount ELSE 0 END),0) AS salary_cost,
+             COALESCE(SUM(CASE WHEN pe.type='advance'       THEN pe.amount ELSE 0 END),0) AS advance_cost,
+             COALESCE(SUM(CASE WHEN pe.type='reimbursement' THEN pe.amount ELSE 0 END),0) AS reimbursement_cost,
+             COUNT(DISTINCT pem.employee_id) AS employee_count
+      FROM projects p
+      LEFT JOIN employees pm  ON p.project_manager_id = pm.id
+      LEFT JOIN employees cb  ON p.created_by = cb.id
+      LEFT JOIN project_expenditures pe ON pe.project_id = p.id
+      LEFT JOIN project_employees pem ON pem.project_id = p.id AND pem.is_active = true
+      ${where}
+      GROUP BY p.id, pm.first_name, pm.last_name, cb.first_name, cb.last_name
+      ORDER BY p.created_at DESC
+    `, params);
 
-      if (!isSun && !is2nd4thSat && !isHoliday) {
-        // Auto-insert present record
-        try {
-          await db.query(
-            `INSERT INTO attendance(employee_id, date, status, remarks, punch_in_location)
-             VALUES($1, $2, 'present', 'Auto-marked', 'Auto')
-             ON CONFLICT(employee_id, date) DO NOTHING`,
-            [empId, istToday]
-          );
-          // Re-fetch to return fresh record
-          const freshAtt = await db.query(
-            `SELECT *, TO_CHAR(date,'YYYY-MM-DD') AS date_str FROM attendance WHERE employee_id=$1 AND date=$2`,
-            [empId, istToday]
-          );
-          todayAtt = freshAtt.rows[0] || { status: 'present', date_str: istToday };
-        } catch (_) {
-          // Non-critical: if insert fails just return synthetic present
-          todayAtt = { status: 'present', date_str: istToday };
-        }
-      }
-    }
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 
-    const now   = new Date();
-    const istParts = new Intl.DateTimeFormat('en-IN', { timeZone:'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit'
-    }).formatToParts(now);
-    const istP = {}; istParts.forEach(({type,value}) => { istP[type]=value; });
-    const month = parseInt(istP.month);
-    const year  = parseInt(istP.year);
-    const msRes = await db.query(
-      `SELECT
-        COUNT(*) FILTER (WHERE status IN ('present','late','half-day')) AS present,
-        COUNT(*) FILTER (WHERE status='absent') AS absent,
-        COALESCE(SUM(working_hours),0) AS total_hours,
-        COALESCE(AVG(working_hours) FILTER (
-          WHERE working_hours > 0
-            AND status IN ('present','late','regularized','od')
-        ), 0) AS avg_hours
-       FROM attendance
-       WHERE employee_id=$1
-         AND EXTRACT(MONTH FROM date)=$2
-         AND EXTRACT(YEAR  FROM date)=$3`,
-      [empId, month, year]
-    );
+// GET /projects/:id — single project with full details
+exports.getProject = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-    let pendingCount = 0;
-    let pendingRegCount = 0;
-    if (['manager','hr','admin','super_admin','tl'].includes(req.user.role)) {
-      const pRes = await db.query(
-        `SELECT COUNT(*) FROM leave_requests
-         WHERE status='pending'
-           AND employee_id != $1
-           AND (
-             current_approver_code = (SELECT employee_code FROM employees WHERE id=$1)
-             OR $2 IN ('hr','super_admin')
-           )`,
-        [empId, req.user.role]
-      );
-      pendingCount = parseInt(pRes.rows[0].count) || 0;
+    const proj = await db.query(`
+      SELECT p.*,
+             CONCAT(pm.first_name,' ',pm.last_name) AS project_manager_name,
+             COALESCE(SUM(pe.amount),0)              AS actual_cost,
+             COALESCE(SUM(CASE WHEN pe.type='salary'        THEN pe.amount ELSE 0 END),0) AS salary_cost,
+             COALESCE(SUM(CASE WHEN pe.type='advance'       THEN pe.amount ELSE 0 END),0) AS advance_cost,
+             COALESCE(SUM(CASE WHEN pe.type='reimbursement' THEN pe.amount ELSE 0 END),0) AS reimbursement_cost
+      FROM projects p
+      LEFT JOIN employees pm ON p.project_manager_id = pm.id
+      LEFT JOIN project_expenditures pe ON pe.project_id = p.id
+      WHERE p.id=$1
+      GROUP BY p.id, pm.first_name, pm.last_name
+    `, [id]);
 
-      // Also count pending regularization requests — direct reports only
-      // (Regularization goes to direct manager, not up the full tree)
-      let regCond = '';
-      let regParams = [];
-      if (['super_admin','hr'].includes(req.user.role)) {
-        regParams = [];
-        regCond = `WHERE a.regularization_status='pending'`;
-      } else if (['admin','manager'].includes(req.user.role)) {
-        regParams = [empId];
-        regCond = `WHERE a.regularization_status='pending' AND e.reporting_manager_id=$1`;
-      } else if (req.user.role === 'tl') {
-        regParams = [empId];
-        regCond = `WHERE a.regularization_status='pending' AND (e.team_leader_id=$1 OR e.id=$1)`;
-      }
-      if (regCond) {
-        const rRes = await db.query(
-          `SELECT COUNT(*) FROM attendance a
-           JOIN employees e ON e.id=a.employee_id
-           ${regCond}`, regParams
-        );
-        pendingRegCount = parseInt(rRes.rows[0].count) || 0;
-      }
-    }
+    if (!proj.rows.length)
+      return res.status(404).json({ success: false, message: 'Project not found' });
 
-    // Count unread notifications for the logged-in employee
-    const unreadNotifRes = await db.query(
-      `SELECT COUNT(*) FROM notifications
-       WHERE employee_id=$1 AND is_read=false
-         AND (expires_at IS NULL OR expires_at > NOW())`,
-      [empId]
-    );
-    const unreadNotifCount = parseInt(unreadNotifRes.rows[0].count) || 0;
+    // Assigned employees (include salary_pct for allocation UI)
+    const emps = await db.query(`
+      SELECT pem.*, e.first_name, e.last_name, e.employee_code, e.role,
+             d.name AS department_name, des.title AS designation_title
+      FROM project_employees pem
+      JOIN employees e ON pem.employee_id = e.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      WHERE pem.project_id=$1 AND pem.is_active=true
+      ORDER BY e.first_name
+    `, [id]);
+
+    // Expenditures (last 50)
+    const expends = await db.query(`
+      SELECT pe.*, e.first_name, e.last_name, e.employee_code
+      FROM project_expenditures pe
+      LEFT JOIN employees e ON pe.employee_id = e.id
+      WHERE pe.project_id=$1
+      ORDER BY pe.recorded_at DESC LIMIT 50
+    `, [id]);
+
+    // Progress reports
+    const reports = await db.query(`
+      SELECT pr.*, CONCAT(e.first_name,' ',e.last_name) AS submitted_by_name
+      FROM project_progress_reports pr
+      LEFT JOIN employees e ON pr.submitted_by = e.id
+      WHERE pr.project_id=$1
+      ORDER BY pr.period_start DESC
+    `, [id]);
 
     res.json({
       success: true,
       data: {
-        today_attendance:             todayAtt,
-        monthly_summary:              msRes.rows[0]  || {},
-        pending_leave_approvals:      pendingCount,
-        pending_regularizations:      pendingRegCount,
-        unread_notifications:         unreadNotifCount,
+        ...proj.rows[0],
+        employees: emps.rows,
+        expenditures: expends.rows,
+        reports: reports.rows,
       }
     });
-  } catch(e) {
-    console.error('Dashboard error:', e.message);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-});
+};
 
-// ── Announcements ─────────────────────────────────────────────────────────────
-router.get ('/announcements/feed',               authenticate,                         annCtrl.getFeed);
-router.get ('/announcements',                    authenticate,                         annCtrl.getAll);
-router.post('/announcements',                    authenticate, authorize(...HR_ADMIN), annCtrl.uploadMiddleware, annCtrl.create);
-router.put ('/announcements/:id',                authenticate, authorize(...HR_ADMIN), annCtrl.uploadMiddleware, annCtrl.update);
-router.delete('/announcements/:id',              authenticate, authorize(...HR_ADMIN), annCtrl.delete);
-// Fix 1: Like & Comment
-router.post('/announcements/:id/like',           authenticate,                         annCtrl.toggleLike);
-router.get ('/announcements/:id/comments',       authenticate,                         annCtrl.getComments);
-router.post('/announcements/:id/comments',       authenticate,                         annCtrl.addComment);
-router.delete('/announcements/:id/comments/:commentId', authenticate,                  annCtrl.deleteComment);
-
-// ── GK Quiz ───────────────────────────────────────────────────────────────────
-router.post  ('/gk/answer',             authenticate,                         gkCtrl.submitAnswer);
-router.get   ('/gk/leaderboard',        authenticate,                         gkCtrl.getLeaderboard);
-router.get   ('/gk/question',           authenticate,                         gkCtrl.getQuestion);
-router.get   ('/gk/thought',            authenticate,                         gkCtrl.getThought);
-router.get   ('/gk/my-stats',           authenticate,                         gkCtrl.getMyStats);
-router.get   ('/gk/responses',          authenticate, authorize(...HR_ADMIN), gkCtrl.getResponses);
-router.get   ('/gk/questions',          authenticate, authorize(...HR_ADMIN), gkCtrl.getQuestions);
-router.post  ('/gk/questions',          authenticate, authorize(...HR_ADMIN), gkCtrl.createQuestion);
-router.put   ('/gk/questions/:id',      authenticate, authorize(...HR_ADMIN), gkCtrl.updateQuestion);
-router.delete('/gk/questions/:id',      authenticate, authorize(...HR_ADMIN), gkCtrl.deleteQuestion);
-router.get   ('/gk/thoughts',           authenticate, authorize(...HR_ADMIN), gkCtrl.getThoughts);
-router.post  ('/gk/thoughts',           authenticate, authorize(...HR_ADMIN), gkCtrl.createThought);
-router.delete('/gk/thoughts/:id',       authenticate, authorize(...HR_ADMIN), gkCtrl.deleteThought);
-router.get   ('/gk/export/scores',      authenticate, authorize(...HR_ADMIN), gkCtrl.exportScores);
-router.get   ('/gk/export/yearly',      authenticate, authorize(...HR_ADMIN), gkCtrl.exportYearly);
-router.get   ('/gk/export/responses',   authenticate, authorize(...HR_ADMIN), gkCtrl.exportResponses);
-
-// ── Import Thoughts + GK from Excel (single combined upload) ─────────────────
-router.post('/gk/import',
-  authenticate, authorize(...HR_ADMIN),
-  gkCtrl.uploadMiddleware,
-  gkCtrl.importBoth
-);
-// Individual sheet imports (fallback)
-router.post('/gk/questions/import',
-  authenticate, authorize(...HR_ADMIN),
-  gkCtrl.uploadMiddleware,
-  gkCtrl.importQuestions
-);
-router.post('/gk/thoughts/import',
-  authenticate, authorize(...HR_ADMIN),
-  gkCtrl.uploadMiddleware,
-  gkCtrl.importThoughts
-);
-
-// ── Geofence ──────────────────────────────────────────────────────────────────
-router.get   ('/geofence/locations',                          authenticate,                           geoCtrl.getLocations);
-router.post  ('/geofence/locations',                          authenticate, authorize(...ADMIN_ONLY), geoCtrl.createLocation);
-router.put   ('/geofence/locations/:id',                      authenticate, authorize(...ADMIN_ONLY), geoCtrl.updateLocation);
-router.delete('/geofence/locations/:id',                      authenticate, authorize(...ADMIN_ONLY), geoCtrl.deleteLocation);
-router.get   ('/geofence/locations/:id/employees',            authenticate, authorize(...ADMIN_ONLY), geoCtrl.getLocationEmployees);
-router.get   ('/geofence/locations/:id/unassigned',           authenticate, authorize(...ADMIN_ONLY), geoCtrl.getUnassignedEmployees);
-router.get   ('/geofence/employees',                          authenticate, authorize(...ADMIN_ONLY), geoCtrl.getEmployeesForLocation);
-router.post  ('/geofence/validate',                           authenticate,                           geoCtrl.validatePunch);
-router.get   ('/geofence/my-locations',                       authenticate,                           geoCtrl.getMyLocations);
-router.get   ('/geofence/logs',                               authenticate,                           geoCtrl.getLogs);
-router.get   ('/geofence/employee/:employee_id',              authenticate,                           geoCtrl.getEmployeeGeofence);
-router.post  ('/geofence/assign',                             authenticate, authorize(...ADMIN_ONLY), geoCtrl.assignBuffer);
-router.post  ('/geofence/bulk-assign',                        authenticate, authorize(...ADMIN_ONLY), geoCtrl.bulkAssignBuffer);
-router.patch ('/geofence/:employee_id/:location_id/toggle',   authenticate, authorize(...ADMIN_ONLY), geoCtrl.toggleUniversal);
-router.delete('/geofence/:employee_id/:location_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.removeBuffer);
-
-// ── Buffer Rules ──────────────────────────────────────────────────────────────
-router.post  ('/geofence/validate-buffer',                    authenticate,                           geoCtrl.validateBuffer);
-router.get   ('/geofence/boundary',                           authenticate,                           geoCtrl.getBoundary);
-router.get   ('/geofence/buffer-rules',                       authenticate, authorize(...ADMIN_ONLY), geoCtrl.getAllBufferRules);
-router.get   ('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.getBufferRule);
-router.post  ('/geofence/buffer-rules',                       authenticate, authorize(...ADMIN_ONLY), geoCtrl.upsertBufferRule);
-router.put   ('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.upsertBufferRule);
-router.delete('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.deleteBufferRule);
-
-// ── Separation ────────────────────────────────────────────────────────────────
-// NOTE: Specific/static routes MUST come before generic routes (POST /separations,
-//       GET /separations) to avoid Express matching them against the HR_ADMIN guard.
-router.get ('/separations/notice-period',        authenticate,                                                        sepCtrl.getNoticePeriod);
-router.post('/separations/resign',               authenticate,                                                        sepCtrl.submitResignation);
-router.post('/separations/process-lwd',          authenticate, authorize('super_admin','admin'),                      sepCtrl.processLWD);
-router.get ('/separations/my',                   authenticate,                                                        sepCtrl.getMySeparations);
-router.get ('/separations/:id',                  authenticate,                                                        sepCtrl.getOne);
-router.post('/separations/:id/withdraw',         authenticate,                                                        sepCtrl.withdraw);
-router.post('/separations/:id/manager-action',   authenticate, authorize('manager','tl','admin','super_admin'),       sepCtrl.managerAction);
-router.post('/separations/:id/hr-action',        authenticate, authorize('hr','admin','super_admin'),                 sepCtrl.hrAction);
-router.post('/separations/:id/accounts-action',  authenticate, authorize('accounts','admin','super_admin'),           sepCtrl.accountsAction);
-router.post('/separations/:id/admin-action',     authenticate, authorize('admin','super_admin'),                      sepCtrl.adminAction);
-// Generic routes last
-router.get ('/separations',                      authenticate, authorize(...HR_ADMIN),                                sepCtrl.getAll);
-router.post('/separations',                      authenticate, authorize(...HR_ADMIN),                                sepCtrl.initiate);
-
-// ── Notifications ─────────────────────────────────────────────────────────────
-router.get('/notifications', authenticate, async (req, res) => {
+// POST /projects — create project (accounts/super_admin)
+exports.createProject = async (req, res) => {
   try {
-    const db     = require('../config/db');
-    const result = await db.query(
-      `SELECT * FROM notifications WHERE employee_id=$1 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT 50`,
-      [req.user.id]
-    );
-    const unread = result.rows.filter(n => !n.is_read).length;
-    res.json({ success: true, data: result.rows, unread });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
 
-// read-all MUST come before :id/read to prevent route conflict
-router.patch('/notifications/read-all', authenticate, async (req, res) => {
+    const {
+      name, code, client_name, description,
+      start_date, end_date, status = 'active',
+      total_budget = 0, planned_cost = 0,
+      project_manager_id
+    } = req.body;
+
+    if (!name?.trim())
+      return res.status(400).json({ success: false, message: 'Project name is required' });
+
+    const result = await db.query(`
+      INSERT INTO projects
+        (name, code, client_name, description, start_date, end_date, status,
+         total_budget, planned_cost, project_manager_id, created_by, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+      RETURNING *
+    `, [name.trim(), code?.trim()||null, client_name?.trim()||null, description?.trim()||null,
+        start_date||null, end_date||null, status,
+        parseFloat(total_budget)||0, parseFloat(planned_cost)||0,
+        project_manager_id||null, req.user.id]);
+
+    res.json({ success: true, data: result.rows[0], message: 'Project created successfully' });
+  } catch (err) {
+    if (err.code === '23505')
+      return res.status(400).json({ success: false, message: 'Project code already exists' });
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// PUT /projects/:id — update project
+exports.updateProject = async (req, res) => {
   try {
-    await require('../config/db').query(
-      `UPDATE notifications SET is_read=true WHERE employee_id=$1`,
-      [req.user.id]
-    );
-    res.json({ success: true });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
 
-router.patch('/notifications/:id/read', authenticate, async (req, res) => {
+    const { id } = req.params;
+    const {
+      name, code, client_name, description,
+      start_date, end_date, status,
+      total_budget, planned_cost, project_manager_id
+    } = req.body;
+
+    const result = await db.query(`
+      UPDATE projects SET
+        name=$1, code=$2, client_name=$3, description=$4,
+        start_date=$5, end_date=$6, status=$7,
+        total_budget=$8, planned_cost=$9, project_manager_id=$10,
+        updated_at=NOW()
+      WHERE id=$11 RETURNING *
+    `, [name, code||null, client_name||null, description||null,
+        start_date||null, end_date||null, status,
+        parseFloat(total_budget)||0, parseFloat(planned_cost)||0,
+        project_manager_id||null, id]);
+
+    if (!result.rows.length)
+      return res.status(404).json({ success: false, message: 'Project not found' });
+
+    res.json({ success: true, data: result.rows[0], message: 'Project updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// DELETE /projects/:id — delete project (accounts/super_admin only)
+exports.deleteProject = async (req, res) => {
   try {
-    await require('../config/db').query(
-      `UPDATE notifications SET is_read=true WHERE id=$1 AND employee_id=$2`,
-      [req.params.id, req.user.id]
-    );
-    res.json({ success: true });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
 
-// ── Departments & Designations ────────────────────────────────────────────────
-router.get('/departments', authenticate, async (req, res) => {
-  const r = await require('../config/db').query('SELECT * FROM departments ORDER BY name');
-  res.json({ success: true, data: r.rows });
-});
-router.get('/designations', authenticate, async (req, res) => {
-  const r = await require('../config/db').query('SELECT * FROM designations ORDER BY title');
-  res.json({ success: true, data: r.rows });
-});
+    const { id } = req.params;
 
-// ── Holidays ──────────────────────────────────────────────────────────────────
-router.get('/holidays', authenticate, async (req, res) => {
+    // Check project exists
+    const proj = await db.query('SELECT id, name FROM projects WHERE id=$1', [id]);
+    if (!proj.rows.length)
+      return res.status(404).json({ success: false, message: 'Project not found' });
+
+    // Nullify project_id on any advance_salary / reimbursements rows that reference this project.
+    // These tables may have an FK without ON DELETE CASCADE, so we must clear them first.
+    await db.query(`UPDATE advance_salary    SET project_id = NULL WHERE project_id = $1`, [id]).catch(() => {});
+    await db.query(`UPDATE reimbursements    SET project_id = NULL WHERE project_id = $1`, [id]).catch(() => {});
+
+    // Delete project — CASCADE will remove project_employees, project_expenditures, project_progress_reports
+    await db.query('DELETE FROM projects WHERE id=$1', [id]);
+
+    res.json({ success: true, message: `Project "${proj.rows[0].name}" deleted successfully` });
+  } catch (err) {
+    console.error('[deleteProject]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE ASSIGNMENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+// POST /projects/:id/assign — assign employee to project
+exports.assignEmployee = async (req, res) => {
   try {
-    const db   = require('../config/db');
-    const { getEmployeeRegion } = require('../config/regionHelper');
-    const year = parseInt(req.query.year) || new Date().getFullYear();
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
 
-    // Get employee's city/state
-    const empInfo = await db.query(
-      `SELECT e.city, e.state, e.reporting_manager_id,
-              m.city AS mgr_city, m.state AS mgr_state
-       FROM employees e
-       LEFT JOIN employees m ON e.reporting_manager_id = m.id
-       WHERE e.id=$1`, [req.user.id]
-    );
-    const emp = empInfo.rows[0];
-    const city  = emp?.city  || '';
-    const state = emp?.state || '';
+    const projectId    = parseInt(req.params.id);
+    const employeeId   = parseInt(req.body.employee_id);
+    const { role_in_project } = req.body;
 
-    // WFH or blank location → use manager's location as fallback
-    const isWFH = city.toLowerCase().includes('work from home') ||
-                  city.toLowerCase().includes('wfh') ||
-                  (!city.trim() && !state.trim());
+    if (!projectId  || isNaN(projectId))  return res.status(400).json({ success: false, message: 'Invalid project id' });
+    if (!employeeId || isNaN(employeeId)) return res.status(400).json({ success: false, message: 'Invalid employee_id — must be a number' });
 
-    const region = isWFH
-      ? getEmployeeRegion(emp?.mgr_city || '', emp?.mgr_state || '')
-      : getEmployeeRegion(city, state);
+    // Auto-run migration if table doesn't exist yet
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS project_employees (
+        id              SERIAL PRIMARY KEY,
+        project_id      INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        employee_id     INT NOT NULL REFERENCES employees(id),
+        role_in_project VARCHAR(100),
+        assigned_at     TIMESTAMPTZ DEFAULT NOW(),
+        assigned_by     INT REFERENCES employees(id),
+        is_active       BOOLEAN DEFAULT true,
+        UNIQUE(project_id, employee_id)
+      )
+    `);
 
-    const r = await db.query(
-      `SELECT id, name, TO_CHAR(date,'YYYY-MM-DD') AS date, type, region, description, year
-       FROM holidays
-       WHERE year=$1 AND (region='all' OR region=$2)
-       ORDER BY date ASC`,
-      [year, region]
-    );
-    res.json({ success: true, data: r.rows });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
+    // Check project exists
+    const proj = await db.query('SELECT id FROM projects WHERE id=$1', [projectId]);
+    if (!proj.rows.length)
+      return res.status(404).json({ success: false, message: 'Project not found' });
 
-// ── Birthdays ─────────────────────────────────────────────────────────────────
+    // Check employee exists
+    const emp = await db.query('SELECT id FROM employees WHERE id=$1 AND is_active=true', [employeeId]);
+    if (!emp.rows.length)
+      return res.status(404).json({ success: false, message: 'Employee not found' });
 
-// GET /birthdays/upcoming — today + next 7 days, with like/wish counts
-router.get('/birthdays/upcoming', authenticate, async (req, res) => {
+    // Upsert (re-activate if previously removed)
+    await db.query(`
+      INSERT INTO project_employees (project_id, employee_id, role_in_project, assigned_by, is_active)
+      VALUES ($1,$2,$3,$4,true)
+      ON CONFLICT(project_id, employee_id) DO UPDATE SET
+        is_active=true, role_in_project=$3, assigned_by=$4, assigned_at=NOW()
+    `, [projectId, employeeId, role_in_project||null, req.user.id]);
+
+    res.json({ success: true, message: 'Employee assigned to project' });
+  } catch (err) {
+    console.error('[assignEmployee]', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+};
+
+// DELETE /projects/:id/employees/:empId — remove employee from project
+exports.removeEmployee = async (req, res) => {
   try {
-    const db     = require('../config/db');
-    const empId  = req.user.id;
-    const today  = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
 
-    // Fetch employees whose birthday falls in next 7 days (month/day match, ignore year)
+    const { id, empId } = req.params;
+    await db.query(
+      'UPDATE project_employees SET is_active=false WHERE project_id=$1 AND employee_id=$2',
+      [id, empId]
+    );
+    res.json({ success: true, message: 'Employee removed from project' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SALARY ALLOCATION — Accounts sets % split per employee across projects
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /projects/employees/:empId/allocation — get all project allocations for an employee
+exports.getEmployeeAllocation = async (req, res) => {
+  try {
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const { empId } = req.params;
+    const result = await db.query(`
+      SELECT pe.project_id, pe.salary_pct, pe.role_in_project,
+             p.name AS project_name, p.code AS project_code, p.status AS project_status
+      FROM project_employees pe
+      JOIN projects p ON pe.project_id = p.id
+      WHERE pe.employee_id=$1 AND pe.is_active=true
+      ORDER BY p.name
+    `, [empId]);
+
+    const total = result.rows.reduce((s, r) => s + parseFloat(r.salary_pct || 0), 0);
+    res.json({ success: true, data: result.rows, total_pct: parseFloat(total.toFixed(2)) });
+  } catch (err) {
+    console.error('[getEmployeeAllocation]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// PUT /projects/employees/:empId/allocation — save % allocations for an employee across all projects
+// Body: { allocations: [{ project_id, salary_pct }, ...] }
+exports.setSalaryAllocation = async (req, res) => {
+  try {
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const { empId } = req.params;
+    const { allocations } = req.body; // [{ project_id, salary_pct }]
+
+    if (!Array.isArray(allocations) || allocations.length === 0)
+      return res.status(400).json({ success: false, message: 'allocations array required' });
+
+    // Validate total = 100
+    const total = allocations.reduce((s, a) => s + parseFloat(a.salary_pct || 0), 0);
+    if (Math.abs(total - 100) > 0.01)
+      return res.status(400).json({
+        success: false,
+        message: `Total allocation must equal 100%. Currently: ${total.toFixed(2)}%`
+      });
+
+    // Validate all values are non-negative
+    for (const a of allocations) {
+      if (parseFloat(a.salary_pct) < 0)
+        return res.status(400).json({ success: false, message: 'Allocation % cannot be negative' });
+    }
+
+    // Save each
+    for (const a of allocations) {
+      await db.query(
+        `UPDATE project_employees SET salary_pct=$1 WHERE employee_id=$2 AND project_id=$3 AND is_active=true`,
+        [parseFloat(a.salary_pct), empId, a.project_id]
+      );
+    }
+
+    res.json({ success: true, message: 'Salary allocation saved successfully' });
+  } catch (err) {
+    console.error('[setSalaryAllocation]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPENDITURE — Manual add + auto-hooks from payroll/advance/reimbursement
+// ══════════════════════════════════════════════════════════════════════════════
+
+// POST /projects/:id/expenditure — manually add expenditure
+exports.addExpenditure = async (req, res) => {
+  try {
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const { id } = req.params;
+    const { employee_id, type, amount, description, month, year, reference_id } = req.body;
+
+    if (!type || !amount || amount <= 0)
+      return res.status(400).json({ success: false, message: 'type and positive amount required' });
+
+    const result = await db.query(`
+      INSERT INTO project_expenditures
+        (project_id, employee_id, type, reference_id, amount, description, month, year, recorded_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *
+    `, [id, employee_id||null, type, reference_id||null,
+        parseFloat(amount), description||null,
+        month||null, year||null, req.user.id]);
+
+    res.json({ success: true, data: result.rows[0], message: 'Expenditure recorded' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Called internally when payroll is processed — splits salary by salary_pct across projects
+exports.hookPayrollExpenditure = async (employeeId, amount, month, year, payrollId) => {
+  try {
+    // Find active project assignments with their salary %
+    const projects = await db.query(
+      `SELECT project_id, salary_pct FROM project_employees WHERE employee_id=$1 AND is_active=true`,
+      [employeeId]
+    );
+
+    if (!projects.rows.length) return; // Not assigned to any project
+
+    // Check if any allocation is defined (at least one > 0)
+    const totalPct = projects.rows.reduce((s, r) => s + parseFloat(r.salary_pct || 0), 0);
+    if (totalPct === 0) {
+      console.warn(`[hookPayroll] Employee ${employeeId} has no salary allocation set — skipping project split`);
+      return;
+    }
+
+    for (const row of projects.rows) {
+      const pct = parseFloat(row.salary_pct || 0);
+      if (pct <= 0) continue; // Skip projects with 0% allocation
+
+      const splitAmount = parseFloat(((amount * pct) / 100).toFixed(2));
+
+      // Dedup: skip if already recorded for this payroll in this project
+      const exists = await db.query(
+        `SELECT id FROM project_expenditures WHERE project_id=$1 AND employee_id=$2 AND type='salary' AND month=$3 AND year=$4 AND reference_id=$5`,
+        [row.project_id, employeeId, month, year, payrollId]
+      );
+      if (!exists.rows.length) {
+        await db.query(`
+          INSERT INTO project_expenditures
+            (project_id, employee_id, type, reference_id, amount, description, month, year, recorded_by)
+          VALUES ($1,$2,'salary',$3,$4,$5,$6,$7,$8)
+        `, [row.project_id, employeeId, payrollId, splitAmount,
+            `Salary ${month}/${year} (${pct}% allocation)`, month, year, employeeId]);
+      }
+    }
+  } catch (err) {
+    console.error('[projectController.hookPayroll]', err.message);
+  }
+};
+
+// Called internally when advance/reimbursement approved & paid
+exports.hookFinanceExpenditure = async (employeeId, amount, type, referenceId, projectId, description) => {
+  try {
+    if (!projectId) return;
+    const exists = await db.query(
+      `SELECT id FROM project_expenditures WHERE reference_id=$1 AND type=$2`,
+      [referenceId, type]
+    );
+    if (!exists.rows.length) {
+      await db.query(`
+        INSERT INTO project_expenditures
+          (project_id, employee_id, type, reference_id, amount, description, recorded_by)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `, [projectId, employeeId, type, referenceId, parseFloat(amount), description||null, employeeId]);
+    }
+  } catch (err) {
+    console.error('[projectController.hookFinance]', err.message);
+  }
+};
+
+// GET /projects/:id/expenditures — paginated expenditure list
+exports.getExpenditures = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, month, year, page = 1, limit = 50 } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const params = [id];
+    let where = 'WHERE pe.project_id=$1';
+
+    if (type)  { params.push(type);         where += ` AND pe.type=$${params.length}`; }
+    if (month) { params.push(parseInt(month)); where += ` AND pe.month=$${params.length}`; }
+    if (year)  { params.push(parseInt(year));  where += ` AND pe.year=$${params.length}`; }
+
+    params.push(parseInt(limit)); params.push(offset);
+
+    const result = await db.query(`
+      SELECT pe.*, e.first_name, e.last_name, e.employee_code,
+             rb.first_name AS recorded_by_fname, rb.last_name AS recorded_by_lname
+      FROM project_expenditures pe
+      LEFT JOIN employees e  ON pe.employee_id = e.id
+      LEFT JOIN employees rb ON pe.recorded_by = rb.id
+      ${where}
+      ORDER BY pe.recorded_at DESC
+      LIMIT $${params.length-1} OFFSET $${params.length}
+    `, params);
+
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PROGRESS REPORTS (Biweekly)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /projects/:id/reports — list reports
+exports.listReports = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(`
+      SELECT pr.*, CONCAT(e.first_name,' ',e.last_name) AS submitted_by_name,
+             e.employee_code AS submitted_by_code
+      FROM project_progress_reports pr
+      LEFT JOIN employees e ON pr.submitted_by = e.id
+      WHERE pr.project_id=$1
+      ORDER BY pr.period_start DESC
+    `, [id]);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// POST /projects/:id/reports — submit progress report
+exports.submitReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      period_start, period_end,
+      work_done, data_count, achievements, challenges,
+      plan_next, target_data,
+      actual_achieved, achievement_pct,  // filled after 15 days
+      report_type = 'biweekly'
+    } = req.body;
+
+    // Only project manager or admin can submit
+    const proj = await db.query('SELECT project_manager_id FROM projects WHERE id=$1', [id]);
+    if (!proj.rows.length)
+      return res.status(404).json({ success: false, message: 'Project not found' });
+
+    const isPM    = proj.rows[0].project_manager_id === req.user.id;
+    const isAdmin = ADMIN_ROLES.includes(req.user.role);
+    if (!isPM && !isAdmin)
+      return res.status(403).json({ success: false, message: 'Only project manager or admin can submit reports' });
+
+    const result = await db.query(`
+      INSERT INTO project_progress_reports
+        (project_id, period_start, period_end, report_type,
+         submitted_by, submitted_at,
+         work_done, data_count, achievements, challenges,
+         plan_next, target_data, actual_achieved, achievement_pct, status)
+      VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8,$9,$10,$11,$12,$13,'submitted')
+      RETURNING *
+    `, [id, period_start, period_end, report_type,
+        req.user.id,
+        work_done||null,
+        data_count ? JSON.stringify(data_count) : null,
+        achievements||null, challenges||null,
+        plan_next||null,
+        target_data ? JSON.stringify(target_data) : null,
+        actual_achieved||null,
+        achievement_pct ? parseFloat(achievement_pct) : null]);
+
+    res.json({ success: true, data: result.rows[0], message: 'Progress report submitted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// PATCH /projects/reports/:reportId — update/review report
+exports.updateReport = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const {
+      work_done, data_count, achievements, challenges,
+      plan_next, target_data, actual_achieved, achievement_pct,
+      manager_remarks, status
+    } = req.body;
+
+    const result = await db.query(`
+      UPDATE project_progress_reports SET
+        work_done=$1, data_count=$2, achievements=$3, challenges=$4,
+        plan_next=$5, target_data=$6, actual_achieved=$7, achievement_pct=$8,
+        manager_remarks=$9, status=COALESCE($10,status)
+      WHERE id=$11 RETURNING *
+    `, [work_done||null,
+        data_count ? JSON.stringify(data_count) : null,
+        achievements||null, challenges||null,
+        plan_next||null,
+        target_data ? JSON.stringify(target_data) : null,
+        actual_achieved||null,
+        achievement_pct ? parseFloat(achievement_pct) : null,
+        manager_remarks||null, status||null,
+        reportId]);
+
+    if (!result.rows.length)
+      return res.status(404).json({ success: false, message: 'Report not found' });
+
+    res.json({ success: true, data: result.rows[0], message: 'Report updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// GET /projects/pending-reports — reports due for current period (for notifications)
+exports.pendingReports = async (req, res) => {
+  try {
+    // Projects where user is PM and no report submitted in last 15 days
+    const today = new Date();
+    const cutoff = new Date(today - 15 * 24 * 60 * 60 * 1000);
+
+    const result = await db.query(`
+      SELECT p.id, p.name, p.code,
+             MAX(pr.submitted_at) AS last_report_at
+      FROM projects p
+      LEFT JOIN project_progress_reports pr ON pr.project_id = p.id
+      WHERE p.project_manager_id=$1 AND p.status='active'
+      GROUP BY p.id, p.name, p.code
+      HAVING MAX(pr.submitted_at) IS NULL OR MAX(pr.submitted_at) < $2
+    `, [req.user.id, cutoff]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONSOLIDATED REPORT + EXCEL EXPORT
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /projects/:id/export — Excel export for accounts
+exports.exportProjectExcel = async (req, res) => {
+  try {
+    if (req.user.role !== 'accounts' && req.user.role !== 'super_admin')
+      return res.status(403).json({ success: false, message: 'Only Accounts can download Excel reports' });
+
+    const { id } = req.params;
+
+    // Fetch project
+    const proj = await db.query(`
+      SELECT p.*, CONCAT(pm.first_name,' ',pm.last_name) AS project_manager_name
+      FROM projects p
+      LEFT JOIN employees pm ON p.project_manager_id = pm.id
+      WHERE p.id=$1
+    `, [id]);
+    if (!proj.rows.length) return res.status(404).json({ success: false, message: 'Project not found' });
+    const p = proj.rows[0];
+
+    // Fetch expenditures
+    const expends = await db.query(`
+      SELECT pe.*, e.first_name||' '||e.last_name AS employee_name, e.employee_code
+      FROM project_expenditures pe
+      LEFT JOIN employees e ON pe.employee_id = e.id
+      WHERE pe.project_id=$1 ORDER BY pe.recorded_at DESC
+    `, [id]);
+
+    // Fetch employees
+    const emps = await db.query(`
+      SELECT pem.*, e.first_name||' '||e.last_name AS name, e.employee_code,
+             d.name AS dept, des.title AS designation,
+             COALESCE(SUM(pe.amount),0) AS total_cost
+      FROM project_employees pem
+      JOIN employees e ON pem.employee_id=e.id
+      LEFT JOIN departments d ON e.department_id=d.id
+      LEFT JOIN designations des ON e.designation_id=des.id
+      LEFT JOIN project_expenditures pe ON pe.project_id=pem.project_id AND pe.employee_id=pem.employee_id
+      WHERE pem.project_id=$1
+      GROUP BY pem.id, e.first_name, e.last_name, e.employee_code, d.name, des.title
+    `, [id]);
+
+    // Fetch progress reports
+    const reports = await db.query(`
+      SELECT pr.*, CONCAT(e.first_name,' ',e.last_name) AS submitted_by
+      FROM project_progress_reports pr
+      LEFT JOIN employees e ON pr.submitted_by=e.id
+      WHERE pr.project_id=$1 ORDER BY pr.period_start DESC
+    `, [id]);
+
+    const wb = XLSX.utils.book_new();
+
+    // ── Sheet 1: Summary ──
+    const totalActual = expends.rows.reduce((s, r) => s + parseFloat(r.amount), 0);
+    const salaryCost  = expends.rows.filter(r=>r.type==='salary').reduce((s,r)=>s+parseFloat(r.amount),0);
+    const advCost     = expends.rows.filter(r=>r.type==='advance').reduce((s,r)=>s+parseFloat(r.amount),0);
+    const reimbCost   = expends.rows.filter(r=>r.type==='reimbursement').reduce((s,r)=>s+parseFloat(r.amount),0);
+
+    const summaryData = [
+      ['PROJECT BUDGET REPORT', ''],
+      ['Generated On', new Date().toLocaleString('en-IN')],
+      [''],
+      ['Project Name',    p.name],
+      ['Project Code',    p.code || '—'],
+      ['Client',          p.client_name || '—'],
+      ['Status',          p.status],
+      ['Project Manager', p.project_manager_name || '—'],
+      ['Start Date',      p.start_date ? new Date(p.start_date).toLocaleDateString('en-IN') : '—'],
+      ['End Date',        p.end_date   ? new Date(p.end_date).toLocaleDateString('en-IN')   : '—'],
+      [''],
+      ['BUDGET SUMMARY', ''],
+      ['Client Budget (Total)',  `₹${parseFloat(p.total_budget||0).toLocaleString('en-IN')}`],
+      ['Planned Cost (Org)',     `₹${parseFloat(p.planned_cost||0).toLocaleString('en-IN')}`],
+      ['Actual Cost (Spent)',    `₹${totalActual.toLocaleString('en-IN')}`],
+      ['  → Salary',            `₹${salaryCost.toLocaleString('en-IN')}`],
+      ['  → Advance',           `₹${advCost.toLocaleString('en-IN')}`],
+      ['  → Reimbursement',     `₹${reimbCost.toLocaleString('en-IN')}`],
+      ['Budget Utilisation',    `${p.total_budget > 0 ? ((totalActual/p.total_budget)*100).toFixed(1) : '—'}%`],
+      ['Variance (Budget-Actual)', `₹${(parseFloat(p.total_budget||0) - totalActual).toLocaleString('en-IN')}`],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+    ws1['!cols'] = [{wch:30},{wch:25}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+    // ── Sheet 2: Expenditure Details ──
+    const expRows = [
+      ['Date','Employee Code','Employee Name','Type','Description','Month','Year','Amount (₹)','Recorded By']
+    ];
+    for (const e of expends.rows) {
+      expRows.push([
+        new Date(e.recorded_at).toLocaleDateString('en-IN'),
+        e.employee_code || '—',
+        e.employee_name || '—',
+        e.type,
+        e.description || '—',
+        e.month || '—',
+        e.year  || '—',
+        parseFloat(e.amount),
+        e.recorded_by_name || '—',
+      ]);
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(expRows);
+    ws2['!cols'] = [{wch:14},{wch:14},{wch:22},{wch:14},{wch:30},{wch:8},{wch:8},{wch:14},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Expenditure Details');
+
+    // ── Sheet 3: Assigned Employees ──
+    const empRows = [
+      ['Employee Code','Name','Department','Designation','Role In Project','Total Cost (₹)','Assigned On']
+    ];
+    for (const e of emps.rows) {
+      empRows.push([
+        e.employee_code, e.name, e.dept||'—', e.designation||'—',
+        e.role_in_project||'—', parseFloat(e.total_cost),
+        new Date(e.assigned_at).toLocaleDateString('en-IN'),
+      ]);
+    }
+    const ws3 = XLSX.utils.aoa_to_sheet(empRows);
+    ws3['!cols'] = [{wch:14},{wch:22},{wch:18},{wch:20},{wch:18},{wch:16},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws3, 'Team Members');
+
+    // ── Sheet 4: Progress Reports ──
+    const rptRows = [
+      ['Period Start','Period End','Work Done','Achievements','Challenges','Plan Next Period','Target %','Actual Achieved','Achievement %','Submitted By','Submitted At','Manager Remarks']
+    ];
+    for (const r of reports.rows) {
+      rptRows.push([
+        r.period_start ? new Date(r.period_start).toLocaleDateString('en-IN') : '—',
+        r.period_end   ? new Date(r.period_end).toLocaleDateString('en-IN')   : '—',
+        r.work_done        || '—',
+        r.achievements     || '—',
+        r.challenges       || '—',
+        r.plan_next        || '—',
+        r.target_data ? JSON.stringify(r.target_data) : '—',
+        r.actual_achieved  || '—',
+        r.achievement_pct  != null ? `${r.achievement_pct}%` : '—',
+        r.submitted_by     || '—',
+        r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-IN') : '—',
+        r.manager_remarks  || '—',
+      ]);
+    }
+    const ws4 = XLSX.utils.aoa_to_sheet(rptRows);
+    ws4['!cols'] = Array(12).fill({wch:22});
+    XLSX.utils.book_append_sheet(wb, ws4, 'Progress Reports');
+
+    // Send
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const filename = `Project_${p.code || p.id}_Budget_Report_${new Date().toISOString().slice(0,10)}.xlsx`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error generating Excel' });
+  }
+};
+
+// GET /projects/summary — overall summary across all projects (accounts dashboard)
+exports.getSummary = async (req, res) => {
+  try {
+    if (!ADMIN_ROLES.includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
+
     const result = await db.query(`
       SELECT
-        e.id,
-        CONCAT(e.first_name,' ',e.last_name) AS full_name,
-        e.employee_code,
-        d.name   AS department_name,
-        des.title AS designation_title,
-        TO_CHAR(e.date_of_birth,'MM-DD') AS birth_md,
-        TO_CHAR(e.date_of_birth,'DD Mon') AS birth_display,
-        gs.offset_days AS days_until,
-        COALESCE((SELECT COUNT(*) FROM birthday_likes  bl WHERE bl.birthday_emp_id=e.id AND bl.like_date=$1),0) AS like_count,
-        COALESCE((SELECT COUNT(*) FROM birthday_wishes bw WHERE bw.birthday_emp_id=e.id AND bw.wish_date=$1),0) AS wish_count,
-        COALESCE(EXISTS(SELECT 1 FROM birthday_likes  bl WHERE bl.birthday_emp_id=e.id AND bl.from_emp_id=$2 AND bl.like_date=$1),false) AS i_liked,
-        COALESCE(EXISTS(SELECT 1 FROM birthday_wishes bw WHERE bw.birthday_emp_id=e.id AND bw.from_emp_id=$2 AND bw.wish_date=$1),false) AS i_wished
-      FROM employees e
-      JOIN generate_series(0, 7) AS gs(offset_days)
-        ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata')::date + (gs.offset_days || ' days')::interval, 'MM-DD')
-      LEFT JOIN departments  d   ON e.department_id  = d.id
-      LEFT JOIN designations des ON e.designation_id = des.id
-      WHERE e.is_active = TRUE
-        AND e.date_of_birth IS NOT NULL
-      ORDER BY gs.offset_days ASC, e.first_name ASC
-    `, [today, empId]);
+        COUNT(DISTINCT p.id)                   AS total_projects,
+        COUNT(DISTINCT CASE WHEN p.status='active' THEN p.id END) AS active_projects,
+        COALESCE(SUM(p.total_budget),0)        AS total_budget,
+        COALESCE(SUM(p.planned_cost),0)        AS total_planned,
+        COALESCE(SUM(pe.amount),0)             AS total_actual,
+        COALESCE(SUM(CASE WHEN pe.type='salary'        THEN pe.amount ELSE 0 END),0) AS total_salary,
+        COALESCE(SUM(CASE WHEN pe.type='advance'       THEN pe.amount ELSE 0 END),0) AS total_advance,
+        COALESCE(SUM(CASE WHEN pe.type='reimbursement' THEN pe.amount ELSE 0 END),0) AS total_reimbursement
+      FROM projects p
+      LEFT JOIN project_expenditures pe ON pe.project_id = p.id
+    `);
 
-    res.json({ success: true, data: result.rows });
-  } catch(e) {
-    console.error('Birthday fetch error:', e.message);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-});
-
-// POST /birthdays/:id/like — toggle like for today's birthday
-router.post('/birthdays/:id/like', authenticate, async (req, res) => {
-  try {
-    const db           = require('../config/db');
-    const birthdayEmpId = parseInt(req.params.id);
-    const fromEmpId    = req.user.id;
-    const today        = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    // Check if already liked
-    const existing = await db.query(
-      `SELECT id FROM birthday_likes WHERE birthday_emp_id=$1 AND from_emp_id=$2 AND like_date=$3`,
-      [birthdayEmpId, fromEmpId, today]
-    );
-
-    if (existing.rows.length) {
-      // Unlike
-      await db.query(`DELETE FROM birthday_likes WHERE id=$1`, [existing.rows[0].id]);
-      return res.json({ success: true, liked: false, message: 'Like removed' });
-    }
-
-    // Like
-    await db.query(
-      `INSERT INTO birthday_likes(birthday_emp_id, from_emp_id, like_date) VALUES($1,$2,$3)`,
-      [birthdayEmpId, fromEmpId, today]
-    );
-
-    // Notify the birthday person
-    const liker = await db.query(`SELECT first_name, last_name FROM employees WHERE id=$1`, [fromEmpId]);
-    if (liker.rows.length) {
-      await db.query(
-        `INSERT INTO notifications(employee_id, title, message, type)
-         VALUES($1,'❤️ Birthday Like',$2,'birthday')
-         ON CONFLICT DO NOTHING`,
-        [birthdayEmpId, `${liker.rows[0].first_name} ${liker.rows[0].last_name} liked your birthday! 🎂`]
-      );
-    }
-
-    const count = await db.query(
-      `SELECT COUNT(*) FROM birthday_likes WHERE birthday_emp_id=$1 AND like_date=$2`,
-      [birthdayEmpId, today]
-    );
-    res.json({ success: true, liked: true, like_count: parseInt(count.rows[0].count) });
-  } catch(e) {
-    console.error('Birthday like error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// POST /birthdays/:id/wish — send a birthday wish
-router.post('/birthdays/:id/wish', authenticate, async (req, res) => {
-  try {
-    const db            = require('../config/db');
-    const birthdayEmpId = parseInt(req.params.id);
-    const fromEmpId     = req.user.id;
-    const { message }   = req.body;
-    const today         = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    if (!message?.trim())
-      return res.status(400).json({ success: false, message: 'Message required' });
-
-    await db.query(
-      `INSERT INTO birthday_wishes(birthday_emp_id, from_emp_id, wish_date, message)
-       VALUES($1,$2,$3,$4)
-       ON CONFLICT(birthday_emp_id, from_emp_id, wish_date) DO UPDATE SET message=EXCLUDED.message`,
-      [birthdayEmpId, fromEmpId, today, message.trim()]
-    );
-
-    // Notify birthday person
-    const wisher = await db.query(`SELECT first_name, last_name FROM employees WHERE id=$1`, [fromEmpId]);
-    if (wisher.rows.length) {
-      await db.query(
-        `INSERT INTO notifications(employee_id, title, message, type)
-         VALUES($1,'🎂 Birthday Wish',$2,'birthday')`,
-        [birthdayEmpId, `${wisher.rows[0].first_name} ${wisher.rows[0].last_name}: "${message.trim().slice(0,80)}"`]
-      );
-    }
-
-    res.json({ success: true, message: 'Wish sent! 🎉' });
-  } catch(e) {
-    console.error('Birthday wish error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// GET /birthdays/:id/wishes — get all wishes for a birthday person today
-router.get('/birthdays/:id/wishes', authenticate, async (req, res) => {
-  try {
-    const db = require('../config/db');
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    const result = await db.query(`
-      SELECT bw.id, bw.message, bw.created_at,
-             bw.from_emp_id,
-             CONCAT(e.first_name,' ',e.last_name) AS from_name,
-             e.employee_code AS from_code
-      FROM birthday_wishes bw
-      JOIN employees e ON e.id = bw.from_emp_id
-      WHERE bw.birthday_emp_id=$1 AND bw.wish_date=$2
-      ORDER BY bw.created_at DESC
-    `, [parseInt(req.params.id), today]);
-
-    res.json({ success: true, data: result.rows });
-  } catch(e) {
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// DELETE /birthdays/wishes/:id — delete own wish
-router.delete('/birthdays/wishes/:id', authenticate, async (req, res) => {
-  try {
-    const db     = require('../config/db');
-    const wishId = parseInt(req.params.id);
-    const empId  = req.user.id;
-    // Only allow deleting own wishes
-    const result = await db.query(
-      `DELETE FROM birthday_wishes WHERE id=$1 AND from_emp_id=$2 RETURNING id`,
-      [wishId, empId]
-    );
-    if (!result.rows.length)
-      return res.status(403).json({ success: false, message: 'Not found or not your wish' });
-    res.json({ success: true, message: 'Wish deleted' });
-  } catch(e) {
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ── Work Anniversaries ────────────────────────────────────────────────────────
-// GET /anniversaries/upcoming — today + next 7 days work anniversaries
-router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
-  try {
-    const db    = require('../config/db');
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-    const todayIST   = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const currentYear = todayIST.getFullYear();
-    const fromEmpId  = req.user.id;
-
-    // Find employees whose joining date MM-DD falls in today → next 7 days
-    const result = await db.query(
-      `SELECT
-         e.id, e.employee_code,
-         CONCAT(e.first_name,' ',e.last_name) AS full_name,
-         e.joining_date,
-         d.name AS department_name,
-         des.title AS designation_title,
-         TO_CHAR(e.joining_date,'MM-DD') AS join_md,
-         TO_CHAR(e.joining_date,'DD Mon') AS join_display,
-         ($1::int - EXTRACT(YEAR FROM e.joining_date)::int) AS years_completed,
-         CASE
-           WHEN TO_CHAR(e.joining_date,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-           THEN 0
-           ELSE (
-             TO_DATE(TO_CHAR($1::int,'9999') || '-' || TO_CHAR(e.joining_date,'MM-DD'), 'YYYY-MM-DD')
-             - CURRENT_DATE
-           )
-         END AS days_until,
-         COALESCE(EXISTS(
-           SELECT 1 FROM birthday_likes bl
-           WHERE bl.birthday_emp_id=e.id AND bl.from_emp_id=$2 AND bl.like_date=$3
-         ),false) AS i_liked,
-         COALESCE((SELECT COUNT(*) FROM birthday_likes bl
-           WHERE bl.birthday_emp_id=e.id AND bl.like_date=$3),0) AS like_count,
-         COALESCE(EXISTS(
-           SELECT 1 FROM birthday_wishes bw
-           WHERE bw.birthday_emp_id=e.id AND bw.from_emp_id=$2 AND bw.wish_date=$3
-         ),false) AS i_wished,
-         COALESCE((SELECT COUNT(*) FROM birthday_wishes bw
-           WHERE bw.birthday_emp_id=e.id AND bw.wish_date=$3),0) AS wish_count
-       FROM employees e
-       LEFT JOIN departments d ON e.department_id = d.id
-       LEFT JOIN designations des ON e.designation_id = des.id
-       WHERE e.is_active = true
-         AND e.joining_date IS NOT NULL
-         AND EXTRACT(YEAR FROM e.joining_date) < $1
-         AND (
-           TO_CHAR(e.joining_date,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-           OR (
-             TO_CHAR(e.joining_date,'MMDD') > TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-             AND TO_CHAR(e.joining_date,'MMDD') <= TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata' + INTERVAL '7 days'),'MMDD')
-           )
-         )
-       ORDER BY TO_CHAR(e.joining_date,'MMDD') ASC`,
-      [currentYear, fromEmpId, today]
-    );
-
-    res.json({ success: true, data: result.rows });
-  } catch(e) {
-    console.error('Anniversary fetch error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ── Offer Letters ─────────────────────────────────────────────────────────────
-router.get   ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.getAll);
-router.post  ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.create);
-router.get   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.getOne);
-router.put   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.update);
-router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.remove);
-router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr'), offerCtrl.preview);
-router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
-
-// ── Test Email (debug only) ───────────────────────────────────────────────────
-router.get('/test-email', authenticate, async (req, res) => {
-  try {
-    const emailSvc = require('../config/emailService');
-    const emp = await require('../config/db').query(
-      `SELECT email, first_name FROM employees WHERE id=$1`, [req.user.id]
-    );
-    const email = emp.rows[0]?.email;
-    if (!email) return res.json({ success: false, message: 'No email found for your account' });
-
-    await emailSvc.send({
-      to:      email,
-      toName:  emp.rows[0].first_name,
-      subject: '✅ KrishiHR Email Test',
-      preview: 'Email system is working!',
-      html: `
-        <div style="font-size:24px;text-align:center;padding:20px">✅</div>
-        <div style="font-size:18px;font-weight:700;text-align:center;color:#1B5E20">Email System Working!</div>
-        <p style="text-align:center;color:#555;margin-top:12px">
-          This is a test email from KrishiHR.<br>
-          Sent to: <strong>${email}</strong><br>
-          Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-        </p>
-        <p style="text-align:center;font-size:12px;color:#999">
-          EMAIL_ENABLED=${process.env.EMAIL_ENABLED}<br>
-          EMAIL_FROM=${process.env.EMAIL_FROM}<br>
-          BREVO_USER=${process.env.BREVO_SMTP_USER}
-        </p>`
-    });
-
-    res.json({ success: true, message: `Test email sent to ${email}` });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ── IT Declaration & Tax ──────────────────────────────────────────────────────
-router.get   ('/it-declaration',              authenticate,                     itDeclCtrl.getDeclaration);
-router.get   ('/it-declaration/all',          authenticate, authorize('hr','accounts'), itDeclCtrl.getAllDeclarations);
-router.get   ('/it-declaration/tax-preview',  authenticate,                     itDeclCtrl.taxPreview);
-router.get   ('/it-declaration/proofs',       authenticate, authorize('hr','accounts'), itDeclCtrl.getProofsByDeclaration);
-router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
-router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
-router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
-router.get   ('/it-declaration/:id',           authenticate, authorize('hr','accounts','admin','super_admin'), itDeclCtrl.getDeclarationById);
-router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
-router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
-
-// ── Project Budget Tracking ───────────────────────────────────────────────────
-const projCtrl = require('../controllers/projectController');
-
-router.get   ('/projects/summary',                  authenticate, authorize('accounts','super_admin','admin'), projCtrl.getSummary);
-router.get   ('/projects/pending-reports',          authenticate, projCtrl.pendingReports);
-router.get   ('/projects/employees/:empId/allocation', authenticate, authorize('accounts','super_admin','admin'), projCtrl.getEmployeeAllocation);
-router.put   ('/projects/employees/:empId/allocation', authenticate, authorize('accounts','super_admin','admin'), projCtrl.setSalaryAllocation);
-router.get   ('/projects',                          authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.listProjects);
-router.post  ('/projects',                          authenticate, authorize('accounts','super_admin','admin'), projCtrl.createProject);
-router.get   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.getProject);
-router.put   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.updateProject);
-router.delete('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.deleteProject);
-router.post  ('/projects/:id/assign',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.assignEmployee);
-router.delete('/projects/:id/employees/:empId',     authenticate, authorize('accounts','super_admin','admin'), projCtrl.removeEmployee);
-router.post  ('/projects/:id/expenditure',          authenticate, authorize('accounts','super_admin','admin'), projCtrl.addExpenditure);
-router.get   ('/projects/:id/expenditures',         authenticate, authorize('accounts','super_admin','admin','manager'), projCtrl.getExpenditures);
-router.get   ('/projects/:id/export',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.exportProjectExcel);
-router.get   ('/projects/:id/reports',              authenticate, projCtrl.listReports);
-router.post  ('/projects/:id/reports',              authenticate, projCtrl.submitReport);
-router.patch ('/projects/reports/:reportId',        authenticate, projCtrl.updateReport);
-
-module.exports = router;
+};
