@@ -696,18 +696,21 @@ function openRevisionModal(id) {
   document.getElementById('revisionModalTitle').textContent =
     `Review: ${reimb.title}`;
 
-  // Show project selector only for Accounts (final approver) — they confirm project billing
+  // Show project selector for ALL approvers — Accounts gets a highlighted "final assignment" style
   const isAccountsUser = currentUser?.role === 'accounts';
-  const projectSelectorHtml = isAccountsUser ? `
-    <div class="form-group" style="margin-top:14px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
-      <label style="font-size:12px;font-weight:700;color:#166534;display:block;margin-bottom:6px">
-        🗂 Link to Project <span style="font-weight:400;color:#555">(Accounts final assignment — overrides employee selection)</span>
+  const projectSelectorHtml = `
+    <div class="form-group" style="margin-top:14px;padding:12px;background:${isAccountsUser ? '#f0fdf4' : '#f8f9fa'};border:1px solid ${isAccountsUser ? '#bbf7d0' : '#dee2e6'};border-radius:8px">
+      <label style="font-size:12px;font-weight:700;color:${isAccountsUser ? '#166534' : '#444'};display:block;margin-bottom:6px">
+        🗂 Link to Project
+        ${isAccountsUser
+          ? '<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 8px;border-radius:4px;margin-left:6px">Accounts — Final Assignment</span>'
+          : '<span style="font-weight:400;color:#888;font-size:11px">(optional — override employee\'s selection)</span>'}
       </label>
-      <select id="approvalProjectSel" class="form-control" style="font-size:13px">
+      <select id="approvalProjectSel" class="form-control" style="font-size:13px;${isAccountsUser ? 'border-color:#16a34a;background:#f0fdf4' : ''}">
         <option value="">-- No Project / Not billable --</option>
       </select>
-      <div style="font-size:11px;color:#888;margin-top:4px">Once approved, the expense will immediately appear in the selected project's budget.</div>
-    </div>` : '';
+      ${isAccountsUser ? '<div style="font-size:11px;color:#555;margin-top:4px">Once approved, the expense immediately appears in the selected project\'s budget.</div>' : ''}
+    </div>`;
 
   document.getElementById('revisionModalBody').innerHTML = `
     <p style="font-size:13px;color:#666;margin-bottom:14px">
@@ -729,21 +732,19 @@ function openRevisionModal(id) {
       <button class="btn btn-outline" onclick="closeModal('revisionModal')">Cancel</button>
     </div>`;
 
-  // If Accounts, load active projects and pre-select employee's suggested project
-  if (isAccountsUser) {
-    const existingProjId = reimb.project_id || '';
-    api('GET', '/projects?status=active').then(r => {
-      const sel = document.getElementById('approvalProjectSel');
-      if (!sel || !r?.success) return;
-      (r.data || []).forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
-        if (p.id == existingProjId) opt.selected = true;
-        sel.appendChild(opt);
-      });
-    }).catch(() => {});
-  }
+  // Load active projects and pre-select employee's suggested project (all approvers can set it)
+  const existingProjId = reimb.project_id || '';
+  api('GET', '/projects?status=active').then(r => {
+    const sel = document.getElementById('approvalProjectSel');
+    if (!sel || !r?.success) return;
+    (r.data || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.code ? ` (${p.code})` : '');
+      if (p.id == existingProjId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }).catch(() => {});
 
   document.getElementById('revisionModal').classList.add('open');
 }
