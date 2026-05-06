@@ -1,9 +1,52 @@
 // compoffController.js — Comp Off Credit & Usage Management
 const db = require('../config/db');
+const { getEmployeeRegion } = require('../config/regionHelper');
+
+// ── Internal helper: check if a holiday date is valid for an employee's zone ──
+// Returns { valid: true, holidayName } if the date is a zone-eligible holiday
+// Returns { valid: false, reason } if the employee's zone doesn't get this holiday
+async function validateHolidayForEmployee(client, empId, workedDate) {
+  // Fetch employee city + state
+  const empRes = await client.query(
+    `SELECT city, state FROM employees WHERE id = $1`,
+    [empId]
+  );
+  if (!empRes.rows.length) return { valid: false, reason: 'Employee not found' };
+
+  const { city, state } = empRes.rows[0];
+  const empRegion = getEmployeeRegion(city || '', state || '');
+
+  // Check if the worked date is a holiday in the DB
+  const holRes = await client.query(
+    `SELECT name, region FROM holidays WHERE date = $1 LIMIT 1`,
+    [workedDate]
+  );
+
+  // Not a holiday at all in DB → skip zone check (weekend compoff is fine)
+  if (!holRes.rows.length) return { valid: true, holidayName: null, empRegion };
+
+  const { name: holidayName, region: holRegion } = holRes.rows[0];
+
+  // Holiday is for all zones → always valid
+  if (holRegion === 'all') return { valid: true, holidayName, empRegion };
+
+  // Zone-specific holiday → employee's region must match
+  if (holRegion !== empRegion) {
+    return {
+      valid: false,
+      reason: `"${holidayName}" is a ${holRegion} zone holiday. Employee is in ${empRegion} zone (${city || state || 'unknown location'}) and is not eligible.`
+    };
+  }
+
+  return { valid: true, holidayName, empRegion };
+}
 
 // ── Grant comp off credit to an employee (HR/Admin only) ─────────────────────
 exports.grantCredit = async (req, res) => {
+  const client = await db.getClient();
   try {
+    await client.query('BEGIN');
+
     const { employee_id, worked_date, worked_type, holiday_name, days_credited, remarks, expiry_date } = req.body;
 
     if (!employee_id || !worked_date || !worked_type)
@@ -16,14 +59,26 @@ exports.grantCredit = async (req, res) => {
     if (days <= 0 || days > 2)
       return res.status(400).json({ success: false, message: 'days_credited must be between 0.5 and 2' });
 
-    const exists = await db.query(
+    // ── ZONE VALIDATION (only for holiday type) ───────────────────────────────
+    if (worked_type === 'holiday') {
+      const zoneCheck = await validateHolidayForEmployee(client, employee_id, worked_date);
+      if (!zoneCheck.valid) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: `Zone mismatch: ${zoneCheck.reason}` });
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const exists = await client.query(
       `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`,
       [employee_id, worked_date]
     );
-    if (exists.rows.length)
+    if (exists.rows.length) {
+      await client.query('ROLLBACK');
       return res.status(409).json({ success: false, message: 'Comp off already credited for this employee on this date' });
+    }
 
-    const result = await db.query(
+    const result = await client.query(
       `INSERT INTO compoff_credits
          (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, remarks, expiry_date)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -31,11 +86,11 @@ exports.grantCredit = async (req, res) => {
       [employee_id, worked_date, worked_type, holiday_name || null, days, req.user.id, remarks || null, expiry_date || null]
     );
 
-    const compoffType = await db.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
+    const compoffType = await client.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
     if (compoffType.rows.length) {
       const ltId = compoffType.rows[0].id;
       const year = new Date(worked_date).getFullYear();
-      await db.query(
+      await client.query(
         `INSERT INTO leave_balances (employee_id, leave_type_id, year, allocated)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (employee_id, leave_type_id, year)
@@ -44,10 +99,14 @@ exports.grantCredit = async (req, res) => {
       );
     }
 
+    await client.query('COMMIT');
     res.json({ success: true, message: `Comp off of ${days} day(s) credited successfully`, data: result.rows[0] });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('grantCredit error:', err);
     res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
   }
 };
 
@@ -146,6 +205,8 @@ exports.revokeCredit = async (req, res) => {
     await client.query('ROLLBACK');
     console.error('revokeCredit error:', err);
     res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
   }
 };
 
@@ -164,8 +225,22 @@ exports.bulkGrant = async (req, res) => {
     const ltId        = compoffType.rows[0]?.id;
     const year        = new Date(worked_date).getFullYear();
 
-    let credited = 0, skipped = 0;
+    let credited = 0, skipped = 0, zoneBlocked = 0;
+    const zoneBlockedList = []; // track who was blocked and why
+
     for (const empId of employee_ids) {
+      // ── ZONE VALIDATION (only for holiday type) ─────────────────────────────
+      if (worked_type === 'holiday') {
+        const zoneCheck = await validateHolidayForEmployee(client, empId, worked_date);
+        if (!zoneCheck.valid) {
+          console.log(`[COMPOFF BULK] emp ${empId} zone-blocked: ${zoneCheck.reason}`);
+          zoneBlockedList.push({ employee_id: empId, reason: zoneCheck.reason });
+          zoneBlocked++;
+          continue; // skip this employee — wrong zone
+        }
+      }
+      // ───────────────────────────────────────────────────────────────────────
+
       const exists = await client.query(
         `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`, [empId, worked_date]
       );
@@ -190,11 +265,17 @@ exports.bulkGrant = async (req, res) => {
     }
 
     await client.query('COMMIT');
-    res.json({ success: true, message: `Credited ${credited} employee(s). Skipped ${skipped} (already credited).` });
+    res.json({
+      success: true,
+      message: `Credited ${credited} employee(s). Skipped ${skipped} (already credited). Zone-blocked ${zoneBlocked} (wrong zone for this holiday).`,
+      zone_blocked: zoneBlockedList   // HR can see exactly who was blocked and why
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('bulkGrant error:', err);
     res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
   }
 };
 
@@ -294,10 +375,8 @@ exports.autoGrantForDate = async (dateStr) => {
     let holidayName = null;
 
     if (!isSunday && !isOff2nd4thSat) {
-      const empCity   = (row.city  || '').toLowerCase();
-      const empState  = (row.state || '').toLowerCase();
-      const northPat  = /delhi|up |uttar pradesh|uttarakhand|haryana|punjab|rajasthan|bihar|madhya pradesh|\bmp\b|himachal|jammu|kashmir|jharkhand|chhattisgarh|west bengal|bengal|assam|odisha|chandigarh/;
-      const empRegion = northPat.test(`${empCity} ${empState}`) ? 'north' : 'south_west';
+      // ── Use regionHelper (single source of truth) instead of inline regex ──
+      const empRegion = getEmployeeRegion(row.city || '', row.state || '');
 
       const holRes = await db.query(
         `SELECT name FROM holidays WHERE date=$1 AND (region='all' OR region=$2) LIMIT 1`,
