@@ -562,9 +562,10 @@ loadNotifBadge();
 setInterval(loadNotifBadge, 30000);
 
 async function loadDashboard() {
-  const [dash, balance, holidays, feed, birthdays, anniversaries] = await Promise.all([
+  const [dash, balance, compoff, holidays, feed, birthdays, anniversaries] = await Promise.all([
     api('GET', '/dashboard'),
     api('GET', '/leave/balance'),
+    api('GET', '/compoff/balance').catch(() => null),
     api('GET', '/holidays?year=' + today.getFullYear()),
     api('GET', '/announcements/feed'),
     api('GET', '/birthdays/upcoming'),
@@ -587,7 +588,7 @@ async function loadDashboard() {
 
   // Leave balance — clear spinner if API failed
   if (balance?.success) {
-    renderBalance(balance.data);
+    renderBalance(balance.data, compoff?.data || null);
   } else {
     document.getElementById('balance-cards').innerHTML =
       `<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center">
@@ -695,14 +696,14 @@ function renderDash(d) {
     </div>`).join('');
 }
 
-function renderBalance(data) {
+function renderBalance(data, compoffData) {
   const el = document.getElementById('balance-cards');
-  if (!data?.length) {
+  if (!data?.length && !compoffData) {
     el.innerHTML = '<div class="empty-state" style="padding:20px"><p>No leave balances found.</p></div>';
     return;
   }
-  const items = data.filter(b => ['EL','SL','CL','COMPOFF'].includes(b.code));
-  el.innerHTML = `<div class="bal-grid" style="padding:4px 0 0">${items.map(b => {
+  const items = data.filter(b => ['EL','SL','CL'].includes(b.code));
+  const cards = items.map(b => {
     const avail = parseFloat(b.available||0);
     const alloc = parseFloat(b.allocated||0) + parseFloat(b.carry_forward||0);
     const used  = parseFloat(b.used||0);
@@ -714,7 +715,24 @@ function renderBalance(data) {
       <div class="bal-bar" style="margin:8px 0 5px"><div class="bal-fill" style="width:${pct}%"></div></div>
       <div class="bal-meta" style="font-size:10px">Used ${fmt.num(used)} / ${fmt.num(alloc)}</div>
     </div>`;
-  }).join('')}</div>`;
+  });
+
+  // Append COMPOFF card from separate API
+  if (compoffData) {
+    const coAvail = parseFloat(compoffData.available || 0);
+    const coTotal = parseFloat(compoffData.total_credited || 0);
+    const coUsed  = parseFloat(compoffData.used || 0);
+    const coPct   = coTotal > 0 ? Math.max(0, Math.min(100, (coUsed/coTotal)*100)) : 0;
+    cards.push(`<div class="bal-card" style="border-color:#ef4444">
+      <div class="bal-code" style="color:#ef4444">COMPOFF</div>
+      <div class="bal-val" style="font-size:30px;margin:4px 0 2px">${fmt.num(coAvail)}</div>
+      <div class="bal-meta" style="font-size:11px">Compensatory Off</div>
+      <div class="bal-bar" style="margin:8px 0 5px"><div class="bal-fill" style="width:${coPct}%;background:#ef4444"></div></div>
+      <div class="bal-meta" style="font-size:10px">Used ${fmt.num(coUsed)} / Earned: ${fmt.num(coTotal)}</div>
+    </div>`);
+  }
+
+  el.innerHTML = `<div class="bal-grid" style="padding:4px 0 0">${cards.join('')}</div>`;
 }
 
 let _allHolidayData = [];
