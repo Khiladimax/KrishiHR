@@ -251,105 +251,118 @@ exports.punchOut = async (req, res) => {
       }
     }
 
-    // ── Auto Comp Off Grant ───────────────────────────────────────────────────
+    // ── Auto Comp Off Grant ──────────────────────────────────────────────────
     // Rules:
-    //  1. Employee must be ONSITE (not is_wfh_permanent, city not "Work from Home")
-    //  2. Day must be a weekend (Sat/Sun) OR a public holiday
-    //  3. Employee must have completed a full punch-in + punch-out (satisfied here)
-    //  4. Always grant exactly 1 full day — no half-day compoff
+    //  1. ONLY onsite employees (saturday_policy = '2nd_4th_off') get comp-off.
+    //     Offsite (saturday_policy = 'all_working') → NEVER, not even on Sunday.
+    //  2. Eligible days: All Sundays | 2nd & 4th Saturday | zone-specific holiday.
+    //     1st/3rd/5th Saturdays and plain weekdays → NOT eligible.
+    //  3. Credit based on attendance status:
+    //     present / late → 1.0 day  |  half-day → 0.5 day  |  absent → 0
     try {
-      // Gate: onsite employees only (saturday_policy = '2nd_4th_off')
-      // Offsite employees (saturday_policy = 'all_working') NEVER get comp-off
       const empTypeRes = await db.query(
-        `SELECT saturday_policy FROM employees WHERE id=$1`, [empId]
+        `SELECT saturday_policy, city, state FROM employees WHERE id=$1`, [empId]
       );
-      const empRec = empTypeRes.rows[0];
+      const empRec           = empTypeRes.rows[0];
       const isOffsiteEmployee = (empRec?.saturday_policy || '2nd_4th_off') === 'all_working';
 
       if (!isOffsiteEmployee) {
-        const todayDate = new Date(today);
-        const dayOfWeek = todayDate.getDay(); // 0=Sun, 6=Sat
-
-        // Check if today is a public holiday for this employee's region
-        const holRes = await db.query(
-          `SELECT name FROM holidays
-           WHERE date=$1 AND (region='all' OR region=(
-             SELECT CASE
-               WHEN LOWER(COALESCE(e.city,'') || ' ' || COALESCE(e.state,'')) ~
-                    '(delhi|up |uttar pradesh|uttarakhand|haryana|punjab|rajasthan|bihar|madhya pradesh|\\bmp\\b|himachal|jammu|kashmir|jharkhand|chhattisgarh|west bengal|bengal|assam|odisha|chandigarh)'
-               THEN 'north' ELSE 'south_west' END
-             FROM employees e WHERE e.id=$2
-           ))
-           LIMIT 1`,
-          [today, empId]
-        );
-        const isHoliday   = holRes.rows.length > 0;
-        const holidayName = holRes.rows[0]?.name || null;
-
-        // For Saturdays: only 2nd & 4th are off (comp-off eligible).
-        // 1st, 3rd, 5th Saturday = regular working day for onsite → NO comp-off.
-        // Sundays always get comp-off. Holidays always get comp-off.
-        let isEligibleDay = false;
-        if (isHoliday) {
-          isEligibleDay = true;
-        } else if (dayOfWeek === 0) {
-          // Sunday — always eligible
-          isEligibleDay = true;
-        } else if (dayOfWeek === 6) {
-          // Saturday — only 2nd and 4th of the month get comp-off
+        const todayDate  = new Date(today);
+        const dayOfWeek  = todayDate.getDay(); // 0=Sun, 6=Sat
+        const isSunday   = dayOfWeek === 0;
+        const isSaturday = dayOfWeek === 6;
+        const isOff2nd4thSat = isSaturday && (() => {
           const weekNumber = Math.ceil(todayDate.getDate() / 7);
-          isEligibleDay = (weekNumber === 2 || weekNumber === 4);
-        }
+          return weekNumber === 2 || weekNumber === 4;
+        })();
 
-        if (isEligibleDay) {
-          const workedType = isHoliday ? 'holiday' : 'weekend';
+        // Skip 1st/3rd/5th Saturdays
+        if (isSaturday && !isOff2nd4thSat) {
+          // not eligible — do nothing
+        } else {
+          // Zone-specific holiday check (only needed for non-Sunday, non-2nd/4th-Sat days)
+          let isHoliday   = false;
+          let holidayName = null;
 
-          // Idempotency guard — skip if already credited for this date
-          const alreadyCredited = await db.query(
-            `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`,
-            [empId, today]
-          );
+          if (!isSunday && !isOff2nd4thSat) {
+            const empCity   = (empRec?.city  || '').toLowerCase();
+            const empState  = (empRec?.state || '').toLowerCase();
+            const northPat  = /delhi|up |uttar pradesh|uttarakhand|haryana|punjab|rajasthan|bihar|madhya pradesh|\bmp\b|himachal|jammu|kashmir|jharkhand|chhattisgarh|west bengal|bengal|assam|odisha|chandigarh/;
+            const empRegion = northPat.test(`${empCity} ${empState}`) ? 'north' : 'south_west';
 
-          if (!alreadyCredited.rows.length) {
-            const compoffType = await db.query(
-              `SELECT id FROM leave_types WHERE code='COMPOFF' LIMIT 1`
+            const holRes = await db.query(
+              `SELECT name FROM holidays WHERE date=$1 AND (region='all' OR region=$2) LIMIT 1`,
+              [today, empRegion]
             );
+            isHoliday   = holRes.rows.length > 0;
+            holidayName = holRes.rows[0]?.name || null;
+          }
 
-            if (compoffType.rows.length) {
-              const ltId = compoffType.rows[0].id;
-              const year = todayDate.getFullYear();
-              const daysToGrant = 1; // always 1 full day, no half-day compoff
+          // Eligible: Sunday always | 2nd/4th Sat always | weekday only if zone holiday
+          const isEligibleDay = isSunday || isOff2nd4thSat || isHoliday;
 
-              // Record the credit
-              await db.query(
-                `INSERT INTO compoff_credits
-                   (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, remarks, status)
-                 VALUES ($1,$2,$3,$4,$5,NULL,$6,'available')
-                 ON CONFLICT (employee_id, worked_date) DO NOTHING`,
-                [empId, today, workedType, holidayName, daysToGrant,
-                 `Auto-granted: worked on ${workedType} (${today})`]
+          if (isEligibleDay) {
+            // Credit based on attendance status
+            let daysToGrant = 0;
+            let creditLabel = '';
+            if (['present', 'late', 'regularized', 'od'].includes(status)) {
+              daysToGrant = 1.00;
+              creditLabel = '1 full day';
+            } else if (status === 'half-day') {
+              daysToGrant = 0.50;
+              creditLabel = '0.5 day (half day)';
+            }
+            // absent → daysToGrant stays 0
+
+            if (daysToGrant > 0) {
+              const workedType = isHoliday ? 'holiday' : 'weekend';
+
+              const alreadyCredited = await db.query(
+                `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`,
+                [empId, today]
               );
 
-              // Credit to leave_balances
-              await db.query(
-                `INSERT INTO leave_balances (employee_id, leave_type_id, year, allocated)
-                 VALUES ($1,$2,$3,$4)
-                 ON CONFLICT (employee_id, leave_type_id, year)
-                 DO UPDATE SET allocated = leave_balances.allocated + $4`,
-                [empId, ltId, year, daysToGrant]
-              );
+              if (!alreadyCredited.rows.length) {
+                const compoffType = await db.query(
+                  `SELECT id FROM leave_types WHERE code='COMPOFF' LIMIT 1`
+                );
 
-              // Notify employee
-              const occasion = isHoliday
-                ? `${holidayName || 'holiday'} (${today})`
-                : `weekend (${today})`;
-              await db.query(
-                `INSERT INTO notifications(employee_id, type, title, message)
-                 VALUES($1,'leave',$2,$3)`,
-                [empId,
-                 '🔄 Comp Off Credited!',
-                 `1 Comp Off day auto-credited for working on ${occasion}. You can apply it as leave anytime.`]
-              );
+                if (compoffType.rows.length) {
+                  const ltId = compoffType.rows[0].id;
+                  const year = todayDate.getFullYear();
+
+                  await db.query(
+                    `INSERT INTO compoff_credits
+                       (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, remarks, status)
+                     VALUES ($1,$2,$3,$4,$5,NULL,$6,'available')
+                     ON CONFLICT (employee_id, worked_date) DO NOTHING`,
+                    [empId, today, workedType, holidayName, daysToGrant,
+                     `Auto-granted: ${status} on ${workedType}${holidayName ? ' (' + holidayName + ')' : ''} = ${creditLabel}`]
+                  );
+
+                  await db.query(
+                    `INSERT INTO leave_balances (employee_id, leave_type_id, year, allocated)
+                     VALUES ($1,$2,$3,$4)
+                     ON CONFLICT (employee_id, leave_type_id, year)
+                     DO UPDATE SET allocated = leave_balances.allocated + $4`,
+                    [empId, ltId, year, daysToGrant]
+                  );
+
+                  const occasion = isSunday
+                    ? `Sunday (${today})`
+                    : isHoliday
+                      ? `${holidayName} (${today})`
+                      : `2nd/4th Saturday (${today})`;
+
+                  await db.query(
+                    `INSERT INTO notifications(employee_id, type, title, message)
+                     VALUES($1,'leave',$2,$3)`,
+                    [empId,
+                     '🔄 Comp Off Credited!',
+                     `${creditLabel} Comp Off auto-credited for working on ${occasion}. Apply it as leave anytime.`]
+                  );
+                }
+              }
             }
           }
         }
