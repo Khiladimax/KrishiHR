@@ -258,19 +258,17 @@ exports.punchOut = async (req, res) => {
     //  3. Employee must have completed a full punch-in + punch-out (satisfied here)
     //  4. Always grant exactly 1 full day — no half-day compoff
     try {
-      // Gate: onsite employees only
+      // Gate: onsite employees only (saturday_policy = '2nd_4th_off')
+      // Offsite employees (saturday_policy = 'all_working') NEVER get comp-off
       const empTypeRes = await db.query(
-        `SELECT is_wfh_permanent, city FROM employees WHERE id=$1`, [empId]
+        `SELECT saturday_policy FROM employees WHERE id=$1`, [empId]
       );
       const empRec = empTypeRes.rows[0];
-      const isWFHEmployee = empRec?.is_wfh_permanent === true ||
-        (empRec?.city || '').toLowerCase().includes('work from home') ||
-        (empRec?.city || '').toLowerCase().includes('wfh');
+      const isOffsiteEmployee = (empRec?.saturday_policy || '2nd_4th_off') === 'all_working';
 
-      if (!isWFHEmployee) {
+      if (!isOffsiteEmployee) {
         const todayDate = new Date(today);
         const dayOfWeek = todayDate.getDay(); // 0=Sun, 6=Sat
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
         // Check if today is a public holiday for this employee's region
         const holRes = await db.query(
