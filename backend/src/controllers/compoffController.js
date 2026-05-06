@@ -16,7 +16,6 @@ exports.grantCredit = async (req, res) => {
     if (days <= 0 || days > 2)
       return res.status(400).json({ success: false, message: 'days_credited must be between 0.5 and 2' });
 
-    // Check if already credited for this date
     const exists = await db.query(
       `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`,
       [employee_id, worked_date]
@@ -24,7 +23,6 @@ exports.grantCredit = async (req, res) => {
     if (exists.rows.length)
       return res.status(409).json({ success: false, message: 'Comp off already credited for this employee on this date' });
 
-    // Insert credit
     const result = await db.query(
       `INSERT INTO compoff_credits
          (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, remarks, expiry_date)
@@ -33,7 +31,6 @@ exports.grantCredit = async (req, res) => {
       [employee_id, worked_date, worked_type, holiday_name || null, days, req.user.id, remarks || null, expiry_date || null]
     );
 
-    // Also add to leave_balances so existing leave apply flow works
     const compoffType = await db.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
     if (compoffType.rows.length) {
       const ltId = compoffType.rows[0].id;
@@ -54,17 +51,11 @@ exports.grantCredit = async (req, res) => {
   }
 };
 
-// ── List comp off credits (always scoped to self unless employee_id explicitly passed by HR) ─────
+// ── List comp off credits ─────────────────────────────────────────────────────
+// PRIVACY RULE: Every user (including HR, admin, super_admin, accounts) can ONLY
+// see their OWN comp-off records. No one can view another employee's records.
 exports.listCredits = async (req, res) => {
   try {
-    const isHR = ['hr', 'admin', 'super_admin'].includes(req.user.role);
-    const empFilter = isHR && req.query.employee_id ? parseInt(req.query.employee_id) : null;
-    // Always default to the logged-in user's own records.
-    // HR can view another employee's records only by passing ?employee_id=
-    const targetEmpId = empFilter || req.user.id;
-
-    const whereClause = `WHERE cc.employee_id = ${targetEmpId}`;
-
     const rows = await db.query(
       `SELECT cc.*,
               e.first_name, e.last_name, e.employee_code,
@@ -72,9 +63,10 @@ exports.listCredits = async (req, res) => {
        FROM compoff_credits cc
        JOIN employees e ON cc.employee_id = e.id
        LEFT JOIN employees g ON cc.granted_by = g.id
-       ${whereClause}
+       WHERE cc.employee_id = $1
        ORDER BY cc.worked_date DESC
-       LIMIT 200`
+       LIMIT 200`,
+      [req.user.id]
     );
 
     res.json({ success: true, data: rows.rows });
@@ -84,10 +76,12 @@ exports.listCredits = async (req, res) => {
   }
 };
 
-// ── Get comp off balance for an employee ─────────────────────────────────────
+// ── Get comp off balance ──────────────────────────────────────────────────────
+// PRIVACY RULE: Every user (including HR, admin, super_admin, accounts) can ONLY
+// see their OWN balance. Any employee_id query param is ignored.
 exports.getBalance = async (req, res) => {
   try {
-    const empId = req.query.employee_id ? parseInt(req.query.employee_id) : req.user.id;
+    const empId = req.user.id; // always self — query param ignored
     const year  = parseInt(req.query.year) || new Date().getFullYear();
 
     const balance = await db.query(
@@ -123,9 +117,7 @@ exports.revokeCredit = async (req, res) => {
     await client.query('BEGIN');
     const { id } = req.params;
 
-    const credit = await client.query(
-      `SELECT * FROM compoff_credits WHERE id=$1`, [id]
-    );
+    const credit = await client.query(`SELECT * FROM compoff_credits WHERE id=$1`, [id]);
     if (!credit.rows.length)
       return res.status(404).json({ success: false, message: 'Credit not found' });
 
@@ -134,10 +126,8 @@ exports.revokeCredit = async (req, res) => {
 
     const { employee_id, days_credited, worked_date } = credit.rows[0];
 
-    // Remove from compoff_credits
     await client.query(`DELETE FROM compoff_credits WHERE id=$1`, [id]);
 
-    // Reduce from leave_balances
     const compoffType = await client.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
     if (compoffType.rows.length) {
       const ltId = compoffType.rows[0].id;
@@ -159,7 +149,7 @@ exports.revokeCredit = async (req, res) => {
   }
 };
 
-// ── Bulk grant comp offs (HR uploads list or selects all onsite on a date) ────
+// ── Bulk grant comp offs (HR/Admin only) ──────────────────────────────────────
 exports.bulkGrant = async (req, res) => {
   const client = await db.getClient();
   try {
@@ -169,10 +159,10 @@ exports.bulkGrant = async (req, res) => {
     if (!employee_ids?.length || !worked_date || !worked_type)
       return res.status(400).json({ success: false, message: 'employee_ids[], worked_date, worked_type required' });
 
-    const days   = parseFloat(days_credited) || 1;
+    const days        = parseFloat(days_credited) || 1;
     const compoffType = await client.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
-    const ltId   = compoffType.rows[0]?.id;
-    const year   = new Date(worked_date).getFullYear();
+    const ltId        = compoffType.rows[0]?.id;
+    const year        = new Date(worked_date).getFullYear();
 
     let credited = 0, skipped = 0;
     for (const empId of employee_ids) {
@@ -216,137 +206,132 @@ function isOffSaturday(date) {
   return weekNumber === 2 || weekNumber === 4;
 }
 
-// ── Helper: check if a date is a public holiday ───────────────────────────────
-async function isPublicHoliday(date) {
-  const result = await db.query(
-    `SELECT id, name FROM holidays WHERE date = $1 LIMIT 1`,
-    [date]
-  );
-  return result.rows.length ? result.rows[0] : null;
-}
-
 // ── Auto-grant comp off for a given date (called by cron) ────────────────────
-// Logic:
-//   sunday          → BOTH policies earn COMPOFF
-//   public holiday  → BOTH policies earn COMPOFF
-//   2nd/4th Saturday (off saturday) → only '2nd_4th_off' policy earns COMPOFF
-//   1st/3rd/5th Saturday            → NO COMPOFF (normal working day for both)
-//   weekday (non-holiday)           → NO COMPOFF
+// Rules:
+//   1. ONLY onsite employees (saturday_policy = '2nd_4th_off') get comp-off.
+//      Offsite (saturday_policy = 'all_working') → NEVER, not even on Sunday.
+//   2. Eligible days:
+//      • All Sundays
+//      • 2nd and 4th Saturday of the month
+//      • Zone-specific public holiday (region = 'north' | 'south_west' | 'all')
+//      1st/3rd/5th Saturdays and plain weekdays (non-holiday) → no comp-off.
+//   3. Credit based on attendance status:
+//      present / late / regularized / od → 1.0 day
+//      half-day                          → 0.5 day
+//      absent / other                    → 0 (no comp-off)
 exports.autoGrantForDate = async (dateStr) => {
-  const date = new Date(dateStr);
-  const day  = date.getDay(); // 0=Sun, 6=Sat
+  const date           = new Date(dateStr);
+  const day            = date.getDay(); // 0=Sun, 6=Sat
+  const isSunday       = day === 0;
+  const isSaturday     = day === 6;
+  const isOff2nd4thSat = isSaturday && isOffSaturday(dateStr);
 
-  const isSunday    = day === 0;
-  const isSaturday  = day === 6;
-  const holiday     = await isPublicHoliday(dateStr);
-  const isHoliday   = !!holiday;
-
-  // Nothing to grant on a regular weekday
-  if (!isSunday && !isSaturday && !isHoliday) {
-    console.log(`[COMPOFF CRON] ${dateStr} is a regular weekday — no grants needed`);
+  // Fast-exit: 1st/3rd/5th Saturday
+  if (isSaturday && !isOff2nd4thSat) {
+    console.log(`[COMPOFF CRON] ${dateStr} is a working Saturday (1st/3rd/5th) — no grants`);
     return { granted: 0, skipped: 0 };
   }
 
-  let workedType   = isSunday ? 'weekend' : (isHoliday ? 'holiday' : 'weekend');
-  let holidayName  = isHoliday ? holiday.name : null;
-  let saturdayPolicyFilter = null; // null means all active employees eligible
-
-  if (isSaturday && !isHoliday) {
-    if (!isOffSaturday(dateStr)) {
-      console.log(`[COMPOFF CRON] ${dateStr} is a working Saturday (1st/3rd/5th) — no grants`);
+  // Fast-exit: plain weekday with no holiday at all
+  const isWeekday = !isSunday && !isSaturday;
+  if (isWeekday) {
+    const anyHoliday = await db.query(`SELECT 1 FROM holidays WHERE date=$1 LIMIT 1`, [dateStr]);
+    if (!anyHoliday.rows.length) {
+      console.log(`[COMPOFF CRON] ${dateStr} is a regular weekday — no grants`);
       return { granted: 0, skipped: 0 };
     }
-    // Off Saturday (2nd/4th) — only '2nd_4th_off' employees earn COMPOFF
-    saturdayPolicyFilter = '2nd_4th_off';
   }
 
-  // If it's a holiday that falls on a Saturday, only '2nd_4th_off' off-Sat employees
-  // get it as a holiday bonus — but actually both policies get holiday COMPOFF regardless
-  // So saturdayPolicyFilter stays null for holidays (both policies eligible)
-
-  // Get all active employees who punched in on this date, including hours worked
-  // IMPORTANT: offsite employees (saturday_policy = 'all_working') NEVER get comp-off,
-  // not even on holidays or Sundays — all Saturdays AND holidays are working days for them.
-  let query = `
-    SELECT a.employee_id, e.saturday_policy,
-           COALESCE(a.working_hours, 0) AS working_hours
-    FROM attendance a
-    JOIN employees e ON a.employee_id = e.id
-    WHERE a.date = $1
-      AND a.punch_in IS NOT NULL
-      AND e.is_active = true
-      AND COALESCE(e.saturday_policy, '2nd_4th_off') != 'all_working'
-  `;
-  const params = [dateStr];
-
-  if (saturdayPolicyFilter) {
-    query += ` AND e.saturday_policy = $2`;
-    params.push(saturdayPolicyFilter);
-  }
-
-  const attendees = await db.query(query, params);
+  // Fetch all ONSITE employees with an attendance record for this date
+  const attendees = await db.query(
+    `SELECT a.employee_id,
+            COALESCE(a.status, 'absent') AS att_status,
+            e.city, e.state
+     FROM attendance a
+     JOIN employees e ON a.employee_id = e.id
+     WHERE a.date = $1
+       AND e.is_active = true
+       AND COALESCE(e.saturday_policy, '2nd_4th_off') = '2nd_4th_off'`,
+    [dateStr]
+  );
 
   if (!attendees.rows.length) {
-    console.log(`[COMPOFF CRON] ${dateStr} — no eligible attendees found`);
+    console.log(`[COMPOFF CRON] ${dateStr} — no eligible onsite attendees found`);
     return { granted: 0, skipped: 0 };
   }
 
-  // Get COMPOFF leave_type id
   const compoffType = await db.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
-  const ltId = compoffType.rows[0]?.id;
-  const year = date.getFullYear();
-  const expiryDate = new Date(date);
-  expiryDate.setDate(expiryDate.getDate() + 30); // 30-day expiry
+  const ltId        = compoffType.rows[0]?.id;
+  const year        = date.getFullYear();
+  const expiryDate  = new Date(date);
+  expiryDate.setDate(expiryDate.getDate() + 30);
 
-  let granted = 0, skipped = 0, insufficient = 0;
+  let granted = 0, skipped = 0, ineligible = 0;
 
   for (const row of attendees.rows) {
-    const empId       = row.employee_id;
-    const hoursWorked = parseFloat(row.working_hours) || 0;
+    const empId     = row.employee_id;
+    const attStatus = row.att_status;
 
-    // ── Determine days to credit based on hours worked ────────────────────────
-    // < 4 hours  → no compoff
-    // 4–7.99 hrs → 0.5 day (half day)
-    // 8+ hours   → 1.0 day (full day)
+    // Credit based on attendance status
     let daysToCredit = 0;
-    let hoursLabel   = '';
-    if (hoursWorked >= 8) {
+    let creditLabel  = '';
+    if (['present', 'late', 'regularized', 'od'].includes(attStatus)) {
       daysToCredit = 1.00;
-      hoursLabel   = 'full day';
-    } else if (hoursWorked >= 4) {
+      creditLabel  = 'full day';
+    } else if (attStatus === 'half-day') {
       daysToCredit = 0.50;
-      hoursLabel   = 'half day';
+      creditLabel  = 'half day';
     } else {
-      console.log(`[COMPOFF CRON] emp ${empId} worked only ${hoursWorked}h on ${dateStr} — no compoff`);
-      insufficient++;
+      console.log(`[COMPOFF CRON] emp ${empId} status='${attStatus}' on ${dateStr} — no comp-off`);
+      ineligible++;
       continue;
     }
 
-    // Skip if already credited for this date (UNIQUE constraint guard)
+    // Day eligibility per employee
+    // Sunday / 2nd-4th Sat → eligible for all onsite
+    // Weekday → must be a zone holiday for this specific employee
+    let workedType  = 'weekend';
+    let holidayName = null;
+
+    if (!isSunday && !isOff2nd4thSat) {
+      const empCity   = (row.city  || '').toLowerCase();
+      const empState  = (row.state || '').toLowerCase();
+      const northPat  = /delhi|up |uttar pradesh|uttarakhand|haryana|punjab|rajasthan|bihar|madhya pradesh|\bmp\b|himachal|jammu|kashmir|jharkhand|chhattisgarh|west bengal|bengal|assam|odisha|chandigarh/;
+      const empRegion = northPat.test(`${empCity} ${empState}`) ? 'north' : 'south_west';
+
+      const holRes = await db.query(
+        `SELECT name FROM holidays WHERE date=$1 AND (region='all' OR region=$2) LIMIT 1`,
+        [dateStr, empRegion]
+      );
+      if (!holRes.rows.length) { ineligible++; continue; }
+      workedType  = 'holiday';
+      holidayName = holRes.rows[0].name;
+    }
+
+    // Idempotency guard
     const exists = await db.query(
       `SELECT id FROM compoff_credits WHERE employee_id=$1 AND worked_date=$2`,
       [empId, dateStr]
     );
     if (exists.rows.length) { skipped++; continue; }
 
-    // Insert comp off credit (ON CONFLICT DO NOTHING prevents duplicates if cron runs twice)
+    // Insert credit
     await db.query(
       `INSERT INTO compoff_credits
          (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, expiry_date, remarks, status)
-       VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, 'available')
+       VALUES ($1,$2,$3,$4,$5,NULL,$6,$7,'available')
        ON CONFLICT (employee_id, worked_date) DO NOTHING`,
       [
         empId, dateStr, workedType, holidayName, daysToCredit,
         expiryDate.toISOString().split('T')[0],
-        `Auto-granted by system (${hoursWorked.toFixed(2)}h worked = ${hoursLabel})`
+        `Auto-granted: ${attStatus} on ${workedType}${holidayName ? ' (' + holidayName + ')' : ''} = ${creditLabel}`
       ]
     );
 
-    // Update leave_balances so the existing leave apply flow works
     if (ltId) {
       await db.query(
         `INSERT INTO leave_balances (employee_id, leave_type_id, year, allocated)
-         VALUES ($1, $2, $3, $4)
+         VALUES ($1,$2,$3,$4)
          ON CONFLICT (employee_id, leave_type_id, year)
          DO UPDATE SET allocated = leave_balances.allocated + $4`,
         [empId, ltId, year, daysToCredit]
@@ -356,7 +341,7 @@ exports.autoGrantForDate = async (dateStr) => {
     granted++;
   }
 
-  console.log(`[COMPOFF CRON] ${dateStr} (${workedType}${holidayName ? ': ' + holidayName : ''}) — granted: ${granted}, skipped: ${skipped}, insufficient hours: ${insufficient}`);
+  console.log(`[COMPOFF CRON] ${dateStr} — granted: ${granted}, skipped: ${skipped}, ineligible: ${ineligible}`);
   return { granted, skipped };
 };
 
@@ -365,7 +350,6 @@ exports.expireOldCredits = async () => {
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    // Find all available credits past expiry
     const expired = await db.query(
       `UPDATE compoff_credits
        SET status = 'expired'
@@ -381,7 +365,6 @@ exports.expireOldCredits = async () => {
       return;
     }
 
-    // Reduce leave_balances for expired credits
     const compoffType = await db.query(`SELECT id FROM leave_types WHERE code='COMPOFF'`);
     const ltId = compoffType.rows[0]?.id;
 
