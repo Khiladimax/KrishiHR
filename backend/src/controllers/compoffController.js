@@ -265,6 +265,8 @@ exports.autoGrantForDate = async (dateStr) => {
   // So saturdayPolicyFilter stays null for holidays (both policies eligible)
 
   // Get all active employees who punched in on this date, including hours worked
+  // IMPORTANT: offsite employees (saturday_policy = 'all_working') NEVER get comp-off,
+  // not even on holidays or Sundays — all Saturdays AND holidays are working days for them.
   let query = `
     SELECT a.employee_id, e.saturday_policy,
            COALESCE(a.working_hours, 0) AS working_hours
@@ -273,6 +275,7 @@ exports.autoGrantForDate = async (dateStr) => {
     WHERE a.date = $1
       AND a.punch_in IS NOT NULL
       AND e.is_active = true
+      AND COALESCE(e.saturday_policy, '2nd_4th_off') != 'all_working'
   `;
   const params = [dateStr];
 
@@ -326,11 +329,12 @@ exports.autoGrantForDate = async (dateStr) => {
     );
     if (exists.rows.length) { skipped++; continue; }
 
-    // Insert comp off credit
+    // Insert comp off credit (ON CONFLICT DO NOTHING prevents duplicates if cron runs twice)
     await db.query(
       `INSERT INTO compoff_credits
          (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, expiry_date, remarks, status)
-       VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, 'available')`,
+       VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, 'available')
+       ON CONFLICT (employee_id, worked_date) DO NOTHING`,
       [
         empId, dateStr, workedType, holidayName, daysToCredit,
         expiryDate.toISOString().split('T')[0],
