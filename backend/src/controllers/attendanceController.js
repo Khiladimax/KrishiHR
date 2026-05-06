@@ -288,7 +288,22 @@ exports.punchOut = async (req, res) => {
         const isHoliday   = holRes.rows.length > 0;
         const holidayName = holRes.rows[0]?.name || null;
 
-        if (isHoliday || isWeekend) {
+        // For Saturdays: only 2nd & 4th are off (comp-off eligible).
+        // 1st, 3rd, 5th Saturday = regular working day for onsite → NO comp-off.
+        // Sundays always get comp-off. Holidays always get comp-off.
+        let isEligibleDay = false;
+        if (isHoliday) {
+          isEligibleDay = true;
+        } else if (dayOfWeek === 0) {
+          // Sunday — always eligible
+          isEligibleDay = true;
+        } else if (dayOfWeek === 6) {
+          // Saturday — only 2nd and 4th of the month get comp-off
+          const weekNumber = Math.ceil(todayDate.getDate() / 7);
+          isEligibleDay = (weekNumber === 2 || weekNumber === 4);
+        }
+
+        if (isEligibleDay) {
           const workedType = isHoliday ? 'holiday' : 'weekend';
 
           // Idempotency guard — skip if already credited for this date
@@ -311,7 +326,8 @@ exports.punchOut = async (req, res) => {
               await db.query(
                 `INSERT INTO compoff_credits
                    (employee_id, worked_date, worked_type, holiday_name, days_credited, granted_by, remarks, status)
-                 VALUES ($1,$2,$3,$4,$5,$1,$6,'available')`,
+                 VALUES ($1,$2,$3,$4,$5,NULL,$6,'available')
+                 ON CONFLICT (employee_id, worked_date) DO NOTHING`,
                 [empId, today, workedType, holidayName, daysToGrant,
                  `Auto-granted: worked on ${workedType} (${today})`]
               );
