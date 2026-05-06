@@ -701,7 +701,7 @@ function renderBalance(data) {
     el.innerHTML = '<div class="empty-state" style="padding:20px"><p>No leave balances found.</p></div>';
     return;
   }
-  const items = data.filter(b => ['EL','SL','CL'].includes(b.code));
+  const items = data.filter(b => ['EL','SL','CL','COMPOFF'].includes(b.code));
   el.innerHTML = `<div class="bal-grid" style="padding:4px 0 0">${items.map(b => {
     const avail = parseFloat(b.available||0);
     const alloc = parseFloat(b.allocated||0) + parseFloat(b.carry_forward||0);
