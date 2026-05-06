@@ -54,16 +54,16 @@ exports.grantCredit = async (req, res) => {
   }
 };
 
-// ── List comp off credits (HR sees all, employee sees own) ────────────────────
+// ── List comp off credits (always scoped to self unless employee_id explicitly passed by HR) ─────
 exports.listCredits = async (req, res) => {
   try {
     const isHR = ['hr', 'admin', 'super_admin'].includes(req.user.role);
     const empFilter = isHR && req.query.employee_id ? parseInt(req.query.employee_id) : null;
-    const targetEmpId = (!isHR) ? req.user.id : (empFilter || null);
+    // Always default to the logged-in user's own records.
+    // HR can view another employee's records only by passing ?employee_id=
+    const targetEmpId = empFilter || req.user.id;
 
-    const whereClause = targetEmpId
-      ? `WHERE cc.employee_id = ${targetEmpId}`
-      : '';
+    const whereClause = `WHERE cc.employee_id = ${targetEmpId}`;
 
     const rows = await db.query(
       `SELECT cc.*,
