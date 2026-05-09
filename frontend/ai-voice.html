@@ -1796,23 +1796,16 @@ async function buildUnknownResponse() {
   try {
     let akshay = null;
 
-    // Try direct fetch by id=6 first (most reliable, works for all roles)
-    const directRes = await api('GET', '/employees/6');
-    if (directRes?.success && directRes.data) {
-      akshay = directRes.data;
+    // /employees/contacts?type=manager&manager_id=6 does WHERE e.id=6
+    // This endpoint is open to ALL roles (no auth restriction)
+    const res = await api('GET', '/employees/contacts?type=manager&manager_id=6');
+    if (res?.success && res.data?.length) {
+      akshay = res.data[0];
     }
 
-    // Fallback: check cached allEmployees
+    // Fallback: check cached allEmployees (works for privileged roles)
     if (!akshay && allEmployees) {
       akshay = allEmployees.find(e => e.id === 6);
-    }
-
-    // Fallback: HR contacts endpoint
-    if (!akshay) {
-      const res = await api('GET', '/employees/contacts?type=hr');
-      if (res?.success && res.data?.length) {
-        akshay = res.data.find(e => e.id === 6) || res.data[0];
-      }
     }
 
     if (akshay) {
