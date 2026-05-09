@@ -1699,9 +1699,14 @@ function isEmployeeQuery(lower) {
     'get hr','get accounts','get accountant','get my reporting','get reporting manager',
     'reporting manager','my manager','who is my manager'])) return false;
   if (anyOf(lower, ['find employee','find colleague','contact of','phone of','email of','number of',
-    'who is ','reach ','contact details','directory','employee details','find ','search employee',
-    'details of','detail of','want to find','looking for','info of','information of',
-    'get details','show details','employee contact','colleague contact'])) return true;
+    'reach ','contact details','directory','employee details','search employee',
+    'details of','detail of','employee contact','colleague contact'])) return true;
+  // 'who is' only for name lookups like "who is John Smith", not general questions
+  if (lower.match(/\bwho is\s+[a-z]+\s+[a-z]+\b/) && !anyOf(lower, ['who is the','who is leading','who is responsible','who is in charge','who is your','who is this','who is that','who is a'])) return true;
+  // 'find X Y' or 'looking for X Y' with two-word names
+  if (lower.match(/\b(?:find|looking for)\s+[a-z]+\s+[a-z]+\b/) && !anyOf(lower, ['find hr','find accounts','find manager'])) return true;
+  // 'info of / details of / want to find' still useful
+  if (anyOf(lower, ['info of ','information of ','want to find','get details of','show details of'])) return true;
   // Super admin: "get <name>" / "show <name>" natural lookups
   if (userRole === 'super_admin' && anyOf(lower, ['get ','show ','search '])) {
     const skipKws = ['get hr','get leave','get salary','get payslip','get attendance',
@@ -1751,9 +1756,9 @@ async function handleEmployeeDir(query) {
     if (res?.success && res.data?.length) {
       pool = res.data;
     } else {
-      // Backend returned nothing (scoped to their own record) — try fetching by name
-      // Use the public /employees/:id route if we can find the ID another way
-      return { text: `No employee found matching "${searchTerm}". Try a different name or ask for "HR contact".`, chips:[] };
+      // Backend returned nothing — let Claude handle it as a general question
+      const claudeReply = await handleWithClaude(query);
+      return { text: claudeReply, chips:[] };
     }
   }
 
@@ -1772,7 +1777,9 @@ async function handleEmployeeDir(query) {
   }).filter(e => e.is_active !== false);
 
   if (!results.length) {
-    return { text: `No employee found matching "${searchTerm}". Try a different name or department.`, chips:[] };
+    // No employee match — let Claude answer as a general question
+    const claudeReply = await handleWithClaude(query);
+    return { text: claudeReply, chips:[] };
   }
 
   // Block MD contact — but super_admin can access everyone
