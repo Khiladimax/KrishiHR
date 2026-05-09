@@ -1595,13 +1595,6 @@ function isHRContactQuery(lower) {
 }
 
 async function handleHRContacts(lower='') {
-  if (!allEmployees) {
-    const res = await api('GET', '/employees');
-    if (!res?.success || !res.data?.length)
-      return { text: 'Could not load contact directory. Please try again.', chips:[] };
-    allEmployees = res.data;
-  }
-
   // Detect exactly what the user asked for — strict intent detection
   const wantsAccounts = anyOf(lower, ['accounts contact','accounts team','accounts details',
     'accounts number','accounts email','contact accounts','reach accounts','get accounts',
@@ -1615,32 +1608,55 @@ async function handleHRContacts(lower='') {
   const wantsBoth = anyOf(lower, ['hr and accounts','hr account contact','key contacts',
     'important contacts','who to contact','who should i contact','escalate','escalation contact']);
 
-  // Strict: only show what was asked — no extras
   const showHR       = wantsBoth || wantsHR;
   const showAccounts = wantsBoth || wantsAccounts;
   const showManager  = wantsBoth || wantsManager;
-  // Fallback: if nothing matched, default to HR
   const showDefault  = !showHR && !showAccounts && !showManager;
 
-  // Find HR team
-  const hrTeam = (showHR || showDefault) ? allEmployees.filter(e =>
-    e.is_active !== false && e.role === 'hr'
-  ) : [];
+  // ── Role-based access rules ──────────────────────────────────────────────────
+  // employee        → HR, Accounts, own Reporting Manager only
+  // manager / tl    → HR, Accounts, own Reporting Manager + their direct team
+  // hr/accounts/admin/super_admin → everything (use cached allEmployees)
+  const isPrivileged = isPrivAdmin; // hr, accounts, admin, super_admin
 
-  // Find Accounts team
-  const accountsTeam = showAccounts ? allEmployees.filter(e =>
-    e.is_active !== false && e.role === 'accounts'
-  ) : [];
+  let hrTeam = [], accountsTeam = [], reportingManager = null;
 
-  // Find reporting manager — ONLY when explicitly asked
-  const currentUser = allEmployees.find(e => e.employee_code === user?.employee_code);
-  const reportingManager = showManager && currentUser?.reporting_manager_id
-    ? allEmployees.find(e =>
-        e.id === currentUser.reporting_manager_id &&
-        e.is_active !== false &&
-        e.role !== 'super_admin'
-      )
-    : null;
+  if (isPrivileged) {
+    // Privileged: use full employee list (already cached or fetch)
+    if (!allEmployees) {
+      const res = await api('GET', '/employees');
+      if (!res?.success || !res.data?.length)
+        return { text: 'Could not load contact directory. Please try again.', chips:[] };
+      allEmployees = res.data;
+    }
+    hrTeam       = (showHR || showDefault) ? allEmployees.filter(e => e.is_active !== false && e.role === 'hr') : [];
+    accountsTeam = showAccounts            ? allEmployees.filter(e => e.is_active !== false && e.role === 'accounts') : [];
+    if (showManager) {
+      const me = allEmployees.find(e => e.employee_code === user?.employee_code);
+      reportingManager = me?.reporting_manager_id
+        ? allEmployees.find(e => e.id === me.reporting_manager_id && e.is_active !== false)
+        : null;
+    }
+  } else {
+    // Non-privileged (employee / manager / tl): make targeted API calls by role
+    // These calls hit /employees?role=hr which backend allows for all authenticated users
+    if (showHR || showDefault) {
+      const res = await api('GET', '/employees?role=hr');
+      if (res?.success && res.data?.length) hrTeam = res.data.filter(e => e.is_active !== false);
+    }
+    if (showAccounts) {
+      const res = await api('GET', '/employees?role=accounts');
+      if (res?.success && res.data?.length) accountsTeam = res.data.filter(e => e.is_active !== false);
+    }
+    if (showManager) {
+      // Get own record first to find reporting_manager_id
+      const meRes = await api('GET', '/employees/' + user?.id);
+      if (meRes?.success && meRes.data?.reporting_manager_id) {
+        const mgrRes = await api('GET', '/employees/' + meRes.data.reporting_manager_id);
+        if (mgrRes?.success && mgrRes.data) reportingManager = mgrRes.data;
+      }
+    }
+  }
 
   let allCards = '';
   const lines = [];
@@ -1661,13 +1677,13 @@ async function handleHRContacts(lower='') {
   }
 
   if (!allCards) {
-    // Fallback: if specifically asked for accounts but none found, show HR team instead
+    // Fallback: accounts asked but none found → show HR
     if (showAccounts && !showHR) {
-      const fallbackHR = allEmployees.filter(e => e.is_active !== false && e.role === 'hr');
+      const res = await api('GET', '/employees?role=hr');
+      const fallbackHR = res?.data?.filter(e => e.is_active !== false) || [];
       if (fallbackHR.length) {
         allCards += fallbackHR.map(e => buildEmpCard(e, '🧑‍💼 HR')).join('');
-        const text = `No accounts team found. Here's your HR contact instead:\n\n__EMP_CARDS__${allCards}__/EMP_CARDS__`;
-        return { text, chips:[] };
+        return { text: `No accounts team found. Here's your HR contact instead:\n\n__EMP_CARDS__${allCards}__/EMP_CARDS__`, chips:[] };
       }
     }
     return { text: `Sorry ${userName}, no contacts found for that request. Try asking for "HR contact" or "Accounts contact".`, chips:[] };
@@ -1706,14 +1722,6 @@ function isEmployeeQuery(lower) {
 }
 
 async function handleEmployeeDir(query) {
-  // Load employees once, cache
-  if (!allEmployees) {
-    const res = await api('GET', '/employees');
-    if (!res?.success || !res.data?.length)
-      return { text: 'Could not load employee directory. Please try again.', chips:[] };
-    allEmployees = res.data;
-  }
-
   // Extract search term — strip query words
   const stopWords = new Set(['find','employee','employees','colleague','contact','of','the','phone',
     'email','number','details','detail','who','is','reach','search','me','please','can','you',
@@ -1726,7 +1734,36 @@ async function handleEmployeeDir(query) {
     return { text: `Sure! Tell me the name of the colleague you're looking for. For example: "Find John Smith" or "Contact of Sarah".`, chips:[] };
   }
 
-  const results = allEmployees.filter(e => {
+  // ── Role-based access ────────────────────────────────────────────────────────
+  // hr / accounts / admin / super_admin → full directory (use cache)
+  // manager / tl / employee → search by name via backend (returns limited set per role)
+  //   BUT we also do a targeted search by name so they can find HR/contacts by name
+
+  let pool = [];
+
+  if (isPrivAdmin) {
+    // Privileged: full cached list
+    if (!allEmployees) {
+      const res = await api('GET', '/employees');
+      if (!res?.success || !res.data?.length)
+        return { text: 'Could not load employee directory. Please try again.', chips:[] };
+      allEmployees = res.data;
+    }
+    pool = allEmployees;
+  } else {
+    // Non-privileged: search by name via backend (backend scopes by role automatically)
+    // Also do a name-search which returns matching employees regardless of dept
+    const res = await api('GET', `/employees?search=${encodeURIComponent(searchTerm)}`);
+    if (res?.success && res.data?.length) {
+      pool = res.data;
+    } else {
+      // Backend returned nothing (scoped to their own record) — try fetching by name
+      // Use the public /employees/:id route if we can find the ID another way
+      return { text: `No employee found matching "${searchTerm}". Try a different name or ask for "HR contact".`, chips:[] };
+    }
+  }
+
+  const results = pool.filter(e => {
     const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
     const code     = (e.employee_code||'').toLowerCase();
     const desg     = (e.designation_title||'').toLowerCase();
@@ -1734,7 +1771,6 @@ async function handleEmployeeDir(query) {
     return fullName.includes(searchTerm) || code.includes(searchTerm) ||
            desg.includes(searchTerm) || dept.includes(searchTerm) ||
            searchTerm.split(' ').every(tok => fullName.includes(tok)) ||
-           // partial first/last name match for short queries like "gurudev"
            (searchTerm.length >= 3 && (
              (e.first_name||'').toLowerCase().startsWith(searchTerm) ||
              (e.last_name||'').toLowerCase().startsWith(searchTerm)
