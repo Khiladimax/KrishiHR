@@ -404,6 +404,44 @@ exports.validatePunch = async (req, res) => {
     if (!latitude || !longitude)
       return res.json({ success: true, data: { valid: true, message: 'No GPS provided — punch allowed', distance: 0 } });
 
+    // ── Step 1: Check employee_buffer_rules (global / state / district access) ─
+    const bufferRule = await db.query(
+      `SELECT rule_type, state, district FROM employee_buffer_rules WHERE employee_id = $1 LIMIT 1`,
+      [empId]
+    );
+
+    if (bufferRule.rows.length) {
+      const rule = bufferRule.rows[0];
+      // Universal / global access — always allow from anywhere
+      if (rule.rule_type === 'universal' || rule.rule_type === 'global') {
+        await db.query(
+          `INSERT INTO attendance_geofence_logs
+             (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [empId, null, latitude, longitude, 0, true, req.body.punch_type || 'in']
+        ).catch(() => {});
+        return res.json({
+          success: true,
+          data: { valid: true, message: 'Global access — punch allowed from any location', distance: 0, location_name: 'Global Access' }
+        });
+      }
+      // State or district level — also allow (they have broad zone access)
+      if (rule.rule_type === 'state' || rule.rule_type === 'district') {
+        await db.query(
+          `INSERT INTO attendance_geofence_logs
+             (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [empId, null, latitude, longitude, 0, true, req.body.punch_type || 'in']
+        ).catch(() => {});
+        const zone = rule.rule_type === 'district' ? rule.district : rule.state;
+        return res.json({
+          success: true,
+          data: { valid: true, message: `${rule.rule_type} access (${zone}) — punch allowed`, distance: 0, location_name: zone || 'Zone Access' }
+        });
+      }
+    }
+
+    // ── Step 2: Check employee_geofence (office location assignments) ──────────
     const buffers = await db.query(
       `SELECT ol.*, eg.is_universal
        FROM employee_geofence eg
