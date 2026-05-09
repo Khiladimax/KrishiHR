@@ -1661,6 +1661,15 @@ async function handleHRContacts(lower='') {
   }
 
   if (!allCards) {
+    // Fallback: if specifically asked for accounts but none found, show HR team instead
+    if (showAccounts && !showHR) {
+      const fallbackHR = allEmployees.filter(e => e.is_active !== false && e.role === 'hr');
+      if (fallbackHR.length) {
+        allCards += fallbackHR.map(e => buildEmpCard(e, '🧑‍💼 HR')).join('');
+        const text = `No accounts team found. Here's your HR contact instead:\n\n__EMP_CARDS__${allCards}__/EMP_CARDS__`;
+        return { text, chips:[] };
+      }
+    }
     return { text: `Sorry ${userName}, no contacts found for that request. Try asking for "HR contact" or "Accounts contact".`, chips:[] };
   }
 
@@ -1675,6 +1684,10 @@ async function handleHRContacts(lower='') {
 
 // ── EMPLOYEE DIRECTORY ─────────────────────────────────────
 function isEmployeeQuery(lower) {
+  // Guard: don't steal HR/accounts/manager contact queries
+  if (anyOf(lower, ['find hr','find accounts','find accountant','find manager','find reporting',
+    'get hr','get accounts','get accountant','get my reporting','get reporting manager',
+    'reporting manager','my manager','who is my manager'])) return false;
   if (anyOf(lower, ['find employee','find colleague','contact of','phone of','email of','number of',
     'who is ','reach ','contact details','directory','employee details','find ','search employee',
     'details of','detail of','want to find','looking for','info of','information of',
@@ -1683,7 +1696,9 @@ function isEmployeeQuery(lower) {
   if (userRole === 'super_admin' && anyOf(lower, ['get ','show ','search '])) {
     const skipKws = ['get hr','get leave','get salary','get payslip','get attendance',
       'get advance','get reimburs','get holiday','get announce','get notice','get team',
+      'get accounts','get accountant','get my reporting','get reporting','get manager',
       'show leave','show salary','show payslip','show attendance','show team',
+      'find hr','find accounts','find accountant','find manager','find reporting',
       'search leave','search salary'];
     if (!skipKws.some(kw => lower.startsWith(kw) || lower.includes(kw))) return true;
   }
