@@ -108,6 +108,7 @@ const ICONS = {
   geofence:     `📍`,
   compoff:      `🔄`,
   projects:     `📊`,
+  aivoice:      `🤖`,
 };
 
 const NAV_GROUPS = [
@@ -156,6 +157,7 @@ const NAV_GROUPS = [
     label: 'System',
     items: [
       { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin'] },
+      { href:'ai-voice.html',       icon: ICONS.aivoice,      label:'Voice Assistant',  always:true },
     ]
   },
 ];
@@ -398,3 +400,82 @@ function closeSidebar() {
   if (sidebar) sidebar.classList.remove('open');
   if (overlay) overlay.classList.remove('open');
 }
+
+// ── Floating Voice Assistant Bubble (shown on all pages except ai-voice.html) ──
+(function injectVoiceBubble() {
+  if (window.location.pathname.includes('ai-voice.html')) return;
+  if (window.location.pathname.includes('login.html')) return;
+  if (window.location.pathname.includes('forgot-password.html')) return;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    #va-bubble {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      animation: va-float 3s ease-in-out infinite;
+    }
+    #va-bubble:hover #va-circle { transform: scale(1.08); }
+    #va-bubble:active #va-circle { transform: scale(0.95); }
+    #va-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #4a8c1c, #8dc63f, #b5d400);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 6px 24px rgba(74,140,28,.4);
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .3s;
+      position: relative;
+    }
+    #va-circle::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid rgba(74,140,28,.35);
+      animation: va-ring 2.5s ease-out infinite;
+    }
+    #va-label {
+      margin-top: 7px;
+      background: #1a2e0a;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(0,0,0,.25);
+      font-family: 'DM Sans', 'Plus Jakarta Sans', sans-serif;
+    }
+    @keyframes va-float {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-6px); }
+    }
+    @keyframes va-ring {
+      0%   { transform: scale(1); opacity: .6; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @media (max-width: 600px) {
+      #va-bubble { bottom: 18px; right: 16px; }
+      #va-circle { width: 54px; height: 54px; font-size: 24px; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  const bubble = document.createElement('div');
+  bubble.id = 'va-bubble';
+  bubble.title = 'Voice HR Assistant';
+  bubble.innerHTML = '<div id="va-circle">🤖</div><div id="va-label">Voice Assistant</div>';
+  bubble.addEventListener('click', () => { window.location.href = 'ai-voice.html'; });
+  document.body.appendChild(bubble);
+})();
