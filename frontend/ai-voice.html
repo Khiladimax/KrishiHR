@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title id="page-title">AI HR Assistant</title>
-<style>:root { --cfg-primary: #4a8c1c; --cfg-accent: #8dc63f; --cfg-light: #b5d400; }</style>
+<style>:root{--cfg-primary:#4a8c1c;--cfg-accent:#8dc63f;--cfg-light:#b5d400;}</style>
 <script>(function(){var t=document.getElementById('page-title');if(t)t.textContent='KrishiHR — AI Assistant';})();</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -477,6 +477,7 @@ buildSidebar('ai-voice.html');
 const user     = Auth.getUser();
 const userName = user?.first_name || 'there';
 const MD_CODE  = 'KH01';
+const COMPANY  = 'KrishiHR (Krishi Care Management Solutions)';
 
 // State
 let chatHistory    = []; // [{role,content}] for Claude context
@@ -1059,21 +1060,11 @@ async function handlePunch(direction) {
   try {
     const res = await api('POST', endpoint, payload);
     if (res?.success) {
-      // Step 5: Confirm by fetching recorded time from server
-      let confirmedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-      try {
-        const todayRes = await api('GET', '/attendance/today');
-        if (todayRes?.success && todayRes?.data) {
-          const d = todayRes.data;
-          const raw = direction === 'in' ? d.punch_in : d.punch_out;
-          if (raw) confirmedTime = raw.slice(0, 5);
-        }
-      } catch(_) {}
       const icon   = direction === 'in' ? '✅' : '👋';
       const action = direction === 'in' ? 'Punched In' : 'Punched Out';
-      const worked = direction === 'out' && res.message?.includes('h worked')
-        ? `\n⏱ ${res.message.split('·')[1]?.trim() || ''}` : '';
-      return `${icon} **${action} Successfully!**\n\n🕐 Time: ${confirmedTime}\n📍 Location: ${locationLabel}${worked}\n\nHave a ${direction === 'in' ? 'productive day' : 'great evening'}, ${userName}!`;
+      const now    = new Date();
+      const confirmedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${icon} **${action} Successfully!**\n\n🕐 Time: ${confirmedTime}\n📍 Location: ${locationLabel}\n\nHave a ${direction === 'in' ? 'productive day' : 'great evening'}, ${userName}!`;
     } else {
       const msg = res?.message || 'Something went wrong.';
       if (msg.toLowerCase().includes('already')) {
@@ -1594,14 +1585,6 @@ function isHRContactQuery(lower) {
 }
 
 async function handleHRContacts(lower='') {
-  if (!allEmployees) {
-    const res = await api('GET', '/employees');
-    if (!res?.success || !res.data?.length)
-      return { text: 'Could not load contact directory. Please try again.', chips:[] };
-    allEmployees = res.data;
-  }
-
-  // Detect exactly what the user asked for — strict intent detection
   const wantsAccounts = anyOf(lower, ['accounts contact','accounts team','accounts details',
     'accounts number','accounts email','contact accounts','reach accounts','get accounts',
     'want accounts','need accounts','show accounts','get accountant','find accountant']);
@@ -1614,32 +1597,48 @@ async function handleHRContacts(lower='') {
   const wantsBoth = anyOf(lower, ['hr and accounts','hr account contact','key contacts',
     'important contacts','who to contact','who should i contact','escalate','escalation contact']);
 
-  // Strict: only show what was asked — no extras
   const showHR       = wantsBoth || wantsHR;
   const showAccounts = wantsBoth || wantsAccounts;
   const showManager  = wantsBoth || wantsManager;
-  // Fallback: if nothing matched, default to HR
   const showDefault  = !showHR && !showAccounts && !showManager;
 
-  // Find HR team
-  const hrTeam = (showHR || showDefault) ? allEmployees.filter(e =>
-    e.is_active !== false && e.role === 'hr'
-  ) : [];
+  let hrTeam = [], accountsTeam = [], reportingManager = null;
 
-  // Find Accounts team
-  const accountsTeam = showAccounts ? allEmployees.filter(e =>
-    e.is_active !== false && e.role === 'accounts'
-  ) : [];
-
-  // Find reporting manager — ONLY when explicitly asked
-  const currentUser = allEmployees.find(e => e.employee_code === user?.employee_code);
-  const reportingManager = showManager && currentUser?.reporting_manager_id
-    ? allEmployees.find(e =>
-        e.id === currentUser.reporting_manager_id &&
-        e.is_active !== false &&
-        e.role !== 'super_admin'
-      )
-    : null;
+  // For admin/hr/accounts/super_admin — use full employee list
+  if (isPrivAdmin) {
+    if (!allEmployees) {
+      const res = await api('GET', '/employees');
+      if (!res?.success || !res.data?.length)
+        return { text: 'Could not load contact directory. Please try again.', chips:[] };
+      allEmployees = res.data;
+    }
+    hrTeam       = (showHR || showDefault) ? allEmployees.filter(e => e.is_active !== false && e.role === 'hr') : [];
+    accountsTeam = showAccounts            ? allEmployees.filter(e => e.is_active !== false && e.role === 'accounts') : [];
+    if (showManager) {
+      const me = allEmployees.find(e => e.employee_code === user?.employee_code);
+      reportingManager = me?.reporting_manager_id
+        ? allEmployees.find(e => e.id === me.reporting_manager_id && e.is_active !== false && e.role !== 'super_admin')
+        : null;
+    }
+  } else {
+    // employee/manager/tl — use /employees/contacts which is open to all roles
+    if (showHR || showDefault) {
+      const res = await api('GET', '/employees/contacts?type=hr');
+      if (res?.success && res.data?.length) hrTeam = res.data;
+    }
+    if (showAccounts) {
+      const res = await api('GET', '/employees/contacts?type=accounts');
+      if (res?.success && res.data?.length) accountsTeam = res.data;
+    }
+    if (showManager) {
+      const meRes = await api('GET', '/auth/me');
+      const myMgrId = meRes?.data?.reporting_manager_id || user?.reporting_manager_id;
+      if (myMgrId) {
+        const mgrRes = await api('GET', `/employees/contacts?type=manager&manager_id=${myMgrId}`);
+        if (mgrRes?.success && mgrRes.data?.length) reportingManager = mgrRes.data[0];
+      }
+    }
+  }
 
   let allCards = '';
   const lines = [];
@@ -1690,14 +1689,6 @@ function isEmployeeQuery(lower) {
 }
 
 async function handleEmployeeDir(query) {
-  // Load employees once, cache
-  if (!allEmployees) {
-    const res = await api('GET', '/employees');
-    if (!res?.success || !res.data?.length)
-      return { text: 'Could not load employee directory. Please try again.', chips:[] };
-    allEmployees = res.data;
-  }
-
   // Extract search term — strip query words
   const stopWords = new Set(['find','employee','employees','colleague','contact','of','the','phone',
     'email','number','details','detail','who','is','reach','search','me','please','can','you',
@@ -1710,7 +1701,29 @@ async function handleEmployeeDir(query) {
     return { text: `Sure! Tell me the name of the colleague you're looking for. For example: "Find John Smith" or "Contact of Sarah".`, chips:[] };
   }
 
-  const results = allEmployees.filter(e => {
+  let pool = [];
+
+  if (isPrivAdmin) {
+    // Privileged: full cached list
+    if (!allEmployees) {
+      const res = await api('GET', '/employees');
+      if (!res?.success || !res.data?.length)
+        return { text: 'Could not load employee directory. Please try again.', chips:[] };
+      allEmployees = res.data;
+    }
+    pool = allEmployees;
+  } else {
+    // Non-privileged: backend scopes by role — search by name
+    const res = await api('GET', `/employees?search=${encodeURIComponent(searchTerm)}`);
+    if (res?.success && res.data?.length) {
+      pool = res.data;
+    } else {
+      // No result from scoped search — let Claude answer as general question
+      return { text: await handleWithClaude(query), chips:[] };
+    }
+  }
+
+  const results = pool.filter(e => {
     const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
     const code     = (e.employee_code||'').toLowerCase();
     const desg     = (e.designation_title||'').toLowerCase();
@@ -1718,7 +1731,6 @@ async function handleEmployeeDir(query) {
     return fullName.includes(searchTerm) || code.includes(searchTerm) ||
            desg.includes(searchTerm) || dept.includes(searchTerm) ||
            searchTerm.split(' ').every(tok => fullName.includes(tok)) ||
-           // partial first/last name match for short queries like "gurudev"
            (searchTerm.length >= 3 && (
              (e.first_name||'').toLowerCase().startsWith(searchTerm) ||
              (e.last_name||'').toLowerCase().startsWith(searchTerm)
@@ -1726,16 +1738,16 @@ async function handleEmployeeDir(query) {
   }).filter(e => e.is_active !== false);
 
   if (!results.length) {
-    return { text: `No employee found matching "${searchTerm}". Try a different name or department.`, chips:[] };
+    // No match — let Claude answer
+    return { text: await handleWithClaude(query), chips:[] };
   }
 
   // Block MD contact — but super_admin can access everyone
-  const mdCode = MD_CODE;
   const isSuperAdmin = userRole === 'super_admin';
   const shown  = isSuperAdmin
     ? results.slice(0, 6)
-    : results.filter(e => e.employee_code !== mdCode).slice(0, 4);
-  const blocked = results.filter(e => e.employee_code === mdCode).length;
+    : results.filter(e => e.employee_code !== MD_CODE).slice(0, 4);
+  const blocked = results.filter(e => e.employee_code === MD_CODE).length;
 
   if (!shown.length && blocked > 0) {
     return { text: `I'm sorry, I can't share contact details for the Managing Director.`, chips:[] };
@@ -1755,7 +1767,7 @@ function buildEmpCard(e, roleLabel) {
 }
 
 async function handleWithClaude(query) {
-  const systemPrompt = `You are a helpful voice HR assistant for KrishiHR (Krishi Care Management Solutions). Employee: ${userName} (${user?.role||'employee'}).
+  const systemPrompt = `You are a helpful voice HR assistant for ${COMPANY}. Employee: ${userName} (${user?.role||'employee'}).
 Reply in 2-4 sentences max. Use plain text suitable for speech. No markdown symbols. Use "rupees" not ₹.
 Be warm and professional. Suggest relevant pages if you can't fetch specific data.
 IMPORTANT: If you cannot answer the question from HR data context, respond ONLY with the single word: UNKNOWN`;
@@ -1784,7 +1796,7 @@ async function buildUnknownResponse() {
   try {
     let akshay = null;
 
-    // Try direct fetch by id=6 first (most reliable)
+    // Try direct fetch by id=6 first (most reliable, works for all roles)
     const directRes = await api('GET', '/employees/6');
     if (directRes?.success && directRes.data) {
       akshay = directRes.data;
@@ -1795,12 +1807,11 @@ async function buildUnknownResponse() {
       akshay = allEmployees.find(e => e.id === 6);
     }
 
-    // Fallback: load all employees and find id=6
+    // Fallback: HR contacts endpoint
     if (!akshay) {
-      const res = await api('GET', '/employees');
+      const res = await api('GET', '/employees/contacts?type=hr');
       if (res?.success && res.data?.length) {
-        allEmployees = res.data;
-        akshay = allEmployees.find(e => e.id === 6);
+        akshay = res.data.find(e => e.id === 6) || res.data[0];
       }
     }
 
@@ -1999,7 +2010,7 @@ window.addEventListener('load', () => {
   window.speechSynthesis?.addEventListener('voiceschanged', ()=>window.speechSynthesis.getVoices());
   const h = new Date().getHours();
   const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
-  const companyName = 'KrishiHR';
+  const companyName = COMPANY;
   setTimeout(()=>{
     speakTTS(`${greet} ${userName}! I am your AI HR Assistant for ${companyName}. I can help you with payslips, leaves, attendance, salary, and employee contacts. How may I help you today?`);
   }, 600);
