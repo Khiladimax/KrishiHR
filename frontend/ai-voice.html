@@ -1837,7 +1837,7 @@ that you cannot access — for example: "What is my exact PF balance?", "How man
     }
     return reply;
   } catch(e) {
-    return 'Sorry, I ran into a problem connecting to the AI. Please try again in a moment.';
+    return await buildUnknownResponse();
   }
 }
 
@@ -1845,37 +1845,26 @@ async function buildUnknownResponse() {
   let contactLine = '';
   let hrAdminCard = '';
   try {
-    // Try full list first (works for admin/hr/accounts/super_admin)
-    let pool = allEmployees;
-    if (!pool) {
-      const res = await api('GET', '/employees');
-      if (res?.success && res.data?.length) {
-        allEmployees = res.data;
-        pool = allEmployees;
-      }
+    // Fetch Akshay Rai directly by id=6
+    let akshay = null;
+
+    // Try direct employee fetch by ID first
+    const directRes = await api('GET', '/employees/6');
+    if (directRes?.success && directRes.data) {
+      akshay = directRes.data;
     }
 
-    // For employee/manager/tl — pool will only have themselves, so also try contacts endpoint
-    let akshay = pool?.find(e =>
-      e.is_active !== false &&
-      (`${e.first_name} ${e.last_name}`).toLowerCase().includes('akshay rai')
-    );
+    // Fallback: check cached allEmployees
+    if (!akshay && allEmployees) {
+      akshay = allEmployees.find(e => e.id === 6);
+    }
 
-    // Not found in pool (restricted role) — fetch via /employees/contacts?type=hr as fallback
+    // Fallback: HR contacts endpoint
     if (!akshay) {
       const res = await api('GET', '/employees/contacts?type=hr');
       if (res?.success && res.data?.length) {
-        // look for akshay rai in hr list, else take first hr
-        akshay = res.data.find(e =>
-          (`${e.first_name} ${e.last_name}`).toLowerCase().includes('akshay rai')
-        ) || res.data[0];
+        akshay = res.data.find(e => e.id === 6) || res.data[0];
       }
-    }
-
-    // Still not found — try admin role via contacts endpoint directly by name search
-    if (!akshay) {
-      const res = await api('GET', '/employees/contacts?type=admin');
-      if (res?.success && res.data?.length) akshay = res.data[0];
     }
 
     if (akshay) {
