@@ -145,6 +145,8 @@ exports.getContacts = async (req, res) => {
     } else if (type === 'accounts') {
       conditions.push(`e.role = $${idx++}`);
       params.push('accounts');
+    } else if (type === 'admin') {
+      conditions.push(`e.role IN ('admin','super_admin','hr')`);
     } else if (type === 'manager' && manager_id) {
       conditions.push(`e.id = $${idx++}`);
       params.push(parseInt(manager_id));
