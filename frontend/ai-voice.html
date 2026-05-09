@@ -1789,13 +1789,13 @@ async function buildUnknownResponse() {
       if (res?.success && res.data?.length) allEmployees = res.data;
     }
     if (allEmployees) {
-      const hrAdmin = allEmployees.find(e =>
+      const akshay = allEmployees.find(e =>
         e.is_active !== false &&
-        (['admin','super_admin','hr'].includes(e.role) && e.is_active !== false)
+        (`${e.first_name} ${e.last_name}`).toLowerCase().includes('akshay rai')
       );
-      if (hrAdmin) {
-        contactLine = `Please register your query with ${hrAdmin.first_name} ${hrAdmin.last_name} so they can update the system for you.`;
-        hrAdminCard = '\n\n__EMP_CARDS__' + buildEmpCard(hrAdmin, '📞 Contact') + '__/EMP_CARDS__';
+      if (akshay) {
+        contactLine = `Please register your query with ${akshay.first_name} ${akshay.last_name} so they can update the system for you.`;
+        hrAdminCard = '\n\n__EMP_CARDS__' + buildEmpCard(akshay, '📞 Contact') + '__/EMP_CARDS__';
       }
     }
   } catch(_) {}
