@@ -1574,11 +1574,11 @@ async function handleMyTeam() {
 // ── HR CONTACTS ─────────────────────────────────────────────
 function isHRContactQuery(lower) {
   return anyOf(lower, [
-    'hr contact','get hr','hr details','hr team','hr person','hr number','hr email',
+    'hr contact','get hr','find hr','hr details','hr team','hr person','hr number','hr email',
     'accounts contact','accounts team','accounts details','accounts number','get accounts',
     'get accountant','find accountant','find accounts',
     'reporting manager','my manager','who is my manager','manager contact','manager details',
-    'find manager','get manager','show manager',
+    'find manager','get manager','show manager','get my reporting','get reporting',
     'contact hr','contact accounts','reach hr','reach accounts',
     'i want to get hr','want hr contact','need hr contact','show hr contact',
     'hr and accounts','hr account contact','key contacts','important contacts',
@@ -1845,7 +1845,7 @@ async function buildUnknownResponse() {
     }
   } catch(_) {}
 
-  const msg = `I'm currently in trial version and this query hasn't been configured yet. ${contactLine}`;
+  const msg = `I don't have the answer to that yet. ${contactLine}`;
   return msg + hrAdminCard;
 }
 
