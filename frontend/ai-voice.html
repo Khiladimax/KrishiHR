@@ -1801,27 +1801,37 @@ function buildEmpCard(e, roleLabel) {
 }
 
 async function handleWithClaude(query) {
-  const systemPrompt = `You are a helpful voice HR assistant for KrishiHR. Employee: ${userName} (${user?.role||'employee'}).
-Reply in 2-4 sentences max. Use plain text suitable for speech. No markdown symbols. Use "rupees" not ₹.
-Be warm and professional. Suggest relevant pages if you can't fetch specific data.
-IMPORTANT: If you cannot answer the question from HR data context, respond ONLY with the single word: UNKNOWN`;
+  const systemPrompt = `You are a helpful, knowledgeable HR assistant for KrishiHR — an agriculture-focused company in India.
+Employee talking to you: ${userName} (role: ${user?.role||'employee'}).
+
+You can answer ANY question helpfully — HR policies, general workplace questions, career advice, Indian labour laws,
+leave rules, PF/ESI/TDS concepts, company culture tips, productivity, communication, or general knowledge.
+Use plain text suitable for text-to-speech. No markdown symbols like **, *, #, or bullet dashes.
+Use "rupees" instead of the rupee symbol. Be warm, concise and professional. Reply in 2-5 sentences.
+
+ONLY respond with the single word UNKNOWN if the question requires live data from the company database
+that you cannot access — for example: "What is my exact PF balance?", "How many leaves do I have left?",
+"Show my payslip for March" — things that need real employee records. For everything else, answer directly.`;
+
   chatHistory.push({ role:'user', content: query });
   if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:400, system:systemPrompt, messages:chatHistory })
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:500, system:systemPrompt, messages:chatHistory })
     });
     const data = await response.json();
     const reply = data?.content?.[0]?.text || 'UNKNOWN';
     chatHistory.push({ role:'assistant', content:reply });
 
-    // If Claude can't answer, show fallback message + HR admin contact
-    if (!reply || reply.trim() === 'UNKNOWN' || reply.trim().toUpperCase().startsWith('UNKNOWN')) {
+    // Only show HR fallback if Claude explicitly says UNKNOWN (needs live DB data)
+    if (reply.trim() === 'UNKNOWN' || reply.trim().toUpperCase() === 'UNKNOWN') {
       return await buildUnknownResponse();
     }
     return reply;
-  } catch(e) { return await buildUnknownResponse(); }
+  } catch(e) {
+    return 'Sorry, I ran into a problem connecting to the AI. Please try again in a moment.';
+  }
 }
 
 async function buildUnknownResponse() {
