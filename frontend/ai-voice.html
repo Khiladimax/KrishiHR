@@ -1416,27 +1416,19 @@ async function suggestLeaveDates() {
   }
 
   const balNote = remaining !== null ? `\n💰 You have **${remaining} days** of ${leaveTypeName} remaining.` : '';
-  let text = `📅 **Best dates for your ${days}-day ${leaveTypeName}**${balNote}${holNote}\n\nTop suggestions — prioritising 2nd/4th Saturdays, holidays & weekends:\n\n`;
+  let text = `📅 **Best dates for your ${days}-day ${leaveTypeName}**${balNote}${holNote}\n\nHere are the suggested leave windows:\n\n`;
 
-  const slotLabels = [
-    '🥇 Best pick — ends Friday, free weekend after',
-    '🥈 Good option — starts Monday, fresh after weekend',
-    '🥉 Alternative — midweek option'
-  ];
+  const slotLabels = ['🥇 Option 1', '🥈 Option 2', '🥉 Option 3'];
   suggestions.forEach((s, i) => {
     const startD = new Date(s.start);
     const endD   = new Date(s.end);
     const fmtS   = startD.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
     const fmtE   = endD.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
     const label  = slotLabels[i] || `Option ${i+1}`;
-    const warn   = s.maxTeam > 0 ? ` ⚠️ ${s.maxTeam} teammate${s.maxTeam>1?'s':''} on leave` : ' ✅ Team all clear';
-    // Show extra bonus reason (holiday/2nd-4th sat) if any beyond the slot reason
-    const extraBonus = s.bonusReasons.filter(r => !r.includes('weekend')).slice(0,1);
-    const bonusTag = extraBonus.length ? ` 🎯 ${extraBonus[0]}` : '';
-    text += `**${label}**\n${fmtS} → ${fmtE}${warn}${bonusTag}\n\n`;
+    text += `**${label}**\n${fmtS} → ${fmtE}\n\n`;
   });
 
-  text += `\nReady to apply? Head to Leaves and use one of these windows! 😊`;
+  text += `Ready to apply? Head to Leaves and use one of these windows! 😊`;
   leavePlan = null;
   return { text, chips:[{ label:'📋 Apply Leave', href:'leaves.html' }] };
 }
