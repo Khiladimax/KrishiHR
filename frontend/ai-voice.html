@@ -1825,27 +1825,49 @@ IMPORTANT: If you cannot answer the question from HR data context, respond ONLY 
 }
 
 async function buildUnknownResponse() {
-  // Try to find an HR admin contact from employee list
   let contactLine = '';
   let hrAdminCard = '';
   try {
-    if (!allEmployees) {
+    // Try full list first (works for admin/hr/accounts/super_admin)
+    let pool = allEmployees;
+    if (!pool) {
       const res = await api('GET', '/employees');
-      if (res?.success && res.data?.length) allEmployees = res.data;
-    }
-    if (allEmployees) {
-      const akshay = allEmployees.find(e =>
-        e.is_active !== false &&
-        (`${e.first_name} ${e.last_name}`).toLowerCase().includes('akshay rai')
-      );
-      if (akshay) {
-        contactLine = `Please register your query with ${akshay.first_name} ${akshay.last_name} so they can update the system for you.`;
-        hrAdminCard = '\n\n__EMP_CARDS__' + buildEmpCard(akshay, '📞 Contact') + '__/EMP_CARDS__';
+      if (res?.success && res.data?.length) {
+        allEmployees = res.data;
+        pool = allEmployees;
       }
+    }
+
+    // For employee/manager/tl — pool will only have themselves, so also try contacts endpoint
+    let akshay = pool?.find(e =>
+      e.is_active !== false &&
+      (`${e.first_name} ${e.last_name}`).toLowerCase().includes('akshay rai')
+    );
+
+    // Not found in pool (restricted role) — fetch via /employees/contacts?type=hr as fallback
+    if (!akshay) {
+      const res = await api('GET', '/employees/contacts?type=hr');
+      if (res?.success && res.data?.length) {
+        // look for akshay rai in hr list, else take first hr
+        akshay = res.data.find(e =>
+          (`${e.first_name} ${e.last_name}`).toLowerCase().includes('akshay rai')
+        ) || res.data[0];
+      }
+    }
+
+    // Still not found — try admin role via contacts endpoint directly by name search
+    if (!akshay) {
+      const res = await api('GET', '/employees/contacts?type=admin');
+      if (res?.success && res.data?.length) akshay = res.data[0];
+    }
+
+    if (akshay) {
+      contactLine = `Please register your query with ${akshay.first_name} ${akshay.last_name} so they can update the system for you.`;
+      hrAdminCard = '\n\n__EMP_CARDS__' + buildEmpCard(akshay, '📞 Contact') + '__/EMP_CARDS__';
     }
   } catch(_) {}
 
-  const msg = `I don't have the answer to that yet. ${contactLine}`;
+  const msg = `I'm currently in trial version and this query hasn't been configured yet. ${contactLine}`;
   return msg + hrAdminCard;
 }
 
