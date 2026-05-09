@@ -1630,22 +1630,22 @@ async function handleHRContacts(lower='') {
         : null;
     }
   } else {
-    // Non-privileged (employee / manager / tl): make targeted API calls by role
-    // These calls hit /employees?role=hr which backend allows for all authenticated users
+    // Non-privileged (employee / manager / tl): use /employees/contacts (open to all roles)
     if (showHR || showDefault) {
-      const res = await api('GET', '/employees?role=hr');
-      if (res?.success && res.data?.length) hrTeam = res.data.filter(e => e.is_active !== false);
+      const res = await api('GET', '/employees/contacts?type=hr');
+      if (res?.success && res.data?.length) hrTeam = res.data;
     }
     if (showAccounts) {
-      const res = await api('GET', '/employees?role=accounts');
-      if (res?.success && res.data?.length) accountsTeam = res.data.filter(e => e.is_active !== false);
+      const res = await api('GET', '/employees/contacts?type=accounts');
+      if (res?.success && res.data?.length) accountsTeam = res.data;
     }
     if (showManager) {
-      // Get own record first to find reporting_manager_id
-      const meRes = await api('GET', '/employees/' + user?.id);
-      if (meRes?.success && meRes.data?.reporting_manager_id) {
-        const mgrRes = await api('GET', '/employees/' + meRes.data.reporting_manager_id);
-        if (mgrRes?.success && mgrRes.data) reportingManager = mgrRes.data;
+      // Get own record to find reporting_manager_id, then fetch manager via contacts
+      const meRes = await api('GET', '/auth/me');
+      const myMgrId = meRes?.data?.reporting_manager_id || user?.reporting_manager_id;
+      if (myMgrId) {
+        const mgrRes = await api('GET', `/employees/contacts?type=manager&manager_id=${myMgrId}`);
+        if (mgrRes?.success && mgrRes.data?.length) reportingManager = mgrRes.data[0];
       }
     }
   }
@@ -1671,8 +1671,10 @@ async function handleHRContacts(lower='') {
   if (!allCards) {
     // Fallback: accounts asked but none found → show HR
     if (showAccounts && !showHR) {
-      const res = await api('GET', '/employees?role=hr');
-      const fallbackHR = res?.data?.filter(e => e.is_active !== false) || [];
+      const res = isPrivileged
+        ? { success: true, data: allEmployees?.filter(e => e.is_active !== false && e.role === 'hr') || [] }
+        : await api('GET', '/employees/contacts?type=hr');
+      const fallbackHR = res?.data || [];
       if (fallbackHR.length) {
         allCards += fallbackHR.map(e => buildEmpCard(e, '🧑‍💼 HR')).join('');
         return { text: `No accounts team found. Here's your HR contact instead:\n\n__EMP_CARDS__${allCards}__/EMP_CARDS__`, chips:[] };
