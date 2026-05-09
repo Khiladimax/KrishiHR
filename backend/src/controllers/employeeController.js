@@ -127,6 +127,49 @@ exports.getAll = async (req, res) => {
   }
 };
 
+// Get Contacts — open to all authenticated users (HR, Accounts, Reporting Manager lookup)
+// Used by AI chatbot for all roles including employee/tl/manager
+exports.getContacts = async (req, res) => {
+  try {
+    const { type, manager_id } = req.query;
+    // type = 'hr' | 'accounts' | 'manager'
+    // manager_id = specific employee id (for reporting manager lookup)
+
+    let conditions = ["e.is_active = true"];
+    let params = [];
+    let idx = 1;
+
+    if (type === 'hr') {
+      conditions.push(`e.role = $${idx++}`);
+      params.push('hr');
+    } else if (type === 'accounts') {
+      conditions.push(`e.role = $${idx++}`);
+      params.push('accounts');
+    } else if (type === 'manager' && manager_id) {
+      conditions.push(`e.id = $${idx++}`);
+      params.push(parseInt(manager_id));
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid type' });
+    }
+
+    const result = await db.query(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
+              e.role, e.is_active,
+              d.name AS department_name, des.title AS designation_title
+       FROM employees e
+       LEFT JOIN departments  d   ON e.department_id  = d.id
+       LEFT JOIN designations des ON e.designation_id = des.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY e.first_name`,
+      params
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Get One
 exports.getOne = async (req, res) => {
   try {
