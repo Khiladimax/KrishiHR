@@ -606,12 +606,17 @@ exports.assignBuffer = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Insert/update the geofence row
+    // Remove ALL previous office location assignments for this employee so the
+    // old location card no longer shows them (e.g. switching Mumbai → Delhi).
+    await client.query(
+      `DELETE FROM employee_geofence WHERE employee_id = $1`,
+      [employee_id]
+    );
+
+    // Insert the new geofence row
     await client.query(
       `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
-       VALUES($1,$2,$3,$4)
-       ON CONFLICT(employee_id, office_location_id)
-       DO UPDATE SET is_universal=$3, assigned_by=$4`,
+       VALUES($1,$2,$3,$4)`,
       [employee_id, office_location_id, is_universal, req.user.id]
     );
 
@@ -655,12 +660,16 @@ exports.bulkAssignBuffer = async (req, res) => {
     const empType  = is_universal ? 'offsite'   : 'onsite';
 
     for (const eid of employee_ids) {
-      // Assign geofence row
+      // Remove old location assignments before inserting the new one
+      await client.query(
+        `DELETE FROM employee_geofence WHERE employee_id = $1`,
+        [eid]
+      );
+
+      // Assign new geofence row
       await client.query(
         `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
-         VALUES($1,$2,$3,$4)
-         ON CONFLICT(employee_id, office_location_id)
-         DO UPDATE SET is_universal=$3, assigned_by=$4`,
+         VALUES($1,$2,$3,$4)`,
         [eid, office_location_id, is_universal, req.user.id]
       );
 
@@ -1215,12 +1224,20 @@ exports.getAllBufferRules = async (req, res) => {
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
               ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
-              eg.office_location_id,
+              latest_eg.office_location_id,
               ol.name AS office_location_name
        FROM employees e
        LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
-       LEFT JOIN employee_geofence eg ON eg.employee_id = e.id
-       LEFT JOIN office_locations ol ON ol.id = eg.office_location_id AND ol.radius_meters < 10000
+       -- Pick only the most recently assigned office location per employee
+       LEFT JOIN LATERAL (
+         SELECT eg.office_location_id
+         FROM employee_geofence eg
+         JOIN office_locations loc ON loc.id = eg.office_location_id AND loc.radius_meters < 10000
+         WHERE eg.employee_id = e.id
+         ORDER BY eg.created_at DESC NULLS LAST
+         LIMIT 1
+       ) latest_eg ON TRUE
+       LEFT JOIN office_locations ol ON ol.id = latest_eg.office_location_id
        WHERE e.is_active = TRUE
        ORDER BY e.first_name`
     );
