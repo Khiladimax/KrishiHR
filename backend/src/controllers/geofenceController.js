@@ -655,12 +655,12 @@ exports.bulkAssignBuffer = async (req, res) => {
     const empType  = is_universal ? 'offsite'   : 'onsite';
 
     for (const eid of employee_ids) {
-      // Assign geofence row
+      // Delete ALL old geofence rows so employee moves cleanly to the new office
+      await client.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [eid]);
+      // Insert the new geofence row
       await client.query(
         `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
-         VALUES($1,$2,$3,$4)
-         ON CONFLICT(employee_id, office_location_id)
-         DO UPDATE SET is_universal=$3, assigned_by=$4`,
+         VALUES($1,$2,$3,$4)`,
         [eid, office_location_id, is_universal, req.user.id]
       );
 
