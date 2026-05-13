@@ -1223,14 +1223,26 @@ exports.getAllBufferRules = async (req, res) => {
   try {
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
-              ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
+              -- If no buffer rule row exists, infer rule_type from geofence assignment:
+              --   is_universal=true  → 'universal'
+              --   has a location row → 'office'
+              --   nothing            → NULL (truly unassigned)
+              COALESCE(
+                ebr.rule_type,
+                CASE
+                  WHEN latest_eg.is_universal = TRUE  THEN 'universal'
+                  WHEN latest_eg.office_location_id IS NOT NULL THEN 'office'
+                  ELSE NULL
+                END
+              ) AS rule_type,
+              ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
               latest_eg.office_location_id,
               ol.name AS office_location_name
        FROM employees e
        LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
        -- Pick only the most recently assigned office location per employee
        LEFT JOIN LATERAL (
-         SELECT eg.office_location_id
+         SELECT eg.office_location_id, eg.is_universal
          FROM employee_geofence eg
          JOIN office_locations loc ON loc.id = eg.office_location_id AND loc.radius_meters < 10000
          WHERE eg.employee_id = e.id
