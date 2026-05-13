@@ -2144,11 +2144,9 @@ async function saveDrawerRule() {
     let body = { employee_id: _drawerEmpId, rule_type: rt };
     if (rt === 'office') {
       body.office_location_id = parseInt(osel.value);
-      // Also call bulk-assign so employee_geofence row is created
-      const ar = await api('POST', '/geofence/bulk-assign', {
-        employee_ids: [_drawerEmpId], office_location_id: body.office_location_id, is_universal: false
-      });
-      if (!ar?.success) { toast(ar?.message || 'Failed to assign to office', 'error'); return; }
+      // Call buffer-rules which now handles both employee_buffer_rules AND employee_geofence move
+      const r = await api('POST', '/geofence/buffer-rules', body);
+      if (!r?.success) { toast(r?.message || 'Failed to assign to office', 'error'); return; }
       toast('✓ Office rule saved');
     } else {
       if (rt === 'state' || rt === 'district') body.state = ssel.value;
