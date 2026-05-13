@@ -404,44 +404,6 @@ exports.validatePunch = async (req, res) => {
     if (!latitude || !longitude)
       return res.json({ success: true, data: { valid: true, message: 'No GPS provided — punch allowed', distance: 0 } });
 
-    // ── Step 1: Check employee_buffer_rules (global / state / district access) ─
-    const bufferRule = await db.query(
-      `SELECT rule_type, state, district FROM employee_buffer_rules WHERE employee_id = $1 LIMIT 1`,
-      [empId]
-    );
-
-    if (bufferRule.rows.length) {
-      const rule = bufferRule.rows[0];
-      // Universal / global access — always allow from anywhere
-      if (rule.rule_type === 'universal' || rule.rule_type === 'global') {
-        await db.query(
-          `INSERT INTO attendance_geofence_logs
-             (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [empId, null, latitude, longitude, 0, true, req.body.punch_type || 'in']
-        ).catch(() => {});
-        return res.json({
-          success: true,
-          data: { valid: true, message: 'Global access — punch allowed from any location', distance: 0, location_name: 'Global Access' }
-        });
-      }
-      // State or district level — also allow (they have broad zone access)
-      if (rule.rule_type === 'state' || rule.rule_type === 'district') {
-        await db.query(
-          `INSERT INTO attendance_geofence_logs
-             (employee_id, office_location_id, employee_lat, employee_lng, distance_meters, is_within_geofence, punch_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [empId, null, latitude, longitude, 0, true, req.body.punch_type || 'in']
-        ).catch(() => {});
-        const zone = rule.rule_type === 'district' ? rule.district : rule.state;
-        return res.json({
-          success: true,
-          data: { valid: true, message: `${rule.rule_type} access (${zone}) — punch allowed`, distance: 0, location_name: zone || 'Zone Access' }
-        });
-      }
-    }
-
-    // ── Step 2: Check employee_geofence (office location assignments) ──────────
     const buffers = await db.query(
       `SELECT ol.*, eg.is_universal
        FROM employee_geofence eg
@@ -606,17 +568,12 @@ exports.assignBuffer = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Remove ALL previous office location assignments for this employee so the
-    // old location card no longer shows them (e.g. switching Mumbai → Delhi).
-    await client.query(
-      `DELETE FROM employee_geofence WHERE employee_id = $1`,
-      [employee_id]
-    );
-
-    // Insert the new geofence row
+    // Insert/update the geofence row
     await client.query(
       `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
-       VALUES($1,$2,$3,$4)`,
+       VALUES($1,$2,$3,$4)
+       ON CONFLICT(employee_id, office_location_id)
+       DO UPDATE SET is_universal=$3, assigned_by=$4`,
       [employee_id, office_location_id, is_universal, req.user.id]
     );
 
@@ -660,16 +617,12 @@ exports.bulkAssignBuffer = async (req, res) => {
     const empType  = is_universal ? 'offsite'   : 'onsite';
 
     for (const eid of employee_ids) {
-      // Remove old location assignments before inserting the new one
-      await client.query(
-        `DELETE FROM employee_geofence WHERE employee_id = $1`,
-        [eid]
-      );
-
-      // Assign new geofence row
+      // Assign geofence row
       await client.query(
         `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
-         VALUES($1,$2,$3,$4)`,
+         VALUES($1,$2,$3,$4)
+         ON CONFLICT(employee_id, office_location_id)
+         DO UPDATE SET is_universal=$3, assigned_by=$4`,
         [eid, office_location_id, is_universal, req.user.id]
       );
 
@@ -1223,26 +1176,13 @@ exports.getAllBufferRules = async (req, res) => {
   try {
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
-              -- If no buffer rule row exists, infer rule_type from geofence assignment:
-              --   is_universal=true  → 'universal'
-              --   has a location row → 'office'
-              --   nothing            → NULL (truly unassigned)
-              COALESCE(
-                ebr.rule_type,
-                CASE
-                  WHEN latest_eg.is_universal = TRUE  THEN 'universal'
-                  WHEN latest_eg.office_location_id IS NOT NULL THEN 'office'
-                  ELSE NULL
-                END
-              ) AS rule_type,
-              ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
+              ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
               latest_eg.office_location_id,
               ol.name AS office_location_name
        FROM employees e
        LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
-       -- Pick only the most recently assigned office location per employee
        LEFT JOIN LATERAL (
-         SELECT eg.office_location_id, eg.is_universal
+         SELECT eg.office_location_id
          FROM employee_geofence eg
          JOIN office_locations loc ON loc.id = eg.office_location_id AND loc.radius_meters < 10000
          WHERE eg.employee_id = e.id
