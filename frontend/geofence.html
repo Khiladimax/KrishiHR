@@ -1800,7 +1800,7 @@ function empSubRow(locId) {
         <div id="office-wrap-${e.id}" style="display:${rt==='office'?'block':'none'};margin-top:4px">
           <select class="g-loc-select" id="office-sel-${e.id}">
             <option value="">— select office location —</option>
-            ${_allLocations.filter(l => l.radius_meters < 10000 && l.is_active).map(l => `<option value="${l.id}" ${(rule?.rule_type==='office' && l.id==locId)?'selected':''}>${l.name}</option>`).join('')}
+            ${_allLocations.filter(l => l.radius_meters < 10000 && l.is_active).map(l => `<option value="${l.id}" ${(rule?.rule_type==='office' && l.id==rule?.office_location_id)?'selected':''}>${l.name}</option>`).join('')}
           </select>
         </div>
         <!-- State / District pickers -->
