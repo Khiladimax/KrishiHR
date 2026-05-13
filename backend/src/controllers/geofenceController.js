@@ -1114,6 +1114,17 @@ exports.upsertBufferRule = async (req, res) => {
     // For universal: keep whatever employee_type they already have.
     if (rule_type === 'office') {
       await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
+      // If a specific office_location_id is provided, move the employee there:
+      // delete ALL old geofence rows then insert the new one so they leave Mumbai and appear under Delhi.
+      const office_location_id = req.body.office_location_id;
+      if (office_location_id) {
+        await db.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [employee_id]);
+        await db.query(
+          `INSERT INTO employee_geofence (employee_id, office_location_id, is_universal, assigned_by)
+           VALUES ($1, $2, FALSE, $3)`,
+          [employee_id, office_location_id, req.user.id]
+        );
+      }
     } else if (rule_type === 'state' || rule_type === 'district') {
       await db.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
       // Remove any stale office_location-based geofence row so the employee stops
@@ -1215,12 +1226,18 @@ exports.getAllBufferRules = async (req, res) => {
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
               ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
-              eg.office_location_id,
+              latest_eg.office_location_id,
               ol.name AS office_location_name
        FROM employees e
        LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
-       LEFT JOIN employee_geofence eg ON eg.employee_id = e.id
-       LEFT JOIN office_locations ol ON ol.id = eg.office_location_id AND ol.radius_meters < 10000
+       LEFT JOIN LATERAL (
+         SELECT eg.office_location_id
+         FROM employee_geofence eg
+         JOIN office_locations loc ON loc.id = eg.office_location_id AND loc.radius_meters < 10000
+         WHERE eg.employee_id = e.id
+         LIMIT 1
+       ) latest_eg ON TRUE
+       LEFT JOIN office_locations ol ON ol.id = latest_eg.office_location_id
        WHERE e.is_active = TRUE
        ORDER BY e.first_name`
     );
