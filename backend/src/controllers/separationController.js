@@ -287,8 +287,7 @@ exports.managerAction = async (req, res) => {
       return res.status(400).json({ success: false, message: `Cannot action — status is "${s.status}". Expected: pending` });
 
     const isManager = s.manager_id === req.user.id;
-    const isAdmin   = ['admin','super_admin'].includes(req.user.role);
-    if (!isManager && !isAdmin)
+    if (!isManager)
       return res.status(403).json({ success: false, message: 'Only the reporting manager can action this step' });
 
     if (action === 'reject') {
@@ -349,7 +348,7 @@ exports.hrAction = async (req, res) => {
 
     if (!['approve','reject'].includes(action))
       return res.status(400).json({ success: false, message: 'action must be approve or reject' });
-    if (!['hr','admin','super_admin'].includes(req.user.role))
+    if (!['hr'].includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Only HR can action this step' });
 
     const sep = await client.query(
@@ -416,7 +415,7 @@ exports.accountsAction = async (req, res) => {
 
     if (!['approve','reject'].includes(action))
       return res.status(400).json({ success: false, message: 'action must be approve or reject' });
-    if (!['accounts','admin','super_admin'].includes(req.user.role))
+    if (!['accounts'].includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Only Accounts can action this step' });
 
     const sep = await client.query(
