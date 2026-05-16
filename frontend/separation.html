@@ -422,10 +422,10 @@ function renderChainPill(level, name, status) {
 }
 
 function isMyTurn(s) {
-  if (s.status === 'pending'           && (s.manager_id === user.id || Role.is('admin','super_admin'))) return true;
-  if (s.status === 'manager_approved'  && Role.is('hr','admin','super_admin'))                          return true;
-  if (s.status === 'hr_approved'       && Role.is('accounts','admin','super_admin'))                    return true;
-  if (s.status === 'accounts_approved' && Role.is('admin','super_admin'))                               return true;
+  if (s.status === 'pending'           && s.manager_id === user.id)               return true;
+  if (s.status === 'manager_approved'  && Role.is('hr'))                          return true;
+  if (s.status === 'hr_approved'       && Role.is('accounts'))                    return true;
+  if (s.status === 'accounts_approved' && Role.is('admin','super_admin'))         return true;
   return false;
 }
 
