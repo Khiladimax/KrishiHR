@@ -285,6 +285,9 @@ async function loadReimbursements(tab) {
 
     // Filter for 'pending my approval': records where it's literally MY turn to act
     let filtered = data;
+    if (tab === 'my') {
+      filtered = data.filter(d => d.status !== 'draft'); // drafts go to Drafts tab only
+    }
     if (tab === 'pending') {
       filtered = data.filter(d =>
         d.status === 'pending' &&
@@ -392,15 +395,20 @@ function renderCard(r, tab) {
       </td>
     </tr>`).join('');
 
-  const approvedAmt = parseFloat(r.approved_amount || r.total_amount || 0);
+  const isDraft     = r.status === 'draft';
+  const approvedAmt = isDraft ? parseFloat(r.total_amount || 0) : parseFloat(r.approved_amount || r.total_amount || 0);
   const totalAmt    = parseFloat(r.total_amount || 0);
-  const amtRevised  = approvedAmt !== totalAmt;
+  const amtRevised  = !isDraft && approvedAmt !== totalAmt;
 
   let actionButtons = '';
   if (isApprover) {
     actionButtons = `
       <button class="btn btn-success btn-sm" onclick="openRevisionModal(${r.id})">✅ Review & Approve</button>
       <button class="btn btn-danger  btn-sm" onclick="rejectReimb(${r.id})">❌ Reject</button>`;
+  }
+  if (isOwner && isDraft) {
+    actionButtons += `<button class="btn btn-primary btn-sm" onclick="submitDraftById(${r.id})">🚀 Submit</button>`;
+    actionButtons += `<button class="btn btn-outline btn-sm" onclick="openEditModal(${r.id})">✏️ Edit</button>`;
   }
   if (isOwner && r.status === 'pending') {
     actionButtons += `<button class="btn btn-outline btn-sm" onclick="openEditModal(${r.id})">✏️ Edit</button>`;
@@ -409,7 +417,9 @@ function renderCard(r, tab) {
   if (isAccounts && r.status === 'approved') {
     actionButtons += `<button class="btn btn-primary btn-sm" onclick="disburseReimb(${r.id})">💰 Disburse</button>`;
   }
-  actionButtons += `<button class="btn btn-outline btn-sm" onclick="viewTimeline(${r.id})">📋 Timeline</button>`;
+  if (!isDraft) {
+    actionButtons += `<button class="btn btn-outline btn-sm" onclick="viewTimeline(${r.id})">📋 Timeline</button>`;
+  }
 
   return `
   <div class="reimb-card" id="card-${r.id}">
@@ -722,39 +732,23 @@ async function saveAsDraft() {
 }
 
 async function loadDrafts() {
-  const container = document.getElementById('mainContent');
-  container.innerHTML = `<p style="color:#888">Loading drafts…</p>`;
+  document.getElementById('contentArea').innerHTML = `<div class="loader">Loading drafts…</div>`;
   try {
-    const res = await api('GET', '/reimbursement');
-    const drafts = (res?.data || []).filter(d => d.status === 'draft' && d.employee_id === window._myEmpId);
+    const res = await api('GET', `/reimbursement?employee_id=${currentUser.id}`);
+    const drafts = (res?.data || []).filter(d => d.status === 'draft');
     if (!drafts.length) {
-      container.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa">
-        <div style="font-size:48px">📝</div>
-        <p>No drafts yet. Start a new request and click "Save as Draft".</p>
-        <button class="btn btn-primary" onclick="showTab('apply')">+ New Request</button>
-      </div>`;
+      document.getElementById('contentArea').innerHTML = `
+        <div class="empty-state">
+          <div style="font-size:48px;margin-bottom:12px">📝</div>
+          <p>No drafts yet. Start a new request and click "Save as Draft".</p>
+          <button class="btn btn-primary" onclick="showTab('apply')">+ New Request</button>
+        </div>`;
       return;
     }
-    container.innerHTML = `
-      <table class="data-table" style="width:100%">
-        <thead><tr>
-          <th>Title</th><th>Total (₹)</th><th>Saved On</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          ${drafts.map(d => `
-            <tr>
-              <td>${d.title}</td>
-              <td style="text-align:right">₹${parseFloat(d.total_amount||0).toLocaleString('en-IN')}</td>
-              <td>${d.requested_at ? new Date(d.requested_at).toLocaleDateString('en-IN') : new Date(d.updated_at).toLocaleDateString('en-IN')}</td>
-              <td style="display:flex;gap:8px">
-                <button class="btn btn-success btn-sm" onclick="submitDraftById(${d.id})">🚀 Submit</button>
-                <button class="btn btn-outline btn-sm" onclick="editDraft(${d.id})">✏️ Edit</button>
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>`;
+    const html = drafts.map(r => renderCard(r, 'drafts')).join('');
+    document.getElementById('contentArea').innerHTML = `<div class="reimb-list">${html}</div>`;
   } catch {
-    container.innerHTML = `<p style="color:red">Failed to load drafts.</p>`;
+    document.getElementById('contentArea').innerHTML = `<p style="color:red">Failed to load drafts.</p>`;
   }
 }
 
