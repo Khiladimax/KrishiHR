@@ -395,10 +395,13 @@ function renderCard(r, tab) {
       </td>
     </tr>`).join('');
 
-  const isDraft     = r.status === 'draft';
-  const approvedAmt = isDraft ? parseFloat(r.total_amount || 0) : parseFloat(r.approved_amount || r.total_amount || 0);
-  const totalAmt    = parseFloat(r.total_amount || 0);
-  const amtRevised  = !isDraft && approvedAmt !== totalAmt;
+  const isDraft      = r.status === 'draft';
+  const isSettled    = ['approved', 'disbursed'].includes(r.status);
+  // Show approved_amount only when actually approved/disbursed; otherwise show total_amount
+  const displayAmt   = isSettled ? parseFloat(r.approved_amount || r.total_amount || 0) : parseFloat(r.total_amount || 0);
+  const totalAmt     = parseFloat(r.total_amount || 0);
+  // "revised" badge only makes sense when approved amount differs from requested total
+  const amtRevised   = isSettled && parseFloat(r.approved_amount || 0) !== totalAmt && parseFloat(r.approved_amount || 0) > 0;
 
   let actionButtons = '';
   if (isApprover) {
@@ -435,7 +438,7 @@ function renderCard(r, tab) {
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="text-align:right">
           <div style="font-size:18px;font-weight:800;color:#1b4332">
-            ₹${approvedAmt.toLocaleString('en-IN')}
+            ₹${displayAmt.toLocaleString('en-IN')}
             ${amtRevised ? `<span style="font-size:11px;color:#888;font-weight:400;display:block"><s>₹${totalAmt.toLocaleString('en-IN')}</s> revised</span>` : ''}
           </div>
         </div>
