@@ -21,6 +21,7 @@
 .reimb-meta{font-size:12px;color:#777;margin-top:2px}
 .status-pill{padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:capitalize}
 .pill-pending{background:#fff3e0;color:#e65100}
+.pill-draft{background:#f3f4f6;color:#6b7280;border:1px dashed #9ca3af}
 .pill-approved{background:#e8f5e9;color:#2e7d32}
 .pill-rejected{background:#fce4ec;color:#c62828}
 .pill-disbursed{background:#e3f2fd;color:#1565c0}
@@ -172,6 +173,7 @@ select.form-control{background:#fff}
     <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" id="tab-my"      onclick="showTab('my')">My Requests</button>
+      <button class="tab-btn"        id="tab-drafts"  onclick="showTab('drafts')">📝 Drafts</button>
       <button class="tab-btn"        id="tab-pending" onclick="showTab('pending')">Pending My Approval</button>
       <button class="tab-btn"        id="tab-all"     onclick="showTab('all')">All Requests</button>
       <button class="tab-btn"        id="tab-apply"   onclick="showTab('apply')">+ Apply</button>
@@ -244,10 +246,12 @@ function showTab(tab) {
   const el = document.getElementById('tab-' + tab);
   if (el) el.classList.add('active');
 
-  document.getElementById('summaryRow').style.display = (tab !== 'apply') ? 'flex' : 'none';
+  document.getElementById('summaryRow').style.display = (tab !== 'apply' && tab !== 'drafts') ? 'flex' : 'none';
 
   if (tab === 'apply') {
     renderApplyForm();
+  } else if (tab === 'drafts') {
+    loadDrafts();
   } else {
     loadReimbursements(tab);
   }
@@ -492,6 +496,7 @@ function renderApplyForm() {
     <br/>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="submitReimb()">Submit Request</button>
+      <button class="btn btn-outline" onclick="saveAsDraft()" style="border-color:#f59e0b;color:#f59e0b">💾 Save as Draft</button>
       <button class="btn btn-outline" onclick="showTab('my')">Cancel</button>
     </div>
   </div>`;
@@ -666,6 +671,111 @@ async function submitReimb() {
   } catch {
     alert('Network error'); btn.disabled = false; btn.textContent = 'Submit Request';
   }
+}
+
+async function saveAsDraft() {
+  const title      = document.getElementById('reimbTitle')?.value?.trim();
+  const project_id = document.getElementById('reimbProject')?.value || null;
+  if (!title) return alert('Please enter a request title before saving draft');
+
+  const items = [];
+  let i = 0;
+  while (i < itemCount) {
+    const itemEl = document.getElementById(`item-${i}`);
+    if (!itemEl) { i++; continue; }
+    const catEl = document.getElementById(`cat-${i}`);
+    const cat  = (catEl?.dataset?.custom === 'true') ? (catEl?.value?.trim() || 'other') : catEl?.value;
+    const desc = document.getElementById(`desc-${i}`)?.value?.trim() || '';
+    const amt  = parseFloat(document.getElementById(`amt-${i}`)?.value) || 0;
+    const date = document.getElementById(`date-${i}`)?.value || new Date().toISOString().slice(0,10);
+    const att  = itemAttachments[i] || {};
+    items.push({
+      category: cat, description: desc, amount: amt, expense_date: date,
+      attachment_data: att.data || null,
+      attachment_name: att.name || null,
+      attachment_mime: att.mime || null,
+      attachment_size: att.size || null
+    });
+    i++;
+  }
+
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const res = await api('POST', '/reimbursement/draft', {
+      title,
+      items: JSON.stringify(items),
+      project_id: project_id ? parseInt(project_id) : null
+    });
+    if (res?.success) {
+      alert('💾 Draft saved! You can find it in the Drafts tab.');
+      showTab('drafts');
+    } else {
+      alert('Error: ' + (res?.message || 'Failed'));
+    }
+  } catch {
+    alert('Network error');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save as Draft';
+  }
+}
+
+async function loadDrafts() {
+  const container = document.getElementById('mainContent');
+  container.innerHTML = `<p style="color:#888">Loading drafts…</p>`;
+  try {
+    const res = await api('GET', '/reimbursement');
+    const drafts = (res?.data || []).filter(d => d.status === 'draft' && d.employee_id === window._myEmpId);
+    if (!drafts.length) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa">
+        <div style="font-size:48px">📝</div>
+        <p>No drafts yet. Start a new request and click "Save as Draft".</p>
+        <button class="btn btn-primary" onclick="showTab('apply')">+ New Request</button>
+      </div>`;
+      return;
+    }
+    container.innerHTML = `
+      <table class="data-table" style="width:100%">
+        <thead><tr>
+          <th>Title</th><th>Total (₹)</th><th>Saved On</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${drafts.map(d => `
+            <tr>
+              <td>${d.title}</td>
+              <td style="text-align:right">₹${parseFloat(d.total_amount||0).toLocaleString('en-IN')}</td>
+              <td>${d.requested_at ? new Date(d.requested_at).toLocaleDateString('en-IN') : new Date(d.updated_at).toLocaleDateString('en-IN')}</td>
+              <td style="display:flex;gap:8px">
+                <button class="btn btn-success btn-sm" onclick="submitDraftById(${d.id})">🚀 Submit</button>
+                <button class="btn btn-outline btn-sm" onclick="editDraft(${d.id})">✏️ Edit</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch {
+    container.innerHTML = `<p style="color:red">Failed to load drafts.</p>`;
+  }
+}
+
+async function submitDraftById(id) {
+  if (!confirm('Submit this draft for approval?')) return;
+  try {
+    const res = await api('POST', `/reimbursement/${id}/submit-draft`, {});
+    if (res?.success) {
+      alert('✅ Draft submitted successfully!');
+      showTab('my');
+    } else {
+      alert('Error: ' + (res?.message || 'Failed'));
+    }
+  } catch {
+    alert('Network error');
+  }
+}
+
+function editDraft(id) {
+  // Opens the edit modal (already exists in the codebase)
+  openEditModal(id);
 }
 
 // ── Review & Approve Modal ────────────────────────────────────────────────────
