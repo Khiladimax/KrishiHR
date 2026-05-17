@@ -757,8 +757,8 @@ async function submitDraftById(id) {
   try {
     const res = await api('POST', `/reimbursement/${id}/submit-draft`, {});
     if (res?.success) {
-      alert('✅ Draft submitted successfully!');
-      showTab('my');
+      alert('✅ Draft submitted successfully! It is now pending approval.');
+      showTab('my'); // showTab calls loadReimbursements('my') which fetches fresh data
     } else {
       alert('Error: ' + (res?.message || 'Failed'));
     }
@@ -1311,7 +1311,7 @@ async function submitEdit(id) {
     if (res?.success) {
       closeModal('editModal');
       alert('✅ Reimbursement updated successfully!');
-      loadReimbursements(currentTab);
+      showTab(currentTab); // showTab handles both 'drafts' and other tabs correctly
     } else {
       alert('Error: ' + (res?.message || 'Failed'));
       btn.disabled = false; btn.textContent = '💾 Update Request';
