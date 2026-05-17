@@ -216,6 +216,10 @@ exports.getAll = async (req, res) => {
     }
 
     if (status) { conds.push(`r.status=$${idx++}`); params.push(status); }
+    else if (!employee_id) {
+      // Never show drafts to other users — drafts are private to the owner
+      conds.push(`r.status != 'draft'`);
+    }
 
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
 
@@ -227,7 +231,7 @@ exports.getAll = async (req, res) => {
        JOIN employees e ON r.employee_id=e.id
        LEFT JOIN departments d ON e.department_id=d.id
        ${where}
-       ORDER BY r.requested_at DESC`,
+       ORDER BY COALESCE(r.requested_at, r.updated_at) DESC`,
       params
     );
 
@@ -610,7 +614,7 @@ exports.exportData = async (req, res) => {
        LEFT JOIN designations des ON e.designation_id = des.id
        WHERE r.requested_at::date BETWEEN $1 AND $2
        ${statusCond}
-       ORDER BY r.requested_at DESC`,
+       ORDER BY COALESCE(r.requested_at, r.updated_at) DESC`,
       params
     );
 
