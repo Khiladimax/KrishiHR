@@ -573,7 +573,10 @@ exports.revoke = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not your request' });
     if (!['pending','draft'].includes(r.rows[0].status))
       return res.status(400).json({ success: false, message: 'Can only revoke pending requests' });
-    await db.query(`UPDATE reimbursements SET status='rejected', remarks='Revoked by employee', updated_at=NOW() WHERE id=$1`, [id]);
+    // Delete approval log, items, then the request itself
+    await db.query(`DELETE FROM reimbursement_approvals WHERE reimbursement_id=$1`, [id]);
+    await db.query(`DELETE FROM reimbursement_items WHERE reimbursement_id=$1`, [id]);
+    await db.query(`DELETE FROM reimbursements WHERE id=$1`, [id]);
     res.json({ success: true, message: 'Revoked' });
   } catch (err) {
     console.error('[reimbursement.revoke]', err);
