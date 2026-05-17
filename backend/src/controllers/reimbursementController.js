@@ -654,6 +654,120 @@ exports.exportData = async (req, res) => {
   }
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SAVE AS DRAFT — POST /reimbursement/draft
+// Saves title + items without triggering approval chain. Items can be partial.
+// ══════════════════════════════════════════════════════════════════════════════
+exports.saveDraft = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const empId = req.user.id;
+    const { title, items, project_id } = req.body;
+
+    if (!title || !title.trim())
+      return res.status(400).json({ success: false, message: 'Title is required' });
+
+    let parsedItems = [];
+    try { parsedItems = typeof items === 'string' ? JSON.parse(items) : (items || []); }
+    catch (_) { return res.status(400).json({ success: false, message: 'Invalid items JSON' }); }
+
+    await client.query(`ALTER TABLE reimbursements ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id)`).catch(()=>{});
+
+    const total = parsedItems.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+
+    const result = await client.query(
+      `INSERT INTO reimbursements
+         (employee_id, title, total_amount, approved_amount, approval_chain,
+          current_approver_code, current_level, status, project_id)
+       VALUES($1,$2,$3,0,'[]',NULL,0,'draft',$4) RETURNING id`,
+      [empId, title.trim(), total, project_id ? parseInt(project_id) : null]
+    );
+    const reimbId = result.rows[0].id;
+
+    for (const item of parsedItems) {
+      if (!item.description && !item.amount) continue; // skip fully empty rows
+      await client.query(
+        `INSERT INTO reimbursement_items
+           (reimbursement_id, category, description, amount, expense_date,
+            attachment_data, attachment_name, attachment_mime, attachment_size)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [reimbId,
+         item.category    || 'miscellaneous',
+         item.description || '',
+         parseFloat(item.amount || 0),
+         item.expense_date || new Date().toISOString().slice(0,10),
+         item.attachment_data || null,
+         item.attachment_name || null,
+         item.attachment_mime || null,
+         item.attachment_size || null]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, message: 'Draft saved', data: { id: reimbId, total } });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[reimbursement.saveDraft]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally { client.release(); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUBMIT DRAFT — POST /reimbursement/:id/submit-draft
+// Converts a draft to pending and kicks off approval chain
+// ══════════════════════════════════════════════════════════════════════════════
+exports.submitDraft = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const empId = req.user.id;
+    const { id } = req.params;
+
+    const existing = await client.query(
+      `SELECT * FROM reimbursements WHERE id=$1 AND employee_id=$2`, [id, empId]
+    );
+    if (!existing.rows.length)
+      return res.status(404).json({ success: false, message: 'Draft not found' });
+    if (existing.rows[0].status !== 'draft')
+      return res.status(400).json({ success: false, message: 'Only drafts can be submitted this way' });
+
+    const itemsRes = await client.query(
+      `SELECT * FROM reimbursement_items WHERE reimbursement_id=$1`, [id]
+    );
+    if (!itemsRes.rows.length)
+      return res.status(400).json({ success: false, message: 'At least one expense item is required' });
+
+    const chain = await getChain(empId);
+    const total = itemsRes.rows.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+
+    await client.query(
+      `UPDATE reimbursements
+         SET status='pending', approval_chain=$1, current_approver_code=$2,
+             current_level=1, total_amount=$3, requested_at=NOW()
+       WHERE id=$4`,
+      [JSON.stringify(chain), chain[0], total, id]
+    );
+
+    await client.query('COMMIT');
+
+    // Notify first approver
+    const empInfo = await db.query(
+      `SELECT CONCAT(first_name,' ',last_name) AS name FROM employees WHERE id=$1`, [empId]
+    );
+    const empName = empInfo.rows[0]?.name || 'An employee';
+    const title   = existing.rows[0].title;
+    await notifyByCode(chain[0], '🧾 Reimbursement Request',
+      `${empName} submitted a reimbursement of ₹${total.toLocaleString('en-IN')} — "${title}". Awaiting your approval.`);
+
+    res.json({ success: true, message: 'Draft submitted successfully', data: { id, total, chain } });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[reimbursement.submitDraft]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally { client.release(); }
+};
+
 // ── Get approval log ──────────────────────────────────────────────────────────
 exports.getApprovals = async (req, res) => {
   try {
