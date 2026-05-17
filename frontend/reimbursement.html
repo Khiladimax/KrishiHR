@@ -1151,82 +1151,105 @@ function openEditModal(id) {
   editItemCount  = 0;
   editAttachments = {};
 
+  // Full category list same as Apply form
+  const ALL_CATS = [
+    ['travel','🚗 Travel'],['food','🍽️ Food & Beverages'],['accommodation','🏨 Accommodation'],
+    ['fuel','⛽ Fuel / Petrol'],['transport','🚕 Local Transport'],['train','🚆 Train / Bus Fare'],
+    ['flight','✈️ Flight'],['medical','💊 Medical'],['stationery','📋 Stationery / Office'],
+    ['internet','🌐 Internet / Phone'],['client_entertainment','🤝 Client Entertainment'],
+    ['printing','🖨️ Printing'],['repair','🔧 Repair / Maintenance'],
+    ['training','📚 Training / Course'],['miscellaneous','📦 Miscellaneous'],['other','✏️ Other']
+  ];
+  window._editAllCats = ALL_CATS;
+
   document.getElementById('editModalBody').innerHTML = `
     <div class="form-group">
       <label>Request Title *</label>
       <input id="editTitle" class="form-control" value="${escHtml(reimb.title)}" placeholder="Request title"/>
     </div>
-    <div id="editItemsContainer"></div>
-    <button class="btn btn-outline" style="margin-bottom:16px" onclick="addEditItem()">+ Add Expense Item</button>
+    <div style="overflow-x:auto;margin-bottom:12px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#f8f9fa;font-weight:600;color:#555">
+            <th style="padding:8px 6px;text-align:left;width:32px">#</th>
+            <th style="padding:8px 6px;text-align:left">Category</th>
+            <th style="padding:8px 6px;text-align:left;width:140px">Date</th>
+            <th style="padding:8px 6px;text-align:left">Description</th>
+            <th style="padding:8px 6px;text-align:right;width:110px">Amount (₹)</th>
+            <th style="padding:8px 6px;text-align:left">Attachment</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="editItemsContainer"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7" style="padding:8px 6px">
+              <button class="btn btn-outline" style="font-size:12px;padding:4px 14px" onclick="addEditItem()">+ Add Row</button>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-primary" onclick="submitEdit(${id})">💾 Update Request</button>
       <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
     </div>`;
 
   // Pre-fill existing items
-  (reimb.items || []).forEach(item => {
-    addEditItem({
-      category:    item.category,
-      description: item.description || '',
-      amount:      item.amount,
-      date:        item.expense_date,
-      existingAttachName: item.has_attachment ? (item.attachment_name || 'attachment') : null,
-    });
-  });
+  (reimb.items || []).forEach(item => addEditItem({
+    category:           item.category,
+    description:        item.description || '',
+    amount:             item.amount,
+    date:               item.expense_date,
+    existingAttachName: item.has_attachment ? (item.attachment_name || 'attachment') : null,
+  }));
   if (!reimb.items || !reimb.items.length) addEditItem();
 
   document.getElementById('editModal').classList.add('open');
 }
 
 function addEditItem(prefill = {}) {
-  const idx = editItemCount++;
-  const container = document.getElementById('editItemsContainer');
-  const div = document.createElement('div');
-  div.className = 'expense-item';
-  div.id = `edit-item-${idx}`;
+  const idx  = editItemCount++;
+  const tbody = document.getElementById('editItemsContainer');
+  const tr   = document.createElement('tr');
+  tr.id = `edit-item-${idx}`;
 
-  const cats = ['travel','food','accommodation','miscellaneous'];
-  const catOptions = cats.map(c =>
-    `<option value="${c}" ${c === (prefill.category||'travel') ? 'selected' : ''}>${c.charAt(0).toUpperCase()+c.slice(1)}</option>`
+  const catOptions = (window._editAllCats || []).map(([val, label]) =>
+    `<option value="${val}" ${val === (prefill.category || 'travel') ? 'selected' : ''}>${label}</option>`
   ).join('');
 
-  const existingName = prefill.existingAttachName || null;
+  const existingName  = prefill.existingAttachName || null;
+  const today         = new Date().toISOString().slice(0, 10);
+  const dateVal       = prefill.date ? prefill.date.slice(0, 10) : today;
 
-  div.innerHTML = `
-    <div class="item-num">Expense #${idx + 1}</div>
-    <button class="remove-item-btn" onclick="removeEditItem(${idx})" title="Remove">×</button>
-    <div class="expense-grid">
-      <div class="form-group">
-        <label>Category *</label>
-        <select class="form-control" id="ecat-${idx}">${catOptions}</select>
+  tr.innerHTML = `
+    <td style="padding:6px;color:#aaa;font-size:12px;font-weight:600;text-align:center">${idx + 1}</td>
+    <td style="padding:4px 6px">
+      <select class="form-control" id="ecat-${idx}" style="min-width:140px">${catOptions}</select>
+    </td>
+    <td style="padding:4px 6px">
+      <input type="date" class="form-control" id="edate-${idx}" value="${dateVal}"/>
+    </td>
+    <td style="padding:4px 6px">
+      <input class="form-control" id="edesc-${idx}" value="${escHtml(prefill.description || '')}" placeholder="e.g. Cab fare"/>
+    </td>
+    <td style="padding:4px 6px">
+      <input type="number" class="form-control" id="eamt-${idx}" value="${prefill.amount || ''}"
+             placeholder="0.00" min="0" step="0.01" style="text-align:right"/>
+    </td>
+    <td style="padding:4px 6px">
+      <input type="file" class="form-control" id="efile-${idx}" accept="image/*,application/pdf"
+             style="font-size:11px;padding:2px 4px;height:28px" onchange="handleEditFile(${idx}, this)"/>
+      <div id="efilePreview-${idx}" style="font-size:10px;margin-top:2px">
+        ${existingName ? `<div class="attach-preview">📎 ${escHtml(existingName)}</div>` : ''}
       </div>
-      <div class="form-group">
-        <label>Expense Date *</label>
-        <input type="date" class="form-control" id="edate-${idx}" value="${prefill.date || new Date().toISOString().slice(0,10)}"/>
-      </div>
-      <div class="form-group" style="grid-column:1/-1">
-        <label>Description *</label>
-        <input class="form-control" id="edesc-${idx}" value="${escHtml(prefill.description||'')}" placeholder="e.g. Cab fare"/>
-      </div>
-      <div class="form-group">
-        <label>Amount (₹) *</label>
-        <input type="number" class="form-control" id="eamt-${idx}" value="${prefill.amount||''}" placeholder="0.00" min="0" step="0.01"/>
-      </div>
-      <div class="form-group">
-        <label>Attachment (Image/PDF)</label>
-        <input type="file" class="form-control" id="efile-${idx}" accept="image/*,application/pdf"
-               onchange="handleEditFile(${idx}, this)"/>
-        <div id="efilePreview-${idx}">
-          ${existingName
-            ? `<div class="attach-preview" style="background:#e8f5e9;color:#2e7d32">📎 ${escHtml(existingName)} <span style="font-size:10px;color:#888">(existing — upload new to replace)</span></div>`
-            : ''}
-        </div>
-      </div>
-    </div>`;
+    </td>
+    <td style="padding:4px 6px;text-align:center">
+      ${idx > 0 ? `<button class="del-row-btn" onclick="removeEditItem(${idx})" title="Delete row">🗑</button>` : ''}
+    </td>`;
 
-  // Store existing attachment flag so we know to keep server-side if not replaced
   if (existingName) editAttachments[idx] = { existing: true, name: existingName };
-  container.appendChild(div);
+  tbody.appendChild(tr);
 }
 
 function removeEditItem(idx) {
@@ -1366,7 +1389,7 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 
 <!-- ── Edit Reimbursement Modal ─────────────────────────────────────────────── -->
 <div class="modal-overlay" id="editModal">
-  <div class="modal-box" style="max-width:680px">
+  <div class="modal-box" style="max-width:min(960px,96vw);width:100%">
     <button class="modal-close" onclick="closeModal('editModal')">×</button>
     <h3>✏️ Edit Reimbursement</h3>
     <div id="editModalBody"></div>
