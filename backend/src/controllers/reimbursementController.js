@@ -450,8 +450,8 @@ exports.edit = async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     if (r.rows[0].employee_id !== empId)
       return res.status(403).json({ success: false, message: 'Not your request' });
-    if (r.rows[0].status !== 'pending')
-      return res.status(400).json({ success: false, message: 'Can only edit pending requests' });
+    if (!['pending','draft'].includes(r.rows[0].status))
+      return res.status(400).json({ success: false, message: 'Can only edit pending or draft requests' });
 
     if (!title || !title.trim())
       return res.status(400).json({ success: false, message: 'Title is required' });
@@ -465,10 +465,19 @@ exports.edit = async (req, res) => {
     const total = parsedItems.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
 
     // Update header
-    await client.query(
-      `UPDATE reimbursements SET title=$1, total_amount=$2, approved_amount=$2, updated_at=NOW() WHERE id=$3`,
-      [title.trim(), total, id]
-    );
+    // For drafts don't touch approved_amount; for pending keep in sync
+    const isDraft = r.rows[0].status === 'draft';
+    if (isDraft) {
+      await client.query(
+        `UPDATE reimbursements SET title=$1, total_amount=$2, updated_at=NOW() WHERE id=$3`,
+        [title.trim(), total, id]
+      );
+    } else {
+      await client.query(
+        `UPDATE reimbursements SET title=$1, total_amount=$2, approved_amount=$2, updated_at=NOW() WHERE id=$3`,
+        [title.trim(), total, id]
+      );
+    }
 
     // Replace all items
     await client.query(`DELETE FROM reimbursement_items WHERE reimbursement_id=$1`, [id]);
@@ -558,7 +567,7 @@ exports.revoke = async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     if (r.rows[0].employee_id !== empId)
       return res.status(403).json({ success: false, message: 'Not your request' });
-    if (r.rows[0].status !== 'pending')
+    if (!['pending','draft'].includes(r.rows[0].status))
       return res.status(400).json({ success: false, message: 'Can only revoke pending requests' });
     await db.query(`UPDATE reimbursements SET status='rejected', remarks='Revoked by employee', updated_at=NOW() WHERE id=$1`, [id]);
     res.json({ success: true, message: 'Revoked' });
