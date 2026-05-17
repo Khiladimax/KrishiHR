@@ -901,12 +901,15 @@ async function rejectReimb(id) {
 
 // ── Revoke ────────────────────────────────────────────────────────────────────
 async function revokeReimb(id) {
-  if (!confirm('Revoke this reimbursement request?')) return;
+  if (!confirm('Revoke this reimbursement request? It will be permanently deleted.')) return;
   try {
     const res = await api('POST', `/reimbursement/${id}/revoke`);
-    const d = res;
-    alert(d.success ? '✅ Revoked' : 'Error: ' + d.message);
-    loadReimbursements(currentTab);
+    if (res?.success) {
+      alert('✅ Request revoked and deleted.');
+      showTab('my');
+    } else {
+      alert('Error: ' + res?.message);
+    }
   } catch { alert('Network error'); }
 }
 
