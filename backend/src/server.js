@@ -5,6 +5,7 @@ const cors    = require('cors');
 const cron    = require('node-cron');
 const db      = require('./config/db');
 const routes  = require('./routes/index');
+const chatCtrl   = require('./controllers/chatController');
 const attCtrl = require('./controllers/attendanceController');
 const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
@@ -33,6 +34,187 @@ app.use((req, _res, next) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// ── Socket.IO ─────────────────────────────────────────────────────────────────
+const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e7 });
+global.io = io;
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token) return next(new Error('Authentication required'));
+  try {
+    const decoded = jwt_sock.verify(token, process.env.JWT_SECRET || 'change-me');
+    socket.user = decoded;
+    next();
+  } catch (e) { next(new Error('Invalid token')); }
+});
+// Per-user socket tracking (for DM presence + call routing)
+global.userSockets = new Map();  // userId -> Set of socketIds
+
+io.on('connection', (socket) => {
+  const user = socket.user;
+  console.log(`[Socket] ${user.first_name || user.id} connected`);
+
+  // Track socket for this user
+  if (!global.userSockets.has(String(user.id))) global.userSockets.set(String(user.id), new Set());
+  global.userSockets.get(String(user.id)).add(socket.id);
+
+  // Broadcast online presence
+  io.emit('userOnline', { userId: user.id });
+
+  // Join a chat group room
+  socket.on('joinGroup', (groupId) => {
+    socket.join(`group:${groupId}`);
+  });
+  socket.on('leaveGroup', (groupId) => {
+    socket.leave(`group:${groupId}`);
+  });
+
+  // Typing indicators
+  socket.on('typing', ({ groupId, name }) => {
+    socket.to(`group:${groupId}`).emit('userTyping', { userId: user.id, name });
+  });
+  socket.on('stopTyping', ({ groupId }) => {
+    socket.to(`group:${groupId}`).emit('userStoppedTyping', { userId: user.id });
+  });
+
+  // ── Call Invites (WhatsApp-style ring) ────────────────────────────────────
+  // Caller emits this; server fans it out to all sockets of the callee
+  socket.on('callInvite', ({ toUserId, roomId, callType, callerName, callerAvatar, groupId, groupName }) => {
+    const calleeSockets = global.userSockets.get(String(toUserId));
+    if (calleeSockets && calleeSockets.size) {
+      calleeSockets.forEach(sid => {
+        io.to(sid).emit('incomingCall', {
+          roomId,
+          callType,       // 'video' | 'audio'
+          callerName,
+          callerAvatar,
+          callerId: user.id,
+          groupId,
+          groupName
+        });
+      });
+    } else {
+      // Callee offline — notify caller
+      socket.emit('calleeOffline', { toUserId, roomId });
+    }
+  });
+
+  // Callee accepted — tell caller
+  socket.on('callAccepted', ({ roomId, callerId }) => {
+    const callerSockets = global.userSockets.get(String(callerId));
+    if (callerSockets) {
+      callerSockets.forEach(sid => io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name }));
+    }
+  });
+
+  // Callee declined — tell caller
+  socket.on('callDeclined', ({ roomId, callerId }) => {
+    const callerSockets = global.userSockets.get(String(callerId));
+    if (callerSockets) {
+      callerSockets.forEach(sid => io.to(sid).emit('callDeclined', { roomId, byUserId: user.id, byName: user.first_name }));
+    }
+  });
+
+  // Caller cancelled before answer
+  socket.on('callCancelled', ({ roomId, toUserId }) => {
+    const calleeSockets = global.userSockets.get(String(toUserId));
+    if (calleeSockets) {
+      calleeSockets.forEach(sid => io.to(sid).emit('callCancelled', { roomId }));
+    }
+  });
+
+  // ── Video / Audio Meeting — WebRTC Signalling ─────────────────────────────
+  socket.on('joinMeeting', ({ roomId, displayName }) => {
+    socket.join(`meeting:${roomId}`);
+    socket.to(`meeting:${roomId}`).emit('peerJoined', {
+      peerId: socket.id,
+      userId: user.id,
+      displayName: displayName || user.first_name || 'Guest'
+    });
+    // Tell the new joiner who's already in the room
+    const existingPeers = [...(io.sockets.adapter.rooms.get(`meeting:${roomId}`) || [])].filter(id => id !== socket.id);
+    socket.emit('existingPeers', existingPeers);
+  });
+
+  socket.on('leaveMeeting', ({ roomId }) => {
+    socket.to(`meeting:${roomId}`).emit('peerLeft', { peerId: socket.id, userId: user.id });
+    socket.leave(`meeting:${roomId}`);
+  });
+
+  // WebRTC offer
+  socket.on('offer', ({ to, offer, roomId }) => {
+    io.to(to).emit('offer', { from: socket.id, userId: user.id, offer, roomId });
+  });
+  // WebRTC answer
+  socket.on('answer', ({ to, answer }) => {
+    io.to(to).emit('answer', { from: socket.id, answer });
+  });
+  // ICE candidates
+  socket.on('ice-candidate', ({ to, candidate }) => {
+    io.to(to).emit('ice-candidate', { from: socket.id, candidate });
+  });
+
+  // Screen share toggle notification
+  socket.on('screenShare', ({ roomId, sharing }) => {
+    socket.to(`meeting:${roomId}`).emit('peerScreenShare', { peerId: socket.id, sharing });
+  });
+
+  // Raise hand
+  socket.on('raiseHand', ({ roomId, raised, displayName }) => {
+    socket.to(`meeting:${roomId}`).emit('raiseHand', { peerId: socket.id, raised, displayName });
+  });
+
+  // Meeting chat
+  socket.on('meetingChat', ({ roomId, message }) => {
+    io.to(`meeting:${roomId}`).emit('meetingChat', {
+      from: socket.id,
+      userId: user.id,
+      name: user.first_name || 'User',
+      message,
+      at: new Date().toISOString()
+    });
+  });
+
+  // Mark messages seen via socket (for DMs — no HTTP roundtrip)
+  socket.on('markSeen', async ({ groupId, messageId }) => {
+    try {
+      const db = require('./config/db');
+      await db.query(`
+        INSERT INTO chat_read_receipts(group_id, employee_id, read_at)
+        VALUES($1,$2,NOW())
+        ON CONFLICT(group_id, employee_id) DO UPDATE SET read_at=NOW()
+      `, [groupId, user.id]);
+      // Notify senders in group
+      const senders = await db.query(
+        `SELECT DISTINCT sender_id FROM chat_messages WHERE group_id=$1 AND sender_id != $2`,
+        [groupId, user.id]
+      );
+      senders.rows.forEach(row => {
+        const ss = global.userSockets.get(String(row.sender_id));
+        if (ss) ss.forEach(sid => io.to(sid).emit('messageSeen', { group_id: groupId, seen_by: user.id }));
+      });
+    } catch(e) { /* non-fatal */ }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket] ${user.first_name || user.id} disconnected`);
+    // Remove socket from tracking
+    const sockets = global.userSockets.get(String(user.id));
+    if (sockets) {
+      sockets.delete(socket.id);
+      if (!sockets.size) {
+        global.userSockets.delete(String(user.id));
+        io.emit('userOffline', { userId: user.id });
+      }
+    }
+  });
+});
+
+
+// Static: serve chat uploaded files
+const chatUploadDir = require('path').join(__dirname, '..', 'uploads', 'chat');
+if (!require('fs').existsSync(chatUploadDir)) require('fs').mkdirSync(chatUploadDir, { recursive: true });
+app.use('/chat/files', require('express').static(chatUploadDir));
+
 app.use('/api', routes);
 
 // Health check
@@ -599,6 +781,7 @@ cron.schedule('5 8 * * *', async () => {
 async function start() {
   try {
     await db.query('SELECT 1');
+    await chatCtrl.migrate();
     console.log('✅ Database connected');
 
     await db.query(`CREATE TABLE IF NOT EXISTS birthday_likes (
@@ -627,7 +810,7 @@ async function start() {
     console.log('✅ DB schema ready');
 
     // ✅ Start accepting requests FIRST — don't block login/API on background fixes
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log('');
       console.log('╔═══════════════════════════════════════╗');
       console.log(`║  KrishiHR Backend on port ${PORT}         ║`);
@@ -817,6 +1000,7 @@ const DB_PING_INTERVAL = 1 * 60 * 1000; // 1 minute
 setInterval(async () => {
   try {
     await db.query('SELECT 1');
+    await chatCtrl.migrate();
   } catch (err) {
     console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
   }
