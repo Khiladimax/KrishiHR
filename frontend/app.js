@@ -125,7 +125,7 @@ const NAV_GROUPS = [
       { href:'attendance.html',     icon: ICONS.attendance,   label:'Attendance',       always:true },
       { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
       { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl'] },
-      { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    always:true },
+      { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    hideRoles:['admin','super_admin','hr','accounts','manager','tl'] },
       // { href:'chat.html',           icon: ICONS.chat || '💬',  label:'Chat & Meetings',  always:true },
     ]
   },
@@ -185,7 +185,10 @@ function buildSidebar(activePage) {
 
   let html = '';
   for (const group of NAV_GROUPS) {
-    const visibleItems = group.items.filter(l => l.always || (l.roles && l.roles.includes(user.role)));
+    const visibleItems = group.items.filter(l => {
+      if (l.hideRoles && l.hideRoles.includes(user.role)) return false;
+      return l.always || (l.roles && l.roles.includes(user.role));
+    });
     if (visibleItems.length === 0) continue;
 
     if (group.label) {
