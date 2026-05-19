@@ -3490,50 +3490,7 @@ function showJoinBanner(roomId, title, errorMsg) {
 }
 
 // ── AI Voice Deep-Link Handler ───────────────────────────────────────────────
-// Handles ?dmUser=<id> (open DM) and ?callUser=<id>&callType=video|audio (start call)
-(async function handleAIVoiceDeepLink() {
-  const params = new URLSearchParams(window.location.search);
-  const dmUserId   = params.get('dmUser');
-  const callUserId = params.get('callUser');
-  const callType   = params.get('callType') || 'video';
-  if (!dmUserId && !callUserId) return;
-
-  const targetUserId = dmUserId || callUserId;
-
-  // Clean URL immediately
-  window.history.replaceState({}, '', 'chat.html');
-
-  // Wait for page to fully initialize (auth, groups loaded, socket connected)
-  await new Promise(r => setTimeout(r, 2000));
-
-  // Find DM group in already-loaded groups list (variable is `groups`, not `allGroups`)
-  let targetGroup = groups.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
-
-  if (!targetGroup) {
-    // DM doesn't exist yet — create it then reload groups
-    const res = await chatApi('POST', '/chat/groups', { type: 'dm', member_ids: [parseInt(targetUserId)] }).catch(() => null);
-    if (res?.success) {
-      await loadGroups();
-      targetGroup = groups.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
-    }
-  }
-
-  if (!targetGroup) return;
-
-  // Open the DM — this sets activeGroup and activeGid
-  await openGroup(targetGroup.id);
-
-  // If it's a call, wait for activeGroup to be set then call initiateCall() directly
-  if (callUserId) {
-    await new Promise(r => setTimeout(r, 800));
-    // Wait for socket to be ready (max 5s)
-    let waited = 0;
-    while (!socket && waited < 5000) { await new Promise(r => setTimeout(r, 200)); waited += 200; }
-    if (socket && activeGroup) {
-      initiateCall(callType);
-    }
-  }
-})();
+// AI Voice deep-link handled via sessionStorage (see init section below)
 
 // ── Modal helpers ─────────────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -3852,7 +3809,37 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadGroups();
+loadGroups().then(async () => {
+  // ── AI Voice assistant deep-link: open DM + optionally start call ──────────
+  const intentRaw = sessionStorage.getItem('ai_call_intent');
+  if (!intentRaw) return;
+  sessionStorage.removeItem('ai_call_intent');
+  let intent;
+  try { intent = JSON.parse(intentRaw); } catch(e) { return; }
+  const { userId, callType } = intent;
+  if (!userId) return;
+
+  // Find or create DM with this user
+  let targetGroup = groups.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(userId));
+  if (!targetGroup) {
+    const res = await chatApi('POST', '/chat/groups', { type: 'dm', member_ids: [parseInt(userId)] }).catch(() => null);
+    if (res?.success) {
+      await loadGroups();
+      targetGroup = groups.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(userId));
+    }
+  }
+  if (!targetGroup) return;
+
+  // Open the DM
+  await openGroup(targetGroup.id);
+
+  // If it's a call (not dm_only), wait for socket then call
+  if (callType && callType !== 'dm_only') {
+    let waited = 0;
+    while (!socket && waited < 8000) { await new Promise(r => setTimeout(r, 300)); waited += 300; }
+    if (socket && activeGroup) initiateCall(callType);
+  }
+});
 loadScheduledMeetings();
 setInterval(loadGroups, 30000);
 setInterval(loadScheduledMeetings, 60000); // refresh every minute
