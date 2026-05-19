@@ -5,6 +5,8 @@ const multer   = require('multer');
 const { authenticate, authorize } = require('../middleware/auth');
 
 // ── Controllers ───────────────────────────────────────────────────────────────
+const chatCtrl       = require('../controllers/chatController');
+
 const authCtrl       = require('../controllers/authController');
 const empCtrl        = require('../controllers/employeeController');
 const attCtrl        = require('../controllers/attendanceController');
@@ -871,5 +873,68 @@ router.get   ('/projects/:id/export',               authenticate, authorize('acc
 router.get   ('/projects/:id/reports',              authenticate, projCtrl.listReports);
 router.post  ('/projects/:id/reports',              authenticate, projCtrl.submitReport);
 router.patch ('/projects/reports/:reportId',        authenticate, projCtrl.updateReport);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHAT ROUTES — v3 (WhatsApp + Google Meet grade)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Groups ───────────────────────────────────────────────────────────────────
+router.get   ('/chat/groups',                             authenticate, chatCtrl.listGroups);
+router.post  ('/chat/groups',                             authenticate, chatCtrl.createGroup);
+router.get   ('/chat/groups/join/:inviteCode',            authenticate, chatCtrl.joinByLink);
+router.get   ('/chat/groups/:id',                         authenticate, chatCtrl.getGroup);
+router.patch ('/chat/groups/:id',                         authenticate, chatCtrl.updateGroup);
+router.post  ('/chat/groups/:id/members',                 authenticate, chatCtrl.addMembers);
+router.delete('/chat/groups/:id/members/:memberId',       authenticate, chatCtrl.removeMember);
+router.post  ('/chat/groups/:id/invite-link/reset',       authenticate, chatCtrl.resetInviteLink);
+router.post  ('/chat/groups/:id/mute',                    authenticate, chatCtrl.muteGroup);
+router.delete('/chat/groups/:id/mute',                    authenticate, chatCtrl.unmuteGroup);
+router.post  ('/chat/groups/:id/promote/:memberId',       authenticate, chatCtrl.promoteAdmin);
+router.post  ('/chat/groups/:id/demote/:memberId',        authenticate, chatCtrl.demoteAdmin);
+router.get   ('/chat/groups/:id/search',                  authenticate, chatCtrl.searchMessages);
+
+// ── Messages ─────────────────────────────────────────────────────────────────
+router.get   ('/chat/groups/:id/messages',                authenticate, chatCtrl.getMessages);
+router.post  ('/chat/groups/:id/messages',                authenticate, chatCtrl.sendMessage);
+router.post  ('/chat/groups/:id/files',                   authenticate, (req, res, next) => {
+  chatCtrl.upload(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    next();
+  });
+}, chatCtrl.sendFile);
+router.patch ('/chat/messages/:id',                       authenticate, chatCtrl.editMessage);
+router.delete('/chat/messages/:id/me',                    authenticate, chatCtrl.deleteForMe);
+router.delete('/chat/messages/:id/everyone',              authenticate, chatCtrl.deleteForEveryone);
+
+// ── Delivery / Read receipts ──────────────────────────────────────────────────
+router.post  ('/chat/messages/delivered',                 authenticate, chatCtrl.markDelivered);
+router.post  ('/chat/messages/seen',                      authenticate, chatCtrl.markSeen);
+
+// ── Reactions ─────────────────────────────────────────────────────────────────
+router.post  ('/chat/messages/:id/reactions',             authenticate, chatCtrl.addReaction);
+
+// ── Pinned messages ───────────────────────────────────────────────────────────
+router.post  ('/chat/messages/:id/pin',                   authenticate, chatCtrl.pinMessage);
+router.delete('/chat/messages/:id/pin',                   authenticate, chatCtrl.unpinMessage);
+
+// ── Presence ──────────────────────────────────────────────────────────────────
+router.post  ('/chat/presence',                           authenticate, chatCtrl.updatePresence);
+router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
+
+// ── Meetings (instant) ───────────────────────────────────────────────────────
+router.post  ('/chat/meetings',                           authenticate, chatCtrl.createMeeting);
+router.get   ('/chat/meetings/:roomId',                   authenticate, chatCtrl.getMeeting);
+router.patch ('/chat/meetings/:roomId/end',               authenticate, chatCtrl.endMeeting);
+router.post  ('/chat/meetings/:roomId/join',              authenticate, chatCtrl.joinMeetingRecord);
+router.post  ('/chat/meetings/:roomId/leave',             authenticate, chatCtrl.leaveMeetingRecord);
+
+// ── Scheduled meetings ────────────────────────────────────────────────────────
+router.post  ('/chat/scheduled-meetings',                 authenticate, chatCtrl.scheduleMeeting);
+router.get   ('/chat/scheduled-meetings',                 authenticate, chatCtrl.getScheduledMeetings);
+router.post  ('/chat/scheduled-meetings/:id/start',       authenticate, chatCtrl.startScheduledMeeting);
+
+// ── Static file serving ───────────────────────────────────────────────────────
+router.get   ('/chat/files/:filename',                    chatCtrl.serveFile);
+
 
 module.exports = router;
