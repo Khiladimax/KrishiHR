@@ -843,12 +843,14 @@ exports.unpinMessage = async (req, res) => {
 exports.updatePresence = async (req, res) => {
   try {
     const empId = req.user.id;
-    const { is_online } = req.body;
+    const isOnline = req.body.is_online !== false;
     await db.query(`
       INSERT INTO user_presence(employee_id, is_online, last_seen)
-      VALUES($1,$2,NOW())
-      ON CONFLICT(employee_id) DO UPDATE SET is_online=$2, last_seen=NOW()
-    `, [empId, is_online !== false]);
+      VALUES($1, $2, NOW())
+      ON CONFLICT(employee_id) DO UPDATE
+        SET is_online = $2,
+            last_seen = CASE WHEN $2 = false THEN NOW() ELSE user_presence.last_seen END
+    `, [empId, isOnline]);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
