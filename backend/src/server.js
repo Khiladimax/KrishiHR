@@ -4,6 +4,9 @@ const express = require('express');
 const cors    = require('cors');
 const cron    = require('node-cron');
 const db      = require('./config/db');
+const http    = require('http');
+const { Server: SocketIO } = require('socket.io');
+const jwt_sock = require('jsonwebtoken');
 const routes  = require('./routes/index');
 const chatCtrl   = require('./controllers/chatController');
 const attCtrl = require('./controllers/attendanceController');
@@ -11,8 +14,9 @@ const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
 const itDeclCtrl = require('./controllers/itDeclarationController');
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+const app    = express();
+const server = http.createServer(app);
+const PORT   = process.env.PORT || 3000;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 const corsOptions = {
