@@ -1551,7 +1551,7 @@ async function handleTeamLeaveRequests() {
 // ── MANAGER: MY TEAM MEMBERS ────────────────────────────────
 async function handleMyTeam() {
   if (!allEmployees) {
-    const res = await api('GET', '/employees');
+    const res = await api('GET', '/employees/directory');
     if (!res?.success || !res.data?.length)
       return { text: 'Could not load employee list. Please try again.', chips:[] };
     allEmployees = res.data;
@@ -1613,7 +1613,7 @@ async function handleHRContacts(lower='') {
   // For admin/hr/accounts/super_admin — use full employee list
   if (isPrivAdmin) {
     if (!allEmployees) {
-      const res = await api('GET', '/employees');
+      const res = await api('GET', '/employees/directory');
       if (!res?.success || !res.data?.length)
         return { text: 'Could not load contact directory. Please try again.', chips:[] };
       allEmployees = res.data;
@@ -1712,7 +1712,7 @@ async function handleEmployeeDir(query) {
   if (isPrivAdmin) {
     // Privileged: full cached list
     if (!allEmployees) {
-      const res = await api('GET', '/employees');
+      const res = await api('GET', '/employees/directory');
       if (!res?.success || !res.data?.length)
         return { text: 'Could not load employee directory. Please try again.', chips:[] };
       allEmployees = res.data;
@@ -1779,7 +1779,7 @@ function isScheduleMeetingQuery(lower) {
 
 async function handleScheduleMeeting(query) {
   if (!allEmployees) {
-    const res = await api('GET', '/employees');
+    const res = await api('GET', '/employees/directory');
     if (res?.success) allEmployees = res.data;
   }
   const emp = findEmployeeInQuery(query, allEmployees);
@@ -1804,7 +1804,7 @@ async function handleScheduleMeeting(query) {
     if (isPM && h < 12) h += 12; if (isAM && h === 12) h = 0;
     scheduledAt.setHours(h, m, 0, 0);
   }
-  const title = emp ? `Meeting with ${emp.first_name} ${emp.last_name}` : 'Team Meeting';
+  const title = emp ? `Meeting with ${emp.first_name} ${emp.last_name || ''}` : 'Team Meeting';
   let group_id = null;
   if (emp) {
     const grpsRes = await api('GET', '/chat/groups');
@@ -1817,7 +1817,7 @@ async function handleScheduleMeeting(query) {
   const res = await api('POST', '/chat/scheduled-meetings', { title, scheduled_at: scheduledAt.toISOString(), group_id, agenda: emp ? `Discussion with ${emp.first_name}` : '' });
   if (!res?.success) return { text: `Sorry ${userName}, I couldn't schedule the meeting. Please try from Chat.`, chips:[{ label:'📅 Meetings', href:'chat.html' }] };
   const timeStr = scheduledAt.toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
-  const withWho = emp ? ` with **${emp.first_name} ${emp.last_name}**` : '';
+  const withWho = emp ? ` with **${emp.first_name} ${emp.last_name || ''}**` : '';
   return { text: `Done! Scheduled "${title}"${withWho} for **${timeStr}**.`, chips:[{ label:'📅 View Meetings', href:'chat.html' }] };
 }
 
@@ -1828,7 +1828,7 @@ function isCallEmployeeQuery(lower) {
 
 async function handleCallEmployee(query) {
   if (!allEmployees) {
-    const res = await api('GET', '/employees');
+    const res = await api('GET', '/employees/directory');
     if (res?.success) allEmployees = res.data;
   }
   const emp = findEmployeeInQuery(query, allEmployees);
@@ -1836,9 +1836,15 @@ async function handleCallEmployee(query) {
   const isVideo = /video/.test(query.toLowerCase());
   const callType = isVideo ? 'video' : 'audio';
   const label = isVideo ? '📹 Video Call' : '📞 Audio Call';
+  const fullName = `${emp.first_name} ${emp.last_name || ''}`.trim();
+
+  // Auto-store intent and navigate after short delay so TTS can start
+  sessionStorage.setItem('ai_call_intent', JSON.stringify({ userId: emp.id, callType }));
+  setTimeout(() => { window.location.href = 'chat.html'; }, 1500);
+
   return {
-    text: `Connecting you to **${label}** with **${emp.first_name} ${emp.last_name}**. Opening Chat now…`,
-    chips:[{ label:`${label} ${emp.first_name}`, action: () => {
+    text: `Connecting you to **${label}** with **${fullName}**. Opening Chat now…`,
+    chips:[{ label:`${label} ${fullName}`, action: () => {
       sessionStorage.setItem('ai_call_intent', JSON.stringify({ userId: emp.id, callType }));
       window.location.href = 'chat.html';
     }}]
@@ -1852,7 +1858,7 @@ function isSendMessageQuery(lower) {
 
 async function handleSendMessage(query) {
   if (!allEmployees) {
-    const res = await api('GET', '/employees');
+    const res = await api('GET', '/employees/directory');
     if (res?.success) allEmployees = res.data;
   }
   const emp = findEmployeeInQuery(query, allEmployees);
@@ -1869,7 +1875,7 @@ async function handleSendMessage(query) {
   } else {
     // Extract everything after the employee name as the message
     const qLow = query.toLowerCase();
-    const fullName = (emp.first_name + ' ' + emp.last_name).toLowerCase();
+    const fullName = (emp.first_name + ' ' + (emp.last_name || '')).toLowerCase();
     const firstName = emp.first_name.toLowerCase();
     let afterEmp = null;
     if (qLow.includes(fullName)) afterEmp = query.slice(qLow.indexOf(fullName) + fullName.length).trim();
@@ -1887,12 +1893,12 @@ async function handleSendMessage(query) {
     }
     if (group_id) {
       const msgRes = await api('POST', `/chat/groups/${group_id}/messages`, { content: messageBody });
-      if (msgRes?.success) return { text: `Message sent to **${emp.first_name} ${emp.last_name}**: "${messageBody}"`, chips:[{ label:'💬 Open Chat', href:'chat.html' }] };
+      if (msgRes?.success) return { text: `Message sent to **${emp.first_name} ${emp.last_name || ''}**: "${messageBody}"`, chips:[{ label:'💬 Open Chat', href:'chat.html' }] };
     }
     return { text: `Couldn't send the message right now. Please try from Chat.`, chips:[{ label:'💬 Open Chat', href:'chat.html' }] };
   }
 
-  return { text: `Opening chat with **${emp.first_name} ${emp.last_name}**. You can type your message there.`, chips:[{ label:`💬 Message ${emp.first_name}`, action: () => {
+  return { text: `Opening chat with **${emp.first_name} ${emp.last_name || ''}**. You can type your message there.`, chips:[{ label:`💬 Message ${emp.first_name}`, action: () => {
     sessionStorage.setItem('ai_call_intent', JSON.stringify({ userId: emp.id, callType: 'dm_only' }));
     window.location.href = 'chat.html';
   }}] };
@@ -1904,11 +1910,11 @@ function findEmployeeInQuery(query, employees) {
   const q = query.toLowerCase();
   let best = null, bestLen = 0;
   for (const e of employees) {
-    if (!e.is_active) continue;
-    const full  = (e.first_name + ' ' + e.last_name).toLowerCase();
-    const first = e.first_name.toLowerCase();
-    const last  = e.last_name.toLowerCase();
-    if (q.includes(full) && full.length > bestLen) { best = e; bestLen = full.length; }
+    if (e.is_active === false) continue;
+    const first = (e.first_name || '').toLowerCase();
+    const last  = (e.last_name  || '').toLowerCase();
+    const full  = (first + (last ? ' ' + last : '')).trim();
+    if (full.length > 2 && q.includes(full) && full.length > bestLen) { best = e; bestLen = full.length; }
     else if (first.length >= 3 && q.includes(first) && first.length > bestLen) { best = e; bestLen = first.length; }
     else if (!best && last.length >= 4 && q.includes(last) && last.length > bestLen) { best = e; bestLen = last.length; }
   }
