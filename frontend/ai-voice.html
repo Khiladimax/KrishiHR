@@ -1774,93 +1774,56 @@ function buildEmpCard(e, roleLabel) {
 
 // ── SCHEDULE MEETING ────────────────────────────────────────────────────────
 function isScheduleMeetingQuery(lower) {
-  return /schedule|set up|arrange|book|create|plan/.test(lower) && /meeting|meet|call/.test(lower);
+  return /schedule|set up|arrange|book a meet|create a meet|plan.*meet/.test(lower) && /meeting|meet\b/.test(lower);
 }
 
 async function handleScheduleMeeting(query) {
-  // Extract employee name from query
-  // e.g. "schedule meeting with Rahul" / "set up a meeting with Priya tomorrow at 3pm"
   if (!allEmployees) {
     const res = await api('GET', '/employees');
     if (res?.success) allEmployees = res.data;
   }
-
-  // Try to find employee name in query
   const emp = findEmployeeInQuery(query, allEmployees);
-
-  // Extract time/date — look for patterns like "tomorrow at 3pm", "at 4:30", "on Friday"
   const timeMatch = query.match(/(?:at|@)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
-  const dateMatch = query.match(/(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[\/-]\d{1,2})/i);
-
-  // Build scheduled_at ISO string (default: 1 hour from now)
+  const dateMatch = query.match(/\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
   let scheduledAt = new Date();
   scheduledAt.setHours(scheduledAt.getHours() + 1, 0, 0, 0);
-
   if (dateMatch) {
     const d = dateMatch[1].toLowerCase();
     if (d === 'tomorrow') scheduledAt.setDate(scheduledAt.getDate() + 1);
-    else if (['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].includes(d)) {
+    else {
       const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
       const target = days.indexOf(d);
-      const today = scheduledAt.getDay();
-      const diff = (target - today + 7) % 7 || 7;
-      scheduledAt.setDate(scheduledAt.getDate() + diff);
+      if (target >= 0) { const diff = (target - scheduledAt.getDay() + 7) % 7 || 7; scheduledAt.setDate(scheduledAt.getDate() + diff); }
     }
   }
   if (timeMatch) {
     const tStr = timeMatch[1].trim();
-    const isPM = /pm/i.test(tStr);
-    const isAM = /am/i.test(tStr);
-    const parts = tStr.replace(/[apm]/gi,'').trim().split(':');
-    let h = parseInt(parts[0]);
-    const m = parts[1] ? parseInt(parts[1]) : 0;
-    if (isPM && h < 12) h += 12;
-    if (isAM && h === 12) h = 0;
+    const isPM = /pm/i.test(tStr); const isAM = /am/i.test(tStr);
+    const parts = tStr.replace(/[apm\s]/gi,'').split(':');
+    let h = parseInt(parts[0]); const m = parts[1] ? parseInt(parts[1]) : 0;
+    if (isPM && h < 12) h += 12; if (isAM && h === 12) h = 0;
     scheduledAt.setHours(h, m, 0, 0);
   }
-
   const title = emp ? `Meeting with ${emp.first_name} ${emp.last_name}` : 'Team Meeting';
-  const scheduled_at = scheduledAt.toISOString();
-
-  // Find or create a DM group if employee found, else use null (personal schedule)
   let group_id = null;
   if (emp) {
-    // Try to find existing DM with this employee
     const grpsRes = await api('GET', '/chat/groups');
     if (grpsRes?.success) {
       const dm = grpsRes.data?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(emp.id));
-      if (dm) {
-        group_id = dm.id;
-      } else {
-        // Create DM group
-        const dmRes = await api('POST', '/chat/groups', { type:'dm', member_ids:[emp.id] });
-        if (dmRes?.success) group_id = dmRes.data?.id;
-      }
+      if (dm) { group_id = dm.id; }
+      else { const dmRes = await api('POST', '/chat/groups', { type:'dm', member_ids:[emp.id] }); if (dmRes?.success) group_id = dmRes.data?.id; }
     }
   }
-
-  const res = await api('POST', '/chat/scheduled-meetings', {
-    title,
-    scheduled_at,
-    group_id,
-    agenda: emp ? `Discussion with ${emp.first_name} ${emp.last_name}` : ''
-  });
-
-  if (!res?.success) {
-    return { text: `Sorry ${userName}, I couldn't schedule the meeting. Please try from the Chat & Meetings page.`, chips:[{ label:'📅 Meetings', href:'chat.html' }] };
-  }
-
+  const res = await api('POST', '/chat/scheduled-meetings', { title, scheduled_at: scheduledAt.toISOString(), group_id, agenda: emp ? `Discussion with ${emp.first_name}` : '' });
+  if (!res?.success) return { text: `Sorry ${userName}, I couldn't schedule the meeting. Please try from Chat.`, chips:[{ label:'📅 Meetings', href:'chat.html' }] };
   const timeStr = scheduledAt.toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
   const withWho = emp ? ` with **${emp.first_name} ${emp.last_name}**` : '';
-  return {
-    text: `Done! I've scheduled "${title}"${withWho} for **${timeStr}**. You can view it in Meetings.`,
-    chips:[{ label:'📅 View Meetings', href:'chat.html' }]
-  };
+  return { text: `Done! Scheduled "${title}"${withWho} for **${timeStr}**.`, chips:[{ label:'📅 View Meetings', href:'chat.html' }] };
 }
 
 // ── CALL EMPLOYEE ────────────────────────────────────────────────────────────
 function isCallEmployeeQuery(lower) {
-  return /(call|video call|audio call|voice call|ring|start call)/.test(lower) && !/schedule|meeting/.test(lower);
+  return /(video call|audio call|voice call|start call|\bcall\b|\bring\b)/.test(lower) && !/schedule|meeting/.test(lower);
 }
 
 async function handleCallEmployee(query) {
@@ -1868,29 +1831,20 @@ async function handleCallEmployee(query) {
     const res = await api('GET', '/employees');
     if (res?.success) allEmployees = res.data;
   }
-
   const emp = findEmployeeInQuery(query, allEmployees);
-  if (!emp) {
-    return {
-      text: `I couldn't find that employee. Please specify a name like "Call Rahul" or "Video call Priya".`,
-      chips: []
-    };
-  }
-
+  if (!emp) return { text: `I couldn't find that employee. Try "Call Rahul" or "Video call Priya".`, chips:[] };
   const isVideo = /video/.test(query.toLowerCase());
   const callType = isVideo ? 'video' : 'audio';
-  const callTypeLabel = isVideo ? '📹 Video Call' : '📞 Audio Call';
-
-  // Navigate to chat with call param
+  const label = isVideo ? '📹 Video Call' : '📞 Audio Call';
   return {
-    text: `Connecting you to **${callTypeLabel}** with **${emp.first_name} ${emp.last_name}**. Opening Chat now…`,
-    chips: [{ label: `${callTypeLabel} ${emp.first_name}`, href: `chat.html?callUser=${emp.id}&callType=${callType}` }]
+    text: `Connecting you to **${label}** with **${emp.first_name} ${emp.last_name}**. Opening Chat now…`,
+    chips:[{ label:`${label} ${emp.first_name}`, href:`chat.html?callUser=${emp.id}&callType=${callType}` }]
   };
 }
 
 // ── SEND MESSAGE ─────────────────────────────────────────────────────────────
 function isSendMessageQuery(lower) {
-  return /send|message|msg|text|write|tell/.test(lower) && /to\s+\w|message\s+\w/.test(lower);
+  return /(send.*message|send.*msg|^message\s|\bmessage\s+[a-z]|\btext\b.*\bto\b|\btell\b.*\bto\b)/.test(lower);
 }
 
 async function handleSendMessage(query) {
@@ -1898,68 +1852,59 @@ async function handleSendMessage(query) {
     const res = await api('GET', '/employees');
     if (res?.success) allEmployees = res.data;
   }
-
   const emp = findEmployeeInQuery(query, allEmployees);
-  if (!emp) {
-    return {
-      text: `I couldn't find that employee. Try saying "Send a message to Rahul: Hello" or "Message Priya".`,
-      chips: []
-    };
+  if (!emp) return { text: `I couldn't find that employee. Try "Send a message to Rahul: Hello" or "Message Priya are you free".`, chips:[] };
+
+  // Extract message body: colon syntax > saying/that > everything after employee name
+  let messageBody = null;
+  const colonMatch = query.match(/:\s*(.+)$/i);
+  const sayingMatch = query.match(/\b(?:saying|that)\b\s+(.+)$/i);
+  if (colonMatch) {
+    messageBody = colonMatch[1].trim();
+  } else if (sayingMatch) {
+    messageBody = sayingMatch[1].trim();
+  } else {
+    // Extract everything after the employee name as the message
+    const qLow = query.toLowerCase();
+    const fullName = (emp.first_name + ' ' + emp.last_name).toLowerCase();
+    const firstName = emp.first_name.toLowerCase();
+    let afterEmp = null;
+    if (qLow.includes(fullName)) afterEmp = query.slice(qLow.indexOf(fullName) + fullName.length).trim();
+    else if (qLow.includes(firstName)) afterEmp = query.slice(qLow.indexOf(firstName) + firstName.length).trim();
+    if (afterEmp && afterEmp.length > 2 && !/^(to|a|the|and|,\s*)$/i.test(afterEmp)) messageBody = afterEmp;
   }
 
-  // Try to extract message content — look for text after colon or "saying" or "that"
-  const msgMatch = query.match(/(?::|saying|that|message\s+\w+[\s\w]*?\s+(?:that|saying|:))\s*["']?(.+?)["']?$/i);
-  let messageBody = msgMatch ? msgMatch[1].trim() : null;
-
   if (messageBody) {
-    // Find/create DM group and send the message directly
     const grpsRes = await api('GET', '/chat/groups');
     let group_id = null;
     if (grpsRes?.success) {
       const dm = grpsRes.data?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(emp.id));
-      if (dm) {
-        group_id = dm.id;
-      } else {
-        const dmRes = await api('POST', '/chat/groups', { type:'dm', member_ids:[emp.id] });
-        if (dmRes?.success) group_id = dmRes.data?.id;
-      }
+      if (dm) { group_id = dm.id; }
+      else { const dmRes = await api('POST', '/chat/groups', { type:'dm', member_ids:[emp.id] }); if (dmRes?.success) group_id = dmRes.data?.id; }
     }
-
     if (group_id) {
       const msgRes = await api('POST', `/chat/groups/${group_id}/messages`, { content: messageBody });
-      if (msgRes?.success) {
-        return {
-          text: `Message sent to **${emp.first_name} ${emp.last_name}**: "${messageBody}"`,
-          chips: [{ label: `💬 Open Chat`, href: 'chat.html' }]
-        };
-      }
+      if (msgRes?.success) return { text: `Message sent to **${emp.first_name} ${emp.last_name}**: "${messageBody}"`, chips:[{ label:'💬 Open Chat', href:'chat.html' }] };
     }
-    return {
-      text: `Couldn't send the message right now. Please try from Chat directly.`,
-      chips: [{ label: '💬 Open Chat', href: 'chat.html' }]
-    };
+    return { text: `Couldn't send the message right now. Please try from Chat.`, chips:[{ label:'💬 Open Chat', href:'chat.html' }] };
   }
 
-  // No message body — open chat with that person
-  return {
-    text: `Opening chat with **${emp.first_name} ${emp.last_name}**. You can type your message there.`,
-    chips: [{ label: `💬 Message ${emp.first_name}`, href: `chat.html?dmUser=${emp.id}` }]
-  };
+  return { text: `Opening chat with **${emp.first_name} ${emp.last_name}**. You can type your message there.`, chips:[{ label:`💬 Message ${emp.first_name}`, href:`chat.html?dmUser=${emp.id}` }] };
 }
 
-// ── HELPER: find employee name in free-text query ────────────────────────────
+// ── HELPER: find employee name in query (full name > first name > last name) ──
 function findEmployeeInQuery(query, employees) {
   if (!employees) return null;
   const q = query.toLowerCase();
-  // Try full name first, then first name
-  let best = null;
-  let bestLen = 0;
+  let best = null, bestLen = 0;
   for (const e of employees) {
     if (!e.is_active) continue;
-    const full = `${e.first_name} ${e.last_name}`.toLowerCase();
+    const full  = (e.first_name + ' ' + e.last_name).toLowerCase();
     const first = e.first_name.toLowerCase();
+    const last  = e.last_name.toLowerCase();
     if (q.includes(full) && full.length > bestLen) { best = e; bestLen = full.length; }
-    else if (!best && q.includes(first) && first.length > bestLen) { best = e; bestLen = first.length; }
+    else if (first.length >= 3 && q.includes(first) && first.length > bestLen) { best = e; bestLen = first.length; }
+    else if (!best && last.length >= 4 && q.includes(last) && last.length > bestLen) { best = e; bestLen = last.length; }
   }
   return best;
 }
