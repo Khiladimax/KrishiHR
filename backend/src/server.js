@@ -208,13 +208,6 @@ io.on('connection', (socket) => {
       if (!sockets.size) {
         global.userSockets.delete(String(user.id));
         io.emit('userOffline', { userId: user.id });
-        // Update last_seen in DB so chat header shows correct "last seen X ago"
-        db.query(
-          `INSERT INTO user_presence(employee_id, is_online, last_seen)
-           VALUES($1, false, NOW())
-           ON CONFLICT(employee_id) DO UPDATE SET is_online=false, last_seen=NOW()`,
-          [user.id]
-        ).catch(e => console.warn('[Presence] DB update failed:', e.message));
       }
     }
   });
@@ -794,10 +787,6 @@ async function start() {
     await db.query('SELECT 1');
     await chatCtrl.migrate();
     console.log('✅ Database connected');
-
-    // Reset all presence to offline on startup (stale is_online=true after restart)
-    await db.query(`UPDATE user_presence SET is_online = false, last_seen = NOW() WHERE is_online = true`);
-    console.log('✅ Presence reset to offline (server restarted)');
 
     await db.query(`CREATE TABLE IF NOT EXISTS birthday_likes (
       id SERIAL PRIMARY KEY,
