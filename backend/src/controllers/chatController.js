@@ -18,7 +18,7 @@ const db     = require('../config/db');
 const multer = require('multer');
 const path   = require('path');
 const fs     = require('fs');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto'); // built-in Node.js ≥ 18, no npm needed
 
 // ── File upload ───────────────────────────────────────────────────────────────
 const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'chat');
