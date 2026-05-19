@@ -90,6 +90,7 @@ const Role = {
 // SVG icons — consistent, clean, professional
 // Emoji icons — consistent size via CSS, clean and recognisable
 const ICONS = {
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
   dashboard:    `🏠`,
   attendance:   `🕐`,
   leaves:       `🌿`,
@@ -125,6 +126,7 @@ const NAV_GROUPS = [
       { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
       { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl'] },
       { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    always:true },
+      { href:'chat.html',           icon: ICONS.chat || '💬',  label:'Chat & Meetings',  always:true },
     ]
   },
   {
