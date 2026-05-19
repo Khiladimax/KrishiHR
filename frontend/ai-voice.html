@@ -1838,10 +1838,7 @@ async function handleCallEmployee(query) {
   const label = isVideo ? '📹 Video Call' : '📞 Audio Call';
   return {
     text: `Connecting you to **${label}** with **${emp.first_name} ${emp.last_name}**. Opening Chat now…`,
-    chips:[{ label:`${label} ${emp.first_name}`, action: () => {
-      sessionStorage.setItem('ai_call_intent', JSON.stringify({ userId: emp.id, callType }));
-      window.location.href = 'chat.html';
-    }}]
+    chips:[{ label:`${label} ${emp.first_name}`, href:`chat.html?callUser=${emp.id}&callType=${callType}` }]
   };
 }
 
@@ -1892,10 +1889,7 @@ async function handleSendMessage(query) {
     return { text: `Couldn't send the message right now. Please try from Chat.`, chips:[{ label:'💬 Open Chat', href:'chat.html' }] };
   }
 
-  return { text: `Opening chat with **${emp.first_name} ${emp.last_name}**. You can type your message there.`, chips:[{ label:`💬 Message ${emp.first_name}`, action: () => {
-    sessionStorage.setItem('ai_call_intent', JSON.stringify({ userId: emp.id, callType: 'dm_only' }));
-    window.location.href = 'chat.html';
-  }}] };
+  return { text: `Opening chat with **${emp.first_name} ${emp.last_name}**. You can type your message there.`, chips:[{ label:`💬 Message ${emp.first_name}`, href:`chat.html?dmUser=${emp.id}` }] };
 }
 
 // ── HELPER: find employee name in query (full name > first name > last name) ──
@@ -2008,15 +2002,9 @@ function addMsg(role, content, chips) {
   // Chips
   let chipsHtml = '';
   if (chips && chips.length) {
-    const chipEls = chips.map((c, i) => {
-      if (c.action) {
-        const key = `chip_action_${id}_${i}`;
-        window[key] = c.action;
-        return `<button class="action-chip" onclick="window['${key}']()">${esc(c.label)}</button>`;
-      }
-      return `<a class="action-chip" href="${esc(c.href)}">${esc(c.label)}</a>`;
-    });
-    chipsHtml = `<div class="action-chips">` + chipEls.join('') + `</div>`;
+    chipsHtml = `<div class="action-chips">` +
+      chips.map(c=>`<a class="action-chip" href="${esc(c.href)}">${esc(c.label)}</a>`).join('') +
+      `</div>`;
   }
 
   div.innerHTML = `
