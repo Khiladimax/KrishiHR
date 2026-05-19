@@ -3489,6 +3489,48 @@ function showJoinBanner(roomId, title, errorMsg) {
   showMeetBanner(roomId, title, 'You were invited — tap "Join now" to enter');
 }
 
+// ── AI Voice Deep-Link Handler ───────────────────────────────────────────────
+// Handles ?dmUser=<id> (open DM) and ?callUser=<id>&callType=video|audio (start call)
+(async function handleAIVoiceDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const dmUserId   = params.get('dmUser');
+  const callUserId = params.get('callUser');
+  const callType   = params.get('callType') || 'video';
+  if (!dmUserId && !callUserId) return;
+
+  const targetUserId = dmUserId || callUserId;
+
+  // Clean URL immediately
+  window.history.replaceState({}, '', 'chat.html');
+
+  // Wait for page to initialize (groups loaded, socket connected)
+  await new Promise(r => setTimeout(r, 1500));
+
+  // Find or create DM with this user
+  let targetGroup = allGroups?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
+
+  if (!targetGroup) {
+    const res = await chatApi('POST', '/chat/groups', { type: 'dm', member_ids: [parseInt(targetUserId)] }).catch(() => null);
+    if (res?.success) {
+      await loadGroups(); // refresh list
+      targetGroup = allGroups?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
+    }
+  }
+
+  if (!targetGroup) return; // give up silently
+
+  // Open the DM
+  await openGroup(targetGroup.id);
+
+  // If it's a call, trigger the call after opening
+  if (callUserId) {
+    await new Promise(r => setTimeout(r, 800));
+    // Click the appropriate call button
+    const callBtn = document.getElementById(callType === 'video' ? 'btn-video-call' : 'btn-audio-call');
+    if (callBtn) callBtn.click();
+  }
+})();
+
 // ── Modal helpers ─────────────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
