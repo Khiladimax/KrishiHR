@@ -48,6 +48,7 @@ router.get   ('/employees/export-master',        authenticate, authorize(...EMP_
 router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin'), empCtrl.exportAttendanceRegister);
 router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
 router.get   ('/employees/contacts',      authenticate,                          empCtrl.getContacts);
+router.get   ('/employees/directory',     authenticate,                          empCtrl.getDirectory); // all active employees, any role
 router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
 router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
 router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
