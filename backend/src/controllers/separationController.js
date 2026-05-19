@@ -525,7 +525,7 @@ exports.adminAction = async (req, res) => {
       await client.query(
         `UPDATE employees SET is_active=false, separation_date=$1,
              separation_type=$2, separation_reason=$3,
-             password=NULL, updated_at=NOW()
+             password_hash=NULL, updated_at=NOW()
          WHERE id=$4`,
         [approvedLWD, s.type, s.reason, s.employee_id]
       );
@@ -692,7 +692,7 @@ exports.processLWD = async (req, res) => {
       await db.query(
         `UPDATE employees SET is_active=false, separation_date=$1,
              separation_type=$2, separation_reason=$3,
-             password=NULL, updated_at=NOW() WHERE id=$4`,
+             password_hash=NULL, updated_at=NOW() WHERE id=$4`,
         [row.last_working_date, row.type, row.reason, row.employee_id]
       );
       await db.query(
