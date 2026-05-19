@@ -2540,18 +2540,18 @@ function setCreateType(type) {
   document.getElementById('addMembersLabel').textContent    = type==='dm' ? 'Select Person' : 'Add Members';
 }
 async function fetchAllEmployees() {
-  const res = await chatApi('GET', '/employees');
+  const res = await chatApi('GET', '/employees/directory');
   if (res.success) allEmployees = (res.data||[]).filter(e => e.id !== me.id);
 }
 function searchEmployees() {
   const q   = document.getElementById('memberSearch').value.toLowerCase();
   const box = document.getElementById('memberSearchResults');
   if (!q) { box.style.display = 'none'; return; }
-  const matches = allEmployees.filter(e => (`${e.first_name} ${e.last_name} ${e.employee_code}`).toLowerCase().includes(q)).slice(0,10);
+  const matches = allEmployees.filter(e => (`${e.first_name} ${e.last_name || ''} ${e.employee_code}`).toLowerCase().includes(q)).slice(0,10);
   box.style.display = matches.length ? 'block' : 'none';
-  box.innerHTML = matches.map(e => `<div class="employee-option" onclick="toggleMember(${e.id},'${esc(e.first_name)} ${esc(e.last_name)}')">
+  box.innerHTML = matches.map(e => `<div class="employee-option" onclick="toggleMember(${e.id},'${esc(e.first_name)} ${esc(e.last_name || '')}')">
     <input type="checkbox" ${selectedMemberIds.has(e.id)?'checked':''} readonly style="accent-color:var(--wa-green)">
-    <span>${esc(e.first_name)} ${esc(e.last_name)}</span>
+    <span>${esc(e.first_name)} ${esc(e.last_name || '')}</span>
     <span style="margin-left:auto;font-size:11px;color:var(--wa-text2)">${esc(e.employee_code)}</span>
   </div>`).join('');
 }
@@ -2564,7 +2564,7 @@ function toggleMember(id, name) {
 function renderSelectedChips() {
   document.getElementById('selectedMembers').innerHTML = [...selectedMemberIds].map(id => {
     const e = allEmployees.find(x => x.id===id);
-    return e ? `<span class="member-chip">${esc(e.first_name)} ${esc(e.last_name)}<span class="member-chip-remove" onclick="toggleMember(${e.id},'')">✕</span></span>` : '';
+    return e ? `<span class="member-chip">${esc(e.first_name)} ${esc(e.last_name || '')}<span class="member-chip-remove" onclick="toggleMember(${e.id},'')">✕</span></span>` : '';
   }).join('');
 }
 async function createGroup() {
@@ -2671,10 +2671,10 @@ function searchAddMembers() {
   const q   = document.getElementById('addMemberSearch').value.toLowerCase();
   const box = document.getElementById('addMemberResults');
   if (!q) { box.innerHTML = ''; return; }
-  const matches = allEmployees.filter(e => (`${e.first_name} ${e.last_name} ${e.employee_code}`).toLowerCase().includes(q)).slice(0,10);
-  box.innerHTML = matches.map(e => `<div class="employee-option" onclick="toggleAddMember(${e.id},'${esc(e.first_name)} ${esc(e.last_name)}')">
+  const matches = allEmployees.filter(e => (`${e.first_name} ${e.last_name || ''} ${e.employee_code}`).toLowerCase().includes(q)).slice(0,10);
+  box.innerHTML = matches.map(e => `<div class="employee-option" onclick="toggleAddMember(${e.id},'${esc(e.first_name)} ${esc(e.last_name || '')}')">
     <input type="checkbox" ${addMemberSelectedIds.has(e.id)?'checked':''} readonly style="accent-color:var(--wa-green)">
-    <span>${esc(e.first_name)} ${esc(e.last_name)}</span>
+    <span>${esc(e.first_name)} ${esc(e.last_name || '')}</span>
     <span style="margin-left:auto;font-size:11px;color:var(--wa-text2)">${esc(e.employee_code||'')}</span>
   </div>`).join('');
 }
@@ -2682,7 +2682,7 @@ function toggleAddMember(id, name) {
   if (addMemberSelectedIds.has(id)) addMemberSelectedIds.delete(id); else addMemberSelectedIds.add(id);
   document.getElementById('addMemberSelected').innerHTML = [...addMemberSelectedIds].map(id => {
     const e = allEmployees.find(x => x.id===id);
-    return e ? `<span class="member-chip">${esc(e.first_name)} ${esc(e.last_name)}</span>` : '';
+    return e ? `<span class="member-chip">${esc(e.first_name)} ${esc(e.last_name || '')}</span>` : '';
   }).join('');
   searchAddMembers();
 }
