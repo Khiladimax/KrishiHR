@@ -129,6 +129,43 @@ exports.getAll = async (req, res) => {
 
 // Get Contacts — open to all authenticated users (HR, Accounts, Reporting Manager lookup)
 // Used by AI chatbot for all roles including employee/tl/manager
+// ── Directory — ALL active employees, open to every authenticated role ────────
+// Used by AI Voice, Chat member search, call initiation
+exports.getDirectory = async (req, res) => {
+  try {
+    const { search } = req.query;
+    let conditions = [
+      "e.is_active = true",
+      "NOT EXISTS (SELECT 1 FROM separations sep WHERE sep.employee_id = e.id AND sep.status = 'completed')"
+    ];
+    let params = [];
+    let idx = 1;
+    if (search) {
+      conditions.push(
+        `(LOWER(CONCAT(e.first_name,' ',COALESCE(e.last_name,''))) LIKE LOWER($${idx})
+          OR LOWER(e.employee_code) LIKE LOWER($${idx})
+          OR LOWER(e.email) LIKE LOWER($${idx}))`
+      );
+      params.push(`%${search}%`); idx++;
+    }
+    const result = await db.query(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
+              e.role, e.is_active, e.gender,
+              d.name AS department_name, des.title AS designation_title
+       FROM employees e
+       LEFT JOIN departments  d   ON e.department_id  = d.id
+       LEFT JOIN designations des ON e.designation_id = des.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY e.first_name, e.last_name`,
+      params
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.getContacts = async (req, res) => {
   try {
     const { type, manager_id } = req.query;
