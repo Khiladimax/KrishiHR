@@ -3503,31 +3503,35 @@ function showJoinBanner(roomId, title, errorMsg) {
   // Clean URL immediately
   window.history.replaceState({}, '', 'chat.html');
 
-  // Wait for page to initialize (groups loaded, socket connected)
-  await new Promise(r => setTimeout(r, 1500));
+  // Wait for page to fully initialize (auth, groups loaded, socket connected)
+  await new Promise(r => setTimeout(r, 2000));
 
-  // Find or create DM with this user
-  let targetGroup = allGroups?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
+  // Find DM group in already-loaded groups list (variable is `groups`, not `allGroups`)
+  let targetGroup = groups.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
 
   if (!targetGroup) {
+    // DM doesn't exist yet — create it then reload groups
     const res = await chatApi('POST', '/chat/groups', { type: 'dm', member_ids: [parseInt(targetUserId)] }).catch(() => null);
     if (res?.success) {
-      await loadGroups(); // refresh list
-      targetGroup = allGroups?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
+      await loadGroups();
+      targetGroup = groups.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(targetUserId));
     }
   }
 
-  if (!targetGroup) return; // give up silently
+  if (!targetGroup) return;
 
-  // Open the DM
+  // Open the DM — this sets activeGroup and activeGid
   await openGroup(targetGroup.id);
 
-  // If it's a call, trigger the call after opening
+  // If it's a call, wait for activeGroup to be set then call initiateCall() directly
   if (callUserId) {
     await new Promise(r => setTimeout(r, 800));
-    // Click the appropriate call button
-    const callBtn = document.getElementById(callType === 'video' ? 'btn-video-call' : 'btn-audio-call');
-    if (callBtn) callBtn.click();
+    // Wait for socket to be ready (max 5s)
+    let waited = 0;
+    while (!socket && waited < 5000) { await new Promise(r => setTimeout(r, 200)); waited += 200; }
+    if (socket && activeGroup) {
+      initiateCall(callType);
+    }
   }
 })();
 
