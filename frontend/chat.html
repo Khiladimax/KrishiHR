@@ -1756,8 +1756,14 @@ function connectSocket() {
   });
 
   // WebRTC
-  socket.on('peerJoined',    onPeerJoined);
-  socket.on('existingPeers', onExistingPeers);
+  socket.on('peerJoined',       onPeerJoined);
+  socket.on('existingPeers',    onExistingPeers);
+  socket.on('existingPeerInfos', (peerInfos) => {
+    // Pre-populate peerNames from server info so tiles have correct names
+    peerInfos.forEach(({ peerId, displayName }) => {
+      if (peerId !== socket.id) peerNames[peerId] = displayName;
+    });
+  });
   socket.on('peerLeft',      onPeerLeft);
   socket.on('offer',         onOffer);
   socket.on('answer',        onAnswer);
@@ -1765,6 +1771,7 @@ function connectSocket() {
   socket.on('peerScreenShare', onPeerScreenShare);
   socket.on('meetingChat',   onMeetingChat);
   socket.on('raiseHand',     onRaiseHand);
+  socket.on('peerMuteState', onPeerMuteState);
 
   socket.on('groupUpdated',  ({ id }) => { if (id === activeGid) openGroup(id); });
   socket.on('membersAdded',  () => { if (activeGid) loadGroups(); });
@@ -2938,43 +2945,51 @@ async function openMeetingPanel(roomId, title, audioOnly = false) {
   document.getElementById('meetGrid').innerHTML = '';
   document.getElementById('meetChatMsgs').innerHTML = '';
   peerConnections = {}; peerNames = {}; peerStreams = {};
+  micEnabled = true; camEnabled = !audioOnly;
   updateParticipantCount();
   updateParticipantList();
 
+  // Request media with noise suppression built-in from the start
+  // (don't replace tracks later — that breaks peer connections)
+  const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
   try {
     if (audioOnly) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      camEnabled = false;
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
     } else {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: audioConstraints
+      });
     }
   } catch {
-    try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true }); camEnabled = false; }
-    catch { alert('Could not access microphone.'); return; }
+    // Camera failed — try audio only
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      camEnabled = false;
+    } catch {
+      alert('Could not access microphone. Please allow microphone access and try again.');
+      return;
+    }
   }
-  document.getElementById('localVideo').srcObject = localStream;
+
+  // Attach local preview
+  const localVid = document.getElementById('localVideo');
+  localVid.srcObject = localStream;
+  localVid.muted = true; // always mute self-preview to avoid echo
   document.getElementById('selfFloatLabel').textContent = 'You · ' + (me.first_name||'Me');
-  checkNoiseSuppression();
+
+  // Update self-float cam state
+  const selfFloat = document.getElementById('selfFloat');
+  if (selfFloat) selfFloat.style.opacity = camEnabled ? '1' : '0.4';
 
   if (socket) socket.emit('joinMeeting', { roomId, displayName: me.first_name||'User' });
   await chatApi('POST', `/chat/meetings/${roomId}/join`).catch(()=>{});
   updateMeetBtns();
 }
 
-// Noise suppression via AudioContext (if supported)
-async function checkNoiseSuppression() {
-  if (!localStream) return;
-  try {
-    const constraints = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
-    const suppressed  = await navigator.mediaDevices.getUserMedia(constraints);
-    const audioTrack  = suppressed.getAudioTracks()[0];
-    if (audioTrack) {
-      const oldAudio = localStream.getAudioTracks()[0];
-      if (oldAudio) localStream.removeTrack(oldAudio);
-      localStream.addTrack(audioTrack);
-    }
-  } catch { /* ignore */ }
-}
+// Noise suppression is now requested inline with getUserMedia constraints
+// (replacing tracks post-connection breaks peer video/audio)
+function checkNoiseSuppression() { /* no-op — handled at getUserMedia time */ }
 
 function updateParticipantCount() {
   const count = 1 + Object.keys(peerConnections).length;
@@ -3042,12 +3057,26 @@ function createPeerConnection(peerId) {
   pc.onicecandidate = ({ candidate }) => {
     if (candidate && socket) socket.emit('ice-candidate', { to: peerId, candidate });
   };
-  pc.ontrack = ({ streams: [stream] }) => {
+  pc.ontrack = (event) => {
+    const stream = event.streams[0];
+    if (!stream) return;
     peerStreams[peerId] = stream;
+
     let tile = document.getElementById('tile-'+peerId);
     if (!tile) tile = addVideoTile(peerId, peerNames[peerId]||'Peer');
     const video = tile.querySelector('video');
-    if (video) { video.srcObject = stream; tile.classList.add('has-cam'); tile.classList.remove('no-cam'); }
+    if (video) {
+      video.srcObject = stream;
+      // Only show camera tile if stream has an active video track
+      const hasVideo = stream.getVideoTracks().some(t => t.enabled && t.readyState === 'live');
+      if (hasVideo) {
+        tile.classList.add('has-cam');
+        tile.classList.remove('no-cam');
+      } else {
+        tile.classList.remove('has-cam');
+        tile.classList.add('no-cam');
+      }
+    }
     // Audio level detection (active speaker)
     setupAudioDetection(stream, peerId);
   };
@@ -3145,15 +3174,27 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
 
 async function toggleMic() {
   micEnabled = !micEnabled;
-  if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+  if (localStream) {
+    localStream.getAudioTracks().forEach(t => { t.enabled = micEnabled; });
+  }
+  // Notify peers of mute state
+  if (socket && currentMeetRoomId) {
+    socket.emit('peerMuteState', { roomId: currentMeetRoomId, micEnabled, camEnabled });
+  }
   updateMeetBtns();
   updateParticipantList();
 }
 async function toggleCam() {
   camEnabled = !camEnabled;
-  if (localStream) localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+  if (localStream) {
+    localStream.getVideoTracks().forEach(t => { t.enabled = camEnabled; });
+  }
   const self = document.getElementById('selfFloat');
   if (self) self.style.opacity = camEnabled ? '1' : '0.4';
+  // Notify peers of cam state change
+  if (socket && currentMeetRoomId) {
+    socket.emit('peerMuteState', { roomId: currentMeetRoomId, micEnabled, camEnabled });
+  }
   updateMeetBtns();
   updateParticipantList();
 }
@@ -3258,6 +3299,27 @@ function onRaiseHand({ peerId, raised, displayName }) {
   const tile = document.getElementById('tile-'+peerId);
   if (tile) tile.classList.toggle('hand-raised', raised);
   if (raised) addMeetChatSys(`${displayName} raised their hand ✋`);
+}
+
+// Update peer tile cam state when they toggle mic/cam
+function onPeerMuteState({ peerId, micEnabled: pMic, camEnabled: pCam }) {
+  const tile = document.getElementById('tile-' + peerId);
+  if (!tile) return;
+  // Update mute icon
+  const muteIcon = document.getElementById('muted-' + peerId);
+  if (muteIcon) muteIcon.textContent = pMic ? '' : '🔇';
+  // Update camera state
+  if (pCam !== undefined) {
+    const vid = tile.querySelector('video');
+    if (vid && vid.srcObject) {
+      const hasVideo = pCam && vid.srcObject.getVideoTracks().length > 0;
+      tile.classList.toggle('has-cam', hasVideo);
+      tile.classList.toggle('no-cam', !hasVideo);
+    } else if (!pCam) {
+      tile.classList.remove('has-cam');
+      tile.classList.add('no-cam');
+    }
+  }
 }
 
 function toggleMeetSide(panel) {
@@ -3425,21 +3487,32 @@ function updateRecordingUI(isRecording) {
 
 
 function updateMeetBtns() {
-  const mic = document.getElementById('btnMic');
-  const cam = document.getElementById('btnCam');
-  const scr = document.getElementById('btnScreen');
-  const hand= document.getElementById('btnHand');
-  mic.className  = 'meet-btn ' + (micEnabled?'on':'off');
-  document.getElementById('micIcon').textContent  = micEnabled?'🎙️':'🔇';
-  document.getElementById('micLabel').textContent = micEnabled?'Mic':'Muted';
-  cam.className  = 'meet-btn ' + (camEnabled?'on':'off');
-  document.getElementById('camIcon').textContent  = camEnabled?'📷':'📵';
-  document.getElementById('camLabel').textContent = camEnabled?'Camera':'Cam off';
-  scr.className  = 'meet-btn ' + (screenSharing?'active-screen':'');
-  document.getElementById('screenLabel').textContent = screenSharing?'Stop share':'Share';
-  hand.className = 'meet-btn ' + (handRaised?'on':'');
-  document.getElementById('handIcon').textContent  = handRaised?'✋':'✋';
-  document.getElementById('handLabel').textContent = handRaised?'Lower hand':'Raise hand';
+  const mic  = document.getElementById('btnMic');
+  const cam  = document.getElementById('btnCam');
+  const scr  = document.getElementById('btnScreen');
+  const hand = document.getElementById('btnHand');
+
+  // Mic: green ring = ON, red ring = muted
+  mic.className = 'meet-btn ' + (micEnabled ? 'on' : 'off');
+  document.getElementById('micIcon').textContent  = micEnabled ? '🎙️' : '🔇';
+  document.getElementById('micLabel').textContent = micEnabled ? 'Mic' : 'Muted';
+
+  // Cam: green ring = ON, red ring = camera off
+  cam.className = 'meet-btn ' + (camEnabled ? 'on' : 'off');
+  document.getElementById('camIcon').textContent  = camEnabled ? '📷' : '📵';
+  document.getElementById('camLabel').textContent = camEnabled ? 'Camera' : 'Cam off';
+
+  // Screen share
+  scr.className = 'meet-btn ' + (screenSharing ? 'active-screen' : '');
+  document.getElementById('screenLabel').textContent = screenSharing ? 'Stop share' : 'Share';
+
+  // Hand
+  hand.className = 'meet-btn ' + (handRaised ? 'on' : '');
+  document.getElementById('handLabel').textContent = handRaised ? 'Lower hand' : 'Raise hand';
+
+  // Visual self-preview opacity
+  const selfFloat = document.getElementById('selfFloat');
+  if (selfFloat) selfFloat.style.opacity = camEnabled ? '1' : '0.4';
 }
 
 async function leaveMeeting() {
