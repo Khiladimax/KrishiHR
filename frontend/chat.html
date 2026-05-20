@@ -1607,20 +1607,15 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="form-label">Agenda (optional)</div>
       <textarea class="form-input" id="scheduleMeetAgenda" rows="3" placeholder="What will be discussed?"></textarea>
     </div>
-    <div class="form-row">
-      <div class="form-label">Invite by Email <span style="font-weight:400;text-transform:none;font-size:10px">(comma-separated, optional)</span></div>
-      <input class="form-input" id="scheduleMeetEmails" placeholder="user@company.com, other@company.com">
-      <div style="font-size:11px;color:var(--wa-text2);margin-top:4px">Each person gets an email with a join link</div>
-    </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeModal('scheduleMeetingModal')">Cancel</button>
-      <button class="btn-primary" onclick="scheduleMeeting()">📅 Schedule</button>
+      <button class="btn-primary" onclick="scheduleMeeting()">Schedule</button>
     </div>
   </div>
 </div>
 
 <!-- ═══════ INCOMING CALL OVERLAY (WhatsApp style) ═══════ -->
-<div id="incomingCallOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+<div id="incomingCallOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
   <div style="background:var(--surface,#fff);border-radius:24px;padding:40px 48px;text-align:center;min-width:300px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
     <div id="incomingCallAvatar" style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg, var(--chat-accent,#4a8c1c), color-mix(in srgb, var(--chat-accent,#4a8c1c) 70%, #000));font-size:36px;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;animation:callPulse 1.5s infinite;"></div>
     <div id="incomingCallType" style="font-size:12px;color:var(--wa-text2);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;font-weight:700;"></div>
@@ -2579,7 +2574,7 @@ function clearFilePreview() {
 
 async function uploadPendingFile() {
   if (!pendingFile || !activeGid) return;
-  const maxBytes = (window.CFG?.chatFileMaxSizeMB||500)*1024*1024; // ✅ 500MB
+  const maxBytes = (window.CFG?.chatFileMaxSizeMB||50)*1024*1024;
   if (pendingFile.size > maxBytes) { alert(`File too large. Max ${window.CFG?.chatFileMaxSizeMB||50} MB`); return; }
   const fd = new FormData(); fd.append('file', pendingFile);
   clearFilePreview();
@@ -3112,12 +3107,9 @@ const ICE_SERVERS = { iceServers: window.CFG?.meetingStunServers || [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  // ⚠️ REPLACE with your Metered.ca/Twilio TURN credentials for reliable mobile video
-  // Get free credentials at https://www.metered.ca/tools/openrelay/
+  // TURN relay — required for mobile-to-mobile / symmetric NAT
   { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turns:openrelay.metered.ca:443',username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
 ] };
 
@@ -3253,29 +3245,14 @@ async function onExistingPeers(peerIds) {
   updateParticipantList();
 }
 
-async function onPeerJoined({ peerId, userId, displayName }) {
+function onPeerJoined({ peerId, userId, displayName }) {
   if (peerId === socket?.id) return;
   peerNames[peerId] = displayName;
   addVideoTile(peerId, displayName);
   updateParticipantCount();
   updateParticipantList();
+  // Add system message in meet chat
   addMeetChatSys(`${displayName} joined`);
-
-  // ✅ CRITICAL FIX: The existing peer (us) must create and send an offer
-  // to the newly joined peer. Without this, WebRTC never negotiates — 
-  // video/audio tracks never flow.
-  try {
-    const pc = createPeerConnection(peerId);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    if (socket) socket.emit('offer', {
-      to: peerId,
-      offer: pc.localDescription,
-      roomId: currentMeetRoomId
-    });
-  } catch(e) {
-    console.warn('[onPeerJoined] offer error:', e);
-  }
 }
 
 function onPeerLeft({ peerId }) {
@@ -3293,10 +3270,7 @@ function createPeerConnection(peerId) {
   if (peerConnections[peerId]) return peerConnections[peerId];
   const pc = new RTCPeerConnection(ICE_SERVERS);
   peerConnections[peerId] = pc;
-  // Add local tracks — if stream not ready yet, it will be added when stream starts
-  if (localStream) {
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-  }
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
   pc.onicecandidate = ({ candidate }) => {
     if (candidate && socket) socket.emit('ice-candidate', { to: peerId, candidate });
   };
@@ -3332,47 +3306,28 @@ function createPeerConnection(peerId) {
 
 async function onOffer({ from, offer }) {
   const pc = createPeerConnection(from);
-  // Handle both string (legacy Android) and object {type,sdp} formats
+  // Android may send offer as plain string (old) or {type,sdp} object (fixed).
+  // Handle both formats defensively.
   const sdpObj = (typeof offer === 'string')
     ? { type: 'offer', sdp: offer }
     : offer;
-  try {
-    // If we already have a remote description (race condition), ignore duplicate offer
-    if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
-      console.warn('[onOffer] unexpected signalingState:', pc.signalingState, '— resetting');
-    }
-    await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    if (socket) socket.emit('answer', { to: from, answer: pc.localDescription });
-  } catch(e) {
-    console.error('[onOffer] error:', e);
-  }
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  if (socket) socket.emit('answer', { to: from, answer: pc.localDescription });
 }
 async function onAnswer({ from, answer }) {
   const pc = peerConnections[from];
   if (!pc) return;
+  // Android may send answer as plain string (old) or {type,sdp} object (fixed).
   const sdpObj = (typeof answer === 'string')
     ? { type: 'answer', sdp: answer }
     : answer;
-  try {
-    if (pc.signalingState === 'stable') { console.warn('[onAnswer] already stable, ignoring'); return; }
-    await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
-  } catch(e) {
-    console.error('[onAnswer] error:', e);
-  }
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
 }
 async function onIceCandidate({ from, candidate }) {
   const pc = peerConnections[from];
-  if (!pc || !candidate) return;
-  try {
-    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-  } catch(e) {
-    // Non-fatal — trickle ICE sometimes delivers candidates before remote desc
-    if (!e.message?.includes('Error processing ICE candidate')) {
-      console.warn('[ICE] addIceCandidate error:', e.message);
-    }
-  }
+  if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
 }
 
 // Active speaker detection via audio levels
@@ -3457,8 +3412,7 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
     grid.style.display = 'none';
     selfFlt.style.display = 'none';
   } else {
-    _stopSSClock();
-  cont.classList.remove('visible');
+    cont.classList.remove('visible');
     grid.style.display = '';
     selfFlt.style.display = '';
     document.getElementById('screenShareVideo').srcObject = null;
@@ -3498,15 +3452,6 @@ async function toggleCam() {
   updateMeetBtns();
   updateParticipantList();
 }
-// ✅ Screen share time overlay (Requirement J)
-let _ssClockTimer = null;
-function _startSSClock() {
-  _stopSSClock();
-  const update = () => { const el = document.getElementById('ssClockSpan'); if (el) el.textContent = new Date().toLocaleTimeString(); };
-  update(); _ssClockTimer = setInterval(update, 1000);
-}
-function _stopSSClock() { clearInterval(_ssClockTimer); _ssClockTimer = null; }
-
 async function toggleScreen() {
   const cont    = document.getElementById('screenshareContainer');
   const grid    = document.getElementById('meetGrid');
@@ -3523,8 +3468,7 @@ async function toggleScreen() {
       });
       document.getElementById('localVideo').srcObject = localStream;
     }
-    _stopSSClock();
-  cont.classList.remove('visible');
+    cont.classList.remove('visible');
     grid.style.display = '';
     selfFlt.style.display = '';
     document.getElementById('screenShareVideo').srcObject = null;
@@ -3538,8 +3482,7 @@ async function toggleScreen() {
       const track  = screenStream.getVideoTracks()[0];
 
       document.getElementById('screenShareVideo').srcObject = screenStream;
-      document.getElementById('screenshareLabel').innerHTML = 'Your screen <span id="ssClockSpan" style="font-variant-numeric:tabular-nums;margin-left:8px;opacity:.8"></span>';
-      _startSSClock();
+      document.getElementById('screenshareLabel').textContent = 'Your screen';
       document.getElementById('localVideoStrip').srcObject = localStream;
       updateSelfThumb();
       syncPeerStrip();
@@ -3912,9 +3855,7 @@ async function scheduleMeeting() {
   if (!localDt) { alert('Date/time required'); return; }
   // Convert local datetime-local to ISO string (preserves local timezone intent)
   const scheduled_at = new Date(localDt).toISOString();
-  const emailsRaw = document.getElementById('scheduleMeetEmails')?.value.trim() || '';
-  const invite_emails = emailsRaw ? emailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
-  const res = await chatApi('POST', '/chat/scheduled-meetings', { title, scheduled_at, group_id, agenda, invite_emails });
+  const res = await chatApi('POST', '/chat/scheduled-meetings', { title, scheduled_at, group_id, agenda });
   if (!res.success) { alert(res.message || 'Failed to schedule'); return; }
   closeModal('scheduleMeetingModal');
   loadScheduledMeetings();
@@ -3933,10 +3874,8 @@ async function loadScheduledMeetings() {
   }
 
   if (!res.data.length) {
-    list.innerHTML = `<div style="text-align:center;padding:32px 10px;color:var(--wa-text2)">
-      <div style="font-size:44px;margin-bottom:12px">📅</div>
-      <div style="font-size:14px;font-weight:700;color:var(--wa-text);margin-bottom:6px">No Upcoming Meetings</div>
-      <div style="font-size:12px;line-height:1.7">Schedule one below — invited members get<br>an email with a direct join link.</div>
+    list.innerHTML = `<div style="color:var(--wa-text2);font-size:13px;padding:12px 0;text-align:center">
+      No upcoming meetings<br><span style="font-size:11px;opacity:.6">Schedule one using the button below</span>
     </div>`;
     return;
   }
@@ -4399,8 +4338,7 @@ loadGroups().then(async () => {
     }
   }
 });
-// ✅ Wait for groups first, then load meetings
-loadGroups().then(() => loadScheduledMeetings());
+loadScheduledMeetings();
 setInterval(loadGroups, 30000);
 setInterval(loadScheduledMeetings, 60000); // refresh every minute
 </script>
