@@ -688,14 +688,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 .meeting-panel.minimized .self-float { display: none; }
 
 /* ── Alone warning ── */
-.meet-alone-warn {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-60%);
-  text-align: center; color: #9aa0a6; display: none; z-index: 3; width: 320px;
-}
-.meet-alone-warn.visible { display: block; }
-.meet-alone-warn-icon { font-size: 52px; margin-bottom: 16px; }
-.meet-alone-warn-text { font-size: 18px; font-weight: 600; color: #e8eaed; margin-bottom: 8px; }
-.meet-alone-warn-sub { font-size: 13px; line-height: 1.5; }
+
 
 /* ── Controls bar — centered like Google Meet ── */
 .meet-controls {
@@ -1265,12 +1258,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="meet-videos-area" id="meetVideosArea">
 
         <!-- Alone warning -->
-        <div class="meet-alone-warn" id="meetAloneWarn">
-          <div class="meet-alone-warn-icon">👋</div>
-          <div class="meet-alone-warn-text">You're the only one here</div>
-          <div class="meet-alone-warn-sub">Share the meeting link to invite others</div>
-          <button class="meet-card-btn join" onclick="copyMeetingLink()" style="margin-top:14px">Copy meeting link</button>
-        </div>
+
 
         <!-- Screen share container (fills 100% like Google Meet) -->
         <div class="screenshare-container" id="screenshareContainer">
@@ -3199,7 +3187,6 @@ function updateParticipantCount() {
   document.getElementById('meetingParticipantCount').textContent =
     count===1 ? 'Just you' : `${count} participants`;
   document.getElementById('participantListCount').textContent = count;
-  document.getElementById('meetAloneWarn').classList.toggle('visible', count===1);
 }
 
 function updateParticipantList() {
