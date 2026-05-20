@@ -136,7 +136,15 @@ io.on('connection', (socket) => {
     });
     // Tell the new joiner who's already in the room
     const existingPeers = [...(io.sockets.adapter.rooms.get(`meeting:${roomId}`) || [])].filter(id => id !== socket.id);
+    // Build peer info map so new joiner knows names
+    const peerInfos = existingPeers.map(pid => {
+      const peerSocket = io.sockets.sockets.get(pid);
+      return { peerId: pid, displayName: peerSocket?._displayName || 'Guest' };
+    });
     socket.emit('existingPeers', existingPeers);
+    socket.emit('existingPeerInfos', peerInfos);
+    // Store display name on socket for others to reference
+    socket._displayName = displayName || user.first_name || 'Guest';
   });
 
   socket.on('leaveMeeting', ({ roomId }) => {
@@ -158,8 +166,12 @@ io.on('connection', (socket) => {
   });
 
   // Screen share toggle notification
-  socket.on('screenShare', ({ roomId, sharing }) => {
-    socket.to(`meeting:${roomId}`).emit('peerScreenShare', { peerId: socket.id, sharing });
+  socket.on('screenShare', ({ roomId, sharing, displayName }) => {
+    socket.to(`meeting:${roomId}`).emit('peerScreenShare', {
+      peerId: socket.id,
+      sharing,
+      displayName: displayName || user.first_name || 'Someone'
+    });
   });
 
   // Raise hand
