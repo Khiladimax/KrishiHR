@@ -3306,14 +3306,24 @@ function createPeerConnection(peerId) {
 
 async function onOffer({ from, offer }) {
   const pc = createPeerConnection(from);
-  await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  // Android may send offer as plain string (old) or {type,sdp} object (fixed).
+  // Handle both formats defensively.
+  const sdpObj = (typeof offer === 'string')
+    ? { type: 'offer', sdp: offer }
+    : offer;
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
-  if (socket) socket.emit('answer', { to: from, answer });
+  if (socket) socket.emit('answer', { to: from, answer: pc.localDescription });
 }
 async function onAnswer({ from, answer }) {
   const pc = peerConnections[from];
-  if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  if (!pc) return;
+  // Android may send answer as plain string (old) or {type,sdp} object (fixed).
+  const sdpObj = (typeof answer === 'string')
+    ? { type: 'answer', sdp: answer }
+    : answer;
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
 }
 async function onIceCandidate({ from, candidate }) {
   const pc = peerConnections[from];
