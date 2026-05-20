@@ -5,7 +5,7 @@
 
 // KrishiHR — no Main_file, using inline defaults
 const CONFIG = {
-  chatFileMaxSizeMB: 50,
+  chatFileMaxSizeMB: 500,
   chatFileRoute: '/chat/files',
   chatBlockedExtensions: ['.exe','.bat','.sh','.cmd','.msi','.ps1','.vbs'],
   chatAdminRoles: ['admin','super_admin','hr'],
@@ -1017,7 +1017,7 @@ exports.createMeeting = async (req, res) => {
 exports.scheduleMeeting = async (req, res) => {
   try {
     const empId = req.user.id;
-    const { title, group_id, scheduled_at, description, agenda } = req.body;
+    const { title, group_id, scheduled_at, description, agenda, invite_emails } = req.body;
     if (!scheduled_at) return res.status(400).json({ success: false, message: 'scheduled_at required' });
     const roomId = uuidv4();
     const r = await db.query(`
@@ -1034,6 +1034,38 @@ exports.scheduleMeeting = async (req, res) => {
         scheduled_by: empId
       });
     }
+
+    // ✅ FIX: Send email invites
+    if (invite_emails && Array.isArray(invite_emails) && invite_emails.length) {
+      const emailSvc = require('../config/emailService');
+      const frontendUrl = process.env.FRONTEND_URL || 'https://krishihr-zuui.onrender.com';
+      const joinLink = `${frontendUrl}/chat.html?meetingId=${roomId}&title=${encodeURIComponent(title || 'Meeting')}`;
+      const dtStr = new Date(scheduled_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      for (const email of invite_emails) {
+        try {
+          await emailSvc.sendEmail({
+            to: email,
+            subject: `📅 Meeting Invitation: ${title || 'Scheduled Meeting'}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:520px;margin:auto;background:#f5f7f5;border-radius:16px;overflow:hidden">
+                <div style="background:#1A7A3C;padding:28px 32px;color:#fff">
+                  <h2 style="margin:0;font-size:22px">📹 You're Invited to a Meeting</h2>
+                </div>
+                <div style="padding:28px 32px">
+                  <h3 style="margin:0 0 8px;font-size:18px">${title || 'Scheduled Meeting'}</h3>
+                  <p style="color:#555;margin:0 0 20px">📅 <strong>${dtStr} IST</strong></p>
+                  ${agenda ? `<p style="color:#555;margin:0 0 20px">${agenda}</p>` : ''}
+                  <a href="${joinLink}" style="display:inline-block;background:#1A7A3C;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">
+                    Join Meeting
+                  </a>
+                  <p style="color:#888;font-size:12px;margin-top:20px">Or copy this link: ${joinLink}</p>
+                </div>
+              </div>`
+          });
+        } catch(emailErr) { console.error('[scheduleMeeting] email fail:', emailErr.message); }
+      }
+    }
+
     res.json({ success: true, data: meeting });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
