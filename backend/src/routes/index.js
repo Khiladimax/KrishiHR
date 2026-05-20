@@ -919,6 +919,7 @@ router.delete('/chat/messages/:id/pin',                   authenticate, chatCtrl
 
 // ── Presence ──────────────────────────────────────────────────────────────────
 router.post  ('/chat/presence',                           authenticate, chatCtrl.updatePresence);
+router.post  ('/chat/presence/offline',                    authenticate, chatCtrl.markOffline);
 router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
 
 // ── Meetings (instant) ───────────────────────────────────────────────────────
