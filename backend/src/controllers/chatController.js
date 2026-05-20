@@ -531,6 +531,18 @@ exports.sendMessage = async (req, res) => {
       [msg.id, empId]
     );
 
+    // If this is a DM and the other person had "deleted" (left_at set), 
+    // restore them so the chat reappears for them when a new message arrives
+    const groupTypeRes = await db.query(`SELECT type FROM chat_groups WHERE id=$1`, [gid]);
+    if (groupTypeRes.rows[0]?.type === 'dm') {
+      await db.query(
+        `UPDATE chat_group_members 
+         SET left_at = NULL 
+         WHERE group_id=$1 AND employee_id != $2 AND left_at IS NOT NULL`,
+        [gid, empId]
+      );
+    }
+
     emitToGroup(gid, 'message', full);
     res.json({ success: true, data: full });
   } catch (e) {
@@ -874,14 +886,10 @@ exports.deleteGroupForMe = async (req, res) => {
   try {
     const empId   = req.user.id;
     const groupId = parseInt(req.params.id);
-    // Mark member as left — this makes loadGroups exclude it permanently
     await db.query(
       `UPDATE chat_group_members SET left_at = NOW() WHERE group_id=$1 AND employee_id=$2`,
       [groupId, empId]
     );
-    // Also clear messages visually (delete just for this user isn't possible in simple schema
-    // so we clear the whole DM since both users agreed implicitly by the UI)
-    await db.query(`DELETE FROM chat_messages WHERE group_id=$1`, [groupId]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -890,8 +898,7 @@ exports.clearGroupMessages = async (req, res) => {
   try {
     const empId  = req.user.id;
     const groupId = parseInt(req.params.groupId);
-    // Verify member
-    const mem = await db.query(`SELECT 1 FROM chat_group_members WHERE group_id=$1 AND employee_id=$2`, [groupId, empId]);
+    const mem = await db.query(`SELECT 1 FROM chat_group_members WHERE group_id=$1 AND employee_id=$2 AND left_at IS NULL`, [groupId, empId]);
     if (!mem.rows.length) return res.status(403).json({ success: false, message: 'Not a member' });
     await db.query(`DELETE FROM chat_messages WHERE group_id=$1`, [groupId]);
     res.json({ success: true });
