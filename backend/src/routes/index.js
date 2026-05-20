@@ -889,6 +889,8 @@ router.delete('/chat/groups/:id/members/:memberId',       authenticate, chatCtrl
 router.post  ('/chat/groups/:id/invite-link/reset',       authenticate, chatCtrl.resetInviteLink);
 router.post  ('/chat/groups/:id/mute',                    authenticate, chatCtrl.muteGroup);
 router.delete('/chat/groups/:id/mute',                    authenticate, chatCtrl.unmuteGroup);
+router.delete('/chat/groups/:id',                         authenticate, chatCtrl.deleteGroupForMe);
+router.delete('/chat/groups/:id/messages',                authenticate, chatCtrl.clearGroupMessages);
 router.post  ('/chat/groups/:id/promote/:memberId',       authenticate, chatCtrl.promoteAdmin);
 router.post  ('/chat/groups/:id/demote/:memberId',        authenticate, chatCtrl.demoteAdmin);
 router.get   ('/chat/groups/:id/search',                  authenticate, chatCtrl.searchMessages);
@@ -919,8 +921,6 @@ router.delete('/chat/messages/:id/pin',                   authenticate, chatCtrl
 
 // ── Presence ──────────────────────────────────────────────────────────────────
 router.post  ('/chat/presence',                           authenticate, chatCtrl.updatePresence);
-router.delete('/chat/groups/:id',                              authenticate, chatCtrl.deleteGroupForMe);
-router.delete('/chat/groups/:groupId/messages',              authenticate, chatCtrl.clearGroupMessages);
 router.post  ('/chat/presence/offline',                    authenticate, chatCtrl.markOffline);
 router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
 
