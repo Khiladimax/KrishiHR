@@ -1046,7 +1046,7 @@ exports.getScheduledMeetings = async (req, res) => {
       LEFT JOIN chat_group_members cgm ON cgm.group_id=sm.group_id AND cgm.employee_id=$1
       WHERE (sm.created_by=$1 OR cgm.employee_id=$1)
         AND sm.status IN ('scheduled','started')
-        AND sm.scheduled_at > NOW() - INTERVAL '24 hours'
+        AND sm.scheduled_at > NOW() - INTERVAL '1 hour'
       ORDER BY sm.scheduled_at ASC
     `, [empId]);
     res.json({ success: true, data: result.rows });
