@@ -136,14 +136,22 @@ exports.createGroup = async (req, res) => {
       if (member_ids.length !== 1)
         return res.status(400).json({ success: false, message: 'DM requires exactly 1 member' });
       const peerId = parseInt(member_ids[0]);
+      // Find existing DM regardless of left_at — if user deleted and re-opens, restore it
       const existing = await client.query(`
         SELECT g.id FROM chat_groups g
         WHERE g.type='dm'
-          AND (SELECT COUNT(*) FROM chat_group_members m WHERE m.group_id=g.id AND m.employee_id IN ($1,$2) AND m.left_at IS NULL)=2
-          AND (SELECT COUNT(*) FROM chat_group_members m WHERE m.group_id=g.id AND m.left_at IS NULL)=2
+          AND (SELECT COUNT(*) FROM chat_group_members m WHERE m.group_id=g.id AND m.employee_id IN ($1,$2))=2
+          AND (SELECT COUNT(*) FROM chat_group_members m WHERE m.group_id=g.id)=2
       `, [empId, peerId]);
-      if (existing.rows.length)
+      if (existing.rows.length) {
+        // Restore the deleting user's membership (left_at → NULL) so chat reappears
+        await client.query(
+          `UPDATE chat_group_members SET left_at = NULL WHERE group_id=$1 AND employee_id=$2`,
+          [existing.rows[0].id, empId]
+        );
+        await client.query('COMMIT');
         return res.json({ success: true, data: { id: existing.rows[0].id }, existing: true });
+      }
     }
 
     if (type === 'group' && (!name || !name.trim()))
@@ -883,15 +891,35 @@ exports.markOffline = async (req, res) => {
 };
 
 exports.deleteGroupForMe = async (req, res) => {
+  const client = await db.getClient();
   try {
+    await client.query('BEGIN');
     const empId   = req.user.id;
     const groupId = parseInt(req.params.id);
-    await db.query(
+
+    // 1. Mark all existing messages in this chat as "deleted for me"
+    //    so that if the user re-opens the chat later, history is gone
+    await client.query(
+      `UPDATE chat_messages
+       SET deleted_for = array_append(COALESCE(deleted_for, '{}'::int[]), $1)
+       WHERE group_id=$2 AND NOT ($1 = ANY(COALESCE(deleted_for, '{}'::int[])))`,
+      [empId, groupId]
+    );
+
+    // 2. Set left_at so this chat is hidden from the sidebar until they get a new message
+    await client.query(
       `UPDATE chat_group_members SET left_at = NOW() WHERE group_id=$1 AND employee_id=$2`,
       [groupId, empId]
     );
+
+    await client.query('COMMIT');
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, message: e.message });
+  } finally {
+    client.release();
+  }
 };
 
 exports.clearGroupMessages = async (req, res) => {
