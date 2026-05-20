@@ -126,7 +126,7 @@ const NAV_GROUPS = [
       { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
       { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl'] },
       { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    hideRoles:['admin','super_admin','hr','accounts','manager','tl'] },
-      { href:'chat.html',           icon: ICONS.chat || '💬',  label:'Chat & Meetings',  always:true },s
+      { href:'chat.html',           icon: ICONS.chat || '💬',  label:'Chat & Meetings',  always:true },
     ]
   },
   {
