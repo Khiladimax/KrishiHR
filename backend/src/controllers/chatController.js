@@ -46,7 +46,7 @@ exports.upload = multer({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isGroupMember(groupId, empId) {
   return db.query(
-    `SELECT role FROM chat_group_members WHERE group_id=$1 AND employee_id=$2 AND left_at IS NULL AND deleted_at IS NULL`,
+    `SELECT role FROM chat_group_members WHERE group_id=$1 AND employee_id=$2 AND left_at IS NULL`,
     [groupId, empId]
   ).then(r => r.rows[0] || null);
 }
@@ -547,15 +547,15 @@ exports.sendMessage = async (req, res) => {
       [msg.id, empId]
     );
 
-    // If this is a DM and the SENDER had previously deleted (left_at set),
-    // restore only the sender's own membership so they can see what they sent.
-    // NEVER restore the recipient's left_at — delete is permanent for them.
+    // WhatsApp behavior: if this is a DM and the OTHER person had deleted the chat,
+    // restore their left_at so the new message appears for them — but deleted_at stays set
+    // so getMessages only shows messages AFTER their deletion timestamp (no old history).
     const groupTypeRes = await db.query(`SELECT type FROM chat_groups WHERE id=$1`, [gid]);
     if (groupTypeRes.rows[0]?.type === 'dm') {
       await db.query(
         `UPDATE chat_group_members 
          SET left_at = NULL 
-         WHERE group_id=$1 AND employee_id = $2 AND left_at IS NOT NULL`,
+         WHERE group_id=$1 AND employee_id != $2 AND left_at IS NOT NULL`,
         [gid, empId]
       );
     }
