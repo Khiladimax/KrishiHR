@@ -1821,10 +1821,15 @@ function connectSocket() {
   socket.on('peerJoined',       onPeerJoined);
   socket.on('existingPeers',    onExistingPeers);
   socket.on('existingPeerInfos', (peerInfos) => {
-    // Pre-populate peerNames from server info so tiles have correct names
+    // Pre-populate peerNames AND create tiles so peers are visible immediately
     peerInfos.forEach(({ peerId, displayName }) => {
-      if (peerId !== socket.id) peerNames[peerId] = displayName;
+      if (peerId !== socket.id) {
+        peerNames[peerId] = displayName;
+        if (!document.getElementById('tile-' + peerId)) addVideoTile(peerId, displayName);
+      }
     });
+    updateParticipantCount();
+    updateParticipantList();
   });
   socket.on('peerLeft',      onPeerLeft);
   socket.on('offer',         onOffer);
@@ -3193,11 +3198,13 @@ async function openMeetingPanel(roomId, title, audioOnly = false) {
 function checkNoiseSuppression() { /* no-op — handled at getUserMedia time */ }
 
 function updateParticipantCount() {
-  const count = 1 + Object.keys(peerConnections).length;
+  const peerCount = Object.keys(peerNames).length;
+  const count = 1 + peerCount;
   document.getElementById('meetingParticipantCount').textContent =
     count===1 ? 'Just you' : `${count} participants`;
   document.getElementById('participantListCount').textContent = count;
-  document.getElementById('meetAloneWarn').classList.toggle('visible', count===1);
+  // Hide "alone" warn as soon as any peer is known — even before video connects
+  document.getElementById('meetAloneWarn').classList.toggle('visible', peerCount === 0);
 }
 
 function updateParticipantList() {
@@ -3222,16 +3229,20 @@ function updateParticipantList() {
 
 async function onExistingPeers(peerIds) {
   for (const pid of peerIds) {
+    // Ensure name/tile exist (peerInfos may arrive after existingPeers on slow connections)
+    if (!peerNames[pid]) peerNames[pid] = 'Peer';
+    if (!document.getElementById('tile-' + pid)) addVideoTile(pid, peerNames[pid]);
     const pc = createPeerConnection(pid);
     try {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      // Use pc.localDescription after setLocalDescription resolves — guaranteed to be set
       if (socket) socket.emit('offer', { to: pid, offer: pc.localDescription, roomId: currentMeetRoomId });
     } catch(e) {
       console.warn('onExistingPeers offer error for', pid, e);
     }
   }
+  updateParticipantCount();
+  updateParticipantList();
 }
 
 function onPeerJoined({ peerId, userId, displayName }) {
@@ -3366,20 +3377,19 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
     // Listen for the next ontrack event which carries the screen track.
     const pc = peerConnections[peerId];
     if (pc) {
-      // Attach a one-time ontrack listener to grab the screen track
-      const origOnTrack = pc.ontrack;
-      pc.ontrack = (event) => {
+      // Use addEventListener so we don't overwrite the existing ontrack handler
+      const screenTrackListener = (event) => {
         const stream = event.streams[0];
         if (stream) {
           peerStreams[peerId] = stream;
-          document.getElementById('screenShareVideo').srcObject = stream;
-          // Also update the peer strip thumb
+          const ssv = document.getElementById('screenShareVideo');
+          if (ssv) ssv.srcObject = stream;
           const stripVid = document.querySelector('#strip-' + peerId + ' video');
           if (stripVid) stripVid.srcObject = stream;
         }
-        // Restore original handler
-        pc.ontrack = origOnTrack;
+        pc.removeEventListener('track', screenTrackListener);
       };
+      pc.addEventListener('track', screenTrackListener);
     }
     // If stream already updated (slow network — track arrived before signal), use it
     const stream = peerStreams[peerId];
