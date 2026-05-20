@@ -891,34 +891,38 @@ exports.markOffline = async (req, res) => {
 };
 
 exports.deleteGroupForMe = async (req, res) => {
-  const client = await db.getClient();
   try {
-    await client.query('BEGIN');
     const empId   = req.user.id;
     const groupId = parseInt(req.params.id);
 
-    // 1. Mark all existing messages in this chat as "deleted for me"
-    //    so that if the user re-opens the chat later, history is gone
-    await client.query(
+    // 1. Mark all existing messages as "deleted for me" so history is hidden
+    //    even if the user re-opens or DMs again later
+    await db.query(
       `UPDATE chat_messages
        SET deleted_for = array_append(COALESCE(deleted_for, '{}'::int[]), $1)
-       WHERE group_id=$2 AND NOT ($1 = ANY(COALESCE(deleted_for, '{}'::int[])))`,
+       WHERE group_id=$2
+         AND NOT ($1 = ANY(COALESCE(deleted_for, '{}'::int[])))`,
       [empId, groupId]
     );
 
-    // 2. Set left_at so this chat is hidden from the sidebar until they get a new message
-    await client.query(
-      `UPDATE chat_group_members SET left_at = NOW() WHERE group_id=$1 AND employee_id=$2`,
+    // 2. Set left_at — this hides the chat from listGroups (WHERE cgm.left_at IS NULL)
+    const r = await db.query(
+      `UPDATE chat_group_members
+       SET left_at = NOW()
+       WHERE group_id=$1 AND employee_id=$2
+       RETURNING id`,
       [groupId, empId]
     );
 
-    await client.query('COMMIT');
+    if (!r.rowCount) {
+      // Member row didn't exist or already had left_at — still a success
+      return res.json({ success: true, note: 'already removed' });
+    }
+
     res.json({ success: true });
   } catch (e) {
-    await client.query('ROLLBACK');
+    console.error('[chat deleteGroupForMe]', e.message);
     res.status(500).json({ success: false, message: e.message });
-  } finally {
-    client.release();
   }
 };
 
