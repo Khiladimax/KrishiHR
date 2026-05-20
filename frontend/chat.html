@@ -1112,7 +1112,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
         <button class="icon-btn" title="Search in chat" onclick="toggleChatSearch()">🔍</button>
         <button class="icon-btn" title="Video call" onclick="initiateCall('video')" id="videoCallBtn">📹</button>
         <button class="icon-btn" title="Voice call"  onclick="initiateCall('audio')" id="audioCallBtn">📞</button>
-        <button class="icon-btn" title="More options" onclick="openGroupInfo()">⋮</button>
+        <button class="icon-btn" title="More options" onclick="showChatMoreMenu(event)">⋮</button>
       </div>
     </div>
 
@@ -1350,6 +1350,15 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 </div>
 
 <!-- Context menu -->
+<!-- Chat header more menu -->
+<div class="ctx-menu" id="chatMoreMenu" style="min-width:200px">
+  <button class="ctx-item" onclick="chatMoreAction('clearChat')">🗑️ Clear Chat</button>
+  <button class="ctx-item" id="chatMoreDeleteBtn" onclick="chatMoreAction('deleteChat')">❌ Delete Chat</button>
+  <button class="ctx-item" id="chatMoreLeaveBtn" onclick="chatMoreAction('leaveGroup')">🚪 Leave Group</button>
+  <button class="ctx-item" onclick="chatMoreAction('groupInfo')">ℹ️ Info</button>
+  <button class="ctx-item" onclick="chatMoreAction('search')">🔍 Search</button>
+</div>
+
 <div class="ctx-menu" id="ctxMenu">
   <div class="ctx-item" id="ctxReply" onclick="ctxAction('reply')">↩ Reply</div>
   <div class="ctx-item" id="ctxReact" onclick="ctxAction('react')">😊 React</div>
@@ -1700,14 +1709,6 @@ function connectSocket() {
   socket.on('answer',        onAnswer);
   socket.on('ice-candidate', onIceCandidate);
   socket.on('peerScreenShare', onPeerScreenShare);
-  socket.on('existingPeerInfos', (peerInfos) => {
-    peerInfos.forEach(({ peerId, displayName }) => {
-      if (displayName) peerNames[peerId] = displayName;
-      let tile = document.getElementById('tile-' + peerId);
-      if (!tile) tile = addVideoTile(peerId, displayName || 'Peer');
-    });
-    updateParticipantList();
-  });
   socket.on('meetingChat',   onMeetingChat);
   socket.on('raiseHand',     onRaiseHand);
 
@@ -2349,6 +2350,59 @@ async function stopAudioRecord(send) {
 
 // ── Context menu ──────────────────────────────────────────────────────────────
 let ctxIsMine = false;
+// ── Chat header more menu ────────────────────────────────────────────────────
+function showChatMoreMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('chatMoreMenu');
+  const isDM = activeGroup?.type === 'dm';
+  // Show/hide relevant options
+  document.getElementById('chatMoreDeleteBtn').style.display = isDM ? 'flex' : 'none';
+  document.getElementById('chatMoreLeaveBtn').style.display = isDM ? 'none' : 'flex';
+  menu.style.right = '12px';
+  menu.style.top = '60px';
+  menu.style.left = 'auto';
+  menu.classList.add('open');
+}
+
+async function chatMoreAction(action) {
+  document.getElementById('chatMoreMenu').classList.remove('open');
+  if (action === 'search') { toggleChatSearch(); return; }
+  if (action === 'groupInfo') { openGroupInfo(); return; }
+  if (action === 'leaveGroup') { leaveGroup(); return; }
+
+  if (action === 'clearChat') {
+    const name = activeGroup?.name || activeGroup?.peer_name || 'this chat';
+    if (!confirm(`Clear all messages in "${name}"? This cannot be undone.`)) return;
+    try {
+      await chatApi('DELETE', `/chat/groups/${activeGid}/messages`);
+      document.getElementById('msgList').innerHTML = '';
+      showToast('Chat cleared', '', null);
+    } catch (e) {
+      // If endpoint doesn't exist, just clear visually
+      document.getElementById('msgList').innerHTML = '';
+      showToast('Chat cleared', '', null);
+    }
+  }
+
+  if (action === 'deleteChat') {
+    const peer = activeGroup?.peer_name || 'this person';
+    if (!confirm(`Delete all messages with ${peer}? This cannot be undone.`)) return;
+    try {
+      await chatApi('DELETE', `/chat/groups/${activeGid}`);
+    } catch (_) {}
+    // Remove from sidebar
+    const el = document.querySelector(`[onclick*="openGroup(${activeGid})"]`);
+    if (el) el.remove();
+    activeGid = null;
+    activeGroup = null;
+    document.getElementById('chatHeader').style.display = 'none';
+    document.getElementById('msgList').innerHTML = '';
+    document.getElementById('chatEmptyState').style.display = '';
+    showToast('Chat deleted', '', null);
+    await loadGroups();
+  }
+}
+
 function showCtxMenu(e, msgId, isMine) {
   e.preventDefault(); e.stopPropagation();
   ctxMsgId = msgId; ctxIsMine = isMine;
@@ -2827,19 +2881,19 @@ async function openMeetingPanel(roomId, title, audioOnly = false) {
   updateMeetBtns();
 }
 
-// Noise suppression via applyConstraints on existing audio track (safe - doesn't break video)
+// Noise suppression via AudioContext (if supported)
 async function checkNoiseSuppression() {
   if (!localStream) return;
   try {
-    const audioTrack = localStream.getAudioTracks()[0];
+    const constraints = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
+    const suppressed  = await navigator.mediaDevices.getUserMedia(constraints);
+    const audioTrack  = suppressed.getAudioTracks()[0];
     if (audioTrack) {
-      await audioTrack.applyConstraints({
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      });
+      const oldAudio = localStream.getAudioTracks()[0];
+      if (oldAudio) localStream.removeTrack(oldAudio);
+      localStream.addTrack(audioTrack);
     }
-  } catch { /* ignore - browser may not support all constraints */ }
+  } catch { /* ignore */ }
 }
 
 function updateParticipantCount() {
@@ -2847,7 +2901,15 @@ function updateParticipantCount() {
   document.getElementById('meetingParticipantCount').textContent =
     count===1 ? 'Just you' : `${count} participants`;
   document.getElementById('participantListCount').textContent = count;
-  document.getElementById('meetAloneWarn').classList.toggle('visible', count===1);
+  // Only show alone warning if alone AND call has been running > 10 seconds
+  const aloneWarn = document.getElementById('meetAloneWarn');
+  if (count > 1) {
+    aloneWarn.classList.remove('visible');
+  } else if (!aloneWarn._shownAt) {
+    aloneWarn._shownAt = Date.now();
+    aloneWarn.classList.add('visible');
+    setTimeout(() => aloneWarn.classList.remove('visible'), 8000); // auto-hide after 8s
+  }
 }
 
 function updateParticipantList() {
@@ -2914,11 +2976,6 @@ function createPeerConnection(peerId) {
     if (!tile) tile = addVideoTile(peerId, peerNames[peerId]||'Peer');
     const video = tile.querySelector('video');
     if (video) { video.srcObject = stream; tile.classList.add('has-cam'); tile.classList.remove('no-cam'); }
-    // If this peer is screen sharing, update the screen share video element too
-    if (window._screenSharePeerId === peerId) {
-      const screenVid = document.getElementById('screenShareVideo');
-      if (screenVid) screenVid.srcObject = stream;
-    }
     // Audio level detection (active speaker)
     setupAudioDetection(stream, peerId);
   };
@@ -2997,25 +3054,20 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
   const grid    = document.getElementById('meetGrid');
   const selfFlt = document.getElementById('selfFloat');
   if (sharing) {
-    document.getElementById('screenshareLabel').textContent = (displayName || peerNames[peerId] || 'Someone') + "'s screen";
+    const stream = peerStreams[peerId];
+    if (stream) document.getElementById('screenShareVideo').srcObject = stream;
+    document.getElementById('screenshareLabel').textContent = (displayName||'Someone') + "'s screen";
     document.getElementById('localVideoStrip').srcObject = localStream;
     updateSelfThumb();
     syncPeerStrip();
     cont.classList.add('visible');
     grid.style.display = 'none';
     selfFlt.style.display = 'none';
-    // The screen track arrives via ontrack after renegotiation - point screenShareVideo at peer stream
-    // Set immediately if already have the stream, otherwise ontrack will update it
-    const screenVid = document.getElementById('screenShareVideo');
-    if (peerStreams[peerId]) screenVid.srcObject = peerStreams[peerId];
-    // Also update the tile's video in ontrack handler
-    window._screenSharePeerId = peerId;
   } else {
     cont.classList.remove('visible');
     grid.style.display = '';
     selfFlt.style.display = '';
     document.getElementById('screenShareVideo').srcObject = null;
-    window._screenSharePeerId = null;
   }
 }
 
@@ -3043,18 +3095,10 @@ async function toggleScreen() {
     if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
     if (localStream) {
       const vt = localStream.getVideoTracks()[0];
-      for (const [peerId, pc] of Object.entries(peerConnections)) {
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender && vt) {
-          await sender.replaceTrack(vt);
-          // Renegotiate so peer switches back to camera
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            if (socket) socket.emit('offer', { to: peerId, offer, roomId: currentMeetRoomId });
-          } catch(e) { console.warn('Renegotiation failed:', e); }
-        }
-      }
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s && vt) s.replaceTrack(vt);
+      });
       document.getElementById('localVideo').srcObject = localStream;
     }
     cont.classList.remove('visible');
@@ -3077,21 +3121,15 @@ async function toggleScreen() {
       syncPeerStrip();
       cont.classList.add('visible');
       grid.style.display = 'none';
-      selfFlt.style.display = 'none'; // self is now in the right strip
+      selfFlt.style.display = 'none'; // self is in right strip
+      // Ensure self-thumb is visible so presenter can see themselves
+      const selfThumbEl = document.getElementById('selfThumb');
+      if (selfThumbEl) { selfThumbEl.style.display = ''; }
 
-      // Replace video track on all peer connections AND renegotiate so remote sees it
-      for (const [peerId, pc] of Object.entries(peerConnections)) {
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-          await sender.replaceTrack(track);
-          // Force renegotiation - create new offer so peer's video element updates
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            if (socket) socket.emit('offer', { to: peerId, offer, roomId: currentMeetRoomId });
-          } catch(e) { console.warn('Renegotiation failed:', e); }
-        }
-      }
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s) s.replaceTrack(track);
+      });
 
       track.onended = () => { screenSharing = true; toggleScreen(); };
       screenSharing = true;
@@ -3107,13 +3145,14 @@ function updateSelfThumb() {
   const thumb    = document.getElementById('selfThumb');
   const avatar   = document.getElementById('selfThumbAvatar');
   const label    = document.getElementById('selfThumbLabel');
-  if (strip) strip.srcObject = localStream;
+  if (strip) { strip.srcObject = localStream; }
   if (label) label.textContent = 'You · ' + (me.first_name || 'Me');
   if (avatar) avatar.textContent = (me.first_name || 'Y').charAt(0).toUpperCase();
   if (thumb) {
     const hasCam = localStream?.getVideoTracks().some(t => t.enabled);
     thumb.classList.toggle('has-cam', hasCam);
     thumb.classList.toggle('no-cam', !hasCam);
+    thumb.style.display = ''; // always visible in strip
   }
 }
 
