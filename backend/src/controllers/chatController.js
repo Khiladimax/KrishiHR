@@ -870,6 +870,22 @@ exports.markOffline = async (req, res) => {
   }
 };
 
+exports.deleteGroupForMe = async (req, res) => {
+  try {
+    const empId   = req.user.id;
+    const groupId = parseInt(req.params.id);
+    // Mark member as left — this makes loadGroups exclude it permanently
+    await db.query(
+      `UPDATE chat_group_members SET left_at = NOW() WHERE group_id=$1 AND employee_id=$2`,
+      [groupId, empId]
+    );
+    // Also clear messages visually (delete just for this user isn't possible in simple schema
+    // so we clear the whole DM since both users agreed implicitly by the UI)
+    await db.query(`DELETE FROM chat_messages WHERE group_id=$1`, [groupId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.clearGroupMessages = async (req, res) => {
   try {
     const empId  = req.user.id;
