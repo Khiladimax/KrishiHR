@@ -1700,6 +1700,14 @@ function connectSocket() {
   socket.on('answer',        onAnswer);
   socket.on('ice-candidate', onIceCandidate);
   socket.on('peerScreenShare', onPeerScreenShare);
+  socket.on('existingPeerInfos', (peerInfos) => {
+    peerInfos.forEach(({ peerId, displayName }) => {
+      if (displayName) peerNames[peerId] = displayName;
+      let tile = document.getElementById('tile-' + peerId);
+      if (!tile) tile = addVideoTile(peerId, displayName || 'Peer');
+    });
+    updateParticipantList();
+  });
   socket.on('meetingChat',   onMeetingChat);
   socket.on('raiseHand',     onRaiseHand);
 
@@ -2819,19 +2827,19 @@ async function openMeetingPanel(roomId, title, audioOnly = false) {
   updateMeetBtns();
 }
 
-// Noise suppression via AudioContext (if supported)
+// Noise suppression via applyConstraints on existing audio track (safe - doesn't break video)
 async function checkNoiseSuppression() {
   if (!localStream) return;
   try {
-    const constraints = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
-    const suppressed  = await navigator.mediaDevices.getUserMedia(constraints);
-    const audioTrack  = suppressed.getAudioTracks()[0];
+    const audioTrack = localStream.getAudioTracks()[0];
     if (audioTrack) {
-      const oldAudio = localStream.getAudioTracks()[0];
-      if (oldAudio) localStream.removeTrack(oldAudio);
-      localStream.addTrack(audioTrack);
+      await audioTrack.applyConstraints({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      });
     }
-  } catch { /* ignore */ }
+  } catch { /* ignore - browser may not support all constraints */ }
 }
 
 function updateParticipantCount() {
@@ -2906,6 +2914,11 @@ function createPeerConnection(peerId) {
     if (!tile) tile = addVideoTile(peerId, peerNames[peerId]||'Peer');
     const video = tile.querySelector('video');
     if (video) { video.srcObject = stream; tile.classList.add('has-cam'); tile.classList.remove('no-cam'); }
+    // If this peer is screen sharing, update the screen share video element too
+    if (window._screenSharePeerId === peerId) {
+      const screenVid = document.getElementById('screenShareVideo');
+      if (screenVid) screenVid.srcObject = stream;
+    }
     // Audio level detection (active speaker)
     setupAudioDetection(stream, peerId);
   };
@@ -2984,20 +2997,25 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
   const grid    = document.getElementById('meetGrid');
   const selfFlt = document.getElementById('selfFloat');
   if (sharing) {
-    const stream = peerStreams[peerId];
-    if (stream) document.getElementById('screenShareVideo').srcObject = stream;
-    document.getElementById('screenshareLabel').textContent = (displayName||'Someone') + "'s screen";
+    document.getElementById('screenshareLabel').textContent = (displayName || peerNames[peerId] || 'Someone') + "'s screen";
     document.getElementById('localVideoStrip').srcObject = localStream;
     updateSelfThumb();
     syncPeerStrip();
     cont.classList.add('visible');
     grid.style.display = 'none';
     selfFlt.style.display = 'none';
+    // The screen track arrives via ontrack after renegotiation - point screenShareVideo at peer stream
+    // Set immediately if already have the stream, otherwise ontrack will update it
+    const screenVid = document.getElementById('screenShareVideo');
+    if (peerStreams[peerId]) screenVid.srcObject = peerStreams[peerId];
+    // Also update the tile's video in ontrack handler
+    window._screenSharePeerId = peerId;
   } else {
     cont.classList.remove('visible');
     grid.style.display = '';
     selfFlt.style.display = '';
     document.getElementById('screenShareVideo').srcObject = null;
+    window._screenSharePeerId = null;
   }
 }
 
@@ -3025,10 +3043,18 @@ async function toggleScreen() {
     if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
     if (localStream) {
       const vt = localStream.getVideoTracks()[0];
-      Object.values(peerConnections).forEach(pc => {
-        const s = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (s && vt) s.replaceTrack(vt);
-      });
+      for (const [peerId, pc] of Object.entries(peerConnections)) {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender && vt) {
+          await sender.replaceTrack(vt);
+          // Renegotiate so peer switches back to camera
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (socket) socket.emit('offer', { to: peerId, offer, roomId: currentMeetRoomId });
+          } catch(e) { console.warn('Renegotiation failed:', e); }
+        }
+      }
       document.getElementById('localVideo').srcObject = localStream;
     }
     cont.classList.remove('visible');
@@ -3053,10 +3079,19 @@ async function toggleScreen() {
       grid.style.display = 'none';
       selfFlt.style.display = 'none'; // self is now in the right strip
 
-      Object.values(peerConnections).forEach(pc => {
-        const s = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (s) s.replaceTrack(track);
-      });
+      // Replace video track on all peer connections AND renegotiate so remote sees it
+      for (const [peerId, pc] of Object.entries(peerConnections)) {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(track);
+          // Force renegotiation - create new offer so peer's video element updates
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (socket) socket.emit('offer', { to: peerId, offer, roomId: currentMeetRoomId });
+          } catch(e) { console.warn('Renegotiation failed:', e); }
+        }
+      }
 
       track.onended = () => { screenSharing = true; toggleScreen(); };
       screenSharing = true;
