@@ -5,6 +5,7 @@ const cors    = require('cors');
 const cron    = require('node-cron');
 const db      = require('./config/db');
 const http    = require('http');
+const crypto  = require('crypto');
 const { Server: SocketIO } = require('socket.io');
 const jwt_sock = require('jsonwebtoken');
 const routes  = require('./routes/index');
@@ -13,6 +14,53 @@ const attCtrl = require('./controllers/attendanceController');
 const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
 const itDeclCtrl = require('./controllers/itDeclarationController');
+
+// ── TURN Credential Generator (RFC 5766-style HMAC credentials) ──────────────
+// Requires env vars: TURN_SERVER_URL, TURN_SECRET (set in .env / Railway)
+// Falls back to public STUN only when TURN is not configured — still better
+// than broken openrelay credentials.
+function generateTurnCredentials(userId) {
+  const secret = process.env.TURN_SECRET;
+  const turnUrl = process.env.TURN_SERVER_URL; // e.g. "turn:your-coturn.example.com:3478"
+  const ttl     = parseInt(process.env.TURN_TTL_SECONDS || '86400', 10); // 24h default
+
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+
+  if (secret && turnUrl) {
+    const unixTs  = Math.floor(Date.now() / 1000) + ttl;
+    const username = `${unixTs}:${userId}`;
+    const hmac     = crypto.createHmac('sha1', secret);
+    hmac.update(username);
+    const credential = hmac.digest('base64');
+
+    // Add UDP, TCP, and TLS variants for maximum NAT traversal
+    const turnUrls = [
+      turnUrl,
+      turnUrl.replace('turn:', 'turn:').replace(/:\d+$/, ':3478'),
+      turnUrl.replace('turn:', 'turns:').replace(/:\d+$/, ':5349'), // TLS
+      `${turnUrl}?transport=tcp`,
+    ].filter((u, i, arr) => arr.indexOf(u) === i); // deduplicate
+
+    iceServers.push({
+      urls: turnUrls,
+      username,
+      credential,
+      credentialType: 'password',
+    });
+  } else {
+    // No Coturn configured — warn in logs (only once)
+    if (!generateTurnCredentials._warned) {
+      console.warn('[TURN] TURN_SERVER_URL / TURN_SECRET not set. Cross-network calls may fail. See .env.example.');
+      generateTurnCredentials._warned = true;
+    }
+  }
+
+  return iceServers;
+}
+generateTurnCredentials._warned = false;
 
 const app    = express();
 const server = http.createServer(app);
@@ -38,6 +86,24 @@ app.use((req, _res, next) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/', routes);
+
+// ── TURN credential endpoint (authenticated) ─────────────────────────────────
+// GET /api/turn-credentials  → { iceServers: [...] }
+// Called by frontend/Android at meeting-join time to get short-lived TURN creds.
+app.get('/api/turn-credentials', (req, res) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (req.query.token || '');
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const decoded = jwt_sock.verify(token, process.env.JWT_SECRET || 'change-me');
+    const iceServers = generateTurnCredentials(decoded.id || decoded.employee_id || 'user');
+    res.json({ iceServers });
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e7 });
 global.io = io;
@@ -141,10 +207,20 @@ io.on('connection', (socket) => {
       const peerSocket = io.sockets.sockets.get(pid);
       return { peerId: pid, displayName: peerSocket?._displayName || 'Guest' };
     });
+    // Send fresh short-lived TURN credentials along with peer list
+    const iceServers = generateTurnCredentials(user.id || user.employee_id || socket.id);
     socket.emit('existingPeers', existingPeers);
     socket.emit('existingPeerInfos', peerInfos);
+    socket.emit('iceServersConfig', { iceServers }); // client should use these instead of hardcoded
     // Store display name on socket for others to reference
     socket._displayName = displayName || user.first_name || 'Guest';
+  });
+
+  // ICE restart — peer requests fresh credentials + triggers renegotiation
+  socket.on('requestIceRestart', ({ roomId }) => {
+    const iceServers = generateTurnCredentials(user.id || user.employee_id || socket.id);
+    socket.emit('iceServersConfig', { iceServers });
+    socket.to(`meeting:${roomId}`).emit('peerRequestsIceRestart', { peerId: socket.id });
   });
 
   socket.on('leaveMeeting', ({ roomId }) => {
