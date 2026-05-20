@@ -855,13 +855,39 @@ exports.updatePresence = async (req, res) => {
   }
 };
 
+// Called via sendBeacon on tab/window close — marks user offline instantly
+exports.markOffline = async (req, res) => {
+  try {
+    const empId = req.user?.id;
+    if (!empId) return res.status(204).end();
+    await db.query(
+      `UPDATE user_presence SET is_online=false, last_seen=NOW() WHERE employee_id=$1`,
+      [empId]
+    );
+    res.status(204).end();
+  } catch (e) {
+    res.status(204).end(); // sendBeacon ignores response, always return 204
+  }
+};
+
 exports.getPresence = async (req, res) => {
   try {
     const { employee_ids } = req.query;
     const ids = (employee_ids || '').split(',').map(Number).filter(Boolean);
     if (!ids.length) return res.json({ success: true, data: [] });
+    // Auto-expire: treat as offline if last_seen > 2 minutes ago (handles tab-close/crash)
     const result = await db.query(
-      `SELECT employee_id, is_online, last_seen FROM user_presence WHERE employee_id = ANY($1)`,
+      `SELECT employee_id,
+              CASE WHEN is_online = true AND last_seen < NOW() - INTERVAL '2 minutes'
+                   THEN false ELSE is_online END AS is_online,
+              last_seen
+       FROM user_presence WHERE employee_id = ANY($1)`,
+      [ids]
+    );
+    // Also update stale rows to offline so next fetch is consistent
+    await db.query(
+      `UPDATE user_presence SET is_online = false
+       WHERE employee_id = ANY($1) AND is_online = true AND last_seen < NOW() - INTERVAL '2 minutes'`,
       [ids]
     );
     res.json({ success: true, data: result.rows });
