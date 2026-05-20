@@ -2019,38 +2019,46 @@ async function sidebarCtxAction(action) {
 async function executeChatDelete(gid) {
   document.getElementById('deleteChatOverlay').style.display = 'none';
 
-  // 1. Immediately remove from sidebar
+  showToast('Deleting chat…', '', null);
+
+  // 1. Hit backend FIRST and WAIT — retry up to 3x to handle Render cold start
+  let success = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await chatApi('DELETE', `/chat/groups/${gid}`);
+      if (res?.success) { success = true; break; }
+      console.warn(`[deleteChat] attempt ${attempt} failed:`, res?.message);
+    } catch (err) {
+      console.warn(`[deleteChat] attempt ${attempt} error:`, err);
+    }
+    if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+  }
+
+  if (!success) {
+    showToast('Delete failed — please try again', '', null);
+    return; // Do NOT remove from UI if DB write failed
+  }
+
+  // 2. DB write confirmed — now remove from UI
   const sidebarEl = document.querySelector(`.group-item[oncontextmenu="showSidebarCtx(event,${gid})"]`);
   if (sidebarEl) sidebarEl.remove();
 
-  // 2. Remove from groups array so 30s polling doesn't re-add
   groups = groups.filter(g => g.id !== gid);
 
-  // 3. Track in deleted set (belt-and-suspenders for polling)
   if (!window._chatDeletedIds) window._chatDeletedIds = new Set();
   window._chatDeletedIds.add(gid);
-  // Keep for 10 minutes to survive polling
   setTimeout(() => window._chatDeletedIds?.delete(gid), 600000);
 
-  // 4. ALWAYS close the chat panel — even if this wasn't the active chat
-  //    Leaving the panel open keeps activeGid set which can restore left_at
   if (socket) socket.emit('leaveGroup', gid);
   activeGid = null;
   activeGroup = null;
-  document.getElementById('chatHeader').style.display     = 'none';
+  document.getElementById('chatHeader').style.display = 'none';
   document.getElementById('messagesArea') && (document.getElementById('messagesArea').style.display = 'none');
   document.getElementById('chatInputWrap') && (document.getElementById('chatInputWrap').style.display = 'none');
   document.getElementById('typingWrap') && (document.getElementById('typingWrap').style.display = 'none');
   document.getElementById('msgList').innerHTML = '';
   const emptyEl = document.getElementById('chatEmptyState') || document.getElementById('chatEmpty');
   if (emptyEl) emptyEl.style.display = '';
-
-  // 5. Fire backend — don't await, don't call loadGroups after
-  chatApi('DELETE', `/chat/groups/${gid}`)
-    .then(res => {
-      if (!res?.success) console.error('[deleteChat] backend error:', res?.message);
-    })
-    .catch(err => console.error('[deleteChat] network error:', err));
 
   showToast('Chat deleted', '', null);
 }
