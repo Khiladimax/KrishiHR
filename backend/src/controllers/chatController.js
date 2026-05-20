@@ -46,7 +46,7 @@ exports.upload = multer({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isGroupMember(groupId, empId) {
   return db.query(
-    `SELECT role FROM chat_group_members WHERE group_id=$1 AND employee_id=$2 AND left_at IS NULL`,
+    `SELECT role FROM chat_group_members WHERE group_id=$1 AND employee_id=$2 AND left_at IS NULL AND deleted_at IS NULL`,
     [groupId, empId]
   ).then(r => r.rows[0] || null);
 }
