@@ -26,8 +26,8 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Request logger (dev only)
 app.use((req, _res, next) => {
@@ -39,7 +39,7 @@ app.use((req, _res, next) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
-const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 5e8 // ✅ 500MB });
+const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e7 });
 global.io = io;
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
