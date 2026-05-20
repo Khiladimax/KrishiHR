@@ -984,7 +984,9 @@ exports.createMeeting = async (req, res) => {
     const roomId = uuidv4();
     const r = await db.query(`
       INSERT INTO chat_meetings(room_id, title, created_by, group_id, status)
-      VALUES($1,$2,$3,$4,'active') RETURNING *
+      VALUES($1,$2,$3,$4,'active')
+      ON CONFLICT (room_id) DO UPDATE SET status='active', ended_at=NULL
+      RETURNING *
     `, [roomId, title || 'Meeting', empId, group_id || null]);
     const meeting = r.rows[0];
 
@@ -1101,10 +1103,12 @@ exports.startScheduledMeeting = async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     const sm = r.rows[0];
 
-    // Create the live meeting
+    // Create the live meeting — use ON CONFLICT to handle double-click / duplicate start
     const liveR = await db.query(`
       INSERT INTO chat_meetings(room_id, title, created_by, group_id, status, scheduled_meeting_id)
-      VALUES($1,$2,$3,$4,'active',$5) RETURNING *
+      VALUES($1,$2,$3,$4,'active',$5)
+      ON CONFLICT (room_id) DO UPDATE SET status='active', ended_at=NULL
+      RETURNING *
     `, [sm.room_id, sm.title, empId, sm.group_id, sm.id]);
 
     await db.query(`UPDATE scheduled_meetings SET status='started' WHERE id=$1`, [id]);
