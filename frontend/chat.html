@@ -2323,7 +2323,13 @@ function buildMsgEl(m) {
     // Pass raw content to linkify (it handles its own escaping internally)
     contentHtml = `<span>${linkify(m.content||'')}</span>`;
   } else {
-    contentHtml = `<span>${esc(m.content||'')}</span>`;
+    // Check if this is a call invite message from Android (contains roomId)
+    const callCard = buildCallCard(m.content||'');
+    if (callCard) {
+      contentHtml = callCard;
+    } else {
+      contentHtml = `<span>${esc(m.content||'')}</span>`;
+    }
   }
 
   // Ticks
@@ -3974,6 +3980,48 @@ function fileIcon(mime) {
   if (mime.includes('zip')||mime.includes('compressed'))return '🗜️';
   return '📄';
 }
+function buildCallCard(content) {
+  if (!content) return null;
+  const isVideoCall  = /video call/i.test(content) || content.includes('📹');
+  const isVoiceCall  = /voice call/i.test(content) || /audio call/i.test(content) || content.includes('📞');
+  const isTapToJoin  = /tap to join/i.test(content);
+  if (!((isVideoCall || isVoiceCall) && isTapToJoin)) return null;
+
+  // Extract roomId — handle both call_timestamp_random and call-min-max formats
+  const roomMatch = content.match(/call_[\d]+_[\w]+/) || content.match(/call-[\d]+-[\d]+/);
+  const roomId    = roomMatch ? roomMatch[0] : null;
+
+  const icon  = isVideoCall ? '📹' : '📞';
+  const title = isVideoCall ? 'Video call' : 'Voice call';
+
+  if (!roomId) {
+    // No roomId embedded — just show card without join button
+    return `<div class="meet-invite-card" style="min-width:200px">
+      <div class="meet-invite-header">
+        <span class="meet-invite-icon">${icon}</span>
+        <div><div class="meet-invite-title">${title}</div><div class="meet-invite-time">Tap to join</div></div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="meet-invite-card" style="min-width:200px">
+    <div class="meet-invite-header">
+      <span class="meet-invite-icon">${icon}</span>
+      <div>
+        <div class="meet-invite-title">${title}</div>
+        <div class="meet-invite-time">Tap to join</div>
+      </div>
+    </div>
+    <button class="meet-invite-btn" onclick="joinCallFromMsg('${roomId}','${title}',${isVoiceCall ? 'true' : 'false'})">
+      Join Now
+    </button>
+  </div>`;
+}
+
+function joinCallFromMsg(roomId, title, audioOnly) {
+  openMeetingPanel(roomId, title, audioOnly);
+}
+
 function linkify(text) {
   // Check if this is a meeting announcement (contains meetjoin= URL)
   const meetMatch = text.match(/[?&]meetjoin=([a-zA-Z0-9_-]+)/);
