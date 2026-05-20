@@ -1483,29 +1483,56 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 
 <!-- New Group/DM -->
 <div class="modal-overlay" id="newGroupModal">
-  <div class="modal">
-    <div class="modal-title">New Conversation</div>
-    <div class="type-tabs">
-      <button class="type-tab active" id="typeTabGroup" onclick="setCreateType('group')">👥 Group</button>
-      <button class="type-tab" id="typeTabDM" onclick="setCreateType('dm')">💬 Direct Message</button>
+  <div class="modal" style="width:420px;max-width:95vw;padding:0;border-radius:16px;overflow:hidden">
+    <!-- Header -->
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--wa-border)">
+      <div style="font-size:17px;font-weight:800;color:var(--wa-text);margin-bottom:14px">New Conversation</div>
+      <!-- Type toggle -->
+      <div style="display:flex;background:var(--wa-bg);border-radius:10px;padding:3px;gap:3px">
+        <button id="typeTabGroup" onclick="setCreateType('group')"
+          style="flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;background:var(--chat-accent,#4a8c1c);color:#fff">
+          👥 Group
+        </button>
+        <button id="typeTabDM" onclick="setCreateType('dm')"
+          style="flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;background:transparent;color:var(--wa-text2)">
+          💬 Direct Message
+        </button>
+      </div>
     </div>
-    <div class="form-row" id="groupNameWrap">
-      <div class="form-label">Group name</div>
-      <input class="form-input" id="newGroupName" placeholder="e.g. Project Alpha Team">
+
+    <!-- Body -->
+    <div style="padding:18px 24px;display:flex;flex-direction:column;gap:14px">
+      <!-- Group name (group only) -->
+      <div id="groupNameWrap">
+        <div style="font-size:11px;font-weight:700;color:var(--wa-text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">Group Name</div>
+        <input class="form-input" id="newGroupName" placeholder="e.g. Project Alpha Team" style="width:100%;box-sizing:border-box">
+      </div>
+      <!-- Description (group only) -->
+      <div id="groupDescWrap">
+        <div style="font-size:11px;font-weight:700;color:var(--wa-text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">Description <span style="font-weight:400;text-transform:none">(optional)</span></div>
+        <input class="form-input" id="newGroupDesc" placeholder="What's this group for?" style="width:100%;box-sizing:border-box">
+      </div>
+      <!-- Search -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--wa-text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px" id="addMembersLabel">Add Members</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none">🔍</span>
+          <input class="form-input" id="memberSearch" placeholder="Search by name or code…" oninput="searchEmployees()"
+            style="width:100%;box-sizing:border-box;padding-left:34px">
+        </div>
+        <!-- Dropdown results -->
+        <div id="memberSearchResults"
+          style="max-height:180px;overflow-y:auto;margin-top:4px;border:1px solid var(--wa-border);border-radius:10px;display:none;background:var(--wa-surface);box-shadow:0 4px 16px rgba(0,0,0,.1)">
+        </div>
+        <!-- Selected chips -->
+        <div id="selectedMembers" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;min-height:0"></div>
+      </div>
     </div>
-    <div class="form-row" id="groupDescWrap">
-      <div class="form-label">Description (optional)</div>
-      <input class="form-input" id="newGroupDesc" placeholder="What's this group for?">
-    </div>
-    <div class="form-row">
-      <div class="form-label" id="addMembersLabel">Add Members</div>
-      <input class="form-input" id="memberSearch" placeholder="Search by name or code…" oninput="searchEmployees()">
-      <div id="memberSearchResults" style="max-height:180px;overflow-y:auto;margin-top:6px;border:1px solid var(--wa-border);border-radius:10px;display:none;background:var(--wa-surface)"></div>
-      <div id="selectedMembers" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal('newGroupModal')">Cancel</button>
-      <button class="btn-primary" onclick="createGroup()">Create</button>
+
+    <!-- Footer -->
+    <div style="padding:14px 24px 20px;display:flex;gap:10px;border-top:1px solid var(--wa-border)">
+      <button class="btn-secondary" onclick="closeModal('newGroupModal')" style="flex:1;padding:10px">Cancel</button>
+      <button class="btn-primary" onclick="createGroup()" style="flex:2;padding:10px;font-weight:700">Create</button>
     </div>
   </div>
 </div>
@@ -2827,11 +2854,15 @@ function openNewGroupModal() {
 }
 function setCreateType(type) {
   createType = type;
-  document.getElementById('typeTabGroup').classList.toggle('active', type==='group');
-  document.getElementById('typeTabDM').classList.toggle('active', type==='dm');
-  document.getElementById('groupNameWrap').style.display    = type==='group' ? '' : 'none';
-  document.getElementById('groupDescWrap').style.display    = type==='group' ? '' : 'none';
-  document.getElementById('addMembersLabel').textContent    = type==='dm' ? 'Select Person' : 'Add Members';
+  const gBtn = document.getElementById('typeTabGroup');
+  const dBtn = document.getElementById('typeTabDM');
+  gBtn.style.background = type==='group' ? 'var(--chat-accent,#4a8c1c)' : 'transparent';
+  gBtn.style.color      = type==='group' ? '#fff' : 'var(--wa-text2)';
+  dBtn.style.background = type==='dm'    ? 'var(--chat-accent,#4a8c1c)' : 'transparent';
+  dBtn.style.color      = type==='dm'    ? '#fff' : 'var(--wa-text2)';
+  document.getElementById('groupNameWrap').style.display = type==='group' ? '' : 'none';
+  document.getElementById('groupDescWrap').style.display = type==='group' ? '' : 'none';
+  document.getElementById('addMembersLabel').textContent = type==='dm' ? 'Select Person' : 'Add Members';
 }
 async function fetchAllEmployees() {
   const res = await chatApi('GET', '/employees');
