@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Ping /health endpoint
         run: |
-          echo "Pinging https://krishihr.onrender.com/health ..."
+          echo "Pinging krishihr-zuui.onrender.com/health ..."
           STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://krishihr.onrender.com/health)
           echo "Response status: $STATUS"
           if [ "$STATUS" -eq 200 ]; then
