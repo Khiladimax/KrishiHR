@@ -1399,7 +1399,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 </div>
 
 <!-- ── Delete Chat Dialog ── -->
-<div id="deleteChatOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;">
+<div id="deleteChatOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:14px;padding:28px 28px 20px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22);font-family:var(--font);">
     <div style="font-size:16px;font-weight:700;color:#111b21;margin-bottom:8px;" id="deleteChatDialogTitle">Delete chat?</div>
     <div style="font-size:13.5px;color:#667781;line-height:1.5;margin-bottom:22px;">
@@ -1830,9 +1830,8 @@ async function loadGroups() {
   const res = await chatApi('GET', '/chat/groups');
   if (!res.success) return;
   const allFetched = res.data || [];
-  groups = window._deletedGroupIds
-    ? allFetched.filter(g => !window._deletedGroupIds.has(g.id))
-    : allFetched;
+  // DB already filters left_at IS NULL — no client-side filter needed
+  groups = allFetched;
   renderGroupList();
   if (currentMode === 'meetings') renderMeetGroupPicker();
   // Load presence for all DM peers
@@ -2481,9 +2480,17 @@ This cannot be undone.`)) return;
       document.getElementById('chatEmptyState').style.display = '';
 
       // Backend: marks all messages as deleted_for + sets left_at
-      try { await chatApi('DELETE', `/chat/groups/${gidToDelete}`); } catch (_) {}
+      try {
+        const delRes = await chatApi('DELETE', `/chat/groups/${gidToDelete}`);
+        if (!delRes?.success) {
+          console.error('[deleteChat] backend error:', delRes?.message);
+          // Still proceed — the UI already removed it
+        }
+      } catch (err) {
+        console.error('[deleteChat] fetch error:', err);
+      }
       showToast('Chat deleted', '', null);
-      // Refresh sidebar to stay in sync with DB
+      // Refresh sidebar — chat should now be gone (left_at is set in DB)
       await loadGroups();
     };
     return;
