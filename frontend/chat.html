@@ -688,7 +688,14 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 .meeting-panel.minimized .self-float { display: none; }
 
 /* ── Alone warning ── */
-
+.meet-alone-warn {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-60%);
+  text-align: center; color: #9aa0a6; display: none; z-index: 3; width: 320px;
+}
+.meet-alone-warn.visible { display: block; }
+.meet-alone-warn-icon { font-size: 52px; margin-bottom: 16px; }
+.meet-alone-warn-text { font-size: 18px; font-weight: 600; color: #e8eaed; margin-bottom: 8px; }
+.meet-alone-warn-sub { font-size: 13px; line-height: 1.5; }
 
 /* ── Controls bar — centered like Google Meet ── */
 .meet-controls {
@@ -1258,7 +1265,12 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="meet-videos-area" id="meetVideosArea">
 
         <!-- Alone warning -->
-
+        <div class="meet-alone-warn" id="meetAloneWarn">
+          <div class="meet-alone-warn-icon">👋</div>
+          <div class="meet-alone-warn-text">You're the only one here</div>
+          <div class="meet-alone-warn-sub">Share the meeting link to invite others</div>
+          <button class="meet-card-btn join" onclick="copyMeetingLink()" style="margin-top:14px">Copy meeting link</button>
+        </div>
 
         <!-- Screen share container (fills 100% like Google Meet) -->
         <div class="screenshare-container" id="screenshareContainer">
@@ -2311,13 +2323,7 @@ function buildMsgEl(m) {
     // Pass raw content to linkify (it handles its own escaping internally)
     contentHtml = `<span>${linkify(m.content||'')}</span>`;
   } else {
-    // Check if this is a call invite message from Android (contains roomId)
-    const callCard = buildCallCard(m.content||'');
-    if (callCard) {
-      contentHtml = callCard;
-    } else {
-      contentHtml = `<span>${esc(m.content||'')}</span>`;
-    }
+    contentHtml = `<span>${esc(m.content||'')}</span>`;
   }
 
   // Ticks
@@ -3095,7 +3101,11 @@ let currentMeetRoomId = null;
 const ICE_SERVERS = { iceServers: window.CFG?.meetingStunServers || [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' }
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // TURN relay — required for mobile-to-mobile / symmetric NAT
+  { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
 ] };
 
 function startInstantMeeting() {
@@ -3187,6 +3197,7 @@ function updateParticipantCount() {
   document.getElementById('meetingParticipantCount').textContent =
     count===1 ? 'Just you' : `${count} participants`;
   document.getElementById('participantListCount').textContent = count;
+  document.getElementById('meetAloneWarn').classList.toggle('visible', count===1);
 }
 
 function updateParticipantList() {
@@ -3212,9 +3223,14 @@ function updateParticipantList() {
 async function onExistingPeers(peerIds) {
   for (const pid of peerIds) {
     const pc = createPeerConnection(pid);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    if (socket) socket.emit('offer', { to: pid, offer, roomId: currentMeetRoomId });
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      // Use pc.localDescription after setLocalDescription resolves — guaranteed to be set
+      if (socket) socket.emit('offer', { to: pid, offer: pc.localDescription, roomId: currentMeetRoomId });
+    } catch(e) {
+      console.warn('onExistingPeers offer error for', pid, e);
+    }
   }
 }
 
@@ -3257,15 +3273,16 @@ function createPeerConnection(peerId) {
     const video = tile.querySelector('video');
     if (video) {
       video.srcObject = stream;
-      // Only show camera tile if stream has an active video track
-      const hasVideo = stream.getVideoTracks().some(t => t.enabled && t.readyState === 'live');
-      if (hasVideo) {
-        tile.classList.add('has-cam');
-        tile.classList.remove('no-cam');
-      } else {
-        tile.classList.remove('has-cam');
-        tile.classList.add('no-cam');
-      }
+      // Check video immediately and also once tracks are confirmed live
+      const refreshCamState = () => {
+        const hasVideo = stream.getVideoTracks().some(t => t.enabled);
+        tile.classList.toggle('has-cam', hasVideo);
+        tile.classList.toggle('no-cam', !hasVideo);
+      };
+      refreshCamState();
+      // Re-check after a short delay — readyState may not be live yet at ontrack time
+      setTimeout(refreshCamState, 500);
+      stream.getVideoTracks().forEach(t => { t.onunmute = refreshCamState; t.onmute = refreshCamState; });
     }
     // Audio level detection (active speaker)
     setupAudioDetection(stream, peerId);
@@ -3345,6 +3362,26 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
   const grid    = document.getElementById('meetGrid');
   const selfFlt = document.getElementById('selfFloat');
   if (sharing) {
+    // The peer's track is coming through their existing PeerConnection.
+    // Listen for the next ontrack event which carries the screen track.
+    const pc = peerConnections[peerId];
+    if (pc) {
+      // Attach a one-time ontrack listener to grab the screen track
+      const origOnTrack = pc.ontrack;
+      pc.ontrack = (event) => {
+        const stream = event.streams[0];
+        if (stream) {
+          peerStreams[peerId] = stream;
+          document.getElementById('screenShareVideo').srcObject = stream;
+          // Also update the peer strip thumb
+          const stripVid = document.querySelector('#strip-' + peerId + ' video');
+          if (stripVid) stripVid.srcObject = stream;
+        }
+        // Restore original handler
+        pc.ontrack = origOnTrack;
+      };
+    }
+    // If stream already updated (slow network — track arrived before signal), use it
     const stream = peerStreams[peerId];
     if (stream) document.getElementById('screenShareVideo').srcObject = stream;
     document.getElementById('screenshareLabel').textContent = (displayName||'Someone') + "'s screen";
@@ -3359,6 +3396,13 @@ function onPeerScreenShare({ peerId, sharing, displayName }) {
     grid.style.display = '';
     selfFlt.style.display = '';
     document.getElementById('screenShareVideo').srcObject = null;
+    // Re-attach peer's camera stream to their tile
+    const stream = peerStreams[peerId];
+    const tile = document.getElementById('tile-' + peerId);
+    if (tile && stream) {
+      const vid = tile.querySelector('video');
+      if (vid) vid.srcObject = stream;
+    }
   }
 }
 
@@ -3967,48 +4011,6 @@ function fileIcon(mime) {
   if (mime.includes('zip')||mime.includes('compressed'))return '🗜️';
   return '📄';
 }
-function buildCallCard(content) {
-  if (!content) return null;
-  const isVideoCall  = /video call/i.test(content) || content.includes('📹');
-  const isVoiceCall  = /voice call/i.test(content) || /audio call/i.test(content) || content.includes('📞');
-  const isTapToJoin  = /tap to join/i.test(content);
-  if (!((isVideoCall || isVoiceCall) && isTapToJoin)) return null;
-
-  // Extract roomId — handle both call_timestamp_random and call-min-max formats
-  const roomMatch = content.match(/call_[\d]+_[\w]+/) || content.match(/call-[\d]+-[\d]+/);
-  const roomId    = roomMatch ? roomMatch[0] : null;
-
-  const icon  = isVideoCall ? '📹' : '📞';
-  const title = isVideoCall ? 'Video call' : 'Voice call';
-
-  if (!roomId) {
-    // No roomId embedded — just show card without join button
-    return `<div class="meet-invite-card" style="min-width:200px">
-      <div class="meet-invite-header">
-        <span class="meet-invite-icon">${icon}</span>
-        <div><div class="meet-invite-title">${title}</div><div class="meet-invite-time">Tap to join</div></div>
-      </div>
-    </div>`;
-  }
-
-  return `<div class="meet-invite-card" style="min-width:200px">
-    <div class="meet-invite-header">
-      <span class="meet-invite-icon">${icon}</span>
-      <div>
-        <div class="meet-invite-title">${title}</div>
-        <div class="meet-invite-time">Tap to join</div>
-      </div>
-    </div>
-    <button class="meet-invite-btn" onclick="joinCallFromMsg('${roomId}','${title}',${isVoiceCall ? 'true' : 'false'})">
-      Join Now
-    </button>
-  </div>`;
-}
-
-function joinCallFromMsg(roomId, title, audioOnly) {
-  openMeetingPanel(roomId, title, audioOnly);
-}
-
 function linkify(text) {
   // Check if this is a meeting announcement (contains meetjoin= URL)
   const meetMatch = text.match(/[?&]meetjoin=([a-zA-Z0-9_-]+)/);
