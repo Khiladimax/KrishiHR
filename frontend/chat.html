@@ -1896,6 +1896,14 @@ async function loadGroups() {
   // (belt-and-suspenders: DB left_at should handle it, but polling races the API)
   if (window._chatDeletedIds?.size) {
     groups = allFetched.filter(g => !window._chatDeletedIds.has(g.id));
+    // Also close panel if somehow a deleted chat is still active
+    if (activeGid && window._chatDeletedIds.has(activeGid)) {
+      activeGid = null; activeGroup = null;
+      document.getElementById('chatHeader').style.display = 'none';
+      document.getElementById('msgList').innerHTML = '';
+      const emptyEl = document.getElementById('chatEmptyState') || document.getElementById('chatEmpty');
+      if (emptyEl) emptyEl.style.display = '';
+    }
   } else {
     groups = allFetched;
   }
@@ -2021,16 +2029,21 @@ async function executeChatDelete(gid) {
   // 3. Track in deleted set (belt-and-suspenders for polling)
   if (!window._chatDeletedIds) window._chatDeletedIds = new Set();
   window._chatDeletedIds.add(gid);
-  setTimeout(() => window._chatDeletedIds?.delete(gid), 120000);
+  // Keep for 10 minutes to survive polling
+  setTimeout(() => window._chatDeletedIds?.delete(gid), 600000);
 
-  // 4. Close chat panel if this was the active chat
-  if (activeGid === gid) {
-    activeGid = null;
-    activeGroup = null;
-    document.getElementById('chatHeader').style.display = 'none';
-    document.getElementById('msgList').innerHTML = '';
-    document.getElementById('chatEmptyState').style.display = '';
-  }
+  // 4. ALWAYS close the chat panel — even if this wasn't the active chat
+  //    Leaving the panel open keeps activeGid set which can restore left_at
+  if (socket) socket.emit('leaveGroup', gid);
+  activeGid = null;
+  activeGroup = null;
+  document.getElementById('chatHeader').style.display     = 'none';
+  document.getElementById('messagesArea') && (document.getElementById('messagesArea').style.display = 'none');
+  document.getElementById('chatInputWrap') && (document.getElementById('chatInputWrap').style.display = 'none');
+  document.getElementById('typingWrap') && (document.getElementById('typingWrap').style.display = 'none');
+  document.getElementById('msgList').innerHTML = '';
+  const emptyEl = document.getElementById('chatEmptyState') || document.getElementById('chatEmpty');
+  if (emptyEl) emptyEl.style.display = '';
 
   // 5. Fire backend — don't await, don't call loadGroups after
   chatApi('DELETE', `/chat/groups/${gid}`)
