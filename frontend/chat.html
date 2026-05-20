@@ -2393,9 +2393,6 @@ function updateTick(messageId, status) {
 }
 
 function onSocketMessage(msg) {
-  // Ignore messages from chats the user has deleted this session
-  if (window._chatDeletedIds?.has(msg.group_id)) return;
-
   const isMine = (msg.sender_id === me.id || msg.sender_id === me.employee_id);
   if (msg.group_id !== activeGid) {
     const g = groups.find(g => g.id===msg.group_id);
