@@ -539,14 +539,16 @@ exports.sendMessage = async (req, res) => {
       [msg.id, empId]
     );
 
-    // If this is a DM and the other person had "deleted" (left_at set), 
-    // restore them so the chat reappears for them when a new message arrives
+    // If this is a DM and the SENDER had previously deleted the chat (left_at set),
+    // restore only the sender's own membership so they can see their sent message.
+    // Do NOT restore the recipient's left_at — if they deleted the chat, it stays
+    // deleted for them until they explicitly open it again.
     const groupTypeRes = await db.query(`SELECT type FROM chat_groups WHERE id=$1`, [gid]);
     if (groupTypeRes.rows[0]?.type === 'dm') {
       await db.query(
         `UPDATE chat_group_members 
          SET left_at = NULL 
-         WHERE group_id=$1 AND employee_id != $2 AND left_at IS NOT NULL`,
+         WHERE group_id=$1 AND employee_id = $2 AND left_at IS NOT NULL`,
         [gid, empId]
       );
     }
