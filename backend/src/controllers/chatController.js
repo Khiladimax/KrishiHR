@@ -112,7 +112,7 @@ exports.listGroups = async (req, res) => {
            WHERE m2.group_id=g.id AND m2.employee_id != $1 AND g.type='dm' LIMIT 1) AS dm_peer_role
       FROM chat_groups g
       JOIN chat_group_members cgm ON cgm.group_id=g.id AND cgm.employee_id=$1
-      WHERE cgm.left_at IS NULL
+      WHERE cgm.left_at IS NULL AND (cgm.deleted_at IS NULL)
       ORDER BY last_message_at DESC NULLS LAST, g.created_at DESC
     `, [empId]);
     res.json({ success: true, data: result.rows });
@@ -144,13 +144,15 @@ exports.createGroup = async (req, res) => {
           AND (SELECT COUNT(*) FROM chat_group_members m WHERE m.group_id=g.id)=2
       `, [empId, peerId]);
       if (existing.rows.length) {
-        // Restore the deleting user's membership (left_at → NULL) so chat reappears
+        const existingGid = existing.rows[0].id;
+        // Only restore if the user explicitly reopens this DM themselves
+        // (they clicked "New Chat" and selected this person = intentional restore)
         await client.query(
-          `UPDATE chat_group_members SET left_at = NULL WHERE group_id=$1 AND employee_id=$2`,
-          [existing.rows[0].id, empId]
+          `UPDATE chat_group_members SET left_at = NULL, deleted_at = NULL WHERE group_id=$1 AND employee_id=$2`,
+          [existingGid, empId]
         );
         await client.query('COMMIT');
-        return res.json({ success: true, data: { id: existing.rows[0].id }, existing: true });
+        return res.json({ success: true, data: { id: existingGid }, existing: true });
       }
     }
 
@@ -539,10 +541,9 @@ exports.sendMessage = async (req, res) => {
       [msg.id, empId]
     );
 
-    // If this is a DM and the SENDER had previously deleted the chat (left_at set),
-    // restore only the sender's own membership so they can see their sent message.
-    // Do NOT restore the recipient's left_at — if they deleted the chat, it stays
-    // deleted for them until they explicitly open it again.
+    // If this is a DM and the SENDER had previously deleted (left_at set),
+    // restore only the sender's own membership so they can see what they sent.
+    // NEVER restore the recipient's left_at — delete is permanent for them.
     const groupTypeRes = await db.query(`SELECT type FROM chat_groups WHERE id=$1`, [gid]);
     if (groupTypeRes.rows[0]?.type === 'dm') {
       await db.query(
@@ -907,10 +908,11 @@ exports.deleteGroupForMe = async (req, res) => {
       [empId, groupId]
     );
 
-    // 2. Set left_at — this hides the chat from listGroups (WHERE cgm.left_at IS NULL)
+    // 2. Set left_at AND deleted_at — left_at hides from listGroups, deleted_at is permanent
+    //    Even if left_at gets reset by some other path, deleted_at keeps it hidden forever
     const r = await db.query(
       `UPDATE chat_group_members
-       SET left_at = NOW()
+       SET left_at = NOW(), deleted_at = NOW()
        WHERE group_id=$1 AND employee_id=$2
        RETURNING id`,
       [groupId, empId]
@@ -1303,8 +1305,9 @@ exports.migrate = async () => {
     `ALTER TABLE chat_meetings ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ`,
 
     // chat_group_members — role column (may have been added later)
-    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS role     TEXT DEFAULT 'member'`,
-    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS left_at  TIMESTAMPTZ`,
+    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS role       TEXT DEFAULT 'member'`,
+    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS left_at    TIMESTAMPTZ`,
+    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
 
     // Ensure invite_link unique constraint (safe — CREATE UNIQUE INDEX IF NOT EXISTS)
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_groups_invite_link ON chat_groups(invite_link) WHERE invite_link IS NOT NULL`,
