@@ -2385,21 +2385,23 @@ async function chatMoreAction(action) {
   }
 
   if (action === 'deleteChat') {
-    const peer = activeGroup?.peer_name || 'this person';
+    const peer = activeGroup?.peer_name || activeGroup?.dm_peer_name || 'this person';
     if (!confirm(`Delete all messages with ${peer}? This cannot be undone.`)) return;
-    try {
-      await chatApi('DELETE', `/chat/groups/${activeGid}`);
-    } catch (_) {}
-    // Remove from sidebar
-    const el = document.querySelector(`[onclick*="openGroup(${activeGid})"]`);
+    const deletedGid = activeGid;
+    // Track deleted group IDs so loadGroups never shows them again
+    if (!window._deletedGroupIds) window._deletedGroupIds = new Set();
+    window._deletedGroupIds.add(deletedGid);
+    // Hide immediately
+    const el = document.querySelector(`.group-item[onclick*="openGroup(${deletedGid})"]`)
+             || document.querySelector(`[data-gid="${deletedGid}"]`);
     if (el) el.remove();
-    activeGid = null;
-    activeGroup = null;
+    activeGid = null; activeGroup = null;
     document.getElementById('chatHeader').style.display = 'none';
     document.getElementById('msgList').innerHTML = '';
     document.getElementById('chatEmptyState').style.display = '';
     showToast('Chat deleted', '', null);
-    await loadGroups();
+    // Tell backend to set left_at (permanently excludes from loadGroups)
+    try { await chatApi('DELETE', `/chat/groups/${deletedGid}`); } catch (_) {}
   }
 }
 
