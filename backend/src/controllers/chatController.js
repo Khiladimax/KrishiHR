@@ -447,6 +447,12 @@ exports.getMessages = async (req, res) => {
       WHERE cm.group_id=$2
         AND cm.deleted_for_everyone IS NOT TRUE
         AND NOT ($1 = ANY(COALESCE(cm.deleted_for, '{}'::int[])))
+        AND cm.created_at > COALESCE(
+          (SELECT cgm.deleted_at FROM chat_group_members cgm
+           WHERE cgm.group_id=$2 AND cgm.employee_id=$1 AND cgm.deleted_at IS NOT NULL
+           ORDER BY cgm.deleted_at DESC LIMIT 1),
+          '1970-01-01'::timestamptz
+        )
     `;
     const params = [empId, gid];
     if (before) {
