@@ -3833,11 +3833,18 @@ loadGroups().then(async () => {
   // Open the DM
   await openGroup(targetGroup.id);
 
-  // If it's a call (not dm_only), wait for socket then call
+  // If it's a call (not dm_only), wait for socket to be fully connected then call
   if (callType && callType !== 'dm_only') {
     let waited = 0;
-    while (!socket && waited < 8000) { await new Promise(r => setTimeout(r, 300)); waited += 300; }
-    if (socket && activeGroup) initiateCall(callType);
+    while ((!socket || !socket.connected) && waited < 8000) {
+      await new Promise(r => setTimeout(r, 300));
+      waited += 300;
+    }
+    if (socket && socket.connected && activeGroup) {
+      // Small extra delay to ensure joinGroup emit has been processed by server
+      await new Promise(r => setTimeout(r, 400));
+      initiateCall(callType);
+    }
   }
 });
 loadScheduledMeetings();
