@@ -179,6 +179,15 @@ io.on('connection', (socket) => {
     socket.to(`meeting:${roomId}`).emit('raiseHand', { peerId: socket.id, raised, displayName });
   });
 
+  // Relay mic/cam mute state to peers in the room
+  socket.on('peerMuteState', ({ roomId, micEnabled, camEnabled }) => {
+    socket.to(`meeting:${roomId}`).emit('peerMuteState', {
+      peerId: socket.id,
+      micEnabled,
+      camEnabled
+    });
+  });
+
   // Meeting chat
   socket.on('meetingChat', ({ roomId, message }) => {
     io.to(`meeting:${roomId}`).emit('meetingChat', {
