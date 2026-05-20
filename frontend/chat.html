@@ -3800,13 +3800,27 @@ function showBriefStatus(msg) {
   showToast('Call', msg, null);
 }
 
-// ── Presence interval ─────────────────────────────────────────────────────────
-setInterval(() => updatePresence(true), 30000);
+// ── Presence heartbeat — every 60s (backend expires after 2min of silence) ───
+setInterval(() => { if (!document.hidden) updatePresence(true); }, 60000);
 
-// Page visibility
+// Page visibility — mark offline when tab hidden/switched, online when back
 document.addEventListener('visibilitychange', () => {
   updatePresence(!document.hidden);
 });
+
+// Mark offline immediately on tab/window close (best-effort)
+window.addEventListener('beforeunload', () => {
+  // Use sendBeacon for reliability during page unload
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const API = (typeof API_BASE !== 'undefined' ? API_BASE : '');
+  if (token && API) {
+    navigator.sendBeacon(API + '/chat/presence/offline', JSON.stringify({ is_online: false }));
+  }
+  updatePresence(false);
+});
+
+// Also mark offline on pagehide (mobile/Safari)
+window.addEventListener('pagehide', () => { updatePresence(false); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadGroups().then(async () => {
@@ -3849,7 +3863,7 @@ loadGroups().then(async () => {
           doCall();
         } else if (waited >= 10000) {
           clearInterval(poll);
-          console.warn('[AI Call] socket never connected, call aborted');
+          console.warn('[AI Call] socket never connected');
         }
       }, 300);
     }
