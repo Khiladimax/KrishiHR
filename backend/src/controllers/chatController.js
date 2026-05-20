@@ -870,6 +870,18 @@ exports.markOffline = async (req, res) => {
   }
 };
 
+exports.clearGroupMessages = async (req, res) => {
+  try {
+    const empId  = req.user.id;
+    const groupId = parseInt(req.params.groupId);
+    // Verify member
+    const mem = await db.query(`SELECT 1 FROM chat_group_members WHERE group_id=$1 AND employee_id=$2`, [groupId, empId]);
+    if (!mem.rows.length) return res.status(403).json({ success: false, message: 'Not a member' });
+    await db.query(`DELETE FROM chat_messages WHERE group_id=$1`, [groupId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.getPresence = async (req, res) => {
   try {
     const { employee_ids } = req.query;
