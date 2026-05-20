@@ -5,7 +5,7 @@
 
 // KrishiHR — no Main_file, using inline defaults
 const CONFIG = {
-  chatFileMaxSizeMB: 500, // ✅ 500MB as required
+  chatFileMaxSizeMB: 50,
   chatFileRoute: '/chat/files',
   chatBlockedExtensions: ['.exe','.bat','.sh','.cmd','.msi','.ps1','.vbs'],
   chatAdminRoles: ['admin','super_admin','hr'],
@@ -984,9 +984,7 @@ exports.createMeeting = async (req, res) => {
     const roomId = uuidv4();
     const r = await db.query(`
       INSERT INTO chat_meetings(room_id, title, created_by, group_id, status)
-      VALUES($1,$2,$3,$4,'active')
-      ON CONFLICT (room_id) DO UPDATE SET status='active', ended_at=NULL
-      RETURNING *
+      VALUES($1,$2,$3,$4,'active') RETURNING *
     `, [roomId, title || 'Meeting', empId, group_id || null]);
     const meeting = r.rows[0];
 
@@ -1019,7 +1017,7 @@ exports.createMeeting = async (req, res) => {
 exports.scheduleMeeting = async (req, res) => {
   try {
     const empId = req.user.id;
-    const { title, group_id, scheduled_at, description, agenda, invite_emails } = req.body;
+    const { title, group_id, scheduled_at, description, agenda } = req.body;
     if (!scheduled_at) return res.status(400).json({ success: false, message: 'scheduled_at required' });
     const roomId = uuidv4();
     const r = await db.query(`
@@ -1035,36 +1033,6 @@ exports.scheduleMeeting = async (req, res) => {
         ...meeting,
         scheduled_by: empId
       });
-    }
-    // ✅ Send email invites if provided
-    if (invite_emails && Array.isArray(invite_emails) && invite_emails.length > 0) {
-      const emailSvc = require('../config/emailService');
-      const frontendUrl = process.env.FRONTEND_URL || 'https://krishi-hr-mu.vercel.app';
-      const joinLink = `${frontendUrl}/chat.html?meetjoin=${meeting.room_id}`;
-      const dtStr = new Date(scheduled_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'full', timeStyle: 'short' });
-      for (const email of invite_emails) {
-        if (!email || !email.includes('@')) continue;
-        try {
-          await emailSvc.sendEmail({
-            to: email,
-            subject: `📅 Meeting Invitation: ${title || 'KrishiHR Meeting'}`,
-            html: `<div style="font-family:sans-serif;max-width:520px;margin:auto">
-              <div style="background:#1A7A3C;padding:24px 32px;border-radius:12px 12px 0 0">
-                <h2 style="color:#fff;margin:0">📹 You're invited to a meeting</h2>
-              </div>
-              <div style="background:#fff;padding:24px 32px;border:1px solid #e0e0e0;border-radius:0 0 12px 12px">
-                <h3 style="margin:0 0 8px">${title || 'KrishiHR Meeting'}</h3>
-                <p style="color:#555;margin:0 0 16px">📅 ${dtStr} IST</p>
-                ${agenda ? `<p style="color:#555;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:20px">${agenda}</p>` : ''}
-                <a href="${joinLink}" style="display:inline-block;background:#1A7A3C;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">Join Meeting →</a>
-                <p style="color:#999;font-size:12px;margin-top:16px">Link: <a href="${joinLink}">${joinLink}</a></p>
-              </div>
-            </div>`
-          });
-        } catch (emailErr) {
-          console.error('[scheduleMeeting] email error:', email, emailErr.message);
-        }
-      }
     }
     res.json({ success: true, data: meeting });
   } catch (e) {
@@ -1104,9 +1072,7 @@ exports.startScheduledMeeting = async (req, res) => {
     // Create the live meeting
     const liveR = await db.query(`
       INSERT INTO chat_meetings(room_id, title, created_by, group_id, status, scheduled_meeting_id)
-      VALUES($1,$2,$3,$4,'active',$5)
-      ON CONFLICT (room_id) DO UPDATE SET status='active', ended_at=NULL
-      RETURNING *
+      VALUES($1,$2,$3,$4,'active',$5) RETURNING *
     `, [sm.room_id, sm.title, empId, sm.group_id, sm.id]);
 
     await db.query(`UPDATE scheduled_meetings SET status='started' WHERE id=$1`, [id]);
