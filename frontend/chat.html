@@ -1398,6 +1398,21 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   </div>
 </div>
 
+<!-- ── Delete Chat Dialog ── -->
+<div id="deleteChatOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;padding:28px 28px 20px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22);font-family:var(--font);">
+    <div style="font-size:16px;font-weight:700;color:#111b21;margin-bottom:8px;" id="deleteChatDialogTitle">Delete chat?</div>
+    <div style="font-size:13.5px;color:#667781;line-height:1.5;margin-bottom:22px;">
+      Messages will be deleted from your account only.<br>
+      If they send you a new message, the chat will reappear.
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <button onclick="document.getElementById('deleteChatOverlay').style.display='none'" style="padding:9px 20px;border:none;border-radius:8px;background:#f0f2f5;color:#111b21;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+      <button id="deleteChatConfirmBtn" style="padding:9px 20px;border:none;border-radius:8px;background:#e53935;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Delete</button>
+    </div>
+  </div>
+</div>
+
 <div class="ctx-menu" id="ctxMenu">
   <div class="ctx-item" id="ctxReply" onclick="ctxAction('reply')">↩ Reply</div>
   <div class="ctx-item" id="ctxReact" onclick="ctxAction('react')">😊 React</div>
@@ -2435,30 +2450,36 @@ This cannot be undone.`)) return;
 
   if (action === 'deleteChat') {
     const peer = activeGroup?.dm_peer_name || activeGroup?.name || 'this chat';
-    if (!confirm(`Delete chat with "${peer}"?
+    const overlay = document.getElementById('deleteChatOverlay');
+    document.getElementById('deleteChatDialogTitle').textContent = `Delete chat with "${peer}"?`;
+    overlay.style.display = 'flex';
 
-Messages will be deleted from your account only.
-If they send you a new message, the chat will reappear.`)) return;
+    // Set up confirm button (clone to remove stale listeners)
+    const btn = document.getElementById('deleteChatConfirmBtn');
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.onclick = async () => {
+      overlay.style.display = 'none';
+      const gidToDelete = activeGid;
 
-    const gidToDelete = activeGid;
-    // Session-level block: loadGroups timer will never show it again this session
-    if (!window._deletedGroupIds) window._deletedGroupIds = new Set();
-    window._deletedGroupIds.add(gidToDelete);
+      // Remove from sidebar immediately
+      const sidebarEl = document.querySelector(`.group-item[onclick="openGroup(${gidToDelete})"]`);
+      if (sidebarEl) sidebarEl.remove();
 
-    // Remove from sidebar immediately
-    const sidebarEl = document.querySelector(`.group-item[onclick="openGroup(${gidToDelete})"]`);
-    if (sidebarEl) sidebarEl.remove();
+      // Close chat panel
+      activeGid = null;
+      activeGroup = null;
+      document.getElementById('chatHeader').style.display = 'none';
+      document.getElementById('msgList').innerHTML = '';
+      document.getElementById('chatEmptyState').style.display = '';
 
-    // Close chat panel
-    activeGid = null;
-    activeGroup = null;
-    document.getElementById('chatHeader').style.display = 'none';
-    document.getElementById('msgList').innerHTML = '';
-    document.getElementById('chatEmptyState').style.display = '';
-
-    // Backend: set left_at so it's permanently hidden (until they message you)
-    try { await chatApi('DELETE', `/chat/groups/${gidToDelete}`); } catch (_) {}
-    showToast('Chat deleted', '', null);
+      // Backend: marks all messages as deleted_for + sets left_at
+      try { await chatApi('DELETE', `/chat/groups/${gidToDelete}`); } catch (_) {}
+      showToast('Chat deleted', '', null);
+      // Refresh sidebar to stay in sync with DB
+      await loadGroups();
+    };
+    return;
   }
 }
 
