@@ -137,6 +137,16 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 .group-list::-webkit-scrollbar { width: 4px; }
 .group-list::-webkit-scrollbar-thumb { background: var(--wa-surface); border-radius: 4px; }
 
+/* Sidebar context menu */
+.sctx-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; font-size: 14px; color: #111b21;
+  cursor: pointer; transition: background .12s; white-space: nowrap;
+}
+.sctx-item:hover { background: #f5f5f5; }
+.sctx-item.danger { color: #e53935; }
+.sctx-icon { font-size: 15px; width: 20px; text-align: center; }
+.sctx-sep { height: 1px; background: #e9edef; margin: 4px 0; }
 .group-item {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; cursor: pointer;
@@ -1398,6 +1408,31 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   </div>
 </div>
 
+<!-- ── Sidebar right-click context menu (WhatsApp style) ── -->
+<div id="sidebarCtxMenu" style="
+  display:none;position:fixed;z-index:10000;
+  background:#fff;border-radius:10px;min-width:200px;
+  box-shadow:0 4px 24px rgba(0,0,0,.18);
+  padding:6px 0;font-family:var(--font);overflow:hidden;
+">
+  <div class="sctx-item" onclick="sidebarCtxAction('open')">
+    <span class="sctx-icon">💬</span> Open chat
+  </div>
+  <div class="sctx-item" onclick="sidebarCtxAction('markRead')">
+    <span class="sctx-icon">✓</span> Mark as read
+  </div>
+  <div class="sctx-item" onclick="sidebarCtxAction('mute')">
+    <span class="sctx-icon">🔇</span> <span id="sctxMuteLabel">Mute notifications</span>
+  </div>
+  <div class="sctx-sep"></div>
+  <div class="sctx-item" onclick="sidebarCtxAction('clearChat')">
+    <span class="sctx-icon">🧹</span> Clear chat
+  </div>
+  <div class="sctx-item danger" onclick="sidebarCtxAction('deleteChat')">
+    <span class="sctx-icon">🗑️</span> Delete chat
+  </div>
+</div>
+
 <!-- ── Delete Chat Dialog ── -->
 <div id="deleteChatOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:14px;padding:28px 28px 20px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22);font-family:var(--font);">
@@ -1830,8 +1865,13 @@ async function loadGroups() {
   const res = await chatApi('GET', '/chat/groups');
   if (!res.success) return;
   const allFetched = res.data || [];
-  // DB already filters left_at IS NULL — no client-side filter needed
-  groups = allFetched;
+  // Filter out any groups the user has deleted this session
+  // (belt-and-suspenders: DB left_at should handle it, but polling races the API)
+  if (window._chatDeletedIds?.size) {
+    groups = allFetched.filter(g => !window._chatDeletedIds.has(g.id));
+  } else {
+    groups = allFetched;
+  }
   renderGroupList();
   if (currentMode === 'meetings') renderMeetGroupPicker();
   // Load presence for all DM peers
@@ -1847,6 +1887,132 @@ async function loadGroups() {
       renderGroupList(); // re-render with online dots
     }
   }
+}
+
+// ── Sidebar right-click context menu ─────────────────────────────────────────
+let sidebarCtxGid = null;
+
+function showSidebarCtx(e, gid) {
+  e.preventDefault();
+  e.stopPropagation();
+  sidebarCtxGid = gid;
+  const menu = document.getElementById('sidebarCtxMenu');
+  const g = groups.find(x => x.id === gid);
+
+  // Update mute label
+  if (g) {
+    document.getElementById('sctxMuteLabel').textContent = g.is_muted ? 'Unmute notifications' : 'Mute notifications';
+  }
+
+  // Position menu — keep it on screen
+  const x = Math.min(e.clientX, window.innerWidth - 220);
+  const y = Math.min(e.clientY, window.innerHeight - 220);
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+  menu.style.display = 'block';
+
+  // Close on next click anywhere
+  setTimeout(() => {
+    document.addEventListener('click', closeSidebarCtx, { once: true });
+    document.addEventListener('contextmenu', closeSidebarCtx, { once: true });
+  }, 0);
+}
+
+function closeSidebarCtx() {
+  document.getElementById('sidebarCtxMenu').style.display = 'none';
+  sidebarCtxGid = null;
+}
+
+async function sidebarCtxAction(action) {
+  const gid = sidebarCtxGid;
+  closeSidebarCtx();
+  if (!gid) return;
+
+  if (action === 'open') {
+    openGroup(gid);
+    return;
+  }
+
+  if (action === 'markRead') {
+    await chatApi('POST', '/chat/messages/seen', { group_id: gid }).catch(() => {});
+    const g = groups.find(x => x.id === gid);
+    if (g) { g.unread_count = 0; renderGroupList(); }
+    return;
+  }
+
+  if (action === 'mute') {
+    const g = groups.find(x => x.id === gid);
+    if (!g) return;
+    if (g.is_muted) {
+      await chatApi('DELETE', `/chat/groups/${gid}/mute`).catch(() => {});
+      g.is_muted = false;
+    } else {
+      await chatApi('POST', `/chat/groups/${gid}/mute`).catch(() => {});
+      g.is_muted = true;
+    }
+    renderGroupList();
+    return;
+  }
+
+  if (action === 'clearChat') {
+    const g = groups.find(x => x.id === gid);
+    const name = g?.dm_peer_name || g?.name || 'this chat';
+    // Show inline confirm instead of browser alert
+    if (!confirm(`Clear all messages in "${name}"? This cannot be undone.`)) return;
+    await chatApi('DELETE', `/chat/groups/${gid}/messages`).catch(() => {});
+    if (activeGid === gid) document.getElementById('msgList').innerHTML = '';
+    showToast('Chat cleared', '', null);
+    return;
+  }
+
+  if (action === 'deleteChat') {
+    // Re-use the existing styled delete dialog
+    const g = groups.find(x => x.id === gid);
+    const peer = g?.dm_peer_name || g?.name || 'this chat';
+    const overlay = document.getElementById('deleteChatOverlay');
+    document.getElementById('deleteChatDialogTitle').textContent = `Delete chat with "${peer}"?`;
+    overlay.style.display = 'flex';
+
+    const btn = document.getElementById('deleteChatConfirmBtn');
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.onclick = () => executeChatDelete(gid);
+  }
+}
+
+// ── Core delete logic — shared by right-click and header ⋮ menu ──────────────
+async function executeChatDelete(gid) {
+  document.getElementById('deleteChatOverlay').style.display = 'none';
+
+  // 1. Immediately remove from sidebar
+  const sidebarEl = document.querySelector(`.group-item[oncontextmenu="showSidebarCtx(event,${gid})"]`);
+  if (sidebarEl) sidebarEl.remove();
+
+  // 2. Remove from groups array so 30s polling doesn't re-add
+  groups = groups.filter(g => g.id !== gid);
+
+  // 3. Track in deleted set (belt-and-suspenders for polling)
+  if (!window._chatDeletedIds) window._chatDeletedIds = new Set();
+  window._chatDeletedIds.add(gid);
+  setTimeout(() => window._chatDeletedIds?.delete(gid), 120000);
+
+  // 4. Close chat panel if this was the active chat
+  if (activeGid === gid) {
+    activeGid = null;
+    activeGroup = null;
+    document.getElementById('chatHeader').style.display = 'none';
+    document.getElementById('msgList').innerHTML = '';
+    document.getElementById('chatEmptyState').style.display = '';
+  }
+
+  // 5. Fire backend — don't await, don't call loadGroups after
+  chatApi('DELETE', `/chat/groups/${gid}`)
+    .then(res => {
+      if (!res?.success) console.error('[deleteChat] backend error:', res?.message);
+    })
+    .catch(err => console.error('[deleteChat] network error:', err));
+
+  showToast('Chat deleted', '', null);
 }
 
 function renderGroupList() {
@@ -1873,7 +2039,7 @@ function renderGroupList() {
     const timeStr = g.last_message_at ? fmtTime(g.last_message_at) : '';
     const isMuted = g.is_muted;
     const isMe    = g.last_message_sender === me.id;
-    return `<div class="group-item ${g.id===activeGid?'active':''}" onclick="openGroup(${g.id})" oncontextmenu="return false">
+    return `<div class="group-item ${g.id===activeGid?'active':''}" onclick="openGroup(${g.id})" oncontextmenu="showSidebarCtx(event,${g.id})">
       <div class="group-avatar ${isDM?'dm':''} ${isOnline?'online':''}" data-peer-id="${g.dm_peer_id||''}">
         ${name.charAt(0).toUpperCase()}
         <div class="online-ring"></div>
@@ -2455,44 +2621,16 @@ This cannot be undone.`)) return;
   }
 
   if (action === 'deleteChat') {
+    // Use shared delete flow (same as right-click menu)
     const peer = activeGroup?.dm_peer_name || activeGroup?.name || 'this chat';
     const overlay = document.getElementById('deleteChatOverlay');
     document.getElementById('deleteChatDialogTitle').textContent = `Delete chat with "${peer}"?`;
     overlay.style.display = 'flex';
-
-    // Set up confirm button (clone to remove stale listeners)
+    const gidToDelete = activeGid;
     const btn = document.getElementById('deleteChatConfirmBtn');
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.onclick = async () => {
-      overlay.style.display = 'none';
-      const gidToDelete = activeGid;
-
-      // Remove from sidebar immediately
-      const sidebarEl = document.querySelector(`.group-item[onclick="openGroup(${gidToDelete})"]`);
-      if (sidebarEl) sidebarEl.remove();
-
-      // Close chat panel
-      activeGid = null;
-      activeGroup = null;
-      document.getElementById('chatHeader').style.display = 'none';
-      document.getElementById('msgList').innerHTML = '';
-      document.getElementById('chatEmptyState').style.display = '';
-
-      // Backend: marks all messages as deleted_for + sets left_at
-      try {
-        const delRes = await chatApi('DELETE', `/chat/groups/${gidToDelete}`);
-        if (!delRes?.success) {
-          console.error('[deleteChat] backend error:', delRes?.message);
-          // Still proceed — the UI already removed it
-        }
-      } catch (err) {
-        console.error('[deleteChat] fetch error:', err);
-      }
-      showToast('Chat deleted', '', null);
-      // Refresh sidebar — chat should now be gone (left_at is set in DB)
-      await loadGroups();
-    };
+    newBtn.onclick = () => executeChatDelete(gidToDelete);
     return;
   }
 }
