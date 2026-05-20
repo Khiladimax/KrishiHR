@@ -39,7 +39,7 @@ app.use((req, _res, next) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
-const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 5e8 });
+const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 5e8 // ✅ 500MB });
 global.io = io;
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
