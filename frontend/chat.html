@@ -4343,8 +4343,12 @@ function onCallAnsweredElsewhere({ roomId }) {
     _outgoingCall = null;
     document.getElementById('outgoingCallOverlay').style.display = 'none';
   }
-  // Close meeting panel if it opened on this device for this room — another device is handling the call
-  if (currentMeetRoomId === roomId || !roomId) {
+  // Only close meeting panel if:
+  // 1. It's for the same room AND
+  // 2. We have no active peer connections (not already in a call with people)
+  const inSameRoom    = currentMeetRoomId === roomId || !roomId;
+  const hasPeers      = Object.keys(peerConnections).length > 0;
+  if (inSameRoom && !hasPeers) {
     leaveMeeting();
   }
 }
