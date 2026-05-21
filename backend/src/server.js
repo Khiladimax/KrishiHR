@@ -91,22 +91,36 @@ io.on('connection', (socket) => {
   // ── Call Invites (WhatsApp-style ring) ────────────────────────────────────
   // Caller emits this; server fans it out to all sockets of the callee
   socket.on('callInvite', ({ toUserId, roomId, callType, callerName, callerAvatar, groupId, groupName }) => {
-    const calleeSockets = global.userSockets.get(String(toUserId));
-    if (calleeSockets && calleeSockets.size) {
-      calleeSockets.forEach(sid => {
-        io.to(sid).emit('incomingCall', {
-          roomId,
-          callType,       // 'video' | 'audio'
-          callerName,
-          callerAvatar,
-          callerId: user.id,
-          groupId,
-          groupName
+    // BUG 3 FIX: deliver immediately, then retry once after 2s to catch reconnecting sockets
+    const deliverInvite = () => {
+      const calleeSockets = global.userSockets.get(String(toUserId));
+      if (calleeSockets && calleeSockets.size) {
+        calleeSockets.forEach(sid => {
+          io.to(sid).emit('incomingCall', {
+            roomId,
+            callType,       // 'video' | 'audio'
+            callerName,
+            callerAvatar,
+            callerId: user.id,
+            groupId,
+            groupName
+          });
         });
-      });
-    } else {
-      // Callee offline — notify caller
-      socket.emit('calleeOffline', { toUserId, roomId });
+        return true; // delivered
+      }
+      return false; // not delivered
+    };
+
+    const delivered = deliverInvite();
+    if (!delivered) {
+      // Callee may be mid-reconnect — retry once after 2s before giving up
+      setTimeout(() => {
+        const retryDelivered = deliverInvite();
+        if (!retryDelivered) {
+          // Still offline — notify caller
+          socket.emit('calleeOffline', { toUserId, roomId });
+        }
+      }, 2000);
     }
   });
 
@@ -120,8 +134,10 @@ io.on('connection', (socket) => {
       callerSockets.forEach(sid => {
         // Always notify caller their call was accepted
         io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
-        // Only dismiss caller's OTHER sockets that are NOT already in the meeting room
-        if (!roomMembers.has(sid)) {
+        // BUG 2 FIX: only dismiss OTHER devices of the caller — not the single initiating socket.
+        // If the caller has only one socket, never send callAnsweredElsewhere to them
+        // (it would immediately hang up the only device that placed the call).
+        if (callerSockets.size > 1 && !roomMembers.has(sid)) {
           io.to(sid).emit('callAnsweredElsewhere', { roomId });
         }
       });
@@ -208,15 +224,32 @@ io.on('connection', (socket) => {
   socket.on('leaveMeeting', async ({ roomId }) => {
     socket.to(`meeting:${roomId}`).emit('peerLeft', { peerId: socket.id, userId: user.id });
     socket.leave(`meeting:${roomId}`);
-    // Mark call ended if this is a 1-to-1 call room
+    // Mark call ended and insert a synthetic chat message so call history appears inline
     try {
       const db = require('./config/db');
-      await db.query(
+      const logRow = await db.query(
         `UPDATE call_log SET ended_at=NOW(),
          duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INT
-         WHERE room_id=$1 AND ended_at IS NULL`,
+         WHERE room_id=$1 AND ended_at IS NULL RETURNING *`,
         [roomId]
       );
+      // BUG 6 FIX: write a 'call' message into the chat group so mobile sees
+      // voice/video call entries inline in the chat timeline (like WhatsApp)
+      if (logRow.rows.length && logRow.rows[0].group_id) {
+        const cl  = logRow.rows[0];
+        const dur = cl.duration_seconds || 0;
+        const label   = cl.call_type === 'video' ? '📹 Video Call' : '📞 Voice Call';
+        const durStr  = dur >= 60
+          ? `${Math.floor(dur / 60)}m ${dur % 60}s`
+          : `${dur}s`;
+        const content = `${label} · ${durStr} · ${roomId}`;
+        await db.query(
+          `INSERT INTO chat_messages(group_id, sender_id, content, message_type)
+           VALUES($1, $2, $3, 'call')
+           ON CONFLICT DO NOTHING`,
+          [cl.group_id, cl.caller_id, content]
+        );
+      }
     } catch (_) { /* non-fatal */ }
   });
 
