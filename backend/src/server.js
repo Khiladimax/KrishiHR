@@ -26,8 +26,8 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request logger (dev only)
 app.use((req, _res, next) => {
@@ -39,19 +39,24 @@ app.use((req, _res, next) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
-const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e7 });
+const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e9 });
 global.io = io;
 io.use((socket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  const token  = socket.handshake.auth?.token || socket.handshake.query?.token;
+  const device = socket.handshake.auth?.device || socket.handshake.query?.device || 'web';
   if (!token) return next(new Error('Authentication required'));
   try {
     const decoded = jwt_sock.verify(token, process.env.JWT_SECRET || 'change-me');
-    socket.user = decoded;
+    socket.user   = decoded;
+    socket.device = device;  // 'web' | 'mobile'
     next();
   } catch (e) { next(new Error('Invalid token')); }
 });
-// Per-user socket tracking (for DM presence + call routing)
-global.userSockets = new Map();  // userId -> Set of socketIds
+// Per-user socket tracking: userId -> Map<socketId, { socket, device }>
+global.userSockets    = new Map();  // userId -> Set of socketIds (legacy, kept for compat)
+global.userSocketsMeta = new Map(); // userId -> Map<socketId, device>
+// Track which device is currently on a call: userId -> socketId
+global.activeCallSocket = new Map();
 
 io.on('connection', (socket) => {
   const user = socket.user;
@@ -60,6 +65,9 @@ io.on('connection', (socket) => {
   // Track socket for this user
   if (!global.userSockets.has(String(user.id))) global.userSockets.set(String(user.id), new Set());
   global.userSockets.get(String(user.id)).add(socket.id);
+  // Also track device type per socket
+  if (!global.userSocketsMeta.has(String(user.id))) global.userSocketsMeta.set(String(user.id), new Map());
+  global.userSocketsMeta.get(String(user.id)).set(socket.id, socket.device || 'web');
 
   // Broadcast online presence
   io.emit('userOnline', { userId: user.id });
@@ -102,12 +110,24 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Callee accepted — tell caller + save call_log record
+  // Callee accepted — tell caller + save call_log record + suspend other devices
   socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
     const callerSockets = global.userSockets.get(String(callerId));
     if (callerSockets) {
       callerSockets.forEach(sid => io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name }));
     }
+    // Tell ALL other sockets of this user (other devices) to dismiss the incoming call
+    const myAllSockets = global.userSockets.get(String(user.id));
+    if (myAllSockets) {
+      myAllSockets.forEach(sid => {
+        if (sid !== socket.id) {
+          io.to(sid).emit('callAnsweredElsewhere', { roomId });
+        }
+      });
+    }
+    // Mark which socket is on this call (so caller's other devices also get suppressed)
+    global.activeCallSocket.set(`${user.id}:${roomId}`, socket.id);
+    global.activeCallSocket.set(`${callerId}:${roomId}`, null); // will be set when caller joins meeting
     // Persist call history so both users can see it later
     try {
       const db = require('./config/db');
@@ -155,6 +175,15 @@ io.on('connection', (socket) => {
     socket.emit('existingPeerInfos', peerInfos);
     // Store display name on socket for others to reference
     socket._displayName = displayName || user.first_name || 'Guest';
+    // Suppress all other devices of this user — they should not show call UI
+    const myAllSockets = global.userSockets.get(String(user.id));
+    if (myAllSockets) {
+      myAllSockets.forEach(sid => {
+        if (sid !== socket.id) {
+          io.to(sid).emit('callAnsweredElsewhere', { roomId });
+        }
+      });
+    }
   });
 
   socket.on('leaveMeeting', async ({ roomId }) => {
@@ -250,6 +279,11 @@ io.on('connection', (socket) => {
         global.userSockets.delete(String(user.id));
         io.emit('userOffline', { userId: user.id });
       }
+    }
+    const meta = global.userSocketsMeta.get(String(user.id));
+    if (meta) {
+      meta.delete(socket.id);
+      if (!meta.size) global.userSocketsMeta.delete(String(user.id));
     }
   });
 });
