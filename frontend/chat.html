@@ -1108,7 +1108,25 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="group-list" id="groupList"></div>
     </div>
 
-    <!-- MEETINGS LIST PANEL -->\n    <div class=\"meetings-panel-left\" id=\"meetingsListPanel\">\n      <div class=\"meetings-section\" style=\"overflow-y:auto;flex:1\">\n        <div class=\"meetings-section-title\">⚡ Live Now</div>\n        <div id=\"liveMeetingsList\"><div style=\"color:var(--wa-text2);font-size:13px;padding:8px 0\">No active meetings</div></div>\n        <div class=\"meetings-section-title\" style=\"margin-top:16px\">📅 Scheduled</div>\n        <div id=\"scheduledMeetingsList\"><div style=\"color:var(--wa-text2);font-size:13px;padding:8px 0\">Loading…</div></div>\n        <div class=\"meetings-section-title\" style=\"margin-top:16px\">📞 Call History</div>\n        <div id=\"callHistoryList\"><div style=\"color:var(--wa-text2);font-size:13px;padding:8px 0\">Loading…</div></div>\n      </div>\n      <div style=\"padding:12px 16px;border-top:1px solid var(--wa-border);display:flex;flex-direction:column;gap:8px;flex-shrink:0\">\n        <button class=\"btn-primary\" style=\"width:100%;display:flex;align-items:center;justify-content:center;gap:8px\" onclick=\"openScheduleMeetingModal()\">\n          📅 Schedule Meeting\n        </button>\n        <button style=\"width:100%;padding:10px;background:var(--wa-surface);border:1px solid var(--wa-border);border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;color:var(--wa-text);display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit\" onclick=\"startInstantMeeting()\">\n          ▶ Start Instant Meeting\n        </button>\n      </div>\n    </div>
+    <!-- MEETINGS LIST PANEL -->
+    <div class="meetings-panel-left" id="meetingsListPanel">
+      <div class="meetings-section" style="overflow-y:auto;flex:1">
+        <div class="meetings-section-title">⚡ Live Now</div>
+        <div id="liveMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">No active meetings</div></div>
+        <div class="meetings-section-title" style="margin-top:16px">📅 Scheduled</div>
+        <div id="scheduledMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">Loading…</div></div>
+        <div class="meetings-section-title" style="margin-top:16px">📞 Call History</div>
+        <div id="callHistoryList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">Loading…</div></div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--wa-border);display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+        <button class="btn-primary" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openScheduleMeetingModal()">
+          📅 Schedule Meeting
+        </button>
+        <button style="width:100%;padding:10px;background:var(--wa-surface);border:1px solid var(--wa-border);border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;color:var(--wa-text);display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit" onclick="startInstantMeeting()">
+          ▶ Start Instant Meeting
+        </button>
+      </div>
+    </div>
 
     <button class="new-chat-fab" id="newChatFab" onclick="openNewGroupModal()" title="New chat">✏️</button>
   </div>
