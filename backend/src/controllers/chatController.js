@@ -1377,17 +1377,7 @@ exports.migrate = async () => {
     CREATE INDEX IF NOT EXISTS idx_scheduled_meet_group  ON scheduled_meetings(group_id, scheduled_at);
   `);
 
-  // ── Step 4: Device tokens table for FCM push (call notifications to offline mobile) ─
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS employee_device_tokens (
-      employee_id  INT PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
-      fcm_token    TEXT NOT NULL,
-      device_type  TEXT DEFAULT 'android',
-      updated_at   TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-
-  console.log('\u2705 Chat tables migrated (v4 — device tokens for FCM push)');
+  console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
 };
 
 // ─── Call Log ──────────────────────────────────────────────────────────────────
