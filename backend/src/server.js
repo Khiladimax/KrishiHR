@@ -89,24 +89,35 @@ io.on('connection', (socket) => {
   });
 
   // ── Call Invites (WhatsApp-style ring) ────────────────────────────────────
-  // Caller emits this; server fans it out to all sockets of the callee
+  // Caller emits this; server fans it out to all sockets of the callee.
+  // BUG FIX: Give mobile 3 s grace period to reconnect before declaring offline.
   socket.on('callInvite', ({ toUserId, roomId, callType, callerName, callerAvatar, groupId, groupName }) => {
+    const sendInvite = () => {
+      const calleeSockets = global.userSockets.get(String(toUserId));
+      if (calleeSockets && calleeSockets.size) {
+        calleeSockets.forEach(sid => {
+          io.to(sid).emit('incomingCall', {
+            roomId,
+            callType,       // 'video' | 'audio'
+            callerName,
+            callerAvatar,
+            callerId: user.id,
+            groupId,
+            groupName
+          });
+        });
+      } else {
+        // Callee is truly offline after grace period
+        socket.emit('calleeOffline', { toUserId, roomId });
+      }
+    };
+    // If callee already has sockets, ring immediately.
+    // Otherwise wait 3 s — Android service may still be reconnecting after Render cold start.
     const calleeSockets = global.userSockets.get(String(toUserId));
     if (calleeSockets && calleeSockets.size) {
-      calleeSockets.forEach(sid => {
-        io.to(sid).emit('incomingCall', {
-          roomId,
-          callType,       // 'video' | 'audio'
-          callerName,
-          callerAvatar,
-          callerId: user.id,
-          groupId,
-          groupName
-        });
-      });
+      sendInvite();
     } else {
-      // Callee offline — notify caller
-      socket.emit('calleeOffline', { toUserId, roomId });
+      setTimeout(sendInvite, 3000);
     }
   });
 
@@ -120,8 +131,10 @@ io.on('connection', (socket) => {
       callerSockets.forEach(sid => {
         // Always notify caller their call was accepted
         io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
-        // Only dismiss caller's OTHER sockets that are NOT already in the meeting room
-        if (!roomMembers.has(sid)) {
+        // BUG FIX: Only dismiss OTHER sockets that are NOT in the meeting AND not the active caller socket
+        const isAlreadyInMeeting = roomMembers.has(sid);
+        const isActiveCaller = global.activeCallSocket.get(`${callerId}:${roomId}`) === sid;
+        if (!isAlreadyInMeeting && !isActiveCaller) {
           io.to(sid).emit('callAnsweredElsewhere', { roomId });
         }
       });
@@ -205,18 +218,43 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('leaveMeeting', async ({ roomId }) => {
+  socket.on('leaveMeeting', async ({ roomId, callType, groupId }) => {
     socket.to(`meeting:${roomId}`).emit('peerLeft', { peerId: socket.id, userId: user.id });
     socket.leave(`meeting:${roomId}`);
-    // Mark call ended if this is a 1-to-1 call room
+    // Mark call ended and insert a chat message so both sides see call history (like WhatsApp)
     try {
       const db = require('./config/db');
-      await db.query(
+      const updated = await db.query(
         `UPDATE call_log SET ended_at=NOW(),
          duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INT
-         WHERE room_id=$1 AND ended_at IS NULL`,
+         WHERE room_id=$1 AND ended_at IS NULL RETURNING *`,
         [roomId]
       );
+      if (updated.rows.length) {
+        const cl  = updated.rows[0];
+        const dur = cl.duration_seconds || 0;
+        const label = dur < 60 ? `${dur}s` : `${Math.floor(dur / 60)}m ${dur % 60}s`;
+        const resolvedGroupId = groupId || cl.group_id;
+        const icon  = (callType || cl.call_type) === 'video' ? '📹' : '📞';
+        const ctype = (callType || cl.call_type) === 'video' ? 'Video' : 'Voice';
+        if (resolvedGroupId) {
+          const msgContent = `${icon} ${ctype} call ended · ${label}`;
+          const msgRow = await db.query(
+            `INSERT INTO chat_messages(group_id, sender_id, content, message_type)
+             VALUES($1,$2,$3,'call_ended') RETURNING *`,
+            [resolvedGroupId, user.id, msgContent]
+          );
+          if (global.io) {
+            global.io.to(`group:${resolvedGroupId}`).emit('message', {
+              ...msgRow.rows[0],
+              sender_name: user.first_name || 'User',
+              reactions: [],
+              seen_count: 0,
+              delivered_count: 0
+            });
+          }
+        }
+      }
     } catch (_) { /* non-fatal */ }
   });
 
