@@ -1152,12 +1152,13 @@ exports.leaveMeetingRecord = async (req, res) => {
 exports.serveFile = async (req, res) => {
   try {
     const idOrName = req.params.filename;
-    const id = parseInt(idOrName);
+    // Check if it's a pure numeric ID (may be too large for JS parseInt/32-bit int)
+    const isNumericId = /^\d+$/.test(idOrName);
 
-    if (!isNaN(id)) {
-      // New style: numeric ID → serve from DB
+    if (isNumericId) {
+      // New style: numeric ID → serve from DB (pass as string to avoid JS integer overflow)
       const r = await db.query(
-        `SELECT original_name, mime_type, file_size, file_data FROM chat_file_data WHERE id=$1`, [id]
+        `SELECT original_name, mime_type, file_size, file_data FROM chat_file_data WHERE id=$1`, [idOrName]
       );
       if (!r.rows.length) return res.status(404).json({ success: false, message: 'File not found' });
       const { original_name, mime_type, file_data } = r.rows[0];
@@ -1230,7 +1231,7 @@ exports.migrate = async () => {
     );
 
     CREATE TABLE IF NOT EXISTS chat_file_data (
-      id            SERIAL PRIMARY KEY,
+      id            BIGSERIAL PRIMARY KEY,
       original_name TEXT NOT NULL,
       mime_type     TEXT NOT NULL,
       file_size     BIGINT,
