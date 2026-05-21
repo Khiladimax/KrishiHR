@@ -3503,14 +3503,22 @@ async function toggleScreen() {
       grid.style.display = 'none';
       selfFlt.style.display = 'none'; // self is now in the right strip
 
+      // FIX: emit screenShare signal BEFORE replaceTrack so remote peers switch their
+      // renderer to ASPECT_FIT *before* the new track arrives via WebRTC.
+      // Without this, Android receives the screen track while still in ASPECT_FILL
+      // mode, making the shared screen appear zoomed in until the signal catches up.
+      screenSharing = true;
+      if (socket && currentMeetRoomId) socket.emit('screenShare', { roomId: currentMeetRoomId, sharing: true, displayName: me.first_name });
+
+      // Small delay so the signal has time to propagate before track replacement
+      await new Promise(r => setTimeout(r, 150));
+
       Object.values(peerConnections).forEach(pc => {
         const s = pc.getSenders().find(s => s.track?.kind === 'video');
         if (s) s.replaceTrack(track);
       });
 
       track.onended = () => { screenSharing = true; toggleScreen(); };
-      screenSharing = true;
-      if (socket && currentMeetRoomId) socket.emit('screenShare', { roomId: currentMeetRoomId, sharing: true, displayName: me.first_name });
     } catch(e) { console.warn('Screen share cancelled or failed:', e.message); }
   }
   updateMeetBtns();
