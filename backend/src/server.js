@@ -163,7 +163,7 @@ io.on('connection', (socket) => {
   });
 
   // ── Video / Audio Meeting — WebRTC Signalling ─────────────────────────────
-  socket.on('joinMeeting', ({ roomId, displayName }) => {
+  socket.on('joinMeeting', async ({ roomId, displayName, callType }) => {
     socket.join(`meeting:${roomId}`);
     socket.to(`meeting:${roomId}`).emit('peerJoined', {
       peerId: socket.id,
@@ -189,6 +189,22 @@ io.on('connection', (socket) => {
           io.to(sid).emit('callAnsweredElsewhere', { roomId });
         }
       });
+    }
+    // Save call log when 2nd person joins a 1-to-1 room (call_TIMESTAMP_random format)
+    if (existingPeers.length === 1 && roomId.startsWith('call_')) {
+      try {
+        const db = require('./config/db');
+        const callerSocket = io.sockets.sockets.get(existingPeers[0]);
+        const callerId = callerSocket?.user?.id;
+        if (callerId && callerId !== user.id) {
+          await db.query(
+            `INSERT INTO call_log (room_id, call_type, caller_id, callee_id, started_at, status)
+             VALUES ($1,$2,$3,$4,NOW(),'answered')
+             ON CONFLICT (room_id) DO NOTHING`,
+            [roomId, callType || 'video', callerId, user.id]
+          );
+        }
+      } catch(_) { /* non-fatal */ }
     }
   });
 
