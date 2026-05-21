@@ -113,14 +113,19 @@ io.on('connection', (socket) => {
   // Callee accepted — tell caller + save call_log record + suspend other devices
   socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
     const callerSockets = global.userSockets.get(String(callerId));
+    // Check if caller is already in the meeting room (they added a 3rd person)
+    const meetingRoom  = `meeting:${roomId}`;
+    const roomMembers  = io.sockets.adapter.rooms.get(meetingRoom) || new Set();
+    const callerInRoom = callerSockets && [...callerSockets].some(sid => roomMembers.has(sid));
+
     if (callerSockets) {
-      // Tell the caller's ACTIVE socket (the one that initiated) about acceptance
-      // Tell the caller's OTHER sockets (web tab etc) to stand down
       callerSockets.forEach(sid => {
         io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
-        // Also send callAnsweredElsewhere to all caller sockets — each socket
-        // will decide itself whether it initiated (web checks _outgoingCall)
-        io.to(sid).emit('callAnsweredElsewhere', { roomId, answeredByDevice: socket.device || 'mobile' });
+        // Only suppress caller's OTHER sockets if caller is NOT already in the meeting
+        // (if they're already in the room, this is an add-people scenario — don't kick anyone)
+        if (!callerInRoom) {
+          io.to(sid).emit('callAnsweredElsewhere', { roomId, answeredByDevice: socket.device || 'mobile' });
+        }
       });
     }
     // Tell ALL other sockets of this user (callee's other devices) to dismiss incoming call
