@@ -939,5 +939,9 @@ router.post  ('/chat/scheduled-meetings/:id/start',       authenticate, chatCtrl
 // ── Static file serving ───────────────────────────────────────────────────────
 router.get   ('/chat/files/:filename',                    chatCtrl.serveFile);
 
+// ── Call History ──────────────────────────────────────────────────────────────
+router.get   ('/chat/call-log',                           authenticate, chatCtrl.getCallLog);
+router.post  ('/chat/call-log/event',                     authenticate, chatCtrl.saveCallEvent);
+
 
 module.exports = router;
