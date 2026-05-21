@@ -102,12 +102,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Callee accepted — tell caller
-  socket.on('callAccepted', ({ roomId, callerId }) => {
+  // Callee accepted — tell caller + save call_log record
+  socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
     const callerSockets = global.userSockets.get(String(callerId));
     if (callerSockets) {
       callerSockets.forEach(sid => io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name }));
     }
+    // Persist call history so both users can see it later
+    try {
+      const db = require('./config/db');
+      await db.query(
+        `INSERT INTO call_log (room_id, call_type, caller_id, callee_id, group_id, started_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (room_id) DO NOTHING`,
+        [roomId, callType || 'audio', callerId, user.id, groupId || null]
+      );
+    } catch (_) { /* non-fatal */ }
   });
 
   // Callee declined — tell caller
@@ -147,9 +157,19 @@ io.on('connection', (socket) => {
     socket._displayName = displayName || user.first_name || 'Guest';
   });
 
-  socket.on('leaveMeeting', ({ roomId }) => {
+  socket.on('leaveMeeting', async ({ roomId }) => {
     socket.to(`meeting:${roomId}`).emit('peerLeft', { peerId: socket.id, userId: user.id });
     socket.leave(`meeting:${roomId}`);
+    // Mark call ended if this is a 1-to-1 call room
+    try {
+      const db = require('./config/db');
+      await db.query(
+        `UPDATE call_log SET ended_at=NOW(),
+         duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INT
+         WHERE room_id=$1 AND ended_at IS NULL`,
+        [roomId]
+      );
+    } catch (_) { /* non-fatal */ }
   });
 
   // WebRTC offer
@@ -236,9 +256,12 @@ io.on('connection', (socket) => {
 
 
 // Static: serve chat uploaded files
+// Served under BOTH paths so old file_url values (/chat/files/...) still work
+// and new uploads (/api/chat/files/...) work too
 const chatUploadDir = require('path').join(__dirname, '..', 'uploads', 'chat');
 if (!require('fs').existsSync(chatUploadDir)) require('fs').mkdirSync(chatUploadDir, { recursive: true });
-app.use('/chat/files', require('express').static(chatUploadDir));
+app.use('/chat/files',     require('express').static(chatUploadDir));  // legacy
+app.use('/api/chat/files', require('express').static(chatUploadDir));  // new
 
 app.use('/api', routes);
 
