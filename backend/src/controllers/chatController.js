@@ -6,7 +6,7 @@
 // KrishiHR — no Main_file, using inline defaults
 const CONFIG = {
   chatFileMaxSizeMB: 50,
-  chatFileRoute: '/chat/files',
+  chatFileRoute: '/api/chat/files',
   chatBlockedExtensions: ['.exe','.bat','.sh','.cmd','.msi','.ps1','.vbs'],
   chatAdminRoles: ['admin','super_admin','hr'],
   meetingStunServers: [
@@ -1209,6 +1209,19 @@ exports.migrate = async () => {
       PRIMARY KEY(group_id, employee_id)
     );
 
+    CREATE TABLE IF NOT EXISTS call_log (
+      id               SERIAL PRIMARY KEY,
+      room_id          TEXT UNIQUE NOT NULL,
+      call_type        TEXT NOT NULL DEFAULT 'audio',
+      caller_id        INT REFERENCES employees(id),
+      callee_id        INT REFERENCES employees(id),
+      group_id         INT REFERENCES chat_groups(id),
+      started_at       TIMESTAMPTZ DEFAULT NOW(),
+      ended_at         TIMESTAMPTZ,
+      duration_seconds INT,
+      status           TEXT DEFAULT 'answered'
+    );
+
     CREATE TABLE IF NOT EXISTS chat_meetings (
       id                   SERIAL PRIMARY KEY,
       room_id              TEXT UNIQUE NOT NULL,
@@ -1335,4 +1348,50 @@ exports.migrate = async () => {
   `);
 
   console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
+};
+
+// ─── Call Log ──────────────────────────────────────────────────────────────────
+
+// GET /api/chat/call-log  — returns call history for the logged-in user
+exports.getCallLog = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { rows } = await db.query(`
+      SELECT
+        cl.id, cl.room_id, cl.call_type, cl.started_at, cl.ended_at,
+        cl.duration_seconds, cl.status,
+        -- caller info
+        ce.id   AS caller_id,
+        ce.first_name || ' ' || ce.last_name AS caller_name,
+        ce.profile_picture AS caller_avatar,
+        -- callee info
+        ee.id   AS callee_id,
+        ee.first_name || ' ' || ee.last_name AS callee_name,
+        ee.profile_picture AS callee_avatar
+      FROM call_log cl
+      LEFT JOIN employees ce ON ce.id = cl.caller_id
+      LEFT JOIN employees ee ON ee.id = cl.callee_id
+      WHERE cl.caller_id = $1 OR cl.callee_id = $1
+      ORDER BY cl.started_at DESC
+      LIMIT 100
+    `, [empId]);
+    res.json({ success: true, calls: rows });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+// POST /api/chat/call-log/missed  — save a missed/declined call
+exports.saveCallEvent = async (req, res) => {
+  try {
+    const { room_id, call_type, caller_id, callee_id, group_id, status } = req.body;
+    await db.query(`
+      INSERT INTO call_log (room_id, call_type, caller_id, callee_id, group_id, status, started_at, ended_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+      ON CONFLICT (room_id) DO UPDATE SET status=$6, ended_at=NOW()
+    `, [room_id, call_type||'audio', caller_id, callee_id, group_id||null, status||'missed']);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
