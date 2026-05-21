@@ -114,9 +114,16 @@ io.on('connection', (socket) => {
   socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
     const callerSockets = global.userSockets.get(String(callerId));
     if (callerSockets) {
-      callerSockets.forEach(sid => io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name }));
+      // Tell the caller's ACTIVE socket (the one that initiated) about acceptance
+      // Tell the caller's OTHER sockets (web tab etc) to stand down
+      callerSockets.forEach(sid => {
+        io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
+        // Also send callAnsweredElsewhere to all caller sockets — each socket
+        // will decide itself whether it initiated (web checks _outgoingCall)
+        io.to(sid).emit('callAnsweredElsewhere', { roomId, answeredByDevice: socket.device || 'mobile' });
+      });
     }
-    // Tell ALL other sockets of this user (other devices) to dismiss the incoming call
+    // Tell ALL other sockets of this user (callee's other devices) to dismiss incoming call
     const myAllSockets = global.userSockets.get(String(user.id));
     if (myAllSockets) {
       myAllSockets.forEach(sid => {
@@ -125,7 +132,6 @@ io.on('connection', (socket) => {
         }
       });
     }
-    // Mark which socket is on this call (so caller's other devices also get suppressed)
     global.activeCallSocket.set(`${user.id}:${roomId}`, socket.id);
     global.activeCallSocket.set(`${callerId}:${roomId}`, null); // will be set when caller joins meeting
     // Persist call history so both users can see it later
