@@ -57,9 +57,6 @@ global.userSockets    = new Map();  // userId -> Set of socketIds (legacy, kept 
 global.userSocketsMeta = new Map(); // userId -> Map<socketId, device>
 // Track which device is currently on a call: userId -> socketId
 global.activeCallSocket = new Map();
-// Track which socketId initiated a call: roomId -> callerSocketId
-// Used so callAnsweredElsewhere is NOT sent to the calling socket itself
-global.callInitiatorSocket = new Map();
 
 io.on('connection', (socket) => {
   const user = socket.user;
@@ -93,58 +90,38 @@ io.on('connection', (socket) => {
 
   // ── Call Invites (WhatsApp-style ring) ────────────────────────────────────
   // Caller emits this; server fans it out to all sockets of the callee
-  socket.on('callInvite', async ({ toUserId, roomId, callType, callerName, callerAvatar, groupId, groupName }) => {
-    // Track which socket initiated this call — used in callAccepted to avoid
-    // sending callAnsweredElsewhere to the very socket that started the call.
-    global.callInitiatorSocket.set(roomId, socket.id);
-    setTimeout(() => global.callInitiatorSocket.delete(roomId), 90000); // cleanup after 90s
-
-    const callPayload = { roomId, callType, callerName, callerAvatar, callerId: user.id, groupId, groupName };
+  socket.on('callInvite', ({ toUserId, roomId, callType, callerName, callerAvatar, groupId, groupName }) => {
     const calleeSockets = global.userSockets.get(String(toUserId));
-
     if (calleeSockets && calleeSockets.size) {
-      // Callee has at least one socket (web or mobile CallSocketService) — ring directly
-      calleeSockets.forEach(sid => io.to(sid).emit('incomingCall', callPayload));
+      calleeSockets.forEach(sid => {
+        io.to(sid).emit('incomingCall', {
+          roomId,
+          callType,       // 'video' | 'audio'
+          callerName,
+          callerAvatar,
+          callerId: user.id,
+          groupId,
+          groupName
+        });
+      });
     } else {
-      // No socket — try FCM push so mobile app wakes up and rings
-      try {
-        const db = require('./config/db');
-        const tokenRow = await db.query(
-          `SELECT fcm_token FROM employee_device_tokens WHERE employee_id = $1 AND fcm_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1`,
-          [toUserId]
-        ).catch(() => ({ rows: [] }));
-        if (tokenRow.rows.length && global.sendFcmCallNotification) {
-          await global.sendFcmCallNotification(tokenRow.rows[0].fcm_token, callPayload);
-          // Push sent — do NOT emit calleeOffline; let caller wait for mobile to connect & ring
-        } else {
-          // Truly offline with no FCM token
-          socket.emit('calleeOffline', { toUserId, roomId });
-        }
-      } catch (e) {
-        console.error('[callInvite FCM]', e.message);
-        socket.emit('calleeOffline', { toUserId, roomId });
-      }
+      // Callee offline — notify caller
+      socket.emit('calleeOffline', { toUserId, roomId });
     }
   });
 
   // Callee accepted — tell caller + save call_log record + suspend other devices
   socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
-    const callerSockets     = global.userSockets.get(String(callerId));
-    const meetingRoom       = `meeting:${roomId}`;
-    const roomMembers       = io.sockets.adapter.rooms.get(meetingRoom) || new Set();
-    // The socket that originally sent callInvite — NEVER send callAnsweredElsewhere to it,
-    // because it hasn't joined the meeting room yet when this fires, but it WILL join
-    // moments later when onCallAccepted() opens the meeting panel on the web side.
-    const initiatorSocketId = global.callInitiatorSocket.get(roomId);
+    const callerSockets = global.userSockets.get(String(callerId));
+    const meetingRoom   = `meeting:${roomId}`;
+    const roomMembers   = io.sockets.adapter.rooms.get(meetingRoom) || new Set();
 
     if (callerSockets) {
       callerSockets.forEach(sid => {
-        // Always send callAccepted so the calling device opens the meeting panel
+        // Always notify caller their call was accepted
         io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
-        // Send callAnsweredElsewhere ONLY to the caller's OTHER devices (not the one that rang),
-        // and only if they're not already inside the meeting room.
-        // This prevents the web caller from getting "answered elsewhere" and killing _outgoingCall.
-        if (sid !== initiatorSocketId && !roomMembers.has(sid)) {
+        // Only dismiss caller's OTHER sockets that are NOT already in the meeting room
+        if (!roomMembers.has(sid)) {
           io.to(sid).emit('callAnsweredElsewhere', { roomId });
         }
       });
@@ -901,82 +878,6 @@ cron.schedule('5 8 * * *', async () => {
     console.error('❌ Anniversary cron failed:', err.message);
   }
 }, { timezone: 'Asia/Kolkata' });
-
-// ── FCM Push Notification helper (for offline call notifications) ─────────────
-// To enable: set FIREBASE_SERVICE_ACCOUNT env var to your Firebase service account JSON (base64 or raw)
-// and add firebase-admin to package.json dependencies.
-// Without FCM configured, calls to offline users show "offline" status (still works, just no push).
-(async () => {
-  const fcmKey = process.env.FIREBASE_SERVER_KEY; // Simple FCM legacy HTTP API key
-  if (fcmKey) {
-    global.sendFcmCallNotification = async (fcmToken, payload) => {
-      const https = require('https');
-      const body = JSON.stringify({
-        to: fcmToken,
-        priority: 'high',
-        data: {
-          type: 'incoming_call',
-          roomId:      payload.roomId,
-          callType:    payload.callType    || 'video',
-          callerName:  payload.callerName  || 'Someone',
-          callerId:    String(payload.callerId || ''),
-          groupId:     String(payload.groupId  || ''),
-          groupName:   payload.groupName   || '',
-        },
-        notification: {
-          title: payload.callType === 'audio' ? '📞 Incoming Voice Call' : '📹 Incoming Video Call',
-          body:  `${payload.callerName || 'Someone'} is calling you`,
-          sound: 'ringtone',
-        }
-      });
-      return new Promise((resolve, reject) => {
-        const req = https.request({
-          hostname: 'fcm.googleapis.com',
-          path: '/fcm/send',
-          method: 'POST',
-          headers: {
-            'Authorization': `key=${fcmKey}`,
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body)
-          }
-        }, res => {
-          let data = '';
-          res.on('data', d => data += d);
-          res.on('end', () => {
-            console.log('[FCM] Push sent:', data);
-            resolve(JSON.parse(data));
-          });
-        });
-        req.on('error', reject);
-        req.write(body);
-        req.end();
-      });
-    };
-    console.log('✅ FCM push notifications enabled');
-  } else {
-    console.log('ℹ️  FCM not configured (FIREBASE_SERVER_KEY not set) — calls to offline users will show "offline" status');
-  }
-})();
-
-// ── Device token registration endpoint (called by Android app on login) ───────
-app.post('/api/chat/device-token', async (req, res) => {
-  try {
-    const token    = req.headers.authorization?.split(' ')[1];
-    const jwt      = require('jsonwebtoken');
-    const decoded  = jwt.verify(token, process.env.JWT_SECRET || 'krishihr_secret_key_2024');
-    const empId    = decoded.id;
-    const { fcm_token, device_type = 'android' } = req.body;
-    if (!fcm_token) return res.status(400).json({ success: false, message: 'fcm_token required' });
-    await db.query(`
-      INSERT INTO employee_device_tokens (employee_id, fcm_token, device_type, updated_at)
-      VALUES ($1, $2, $3, NOW())
-      ON CONFLICT (employee_id) DO UPDATE SET fcm_token=$2, device_type=$3, updated_at=NOW()
-    `, [empId, fcm_token, device_type]);
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
 
 async function start() {
   try {
