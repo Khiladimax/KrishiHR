@@ -20,21 +20,14 @@ const path   = require('path');
 const fs     = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-// ── File upload ───────────────────────────────────────────────────────────────
-const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'chat');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// ── File upload → PostgreSQL (persistent, no ephemeral disk issues) ───────────
+// Files stored as bytea in chat_files table. Served via /api/chat/files/:id
+// This works on any hosting (Render, Railway, VPS) without external storage.
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}_${uuidv4().slice(0,8)}_${safe}`);
-  }
-});
-
+// Use memoryStorage — buffer goes straight to DB
 exports.upload = multer({
-  storage,
-  limits: { fileSize: (CONFIG.chatFileMaxSizeMB || 50) * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: (CONFIG.chatFileMaxSizeMB || 1024) * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const blocked = CONFIG.chatBlockedExtensions || ['.exe','.bat','.sh','.cmd'];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -577,13 +570,21 @@ exports.sendFile = async (req, res) => {
     if (!req.file)
       return res.status(400).json({ success: false, message: 'No file uploaded' });
 
-    const { originalname, mimetype, size, filename } = req.file;
+    const { originalname, mimetype, size, buffer } = req.file;
     let type = 'file';
     if (mimetype.startsWith('image/')) type = 'image';
     if (mimetype.startsWith('audio/')) type = 'audio';
     if (mimetype.startsWith('video/')) type = 'video';
 
-    const fileUrl = `${CONFIG.chatFileRoute || '/api/chat/files'}/${filename}`;
+    // Store file in DB (persistent — survives Render restarts, no external storage needed)
+    const fileRow = await db.query(
+      `INSERT INTO chat_file_data (original_name, mime_type, file_size, file_data)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [originalname, mimetype, size, buffer]
+    );
+    const fileId  = fileRow.rows[0].id;
+    const fileUrl = `/api/chat/files/${fileId}`;
+
     const r = await db.query(`
       INSERT INTO chat_messages(group_id, sender_id, content, message_type, file_name, file_size, file_mime, file_url)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
@@ -1150,8 +1151,27 @@ exports.leaveMeetingRecord = async (req, res) => {
 
 exports.serveFile = async (req, res) => {
   try {
-    const filePath = path.join(uploadDir, req.params.filename);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, message: 'File not found' });
+    const idOrName = req.params.filename;
+    const id = parseInt(idOrName);
+
+    if (!isNaN(id)) {
+      // New style: numeric ID → serve from DB
+      const r = await db.query(
+        `SELECT original_name, mime_type, file_size, file_data FROM chat_file_data WHERE id=$1`, [id]
+      );
+      if (!r.rows.length) return res.status(404).json({ success: false, message: 'File not found' });
+      const { original_name, mime_type, file_data } = r.rows[0];
+      res.setHeader('Content-Type', mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(original_name)}"`);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      return res.send(file_data);
+    }
+
+    // Legacy style: filename on disk (old uploads before this change)
+    const uploadDir = require('path').join(__dirname, '..', '..', 'uploads', 'chat');
+    const filePath  = require('path').join(uploadDir, idOrName);
+    if (!require('fs').existsSync(filePath))
+      return res.status(404).json({ success: false, message: 'File not found' });
     res.sendFile(filePath);
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -1207,6 +1227,15 @@ exports.migrate = async () => {
       employee_id INT NOT NULL REFERENCES employees(id),
       read_at     TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY(group_id, employee_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_file_data (
+      id            SERIAL PRIMARY KEY,
+      original_name TEXT NOT NULL,
+      mime_type     TEXT NOT NULL,
+      file_size     BIGINT,
+      file_data     BYTEA NOT NULL,
+      uploaded_at   TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS call_log (
