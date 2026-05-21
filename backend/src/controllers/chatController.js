@@ -1162,25 +1162,10 @@ exports.serveFile = async (req, res) => {
       );
       if (!r.rows.length) return res.status(404).json({ success: false, message: 'File not found' });
       const { original_name, mime_type, file_data } = r.rows[0];
-      const buf       = Buffer.isBuffer(file_data) ? file_data : Buffer.from(file_data);
-      const totalSize = buf.length;
-      const rangeHeader = req.headers['range'];
-      res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Content-Type', mime_type || 'application/octet-stream');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(original_name)}"`);
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      if (rangeHeader) {
-        const [startStr, endStr] = rangeHeader.replace('bytes=', '').split('-');
-        const start = parseInt(startStr, 10);
-        const end   = endStr ? parseInt(endStr, 10) : totalSize - 1;
-        const chunkSize = end - start + 1;
-        res.status(206);
-        res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
-        res.setHeader('Content-Length', chunkSize);
-        return res.end(buf.slice(start, end + 1));
-      }
-      res.setHeader('Content-Length', totalSize);
-      return res.end(buf);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      return res.send(file_data);
     }
 
     // Legacy style: filename on disk (old uploads before this change)
