@@ -5,7 +5,7 @@
 
 // KrishiHR — no Main_file, using inline defaults
 const CONFIG = {
-  chatFileMaxSizeMB: 50,
+  chatFileMaxSizeMB: 1024,
   chatFileRoute: '/api/chat/files',
   chatBlockedExtensions: ['.exe','.bat','.sh','.cmd','.msi','.ps1','.vbs'],
   chatAdminRoles: ['admin','super_admin','hr'],
