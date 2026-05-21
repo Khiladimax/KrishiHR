@@ -113,26 +113,24 @@ io.on('connection', (socket) => {
   // Callee accepted — tell caller + save call_log record + suspend other devices
   socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
     const callerSockets = global.userSockets.get(String(callerId));
-    // Check if caller is already in the meeting room (they added a 3rd person)
-    const meetingRoom  = `meeting:${roomId}`;
-    const roomMembers  = io.sockets.adapter.rooms.get(meetingRoom) || new Set();
-    const callerInRoom = callerSockets && [...callerSockets].some(sid => roomMembers.has(sid));
+    const meetingRoom   = `meeting:${roomId}`;
+    const roomMembers   = io.sockets.adapter.rooms.get(meetingRoom) || new Set();
 
     if (callerSockets) {
       callerSockets.forEach(sid => {
+        // Always notify caller their call was accepted
         io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
-        // Only suppress caller's OTHER sockets if caller is NOT already in the meeting
-        // (if they're already in the room, this is an add-people scenario — don't kick anyone)
-        if (!callerInRoom) {
-          io.to(sid).emit('callAnsweredElsewhere', { roomId, answeredByDevice: socket.device || 'mobile' });
+        // Only dismiss caller's OTHER sockets that are NOT already in the meeting room
+        if (!roomMembers.has(sid)) {
+          io.to(sid).emit('callAnsweredElsewhere', { roomId });
         }
       });
     }
-    // Tell ALL other sockets of this user (callee's other devices) to dismiss incoming call
+    // Dismiss incoming call UI on callee's other devices not already in the meeting
     const myAllSockets = global.userSockets.get(String(user.id));
     if (myAllSockets) {
       myAllSockets.forEach(sid => {
-        if (sid !== socket.id) {
+        if (sid !== socket.id && !roomMembers.has(sid)) {
           io.to(sid).emit('callAnsweredElsewhere', { roomId });
         }
       });
@@ -186,15 +184,9 @@ io.on('connection', (socket) => {
     socket.emit('existingPeerInfos', peerInfos);
     // Store display name on socket for others to reference
     socket._displayName = displayName || user.first_name || 'Guest';
-    // Suppress all other devices of this user — they should not show call UI
-    const myAllSockets = global.userSockets.get(String(user.id));
-    if (myAllSockets) {
-      myAllSockets.forEach(sid => {
-        if (sid !== socket.id) {
-          io.to(sid).emit('callAnsweredElsewhere', { roomId });
-        }
-      });
-    }
+    // NOTE: We intentionally do NOT send callAnsweredElsewhere here.
+    // Once someone is in a meeting room they must never be kicked out by another
+    // device joining. callAnsweredElsewhere is only for the ringing phase (callAccepted).
     // Save call log when 2nd person joins a 1-to-1 room (call_TIMESTAMP_random format)
     if (existingPeers.length === 1 && roomId.startsWith('call_')) {
       try {
