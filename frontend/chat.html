@@ -4026,8 +4026,20 @@ document.addEventListener('keydown', e => {
 // Uses fetch+blob so cross-origin files download instead of opening in browser
 async function dlFile(url, filename) {
   try {
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error('Failed');
+    const res = await fetch(url);
+    if (!res.ok) {
+      // Try to read error message from backend
+      let msg = 'Download failed';
+      try {
+        const j = await res.json();
+        if (j.message === 'File not found') {
+          msg = '⚠️ This file was uploaded before persistent storage was enabled and is no longer available. Please ask the sender to re-upload it.';
+        } else {
+          msg = j.message || msg;
+        }
+      } catch(_) {}
+      return showToast('Download failed', msg, null);
+    }
     const blob = await res.blob();
     const a    = document.createElement('a');
     a.href     = URL.createObjectURL(blob);
@@ -4036,8 +4048,7 @@ async function dlFile(url, filename) {
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   } catch(e) {
-    // Fallback: open in new tab
-    window.open(url, '_blank');
+    showToast('Download failed', 'Could not reach server. Check your connection.', null);
   }
 }
 
@@ -4269,7 +4280,10 @@ function onCallAccepted({ roomId, byName }) {
   clearTimeout(_callTimeout);
   stopRingTone();
   document.getElementById('outgoingCallOverlay').style.display = 'none';
-  const ct = _outgoingCall?.callType || 'video';
+  // Only open meeting panel if WEB initiated this call
+  // If _outgoingCall is null, this call was started from mobile — web should stay silent
+  if (!_outgoingCall) return;
+  const ct = _outgoingCall.callType || 'video';
   _outgoingCall = null;
   // Join the meeting room
   openMeetingPanel(roomId, (byName||'') + '\'s call', ct === 'audio');
@@ -4318,22 +4332,20 @@ function onCallCancelled({ roomId }) {
 // Called when the same user answered this call on another device
 function onCallAnsweredElsewhere({ roomId }) {
   stopRingTone();
-  // Dismiss incoming call overlay if showing
-  if (_pendingCall?.roomId === roomId || !roomId) {
+  clearTimeout(_callTimeout);
+  // Dismiss incoming call overlay
+  if (_pendingCall) {
     _pendingCall = null;
     document.getElementById('incomingCallOverlay').style.display = 'none';
   }
-  // Dismiss outgoing call overlay if showing (caller picked up on mobile)
-  if (_outgoingCall?.roomId === roomId || !roomId) {
-    clearTimeout(_callTimeout);
+  // Dismiss outgoing call overlay — another device of mine answered/initiated
+  if (_outgoingCall) {
     _outgoingCall = null;
     document.getElementById('outgoingCallOverlay').style.display = 'none';
   }
-  // Also close the meeting panel if it somehow opened on this device
-  const mp = document.getElementById('meetingPanel');
-  if (mp && mp.style.display !== 'none') {
-    // Only close if we didn't intentionally start the meeting here
-    // (meeting panel opened = we are the active device, so don't close)
+  // Close meeting panel if it opened on this device for this room — another device is handling the call
+  if (currentMeetRoomId === roomId || !roomId) {
+    leaveMeeting();
   }
 }
 
