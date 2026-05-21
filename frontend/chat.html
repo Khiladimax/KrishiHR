@@ -1108,23 +1108,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="group-list" id="groupList"></div>
     </div>
 
-    <!-- MEETINGS LIST PANEL -->
-    <div class="meetings-panel-left" id="meetingsListPanel">
-      <div class="meetings-section" style="overflow-y:auto;flex:1">
-        <div class="meetings-section-title">⚡ Live Now</div>
-        <div id="liveMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">No active meetings</div></div>
-        <div class="meetings-section-title" style="margin-top:16px">📅 Scheduled</div>
-        <div id="scheduledMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">Loading…</div></div>
-      </div>
-      <div style="padding:12px 16px;border-top:1px solid var(--wa-border);display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-        <button class="btn-primary" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openScheduleMeetingModal()">
-          📅 Schedule Meeting
-        </button>
-        <button style="width:100%;padding:10px;background:var(--wa-surface);border:1px solid var(--wa-border);border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;color:var(--wa-text);display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit" onclick="startInstantMeeting()">
-          ▶ Start Instant Meeting
-        </button>
-      </div>
-    </div>
+    <!-- MEETINGS LIST PANEL -->\n    <div class=\"meetings-panel-left\" id=\"meetingsListPanel\">\n      <div class=\"meetings-section\" style=\"overflow-y:auto;flex:1\">\n        <div class=\"meetings-section-title\">⚡ Live Now</div>\n        <div id=\"liveMeetingsList\"><div style=\"color:var(--wa-text2);font-size:13px;padding:8px 0\">No active meetings</div></div>\n        <div class=\"meetings-section-title\" style=\"margin-top:16px\">📅 Scheduled</div>\n        <div id=\"scheduledMeetingsList\"><div style=\"color:var(--wa-text2);font-size:13px;padding:8px 0\">Loading…</div></div>\n        <div class=\"meetings-section-title\" style=\"margin-top:16px\">📞 Call History</div>\n        <div id=\"callHistoryList\"><div style=\"color:var(--wa-text2);font-size:13px;padding:8px 0\">Loading…</div></div>\n      </div>\n      <div style=\"padding:12px 16px;border-top:1px solid var(--wa-border);display:flex;flex-direction:column;gap:8px;flex-shrink:0\">\n        <button class=\"btn-primary\" style=\"width:100%;display:flex;align-items:center;justify-content:center;gap:8px\" onclick=\"openScheduleMeetingModal()\">\n          📅 Schedule Meeting\n        </button>\n        <button style=\"width:100%;padding:10px;background:var(--wa-surface);border:1px solid var(--wa-border);border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;color:var(--wa-text);display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit\" onclick=\"startInstantMeeting()\">\n          ▶ Start Instant Meeting\n        </button>\n      </div>\n    </div>
 
     <button class="new-chat-fab" id="newChatFab" onclick="openNewGroupModal()" title="New chat">✏️</button>
   </div>
@@ -3910,6 +3894,38 @@ async function loadScheduledMeetings() {
   }).join('');
 }
 
+async function loadCallHistory() {
+  const el = document.getElementById('callHistoryList');
+  if (!el) return;
+  try {
+    const res = await chatApi('GET', '/chat/call-log');
+    if (!res.success || !res.calls.length) {
+      el.innerHTML = '<div style="color:var(--wa-text2);font-size:13px;padding:12px 0;text-align:center">No call history yet</div>';
+      return;
+    }
+    el.innerHTML = res.calls.map(c => {
+      const isMeCaller = c.caller_id === me?.id;
+      const otherName  = isMeCaller ? (c.callee_name || 'Unknown') : (c.caller_name || 'Unknown');
+      const icon       = c.call_type === 'video' ? '📹' : '📞';
+      const statusIcon = c.status === 'missed' ? '⬇️' : c.status === 'declined' ? '❌' : isMeCaller ? '⬆️' : '⬇️';
+      const statusColor= c.status === 'missed' || c.status === 'declined' ? '#ef5350' : 'var(--wa-text2)';
+      const dt         = new Date(c.started_at);
+      const timeStr    = dt.toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:true });
+      const dur        = c.duration_seconds ? ` · ${Math.floor(c.duration_seconds/60)}m ${c.duration_seconds%60}s` : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--wa-border)">
+        <div style="font-size:22px">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px;color:var(--wa-text)">${esc(otherName)}</div>
+          <div style="font-size:12px;color:${statusColor}">${statusIcon} ${c.status||'answered'}${dur}</div>
+        </div>
+        <div style="font-size:11px;color:var(--wa-text2);text-align:right">${timeStr}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:#ef5350;font-size:13px;padding:8px">Failed to load call history</div>';
+  }
+}
+
 function copyScheduledLink(roomId) {
   const link = `${FRONTEND_URL}/chat.html?meetjoin=${roomId}`;
   navigator.clipboard.writeText(link).then(() => showToast('🔗 Link copied', 'Share this link to invite others', null));
@@ -4212,10 +4228,21 @@ function onCallAccepted({ roomId, byName }) {
 }
 
 // Called when the other person declines
-function onCallDeclined({ byName }) {
+function onCallDeclined({ byName, roomId }) {
   clearTimeout(_callTimeout);
   stopRingTone();
   playCallEndSound();
+  // Save declined call to history
+  if (_outgoingCall) {
+    chatApi('POST', '/chat/call-log/event', {
+      room_id: _outgoingCall.roomId || roomId,
+      call_type: _outgoingCall.callType || 'audio',
+      caller_id: me?.id,
+      callee_id: activeGroup?.dm_peer_id,
+      group_id: activeGid,
+      status: 'declined'
+    }).catch(() => {});
+  }
   _outgoingCall = null;
   document.getElementById('outgoingCallOverlay').style.display = 'none';
   showBriefStatus('Call declined by ' + (byName || 'the other person'));
@@ -4225,6 +4252,14 @@ function onCallDeclined({ byName }) {
 function onCallCancelled({ roomId }) {
   if (_pendingCall?.roomId === roomId) {
     stopRingTone();
+    // Save missed call to history (callee side)
+    chatApi('POST', '/chat/call-log/event', {
+      room_id: roomId,
+      call_type: _pendingCall.callType || 'audio',
+      caller_id: _pendingCall.callerId,
+      callee_id: me?.id,
+      status: 'missed'
+    }).catch(() => {});
     _pendingCall = null;
     document.getElementById('incomingCallOverlay').style.display = 'none';
     showBriefStatus('Call cancelled');
@@ -4339,6 +4374,7 @@ loadGroups().then(async () => {
   }
 });
 loadScheduledMeetings();
+loadCallHistory();
 setInterval(loadGroups, 30000);
 setInterval(loadScheduledMeetings, 60000); // refresh every minute
 </script>
