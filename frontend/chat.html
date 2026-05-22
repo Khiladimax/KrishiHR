@@ -2586,14 +2586,146 @@ function clearFilePreview() {
   document.getElementById('filePreviewThumb').style.display = 'none';
 }
 
+// ── Chunked 1 GB upload engine ────────────────────────────────────────────────
+const CHUNK_SIZE       = 5 * 1024 * 1024;  // 5 MB per chunk
+const MAX_FILE_BYTES   = 1024 * 1024 * 1024; // 1 GB hard limit
+const DIRECT_THRESHOLD = 50 * 1024 * 1024;  // files ≤ 50 MB → direct POST
+
+let activeUpload = null; // { uploadId, abortController, msgPlaceholderId }
+
 async function uploadPendingFile() {
   if (!pendingFile || !activeGid) return;
-  const maxBytes = (window.CFG?.chatFileMaxSizeMB||50)*1024*1024;
-  if (pendingFile.size > maxBytes) { alert(`File too large. Max ${window.CFG?.chatFileMaxSizeMB||50} MB`); return; }
-  const fd = new FormData(); fd.append('file', pendingFile);
+  if (pendingFile.size > MAX_FILE_BYTES) {
+    alert('File too large. Maximum allowed size is 1 GB.');
+    return;
+  }
+
+  const file = pendingFile;
   clearFilePreview();
-  const res = await chatApiForm(`/chat/groups/${activeGid}/files`, fd);
-  if (!res.success) alert('Upload failed: ' + (res.message||'Unknown error'));
+
+  if (file.size <= DIRECT_THRESHOLD) {
+    // Small file — existing single-shot POST
+    const fd = new FormData();
+    fd.append('file', file);
+    showUploadProgress(file.name, 0, file.size);
+    const res = await chatApiFormWithProgress(`/chat/groups/${activeGid}/files`, fd,
+      (pct) => showUploadProgress(file.name, pct, file.size));
+    hideUploadProgress();
+    if (!res.success) alert('Upload failed: ' + (res.message || 'Unknown error'));
+  } else {
+    // Large file — chunked upload
+    await chunkedUpload(file);
+  }
+}
+
+function showUploadProgress(name, pct, total) {
+  let bar = document.getElementById('uploadProgressBar');
+  if (!bar) {
+    const wrap = document.createElement('div');
+    wrap.id = 'uploadProgressWrap';
+    wrap.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--wa-panel);border:1px solid var(--wa-border);border-radius:12px;padding:12px 18px;z-index:9999;min-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.25)';
+    wrap.innerHTML = `<div style="font-size:13px;font-weight:600;color:var(--wa-text);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px" id="uploadFileName"></div>
+      <div style="background:var(--wa-border);border-radius:4px;height:6px;overflow:hidden"><div id="uploadProgressBar" style="height:100%;background:var(--chat-accent);transition:width .3s;width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px"><span id="uploadPct" style="font-size:11px;color:var(--chat-accent);font-weight:700">0%</span><button onclick="abortUpload()" style="font-size:11px;color:#ef5350;background:none;border:none;cursor:pointer;padding:0">Cancel</button></div>`;
+    document.body.appendChild(wrap);
+    bar = document.getElementById('uploadProgressBar');
+  }
+  document.getElementById('uploadFileName').textContent = name;
+  bar.style.width = pct + '%';
+  document.getElementById('uploadPct').textContent = pct + '%';
+}
+function hideUploadProgress() {
+  const w = document.getElementById('uploadProgressWrap');
+  if (w) w.remove();
+}
+function abortUpload() {
+  if (activeUpload) {
+    activeUpload.abortController.abort();
+    fetch(chatUrl(`/chat/upload/abort/${activeUpload.uploadId}`), { method: 'DELETE', headers: authHeaders() }).catch(() => {});
+    activeUpload = null;
+  }
+  hideUploadProgress();
+}
+
+async function chatApiFormWithProgress(path, fd, onProgress) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', chatUrl(path));
+    Object.entries(authHeaders()).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
+    xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ success: false }); } };
+    xhr.onerror = () => resolve({ success: false, message: 'Network error' });
+    xhr.send(fd);
+  });
+}
+
+async function chunkedUpload(file) {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  showUploadProgress(file.name, 0, file.size);
+
+  // 1. Init session
+  const initRes = await chatApi('POST', '/chat/upload/init', {
+    groupId: activeGid, fileName: file.name, fileSize: file.size,
+    mimeType: file.type || 'application/octet-stream', totalChunks
+  });
+  if (!initRes.success) { hideUploadProgress(); alert('Upload init failed: ' + initRes.message); return; }
+
+  const { uploadId } = initRes;
+  const abortController = new AbortController();
+  activeUpload = { uploadId, abortController };
+
+  try {
+    // 2. Upload chunks
+    for (let i = 0; i < totalChunks; i++) {
+      if (abortController.signal.aborted) { hideUploadProgress(); return; }
+      const start = i * CHUNK_SIZE;
+      const chunk = file.slice(start, start + CHUNK_SIZE);
+
+      const fd = new FormData();
+      fd.append('chunk', chunk, file.name);
+      fd.append('chunkIndex', i);
+
+      let uploaded = false, retries = 0;
+      while (!uploaded && retries < 3) {
+        try {
+          const r = await fetch(chatUrl(`/chat/upload/chunk/${uploadId}`), {
+            method: 'POST', headers: authHeaders(), body: fd, signal: abortController.signal
+          });
+          const j = await r.json();
+          if (j.success) uploaded = true;
+          else retries++;
+        } catch (e) {
+          if (abortController.signal.aborted) { hideUploadProgress(); return; }
+          retries++;
+          await new Promise(r => setTimeout(r, 1000 * retries));
+        }
+      }
+      if (!uploaded) { hideUploadProgress(); alert('Chunk upload failed after retries. Try again.'); return; }
+
+      const pct = Math.round((i + 1) / totalChunks * 100);
+      showUploadProgress(file.name, pct, file.size);
+    }
+
+    // 3. Complete
+    showUploadProgress(file.name, 99, file.size);
+    const completeRes = await chatApi('POST', `/chat/upload/complete/${uploadId}`, {});
+    if (!completeRes.success) { hideUploadProgress(); alert('Finalisation failed: ' + completeRes.message); return; }
+
+    showUploadProgress(file.name, 100, file.size);
+    setTimeout(hideUploadProgress, 800);
+    activeUpload = null;
+  } catch (e) {
+    if (!abortController.signal.aborted) { hideUploadProgress(); alert('Upload error: ' + e.message); }
+  }
+}
+
+function authHeaders() {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  return token ? { Authorization: 'Bearer ' + token } : {};
+}
+function chatUrl(path) {
+  const base = (window.API_BASE || window.location.origin + '/api').replace(/\/$/, '');
+  return base + (path.startsWith('/') ? path : '/' + path);
 }
 
 // Drag & drop
@@ -3116,15 +3248,35 @@ let localStream = null, screenStream = null;
 let peerConnections = {}, peerNames = {}, peerStreams = {};
 let micEnabled = true, camEnabled = true, screenSharing = false;
 let currentMeetRoomId = null;
-const ICE_SERVERS = { iceServers: window.CFG?.meetingStunServers || [
+// ── ICE Servers (STUN + TURN) — fetched fresh from backend ──────────────────
+// Falls back to hardcoded list if fetch fails
+let ICE_SERVERS = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
-  // TURN relay — required for mobile-to-mobile / symmetric NAT
-  { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-] };
+  // TURN relay servers — essential for mobile-to-mobile / symmetric NAT
+  // (Android ↔ Android, Android ↔ Web, Web ↔ Web across different networks)
+  { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:80?transport=tcp',  username: 'openrelayproject', credential: 'openrelayproject' },
+]};
+
+// Refresh ICE servers from backend every 30 min (for time-limited TURN credentials)
+async function refreshIceServers() {
+  try {
+    const r = await fetch(chatUrl('/chat/turn-credentials'), { headers: authHeaders() });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.success && j.iceServers?.length) {
+        ICE_SERVERS = { iceServers: j.iceServers };
+        console.log('[WebRTC] TURN credentials refreshed:', j.iceServers.length, 'servers');
+      }
+    }
+  } catch (e) { console.warn('[WebRTC] Could not refresh TURN servers, using fallback:', e.message); }
+}
+refreshIceServers();
+setInterval(refreshIceServers, 30 * 60 * 1000);
 
 function startInstantMeeting() {
   if (!activeGid) {
@@ -4222,9 +4374,20 @@ async function initiateCall(callType) {
   if (!activeGroup) return;
   if (!socket) { alert('Not connected — please refresh.'); return; }
 
-  // For group chats: just open a meeting (multi-person, no ring needed)
+  // For group chats: ring all members AND open a meeting (multi-person)
   if (activeGroup.type === 'group') {
-    startMeeting(callType);
+    const roomId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const callerName = (me.first_name || '') + ' ' + (me.last_name || '');
+    // Notify all group members (backend fans out)
+    socket.emit('groupCallInvite', {
+      groupId:    activeGid,
+      roomId,
+      callType,
+      callerName,
+      groupName:  activeGroup.name
+    });
+    // Caller directly opens the meeting panel
+    await openMeetingPanel(roomId, (activeGroup.name || 'Group') + ' · ' + callType, callType === 'audio');
     return;
   }
 
