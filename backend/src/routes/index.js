@@ -898,12 +898,32 @@ router.get   ('/chat/groups/:id/search',                  authenticate, chatCtrl
 // ── Messages ─────────────────────────────────────────────────────────────────
 router.get   ('/chat/groups/:id/messages',                authenticate, chatCtrl.getMessages);
 router.post  ('/chat/groups/:id/messages',                authenticate, chatCtrl.sendMessage);
-router.post  ('/chat/groups/:id/files',                   authenticate, (req, res, next) => {
-  chatCtrl.upload(req, res, (err) => {
+// ── File upload: direct (<=50 MB) + chunked (up to 1 GB) ─────────────────────
+const fileCtrl = require('../controllers/chatFileController');
+router.post  ('/chat/groups/:id/files', authenticate, (req, res, next) => {
+  fileCtrl.directUploadMiddleware(req, res, (err) => {
     if (err) return res.status(400).json({ success: false, message: err.message });
     next();
   });
-}, chatCtrl.sendFile);
+}, fileCtrl.sendFile);
+// Chunked upload
+router.post  ('/chat/upload/init',                        authenticate, fileCtrl.initUpload);
+router.post  ('/chat/upload/chunk/:uploadId',             authenticate, fileCtrl.uploadChunk);
+router.post  ('/chat/upload/complete/:uploadId',          authenticate, fileCtrl.completeUpload);
+router.delete('/chat/upload/abort/:uploadId',             authenticate, fileCtrl.abortUpload);
+router.get   ('/chat/upload/status/:uploadId',            authenticate, fileCtrl.uploadStatus);
+// TURN credentials
+router.get   ('/chat/turn-credentials', authenticate, (_req, res) => {
+  res.json({ success: true, iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:80?transport=tcp',  username: 'openrelayproject', credential: 'openrelayproject' },
+  ]});
+});
 router.patch ('/chat/messages/:id',                       authenticate, chatCtrl.editMessage);
 router.delete('/chat/messages/:id/me',                    authenticate, chatCtrl.deleteForMe);
 router.delete('/chat/messages/:id/everyone',              authenticate, chatCtrl.deleteForEveryone);
@@ -937,7 +957,8 @@ router.get   ('/chat/scheduled-meetings',                 authenticate, chatCtrl
 router.post  ('/chat/scheduled-meetings/:id/start',       authenticate, chatCtrl.startScheduledMeeting);
 
 // ── Static file serving ───────────────────────────────────────────────────────
-router.get   ('/chat/files/:filename',                    chatCtrl.serveFile);
+router.get   ('/chat/files/:id',  fileCtrl.serveFile);
+router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 
 // ── Call History ──────────────────────────────────────────────────────────────
 router.get   ('/chat/call-log',                           authenticate, chatCtrl.getCallLog);
