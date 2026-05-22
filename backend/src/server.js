@@ -9,6 +9,21 @@ const { Server: SocketIO } = require('socket.io');
 const jwt_sock = require('jsonwebtoken');
 const routes  = require('./routes/index');
 const chatCtrl   = require('./controllers/chatController');
+
+// ── LiveKit SFU — replaces raw WebRTC signalling for calls ───────────────────
+let livekitTokenSdk = null;
+let livekitWebhookReceiver = null;
+try {
+  const lk = require('livekit-server-sdk');
+  livekitTokenSdk = lk;
+  livekitWebhookReceiver = new lk.WebhookReceiver(
+    process.env.LIVEKIT_API_KEY  || '',
+    process.env.LIVEKIT_API_SECRET || ''
+  );
+  console.log('✅ LiveKit SDK loaded');
+} catch(e) {
+  console.warn('⚠️  livekit-server-sdk not installed — run: npm install livekit-server-sdk');
+}
 const attCtrl = require('./controllers/attendanceController');
 const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
@@ -181,50 +196,33 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ── Video / Audio Meeting — WebRTC Signalling ─────────────────────────────
-  socket.on('joinMeeting', async ({ roomId, displayName, callType }) => {
+  // ── Video / Audio Meeting — LiveKit SFU — Signalling replaced by LiveKit server ──────────────────
+  // joinMeeting is now a lightweight event — LiveKit handles all media routing.
+  // We still use it to track call_log and emit chat message on call end.
+  socket.on('joinMeeting', async ({ roomId, callType, groupId, callerId: incomingCallerId }) => {
     socket.join(`meeting:${roomId}`);
-    socket.to(`meeting:${roomId}`).emit('peerJoined', {
-      peerId: socket.id,
-      userId: user.id,
-      displayName: displayName || user.first_name || 'Guest'
-    });
-    // Tell the new joiner who's already in the room
+    // Save call log when callee joins (2nd person in a 1-to-1 room)
     const existingPeers = [...(io.sockets.adapter.rooms.get(`meeting:${roomId}`) || [])].filter(id => id !== socket.id);
-    // Build peer info map so new joiner knows names
-    const peerInfos = existingPeers.map(pid => {
-      const peerSocket = io.sockets.sockets.get(pid);
-      return { peerId: pid, displayName: peerSocket?._displayName || 'Guest' };
-    });
-    socket.emit('existingPeers', existingPeers);
-    socket.emit('existingPeerInfos', peerInfos);
-    // Store display name on socket for others to reference
-    socket._displayName = displayName || user.first_name || 'Guest';
-    // NOTE: We intentionally do NOT send callAnsweredElsewhere here.
-    // Once someone is in a meeting room they must never be kicked out by another
-    // device joining. callAnsweredElsewhere is only for the ringing phase (callAccepted).
-    // Save call log when 2nd person joins a 1-to-1 room (call_TIMESTAMP_random format)
     if (existingPeers.length === 1 && roomId.startsWith('call_')) {
       try {
         const db = require('./config/db');
         const callerSocket = io.sockets.sockets.get(existingPeers[0]);
-        const callerId = callerSocket?.user?.id;
+        const callerId = incomingCallerId || callerSocket?.user?.id;
         if (callerId && callerId !== user.id) {
           await db.query(
-            `INSERT INTO call_log (room_id, call_type, caller_id, callee_id, started_at, status)
-             VALUES ($1,$2,$3,$4,NOW(),'answered')
+            `INSERT INTO call_log (room_id, call_type, caller_id, callee_id, group_id, started_at, status)
+             VALUES ($1,$2,$3,$4,$5,NOW(),'answered')
              ON CONFLICT (room_id) DO NOTHING`,
-            [roomId, callType || 'video', callerId, user.id]
+            [roomId, callType || 'video', callerId, user.id, groupId || null]
           );
         }
       } catch(_) { /* non-fatal */ }
     }
   });
 
+  // leaveMeeting — update call_log duration; LiveKit webhook also does this as backup
   socket.on('leaveMeeting', async ({ roomId }) => {
-    socket.to(`meeting:${roomId}`).emit('peerLeft', { peerId: socket.id, userId: user.id });
     socket.leave(`meeting:${roomId}`);
-    // Mark call ended and insert a synthetic chat message so call history appears inline
     try {
       const db = require('./config/db');
       const logRow = await db.query(
@@ -233,44 +231,32 @@ io.on('connection', (socket) => {
          WHERE room_id=$1 AND ended_at IS NULL RETURNING *`,
         [roomId]
       );
-      // BUG 6 FIX: write a 'call' message into the chat group so mobile sees
-      // voice/video call entries inline in the chat timeline (like WhatsApp)
       if (logRow.rows.length && logRow.rows[0].group_id) {
         const cl  = logRow.rows[0];
         const dur = cl.duration_seconds || 0;
-        const label   = cl.call_type === 'video' ? '📹 Video Call' : '📞 Voice Call';
-        const durStr  = dur >= 60
-          ? `${Math.floor(dur / 60)}m ${dur % 60}s`
-          : `${dur}s`;
-        const content = `${label} · ${durStr} · ${roomId}`;
+        const label  = cl.call_type === 'video' ? '📹 Video Call' : '📞 Voice Call';
+        const durStr = dur >= 60 ? `${Math.floor(dur/60)}m ${dur%60}s` : `${dur}s`;
         await db.query(
           `INSERT INTO chat_messages(group_id, sender_id, content, message_type)
-           VALUES($1, $2, $3, 'call')
-           ON CONFLICT DO NOTHING`,
-          [cl.group_id, cl.caller_id, content]
+           VALUES($1,$2,$3,'call') ON CONFLICT DO NOTHING`,
+          [cl.group_id, cl.caller_id, `${label} · ${durStr} · ${roomId}`]
         );
+        // Push new message to group room so clients reload
+        io.to(`group:${cl.group_id}`).emit('newMessage', { groupId: cl.group_id, reload: true });
       }
     } catch (_) { /* non-fatal */ }
   });
 
-  // WebRTC offer
-  socket.on('offer', ({ to, offer, roomId }) => {
-    io.to(to).emit('offer', { from: socket.id, userId: user.id, offer, roomId });
-  });
-  // WebRTC answer
-  socket.on('answer', ({ to, answer }) => {
-    io.to(to).emit('answer', { from: socket.id, answer });
-  });
-  // ICE candidates
-  socket.on('ice-candidate', ({ to, candidate }) => {
-    io.to(to).emit('ice-candidate', { from: socket.id, candidate });
-  });
+  // offer / answer / ice-candidate — kept as fallback for direct P2P (scheduled meetings)
+  // These are NOT used for 1-to-1 calls anymore — LiveKit handles them.
+  socket.on('offer',         ({ to, offer, roomId })  => io.to(to).emit('offer',         { from: socket.id, userId: user.id, offer, roomId }));
+  socket.on('answer',        ({ to, answer })         => io.to(to).emit('answer',        { from: socket.id, answer }));
+  socket.on('ice-candidate', ({ to, candidate })      => io.to(to).emit('ice-candidate', { from: socket.id, candidate }));
 
-  // Screen share toggle notification
+  // peerMuteState — still used by LiveKit sessions to show mute indicators in UI
   socket.on('screenShare', ({ roomId, sharing, displayName }) => {
     socket.to(`meeting:${roomId}`).emit('peerScreenShare', {
-      peerId: socket.id,
-      sharing,
+      peerId: socket.id, sharing,
       displayName: displayName || user.first_name || 'Someone'
     });
   });
@@ -348,6 +334,92 @@ const chatUploadDir = require('path').join(__dirname, '..', 'uploads', 'chat');
 if (!require('fs').existsSync(chatUploadDir)) require('fs').mkdirSync(chatUploadDir, { recursive: true });
 app.use('/chat/files',     require('express').static(chatUploadDir));  // legacy
 app.use('/api/chat/files', require('express').static(chatUploadDir));  // new
+
+// ── LiveKit: Generate room access token ───────────────────────────────────────
+// POST /api/livekit/token  { roomId, callType }
+// Returns { token, url } — client passes token to LiveKit SDK to join the room
+const { authenticate: _lvAuth } = require('./middleware/auth');
+app.post('/api/livekit/token', _lvAuth, async (req, res) => {
+  try {
+    if (!livekitTokenSdk) return res.status(503).json({ success: false, message: 'LiveKit not configured' });
+    const { roomId, callType = 'video' } = req.body;
+    if (!roomId) return res.status(400).json({ success: false, message: 'roomId required' });
+
+    const apiKey    = process.env.LIVEKIT_API_KEY    || 'krishihr_key';
+    const apiSecret = process.env.LIVEKIT_API_SECRET || 'krishihr_secret_change_me';
+    const wsUrl     = process.env.LIVEKIT_URL        || 'ws://localhost:7880';
+
+    const identity  = String(req.user.id);
+    const name      = `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || 'User';
+
+    const at = new livekitTokenSdk.AccessToken(apiKey, apiSecret, { identity, name, ttl: '4h' });
+    at.addGrant({
+      roomJoin:    true,
+      room:        roomId,
+      canPublish:  true,
+      canSubscribe: true,
+      canPublishData: true,
+      // For audio-only calls, only allow microphone publishing
+      ...(callType === 'audio' ? { canPublishSources: ['microphone'] } : {})
+    });
+
+    const token = await at.toJwt();
+    res.json({ success: true, data: { token, url: wsUrl } });
+  } catch (err) {
+    console.error('[LiveKit token]', err.message);
+    res.status(500).json({ success: false, message: 'Token generation failed' });
+  }
+});
+
+// ── LiveKit: Webhook receiver ─────────────────────────────────────────────────
+// LiveKit posts room events here (room_started, room_finished, participant_joined…)
+// Used to insert call history rows into chat_messages for the timeline
+app.post('/api/livekit/webhook',
+  express.raw({ type: 'application/webhook+json' }),
+  async (req, res) => {
+    try {
+      if (!livekitWebhookReceiver) return res.sendStatus(200);
+      let event;
+      try {
+        event = await livekitWebhookReceiver.receive(req.body, req.headers['webhook-signature']);
+      } catch (e) {
+        // Signature mismatch — ignore (might be a test ping)
+        return res.sendStatus(200);
+      }
+
+      // When a room finishes, write a call message into the chat group timeline
+      if (event.event === 'room_finished' && event.room) {
+        const roomId = event.room.name;
+        // room names for DM calls follow: call_<groupId>_<timestamp>_<random>
+        // or the caller sets the roomId = groupId-derived string
+        try {
+          const logRow = await db.query(
+            `UPDATE call_log SET ended_at=NOW(),
+             duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INT
+             WHERE room_id=$1 AND ended_at IS NULL RETURNING *`,
+            [roomId]
+          );
+          if (logRow.rows.length && logRow.rows[0].group_id) {
+            const cl  = logRow.rows[0];
+            const dur = cl.duration_seconds || 0;
+            const label  = cl.call_type === 'video' ? '📹 Video Call' : '📞 Voice Call';
+            const durStr = dur >= 60 ? `${Math.floor(dur/60)}m ${dur%60}s` : `${dur}s`;
+            await db.query(
+              `INSERT INTO chat_messages(group_id, sender_id, content, message_type)
+               VALUES($1,$2,$3,'call') ON CONFLICT DO NOTHING`,
+              [cl.group_id, cl.caller_id, `${label} · ${durStr} · ${roomId}`]
+            );
+          }
+        } catch(dbErr) { console.warn('[LiveKit webhook] DB error:', dbErr.message); }
+      }
+
+      res.sendStatus(200);
+    } catch (err) {
+      console.error('[LiveKit webhook]', err.message);
+      res.sendStatus(200); // always 200 so LiveKit doesn't retry endlessly
+    }
+  }
+);
 
 app.use('/api', routes);
 
