@@ -26,8 +26,8 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logger (dev only)
 app.use((req, _res, next) => {
@@ -39,7 +39,7 @@ app.use((req, _res, next) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
-const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e9 });
+const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e6 });
 global.io = io;
 io.use((socket, next) => {
   const token  = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -163,6 +163,28 @@ io.on('connection', (socket) => {
     if (calleeSockets) {
       calleeSockets.forEach(sid => io.to(sid).emit('callCancelled', { roomId }));
     }
+  });
+
+  // ── Group call invite (fans out to ALL group members) ────────────────────
+  socket.on('groupCallInvite', async ({ groupId, roomId, callType, callerName, callerAvatar, groupName }) => {
+    try {
+      const dbInst = require('./config/db');
+      const members = await dbInst.query(
+        `SELECT employee_id FROM chat_group_members WHERE group_id=$1 AND left_at IS NULL AND employee_id != $2`,
+        [groupId, user.id]
+      );
+      members.rows.forEach(({ employee_id }) => {
+        const calleeSockets = global.userSockets.get(String(employee_id));
+        if (calleeSockets) {
+          calleeSockets.forEach(sid => {
+            io.to(sid).emit('incomingCall', {
+              roomId, callType, callerName, callerAvatar,
+              callerId: user.id, groupId, groupName, isGroupCall: true
+            });
+          });
+        }
+      });
+    } catch (e) { console.error('[groupCallInvite]', e.message); }
   });
 
   // ── Video / Audio Meeting — WebRTC Signalling ─────────────────────────────
