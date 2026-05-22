@@ -2,8 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <!-- LiveKit Client SDK — SFU for all video/audio/screen share -->
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
 <title id="page-title">Chat & Meetings</title>
 <link rel="stylesheet" href="style.css">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1068,15 +1066,6 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="topbar-title">💬 Chat &amp; Meetings</div>
     </div>
     <div class="topbar-right">
-      <!-- IN CALL indicator — always visible while in a call, click to restore panel -->
-      <div id="inCallPill" onclick="document.getElementById('meetingPanel').classList.remove('minimized');document.getElementById('meetingPanel').classList.add('open');
-  // Show IN CALL pill (visible even when panel is minimized or behind other content)
-  const pill = document.getElementById('inCallPill');
-  if (pill) pill.style.display = 'flex';
-  document.body.classList.add('in-call');"
-           style="display:none;align-items:center;gap:6px;background:#ea4335;color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;cursor:pointer;animation:pulse 2s infinite">
-        🔴 IN CALL
-      </div>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications" onclick="openNotifications()">🔔<span id="notif-badge"></span></button>
       <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
@@ -3127,195 +3116,272 @@ let localStream = null, screenStream = null;
 let peerConnections = {}, peerNames = {}, peerStreams = {};
 let micEnabled = true, camEnabled = true, screenSharing = false;
 let currentMeetRoomId = null;
-// ─────────────────────────────────────────────────────────────────────────────
-// LIVEKIT SFU — replaces all hand-rolled WebRTC mesh code
-// LiveKit handles: ICE, DTLS, SRTP, simulcast, adaptive bitrate, screen share
-// Each client sends 1 stream UP to LiveKit; LiveKit forwards to all others.
-// ─────────────────────────────────────────────────────────────────────────────
-let currentRoom     = null;  // LiveKit Room instance
-let localStream     = null;  // kept for self-preview <video> element
-let screenSharing   = false;
-let screenStream    = null;
-let handRaised      = false;
-let isMinimized     = false;
-let meetSideOpen    = null;
-let _meetRecorder   = null;
-let micEnabled      = true;
-let camEnabled      = true;
-let currentMeetRoomId = null;
-let currentCallType   = null;
+const ICE_SERVERS = { iceServers: window.CFG?.meetingStunServers || [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // TURN relay — required for mobile-to-mobile / symmetric NAT
+  { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+] };
 
-// ── Open meeting panel and connect to LiveKit ─────────────────────────────────
+function startInstantMeeting() {
+  if (!activeGid) {
+    setMode('chat');
+    if (groups.length) { openGroup(groups[0].id); setTimeout(() => startMeeting('video'), 400); }
+    else alert('Open a chat first, then start a meeting.');
+    return;
+  }
+  startMeeting('video');
+}
+
+async function startMeeting(callType) {
+  if (!activeGid) return;
+  const now   = new Date();
+  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const title = (activeGroup?.name || 'Meeting') + ' · ' + timeStr;
+
+  const res = await chatApi('POST', '/chat/meetings', { title, group_id: activeGid });
+  if (!res.success) { alert('Could not start meeting: ' + (res.message || 'Unknown')); return; }
+
+  const roomId   = res.data.room_id;
+  const joinLink = `${FRONTEND_URL}/chat.html?meetjoin=${roomId}`;
+  const hostName = (me.first_name || '') + (me.last_name ? ' ' + me.last_name : '');
+
+  // Send a rich meeting announcement message to the group
+  const inviteMsg = `📹 ${hostName} has started a meeting!\n🕐 ${dateStr} at ${timeStr}\n🔗 ${joinLink}`;
+  await chatApi('POST', `/chat/groups/${activeGid}/messages`, { content: inviteMsg }).catch(() => {});
+
+  await openMeetingPanel(roomId, title, callType === 'audio');
+}
+
 async function openMeetingPanel(roomId, title, audioOnly = false) {
   currentMeetRoomId = roomId;
-  currentCallType   = audioOnly ? 'audio' : 'video';
-  document.getElementById('meetingTitle').textContent = title || 'Meeting';
+  document.getElementById('meetingTitle').textContent = title||'Meeting';
   document.getElementById('meetingPanel').classList.add('open');
   document.getElementById('meetGrid').innerHTML = '';
   document.getElementById('meetChatMsgs').innerHTML = '';
-  document.getElementById('meetAloneWarn').classList.add('visible');
+  peerConnections = {}; peerNames = {}; peerStreams = {};
   micEnabled = true; camEnabled = !audioOnly;
   updateParticipantCount();
+  updateParticipantList();
 
-  // Save to sessionStorage so page refresh can rejoin
-  sessionStorage.setItem('active_call', JSON.stringify({ roomId, title, audioOnly }));
-
+  // Request media with noise suppression built-in from the start
+  // (don't replace tracks later — that breaks peer connections)
+  const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
   try {
-    // Get LiveKit JWT from your backend
-    const { data: { token, url } } = await chatApi('POST', '/livekit/token', {
-      roomId, callType: audioOnly ? 'audio' : 'video'
-    });
-
-    // Create LiveKit Room with adaptive stream + dynacast for bandwidth efficiency
-    const { Room, RoomEvent, Track, VideoPresets, ConnectionState } = window.LivekitClient;
-    currentRoom = new Room({
-      adaptiveStream: true,
-      dynacast:       true,
-      videoCaptureDefaults: { resolution: VideoPresets.h720.resolution }
-    });
-
-    // ── Room events ──────────────────────────────────────────────────────────
-    currentRoom
-      .on(RoomEvent.ConnectionStateChanged, (state) => {
-        if (state === ConnectionState.Reconnecting) {
-          document.getElementById('meetingTitle').textContent = '⟳ Reconnecting…';
-        } else if (state === ConnectionState.Connected) {
-          document.getElementById('meetingTitle').textContent = title || 'Meeting';
-        } else if (state === ConnectionState.Disconnected) {
-          sessionStorage.removeItem('active_call');
-        }
-      })
-      .on(RoomEvent.ParticipantConnected, (participant) => {
-        addParticipantTile(participant.identity, participant.name || participant.identity);
-        addMeetChatSys(`${participant.name || participant.identity} joined`);
-        updateParticipantCount();
-        document.getElementById('meetAloneWarn').classList.remove('visible');
-      })
-      .on(RoomEvent.ParticipantDisconnected, (participant) => {
-        removeParticipantTile(participant.identity);
-        addMeetChatSys(`${participant.name || participant.identity} left`);
-        updateParticipantCount();
-      })
-      .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        const tile = document.getElementById('tile-' + participant.identity)
-                  || addParticipantTile(participant.identity, participant.name || participant.identity);
-        if (track.kind === 'video') {
-          const videoEl = track.attach();
-          videoEl.autoplay = true; videoEl.playsInline = true;
-          videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
-          // Screen share — show in fullscreen share view
-          if (publication.source === Track.Source.ScreenShare) {
-            videoEl.style.objectFit = 'contain';
-            showRemoteScreenShare(videoEl, participant.name || participant.identity);
-          } else {
-            const existingVid = tile.querySelector('video');
-            if (existingVid) existingVid.replaceWith(videoEl);
-            else tile.prepend(videoEl);
-            tile.classList.add('has-cam');
-          }
-        }
-        if (track.kind === 'audio') {
-          const audioEl = track.attach();
-          document.body.appendChild(audioEl);
-        }
-      })
-      .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-        track.detach().forEach(el => el.remove());
-        if (publication.source === Track.Source.ScreenShare) {
-          hideRemoteScreenShare();
-        }
-      })
-      .on(RoomEvent.LocalTrackPublished, (publication) => {
-        if (publication.source === Track.Source.ScreenShare) {
-          showLocalScreenShareView();
-        }
-      })
-      .on(RoomEvent.LocalTrackUnpublished, (publication) => {
-        if (publication.source === Track.Source.ScreenShare) {
-          hideLocalScreenShareView();
-          screenSharing = false;
-          updateMeetBtns();
-        }
-      })
-      .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-        // Highlight active speaker tile
-        document.querySelectorAll('.video-tile').forEach(t => t.classList.remove('speaking'));
-        speakers.forEach(p => {
-          const tile = document.getElementById('tile-' + p.identity);
-          if (tile) tile.classList.add('speaking');
-        });
-      })
-      .on(RoomEvent.Disconnected, () => {
-        sessionStorage.removeItem('active_call');
-        leaveMeeting();
-      });
-
-    // Connect to LiveKit SFU
-    await currentRoom.connect(url, token);
-
-    // Publish local media
     if (audioOnly) {
-      await currentRoom.localParticipant.setMicrophoneEnabled(true);
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
     } else {
-      await currentRoom.localParticipant.enableCameraAndMicrophone();
-    }
-
-    // Attach self-preview
-    const camPub = currentRoom.localParticipant.getTrackPublication(Track.Source.Camera);
-    if (camPub?.track) {
-      const selfVid = document.getElementById('localVideo');
-      const el = camPub.track.attach();
-      el.muted = true; // prevent echo
-      selfVid.replaceWith(el);
-      el.id = 'localVideo';
-    }
-    document.getElementById('selfFloatLabel').textContent = 'You · ' + (me?.first_name || 'Me');
-
-    // Render existing participants
-    currentRoom.remoteParticipants.forEach((participant) => {
-      addParticipantTile(participant.identity, participant.name || participant.identity);
-      participant.videoTrackPublications.forEach((pub) => {
-        if (pub.isSubscribed && pub.track) {
-          const videoEl = pub.track.attach();
-          videoEl.autoplay = true; videoEl.playsInline = true;
-          videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
-          const tile = document.getElementById('tile-' + participant.identity);
-          if (tile) { const v = tile.querySelector('video'); if (v) v.replaceWith(videoEl); else tile.prepend(videoEl); }
-        }
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: audioConstraints
       });
-    });
-
-    // Tell server we joined (for call_log tracking)
-    if (socket) socket.emit('joinMeeting', { roomId, callType: currentCallType });
-    await chatApi('POST', `/chat/meetings/${roomId}/join`).catch(() => {});
-    updateMeetBtns();
-  } catch (e) {
-    console.error('[LiveKit connect]', e);
-    alert('Could not join call: ' + e.message);
-    leaveMeeting();
+    }
+  } catch {
+    // Camera failed — try audio only
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      camEnabled = false;
+    } catch {
+      alert('Could not access microphone. Please allow microphone access and try again.');
+      return;
+    }
   }
+
+  // Attach local preview
+  const localVid = document.getElementById('localVideo');
+  localVid.srcObject = localStream;
+  localVid.muted = true; // always mute self-preview to avoid echo
+  document.getElementById('selfFloatLabel').textContent = 'You · ' + (me.first_name||'Me');
+
+  // Update self-float cam state
+  const selfFloat = document.getElementById('selfFloat');
+  if (selfFloat) selfFloat.style.opacity = camEnabled ? '1' : '0.4';
+
+  if (socket) socket.emit('joinMeeting', { roomId, displayName: me.first_name||'User' });
+  await chatApi('POST', `/chat/meetings/${roomId}/join`).catch(()=>{});
+  updateMeetBtns();
 }
 
-// ── Participant tile ──────────────────────────────────────────────────────────
-function addParticipantTile(identity, displayName) {
-  if (document.getElementById('tile-' + identity)) return document.getElementById('tile-' + identity);
+// Noise suppression is now requested inline with getUserMedia constraints
+// (replacing tracks post-connection breaks peer video/audio)
+function checkNoiseSuppression() { /* no-op — handled at getUserMedia time */ }
+
+function updateParticipantCount() {
+  const peerCount = Object.keys(peerNames).length;
+  const count = 1 + peerCount;
+  document.getElementById('meetingParticipantCount').textContent =
+    count===1 ? 'Just you' : `${count} participants`;
+  document.getElementById('participantListCount').textContent = count;
+  // Hide "alone" warn as soon as any peer is known — even before video connects
+  document.getElementById('meetAloneWarn').classList.toggle('visible', peerCount === 0);
+}
+
+function updateParticipantList() {
+  const list = document.getElementById('participantList');
+  let html = `<div class="participant-row">
+    <div class="participant-avatar">${(me.first_name||'Y').charAt(0)}</div>
+    <div class="participant-name">${esc(me.first_name||'You')} <span class="host-badge">Host</span></div>
+    <div class="participant-status">
+      <span class="status-icon">${micEnabled?'🎙️':'🔇'}</span>
+      <span class="status-icon">${camEnabled?'📷':'🚫'}</span>
+    </div>
+  </div>`;
+  Object.entries(peerNames).forEach(([peerId, name]) => {
+    html += `<div class="participant-row" id="peer-row-${peerId}">
+      <div class="participant-avatar">${(name||'?').charAt(0).toUpperCase()}</div>
+      <div class="participant-name">${esc(name||'Peer')}</div>
+      <div class="participant-status"><span class="status-icon">🎙️</span></div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+async function onExistingPeers(peerIds) {
+  for (const pid of peerIds) {
+    // Ensure name/tile exist (peerInfos may arrive after existingPeers on slow connections)
+    if (!peerNames[pid]) peerNames[pid] = 'Peer';
+    if (!document.getElementById('tile-' + pid)) addVideoTile(pid, peerNames[pid]);
+    const pc = createPeerConnection(pid);
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (socket) socket.emit('offer', { to: pid, offer: pc.localDescription, roomId: currentMeetRoomId });
+    } catch(e) {
+      console.warn('onExistingPeers offer error for', pid, e);
+    }
+  }
+  updateParticipantCount();
+  updateParticipantList();
+}
+
+function onPeerJoined({ peerId, userId, displayName }) {
+  if (peerId === socket?.id) return;
+  peerNames[peerId] = displayName;
+  addVideoTile(peerId, displayName);
+  updateParticipantCount();
+  updateParticipantList();
+  // Add system message in meet chat
+  addMeetChatSys(`${displayName} joined`);
+}
+
+function onPeerLeft({ peerId }) {
+  const name = peerNames[peerId]||'Someone';
+  if (peerConnections[peerId]) { peerConnections[peerId].close(); delete peerConnections[peerId]; }
+  delete peerNames[peerId];
+  const el = document.getElementById('tile-'+peerId);
+  if (el) el.remove();
+  updateParticipantCount();
+  updateParticipantList();
+  addMeetChatSys(`${name} left`);
+}
+
+function createPeerConnection(peerId) {
+  if (peerConnections[peerId]) return peerConnections[peerId];
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConnections[peerId] = pc;
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.onicecandidate = ({ candidate }) => {
+    if (candidate && socket) socket.emit('ice-candidate', { to: peerId, candidate });
+  };
+  pc.ontrack = (event) => {
+    const stream = event.streams[0];
+    if (!stream) return;
+    peerStreams[peerId] = stream;
+
+    let tile = document.getElementById('tile-'+peerId);
+    if (!tile) tile = addVideoTile(peerId, peerNames[peerId]||'Peer');
+    const video = tile.querySelector('video');
+    if (video) {
+      video.srcObject = stream;
+      // Check video immediately and also once tracks are confirmed live
+      const refreshCamState = () => {
+        const hasVideo = stream.getVideoTracks().some(t => t.enabled);
+        tile.classList.toggle('has-cam', hasVideo);
+        tile.classList.toggle('no-cam', !hasVideo);
+      };
+      refreshCamState();
+      // Re-check after a short delay — readyState may not be live yet at ontrack time
+      setTimeout(refreshCamState, 500);
+      stream.getVideoTracks().forEach(t => { t.onunmute = refreshCamState; t.onmute = refreshCamState; });
+    }
+    // Audio level detection (active speaker)
+    setupAudioDetection(stream, peerId);
+  };
+  pc.onconnectionstatechange = () => {
+    if (['disconnected','failed'].includes(pc.connectionState)) onPeerLeft({ peerId });
+  };
+  return pc;
+}
+
+async function onOffer({ from, offer }) {
+  const pc = createPeerConnection(from);
+  // Android may send offer as plain string (old) or {type,sdp} object (fixed).
+  // Handle both formats defensively.
+  const sdpObj = (typeof offer === 'string')
+    ? { type: 'offer', sdp: offer }
+    : offer;
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  if (socket) socket.emit('answer', { to: from, answer: pc.localDescription });
+}
+async function onAnswer({ from, answer }) {
+  const pc = peerConnections[from];
+  if (!pc) return;
+  // Android may send answer as plain string (old) or {type,sdp} object (fixed).
+  const sdpObj = (typeof answer === 'string')
+    ? { type: 'answer', sdp: answer }
+    : answer;
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
+}
+async function onIceCandidate({ from, candidate }) {
+  const pc = peerConnections[from];
+  if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+}
+
+// Active speaker detection via audio levels
+function setupAudioDetection(stream, peerId) {
+  try {
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(stream);
+    const analyzer = ctx.createAnalyser();
+    analyzer.fftSize = 512;
+    src.connect(analyzer);
+    const data = new Uint8Array(analyzer.frequencyBinCount);
+    let lastSpeak = 0;
+    const check = () => {
+      analyzer.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      const tile = document.getElementById('tile-'+peerId);
+      if (tile) {
+        if (avg > 15) { tile.classList.add('speaking'); lastSpeak = Date.now(); }
+        else if (Date.now()-lastSpeak > 500) tile.classList.remove('speaking');
+      }
+      if (peerConnections[peerId]) requestAnimationFrame(check);
+    };
+    check();
+  } catch {}
+}
+
+function addVideoTile(peerId, displayName) {
+  const existing = document.getElementById('tile-'+peerId);
+  if (existing) return existing;
   const tile = document.createElement('div');
   tile.className = 'video-tile no-cam';
-  tile.id = 'tile-' + identity;
+  tile.id = 'tile-'+peerId;
   tile.innerHTML = `
+    <video autoplay playsinline></video>
     <div class="video-tile-avatar"><div class="tile-avatar-circle">${(displayName||'?').charAt(0).toUpperCase()}</div></div>
-    <div class="video-tile-label">${esc(displayName||'Peer')}</div>
-    <div class="raised-hand-badge" id="hand-${identity}">✋</div>
+    <div class="video-tile-label">${esc(displayName||'Peer')}<span class="tile-muted-icon" id="muted-${peerId}"></span></div>
+    <div class="raised-hand-badge" id="hand-${peerId}">✋</div>
   `;
   document.getElementById('meetGrid').appendChild(tile);
   updateMeetGridLayout();
   return tile;
-}
-
-function removeParticipantTile(identity) {
-  const el = document.getElementById('tile-' + identity);
-  if (el) el.remove();
-  updateMeetGridLayout();
 }
 
 function updateMeetGridLayout() {
@@ -3325,268 +3391,417 @@ function updateMeetGridLayout() {
   grid.className = 'meet-grid ' + (n<=1?'solo':n===2?'two':n===3?'three':'four');
 }
 
-// ── Screen share ──────────────────────────────────────────────────────────────
-async function toggleScreen() {
-  if (!currentRoom) return;
-  const { Track } = window.LivekitClient;
-  if (screenSharing) {
-    await currentRoom.localParticipant.setScreenShareEnabled(false);
-    screenSharing = false;
-  } else {
-    try {
-      // LiveKit handles getDisplayMedia, track publishing, and renegotiation
-      await currentRoom.localParticipant.setScreenShareEnabled(true);
-      screenSharing = true;
-    } catch (e) {
-      console.warn('Screen share cancelled:', e.message);
+function onPeerScreenShare({ peerId, sharing, displayName }) {
+  const cont    = document.getElementById('screenshareContainer');
+  const grid    = document.getElementById('meetGrid');
+  const selfFlt = document.getElementById('selfFloat');
+  if (sharing) {
+    // The peer's track is coming through their existing PeerConnection.
+    // Listen for the next ontrack event which carries the screen track.
+    const pc = peerConnections[peerId];
+    if (pc) {
+      // Use addEventListener so we don't overwrite the existing ontrack handler
+      const screenTrackListener = (event) => {
+        const stream = event.streams[0];
+        if (stream) {
+          peerStreams[peerId] = stream;
+          const ssv = document.getElementById('screenShareVideo');
+          if (ssv) ssv.srcObject = stream;
+          const stripVid = document.querySelector('#strip-' + peerId + ' video');
+          if (stripVid) stripVid.srcObject = stream;
+        }
+        pc.removeEventListener('track', screenTrackListener);
+      };
+      pc.addEventListener('track', screenTrackListener);
     }
+    // If stream already updated (slow network — track arrived before signal), use it
+    const stream = peerStreams[peerId];
+    if (stream) document.getElementById('screenShareVideo').srcObject = stream;
+    document.getElementById('screenshareLabel').textContent = (displayName||'Someone') + "'s screen";
+    document.getElementById('localVideoStrip').srcObject = localStream;
+    updateSelfThumb();
+    syncPeerStrip();
+    cont.classList.add('visible');
+    grid.style.display = 'none';
+    selfFlt.style.display = 'none';
+  } else {
+    cont.classList.remove('visible');
+    grid.style.display = '';
+    selfFlt.style.display = '';
+    document.getElementById('screenShareVideo').srcObject = null;
+    // Re-attach peer's camera stream to their tile
+    const stream = peerStreams[peerId];
+    const tile = document.getElementById('tile-' + peerId);
+    if (tile && stream) {
+      const vid = tile.querySelector('video');
+      if (vid) vid.srcObject = stream;
+    }
+  }
+}
+
+async function toggleMic() {
+  micEnabled = !micEnabled;
+  if (localStream) {
+    localStream.getAudioTracks().forEach(t => { t.enabled = micEnabled; });
+  }
+  // Notify peers of mute state
+  if (socket && currentMeetRoomId) {
+    socket.emit('peerMuteState', { roomId: currentMeetRoomId, micEnabled, camEnabled });
+  }
+  updateMeetBtns();
+  updateParticipantList();
+}
+async function toggleCam() {
+  camEnabled = !camEnabled;
+  if (localStream) {
+    localStream.getVideoTracks().forEach(t => { t.enabled = camEnabled; });
+  }
+  const self = document.getElementById('selfFloat');
+  if (self) self.style.opacity = camEnabled ? '1' : '0.4';
+  // Notify peers of cam state change
+  if (socket && currentMeetRoomId) {
+    socket.emit('peerMuteState', { roomId: currentMeetRoomId, micEnabled, camEnabled });
+  }
+  updateMeetBtns();
+  updateParticipantList();
+}
+async function toggleScreen() {
+  const cont    = document.getElementById('screenshareContainer');
+  const grid    = document.getElementById('meetGrid');
+  const selfFlt = document.getElementById('selfFloat');
+
+  if (screenSharing) {
+    // ── Stop ──────────────────────────────────────────────────────────────
+    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+    if (localStream) {
+      const vt = localStream.getVideoTracks()[0];
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s && vt) s.replaceTrack(vt);
+      });
+      document.getElementById('localVideo').srcObject = localStream;
+    }
+    cont.classList.remove('visible');
+    grid.style.display = '';
+    selfFlt.style.display = '';
+    document.getElementById('screenShareVideo').srcObject = null;
+    screenSharing = false;
+    if (socket && currentMeetRoomId) socket.emit('screenShare', { roomId: currentMeetRoomId, sharing: false, displayName: me.first_name });
+
+  } else {
+    // ── Start ──────────────────────────────────────────────────────────────
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: true });
+      const track  = screenStream.getVideoTracks()[0];
+
+      document.getElementById('screenShareVideo').srcObject = screenStream;
+      document.getElementById('screenshareLabel').textContent = 'Your screen';
+      document.getElementById('localVideoStrip').srcObject = localStream;
+      updateSelfThumb();
+      syncPeerStrip();
+      cont.classList.add('visible');
+      grid.style.display = 'none';
+      selfFlt.style.display = 'none'; // self is now in the right strip
+
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s) s.replaceTrack(track);
+      });
+
+      track.onended = () => { screenSharing = true; toggleScreen(); };
+      screenSharing = true;
+      if (socket && currentMeetRoomId) socket.emit('screenShare', { roomId: currentMeetRoomId, sharing: true, displayName: me.first_name });
+    } catch(e) { console.warn('Screen share cancelled or failed:', e.message); }
   }
   updateMeetBtns();
 }
 
-function showLocalScreenShareView() {
-  const { Track } = window.LivekitClient;
-  const pub = currentRoom?.localParticipant?.getTrackPublication(Track.Source.ScreenShare);
-  if (pub?.track) {
-    const ssv = document.getElementById('screenShareVideo');
-    const el  = pub.track.attach();
-    el.autoplay = true; el.playsInline = true;
-    ssv.replaceWith(el); el.id = 'screenShareVideo';
-    document.getElementById('screenshareLabel').textContent = 'Your screen';
-    document.getElementById('screenshareContainer').classList.add('visible');
-    document.getElementById('meetGrid').style.display = 'none';
-    document.getElementById('selfFloat').style.display = 'none';
+function updateSelfThumb() {
+  const selfName = (me.first_name || 'You') + (me.last_name ? ' ' + me.last_name : '');
+  const strip    = document.getElementById('localVideoStrip');
+  const thumb    = document.getElementById('selfThumb');
+  const avatar   = document.getElementById('selfThumbAvatar');
+  const label    = document.getElementById('selfThumbLabel');
+  if (strip) strip.srcObject = localStream;
+  if (label) label.textContent = 'You · ' + (me.first_name || 'Me');
+  if (avatar) avatar.textContent = (me.first_name || 'Y').charAt(0).toUpperCase();
+  if (thumb) {
+    const hasCam = localStream?.getVideoTracks().some(t => t.enabled);
+    thumb.classList.toggle('has-cam', hasCam);
+    thumb.classList.toggle('no-cam', !hasCam);
   }
 }
 
-function showRemoteScreenShare(videoEl, participantName) {
-  const ssv = document.getElementById('screenShareVideo');
-  ssv.replaceWith(videoEl); videoEl.id = 'screenShareVideo';
-  document.getElementById('screenshareLabel').textContent = `${participantName}'s screen`;
-  document.getElementById('screenshareContainer').classList.add('visible');
-  document.getElementById('meetGrid').style.display = 'none';
-  document.getElementById('selfFloat').style.display = 'none';
+// Build/sync the peer thumbnail strip when screensharing
+function syncPeerStrip() {
+  const strip = document.getElementById('peerStripContainer');
+  if (!strip) return;
+  strip.innerHTML = '';
+  Object.entries(peerNames).forEach(([peerId, name]) => {
+    const stream = peerStreams[peerId];
+    const div = document.createElement('div');
+    div.className = 'side-thumb ' + (stream ? 'has-cam' : 'no-cam');
+    div.id = 'strip-' + peerId;
+    const vid = document.createElement('video');
+    vid.autoplay = true; vid.playsInline = true;
+    if (stream) vid.srcObject = stream;
+    const avatar = document.createElement('div');
+    avatar.className = 'side-thumb-avatar';
+    avatar.textContent = (name || '?').charAt(0).toUpperCase();
+    const label = document.createElement('div');
+    label.className = 'side-thumb-label';
+    label.textContent = name || 'Peer';
+    div.appendChild(vid); div.appendChild(avatar); div.appendChild(label);
+    strip.appendChild(div);
+  });
 }
 
-function hideLocalScreenShareView() {
-  document.getElementById('screenshareContainer').classList.remove('visible');
-  document.getElementById('meetGrid').style.display = '';
-  document.getElementById('selfFloat').style.display = '';
-  // Restore screen share video to a plain <video> element
-  const el = document.createElement('video');
-  el.id = 'screenShareVideo'; el.autoplay = true; el.playsInline = true;
-  document.getElementById('screenShareVideo').replaceWith(el);
-}
-
-function hideRemoteScreenShare() {
-  hideLocalScreenShareView();
-}
-
-// ── Mic / Cam toggle ──────────────────────────────────────────────────────────
-async function toggleMic() {
-  if (!currentRoom) return;
-  micEnabled = !micEnabled;
-  await currentRoom.localParticipant.setMicrophoneEnabled(micEnabled);
-  updateMeetBtns(); updateParticipantList();
-}
-
-async function toggleCam() {
-  if (!currentRoom) return;
-  camEnabled = !camEnabled;
-  await currentRoom.localParticipant.setCameraEnabled(camEnabled);
-  const self = document.getElementById('selfFloat');
-  if (self) self.style.opacity = camEnabled ? '1' : '0.4';
-  updateMeetBtns(); updateParticipantList();
-}
-
-// ── Leave meeting ─────────────────────────────────────────────────────────────
-async function leaveMeeting() {
-  sessionStorage.removeItem('active_call');
-  if (currentRoom) {
-    try { await currentRoom.disconnect(); } catch (_) {}
-    currentRoom = null;
-  }
-  if (socket && currentMeetRoomId) socket.emit('leaveMeeting', { roomId: currentMeetRoomId });
-  await chatApi('POST', `/chat/meetings/${currentMeetRoomId}/leave`).catch(() => {});
-
-  // Stop any recording
-  if (_meetRecorder && _meetRecorder.state === 'recording') _meetRecorder.stop();
-
-  // Reset UI
-  document.getElementById('meetingPanel').classList.remove('open', 'minimized');
-  document.getElementById('screenshareContainer').classList.remove('visible');
-  document.getElementById('meetGrid').style.display = '';
-  document.getElementById('selfFloat').style.display = '';
-  document.getElementById('meetGrid').innerHTML = '';
-
-  // Restore self-preview to empty <video>
-  const selfVid = document.createElement('video');
-  selfVid.id = 'localVideo'; selfVid.autoplay = true; selfVid.playsInline = true; selfVid.muted = true;
-  const old = document.getElementById('localVideo');
-  if (old) old.replaceWith(selfVid);
-
-  currentMeetRoomId = null; currentCallType = null;
-  // Hide IN CALL pill
-  const pill = document.getElementById('inCallPill');
-  if (pill) pill.style.display = 'none';
-  document.body.classList.remove('in-call');
-  handRaised = false; screenSharing = false; isMinimized = false; meetSideOpen = null;
-  document.getElementById('meetSideParticipants').classList.remove('open');
-  document.getElementById('meetSideChat').classList.remove('open');
-}
-
-// ── Participant count + list ───────────────────────────────────────────────────
-function updateParticipantCount() {
-  const peerCount = currentRoom ? currentRoom.remoteParticipants.size : 0;
-  const count = 1 + peerCount;
-  const el = document.getElementById('meetingParticipantCount');
-  if (el) el.textContent = count === 1 ? 'Just you' : `${count} participants`;
-  const el2 = document.getElementById('participantListCount');
-  if (el2) el2.textContent = count;
-  const warn = document.getElementById('meetAloneWarn');
-  if (warn) warn.classList.toggle('visible', peerCount === 0);
-}
-
-function updateParticipantList() {
-  const list = document.getElementById('participantList');
-  if (!list) return;
-  let html = `<div class="participant-row">
-    <div class="participant-avatar">${(me?.first_name||'Y').charAt(0)}</div>
-    <div class="participant-name">${esc(me?.first_name||'You')} <span class="host-badge">Host</span></div>
-    <div class="participant-status">
-      <span class="status-icon">${micEnabled?'🎙️':'🔇'}</span>
-      <span class="status-icon">${camEnabled?'📷':'🚫'}</span>
-    </div>
-  </div>`;
-  if (currentRoom) {
-    currentRoom.remoteParticipants.forEach((p) => {
-      html += `<div class="participant-row" id="peer-row-${p.identity}">
-        <div class="participant-avatar">${(p.name||'?').charAt(0).toUpperCase()}</div>
-        <div class="participant-name">${esc(p.name||p.identity)}</div>
-        <div class="participant-status"><span class="status-icon">🎙️</span></div>
-      </div>`;
-    });
-  }
-  list.innerHTML = html;
-}
-
-// ── Raise hand ────────────────────────────────────────────────────────────────
 function toggleRaiseHand() {
   handRaised = !handRaised;
-  if (socket && currentMeetRoomId) {
-    socket.emit('raiseHand', { roomId: currentMeetRoomId, raised: handRaised, displayName: me?.first_name });
-  }
+  if (socket && currentMeetRoomId) socket.emit('raiseHand', { roomId: currentMeetRoomId, raised: handRaised, displayName: me.first_name });
   updateMeetBtns();
 }
 
 function onRaiseHand({ peerId, raised, displayName }) {
-  const badge = document.getElementById('hand-' + peerId);
-  if (badge) badge.style.display = raised ? 'block' : 'none';
+  const tile = document.getElementById('tile-'+peerId);
+  if (tile) tile.classList.toggle('hand-raised', raised);
+  if (raised) addMeetChatSys(`${displayName} raised their hand ✋`);
 }
 
-// ── Minimize / toggle ─────────────────────────────────────────────────────────
-function toggleMinimize() {
+// Update peer tile cam state when they toggle mic/cam
+function onPeerMuteState({ peerId, micEnabled: pMic, camEnabled: pCam }) {
+  const tile = document.getElementById('tile-' + peerId);
+  if (!tile) return;
+  // Update mute icon
+  const muteIcon = document.getElementById('muted-' + peerId);
+  if (muteIcon) muteIcon.textContent = pMic ? '' : '🔇';
+  // Update camera state
+  if (pCam !== undefined) {
+    const vid = tile.querySelector('video');
+    if (vid && vid.srcObject) {
+      const hasVideo = pCam && vid.srcObject.getVideoTracks().length > 0;
+      tile.classList.toggle('has-cam', hasVideo);
+      tile.classList.toggle('no-cam', !hasVideo);
+    } else if (!pCam) {
+      tile.classList.remove('has-cam');
+      tile.classList.add('no-cam');
+    }
+  }
+}
+
+function toggleMeetSide(panel) {
+  const pMap = { participants: 'meetSideParticipants', chat: 'meetSideChat' };
+  const sid  = pMap[panel];
+  if (!sid) return;
+  if (meetSideOpen===panel) {
+    document.getElementById(sid).classList.remove('open');
+    meetSideOpen = null;
+  } else {
+    Object.values(pMap).forEach(id => document.getElementById(id).classList.remove('open'));
+    document.getElementById(sid).classList.add('open');
+    meetSideOpen = panel;
+  }
+}
+
+function toggleMinimizeMeeting() {
   isMinimized = !isMinimized;
   document.getElementById('meetingPanel').classList.toggle('minimized', isMinimized);
 }
 
-function openMeetSide(which) {
-  if (meetSideOpen === which) {
-    document.getElementById('meetSide' + which).classList.remove('open');
-    meetSideOpen = null;
-  } else {
-    ['Participants','Chat'].forEach(s => document.getElementById('meetSide'+s).classList.remove('open'));
-    document.getElementById('meetSide' + which).classList.add('open');
-    meetSideOpen = which;
+async function enterPiP() {
+  const video = document.getElementById('localVideo');
+  if (video && document.pictureInPictureEnabled) {
+    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+    else await video.requestPictureInPicture().catch(()=>{});
   }
 }
 
-// ── Update meeting control buttons ────────────────────────────────────────────
-function updateMeetBtns() {
-  const b = (id, active, activeColor='#ea4335') => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.style.background = active ? activeColor : '';
-    el.style.color      = active ? '#fff' : '';
-  };
-  b('meetBtnMic',    !micEnabled);
-  b('meetBtnCam',    !camEnabled);
-  b('meetBtnScreen', screenSharing, '#1a73e8');
-  b('meetBtnHand',   handRaised,    '#fbbc04');
+// ── Meeting Recording (browser MediaRecorder) ─────────────────────────────────
+let _meetRecorder = null, _meetRecChunks = [], _meetRecTimer = null, _meetRecSecs = 0;
+
+function openMeetingMoreOptions() {
+  const isRecording = _meetRecorder && _meetRecorder.state === 'recording';
+  const opts = [
+    isRecording ? '⏹ Stop Recording' : '🔴 Start Recording',
+    '📋 Copy meeting link',
+    '🔇 Mute all (host)',
+    '📊 Change layout'
+  ];
+  // Build a quick in-meeting dropdown instead of prompt()
+  const existing = document.getElementById('meetMoreMenu');
+  if (existing) { existing.remove(); return; }
+  const menu = document.createElement('div');
+  menu.id = 'meetMoreMenu';
+  menu.style.cssText = `position:fixed;bottom:90px;right:80px;z-index:9999;
+    background:#2d2d2d;border:1px solid rgba(255,255,255,.15);border-radius:12px;
+    padding:6px;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.6)`;
+  opts.forEach((label, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = `display:block;width:100%;text-align:left;padding:10px 14px;
+      background:none;border:none;color:#e8eaed;font-size:13px;cursor:pointer;
+      border-radius:8px;font-family:inherit;`;
+    btn.onmouseenter = () => btn.style.background = 'rgba(255,255,255,.1)';
+    btn.onmouseleave = () => btn.style.background = 'none';
+    btn.onclick = () => {
+      menu.remove();
+      if (i === 0) toggleMeetRecording();
+      if (i === 1) copyMeetingLink();
+    };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 100);
 }
 
-// ── In-meeting chat ───────────────────────────────────────────────────────────
-function onMeetingChat({ name, message, at }) {
-  const area = document.getElementById('meetChatMsgs');
-  if (!area) return;
-  area.insertAdjacentHTML('beforeend', `<div class="meet-chat-msg">
-    <div class="meet-chat-sender">${esc(name||'?')}</div>
-    <div class="meet-chat-text">${esc(message)}</div>
-  </div>`);
-  area.scrollTop = area.scrollHeight;
-}
-
-function addMeetChatSys(msg) {
-  const area = document.getElementById('meetChatMsgs');
-  if (!area) return;
-  area.insertAdjacentHTML('beforeend', `<div style="text-align:center;color:#aaa;font-size:11px;padding:4px 0">${esc(msg)}</div>`);
-  area.scrollTop = area.scrollHeight;
-}
-
-// ── Recording (local, no server needed) ──────────────────────────────────────
-async function toggleRecording() {
+async function toggleMeetRecording() {
   if (_meetRecorder && _meetRecorder.state === 'recording') {
+    // Stop and download
     _meetRecorder.stop();
-    document.getElementById('meetBtnRecord')?.classList.remove('recording');
     return;
   }
+  // Start recording — capture the whole meeting video area
   try {
-    const streams = [];
-    if (currentRoom) {
-      currentRoom.remoteParticipants.forEach(p => {
-        p.audioTrackPublications.forEach(pub => {
-          if (pub.track) streams.push(pub.track.mediaStreamTrack);
-        });
-      });
+    // Combine all streams: local + all peers
+    const canvas  = document.createElement('canvas');
+    canvas.width  = 1280; canvas.height = 720;
+    const ctx     = canvas.getContext('2d');
+    const canvasStream = canvas.captureStream(30);
+
+    // Mix audio from all streams
+    const audioCtx = new AudioContext();
+    const dest     = audioCtx.createMediaStreamDestination();
+    const addAudio = (stream) => {
+      if (!stream) return;
+      const src = audioCtx.createMediaStreamSource(stream);
+      src.connect(dest);
+    };
+    if (localStream) addAudio(localStream);
+    Object.values(peerStreams).forEach(addAudio);
+
+    // Draw frames
+    const videos = [];
+    if (localStream) {
+      const v = document.getElementById('localVideo');
+      if (v) videos.push(v);
     }
-    const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-    const combined = new MediaStream([...displayStream.getTracks(), ...streams]);
-    _meetRecorder = new MediaRecorder(combined, { mimeType: 'video/webm;codecs=vp9,opus' });
-    const chunks = [];
-    _meetRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    Object.entries(peerStreams).forEach(([pid]) => {
+      const tile = document.getElementById('tile-' + pid);
+      const v = tile?.querySelector('video');
+      if (v) videos.push(v);
+    });
+
+    const drawFrame = () => {
+      if (!_meetRecorder || _meetRecorder.state !== 'recording') return;
+      ctx.fillStyle = '#1c2025';
+      ctx.fillRect(0, 0, 1280, 720);
+      const count = videos.length || 1;
+      const cols  = Math.ceil(Math.sqrt(count));
+      const rows  = Math.ceil(count / cols);
+      const w = 1280 / cols, h = 720 / rows;
+      videos.forEach((v, i) => {
+        const x = (i % cols) * w, y = Math.floor(i / cols) * h;
+        try { ctx.drawImage(v, x, y, w, h); } catch {}
+      });
+      requestAnimationFrame(drawFrame);
+    };
+
+    // Merge canvas video + audio
+    const finalStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks()
+    ]);
+
+    _meetRecChunks = [];
+    _meetRecorder  = new MediaRecorder(finalStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    _meetRecorder.ondataavailable = e => { if (e.data.size) _meetRecChunks.push(e.data); };
     _meetRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      clearInterval(_meetRecTimer);
+      const blob = new Blob(_meetRecChunks, { type: 'video/webm' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
       a.download = `Meeting_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.webm`;
       a.click();
-      displayStream.getTracks().forEach(t => t.stop());
+      URL.revokeObjectURL(url);
+      _meetRecorder = null;
+      updateRecordingUI(false);
     };
-    _meetRecorder.start();
-    document.getElementById('meetBtnRecord')?.classList.add('recording');
-  } catch (e) { console.warn('Recording failed:', e.message); }
+    _meetRecorder.start(1000);
+    drawFrame();
+
+    // Timer
+    _meetRecSecs = 0;
+    updateRecordingUI(true);
+    _meetRecTimer = setInterval(() => {
+      _meetRecSecs++;
+      const m = String(Math.floor(_meetRecSecs/60)).padStart(2,'0');
+      const s = String(_meetRecSecs%60).padStart(2,'0');
+      const el = document.getElementById('meetRecTime');
+      if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+  } catch(e) {
+    alert('Recording failed: ' + e.message + '\n\nTip: Use Chrome for best recording support.');
+  }
 }
 
-// ── Copy meeting link ─────────────────────────────────────────────────────────
-function copyMeetLink() {
-  if (!currentMeetRoomId) return;
-  const link = `${location.origin}/chat.html?meetjoin=${currentMeetRoomId}`;
-  navigator.clipboard.writeText(link).then(() => showToast('Link copied', 'Share this link to invite others', null));
+function updateRecordingUI(isRecording) {
+  const bar = document.getElementById('meetRecBar');
+  if (!bar) return;
+  bar.style.display = isRecording ? 'flex' : 'none';
 }
 
-// ── Rejoin after page refresh ─────────────────────────────────────────────────
-// Called from init section after loadGroups() completes
-async function tryRejoinCall() {
-  const saved = sessionStorage.getItem('active_call');
-  if (!saved) return;
-  try {
-    const { roomId, title, audioOnly } = JSON.parse(saved);
-    sessionStorage.removeItem('active_call');
-    // Small delay so socket connects first
-    setTimeout(() => openMeetingPanel(roomId, title, audioOnly), 800);
-  } catch (_) { sessionStorage.removeItem('active_call'); }
+
+function updateMeetBtns() {
+  const mic  = document.getElementById('btnMic');
+  const cam  = document.getElementById('btnCam');
+  const scr  = document.getElementById('btnScreen');
+  const hand = document.getElementById('btnHand');
+
+  // Mic: green ring = ON, red ring = muted
+  mic.className = 'meet-btn ' + (micEnabled ? 'on' : 'off');
+  document.getElementById('micIcon').textContent  = micEnabled ? '🎙️' : '🔇';
+  document.getElementById('micLabel').textContent = micEnabled ? 'Mic' : 'Muted';
+
+  // Cam: green ring = ON, red ring = camera off
+  cam.className = 'meet-btn ' + (camEnabled ? 'on' : 'off');
+  document.getElementById('camIcon').textContent  = camEnabled ? '📷' : '📵';
+  document.getElementById('camLabel').textContent = camEnabled ? 'Camera' : 'Cam off';
+
+  // Screen share
+  scr.className = 'meet-btn ' + (screenSharing ? 'active-screen' : '');
+  document.getElementById('screenLabel').textContent = screenSharing ? 'Stop share' : 'Share';
+
+  // Hand
+  hand.className = 'meet-btn ' + (handRaised ? 'on' : '');
+  document.getElementById('handLabel').textContent = handRaised ? 'Lower hand' : 'Raise hand';
+
+  // Visual self-preview opacity
+  const selfFloat = document.getElementById('selfFloat');
+  if (selfFloat) selfFloat.style.opacity = camEnabled ? '1' : '0.4';
 }
 
+async function leaveMeeting() {
+  if (socket && currentMeetRoomId) socket.emit('leaveMeeting', { roomId: currentMeetRoomId });
+  await chatApi('POST', `/chat/meetings/${currentMeetRoomId}/leave`).catch(()=>{});
+  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  if (screenStream) { screenStream.getTracks().forEach(t=>t.stop()); screenStream=null; }
+  Object.values(peerConnections).forEach(pc=>pc.close());
+  peerConnections={}; peerNames={}; peerStreams={};
+  // Reset all panels
+  document.getElementById('meetingPanel').classList.remove('open','minimized');
+  document.getElementById('screenshareContainer').classList.remove('visible');
+  document.getElementById('meetGrid').style.display = '';
+  document.getElementById('selfFloat').style.display = '';
+  document.getElementById('meetSideParticipants').classList.remove('open');
+  document.getElementById('meetSideChat').classList.remove('open');
+  document.getElementById('meetGrid').innerHTML = '';
+  // Stop recording if active
+  if (_meetRecorder && _meetRecorder.state === 'recording') _meetRecorder.stop();
+  currentMeetRoomId=null; handRaised=false; screenSharing=false;
+  meetSideOpen=null; isMinimized=false;
+}
 
 function sendMeetingChat() {
   const input = document.getElementById('meetChatInput');
@@ -4184,13 +4399,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Mark offline immediately on tab/window close (best-effort)
-window.addEventListener('beforeunload', (e) => {
-  // Warn user if they try to close/refresh while in a call
-  if (currentMeetRoomId) {
-    e.preventDefault();
-    e.returnValue = 'You are in a call. Leave anyway?';
-    return e.returnValue;
-  }
+window.addEventListener('beforeunload', () => {
   // Use sendBeacon for reliability during page unload
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const API = (typeof API_BASE !== 'undefined' ? API_BASE : '');
@@ -4205,8 +4414,6 @@ window.addEventListener('pagehide', () => { updatePresence(false); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadGroups().then(async () => {
-  // Rejoin active call if page was refreshed mid-call
-  tryRejoinCall();
   // ── AI Voice assistant deep-link: open DM + optionally start call ──────────
   const intentRaw = sessionStorage.getItem('ai_call_intent');
   if (!intentRaw) return;
