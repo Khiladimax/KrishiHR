@@ -912,8 +912,6 @@ router.post  ('/chat/upload/chunk/:uploadId',             authenticate, fileCtrl
 router.post  ('/chat/upload/complete/:uploadId',          authenticate, fileCtrl.completeUpload);
 router.delete('/chat/upload/abort/:uploadId',             authenticate, fileCtrl.abortUpload);
 router.get   ('/chat/upload/status/:uploadId',            authenticate, fileCtrl.uploadStatus);
-// TURN credentials
-});
 router.patch ('/chat/messages/:id',                       authenticate, chatCtrl.editMessage);
 router.delete('/chat/messages/:id/me',                    authenticate, chatCtrl.deleteForMe);
 router.delete('/chat/messages/:id/everyone',              authenticate, chatCtrl.deleteForEveryone);
