@@ -101,7 +101,7 @@ exports.listGroups = async (req, res) => {
            WHERE m2.group_id=g.id AND m2.employee_id != $1 AND g.type='dm' LIMIT 1) AS dm_peer_role,
         (SELECT e2.profile_picture FROM chat_group_members m2
            JOIN employees e2 ON e2.id=m2.employee_id
-           WHERE m2.group_id=g.id AND m2.employee_id != $1 AND g.type='dm' LIMIT 1) AS dm_peer_avatar
+           WHERE m2.group_id=g.id AND m2.employee_id != $1 AND g.type='dm' LIMIT 1) AS dm_peer_photo
       FROM chat_groups g
       JOIN chat_group_members cgm ON cgm.group_id=g.id AND cgm.employee_id=$1
       WHERE cgm.left_at IS NULL AND (cgm.deleted_at IS NULL)
