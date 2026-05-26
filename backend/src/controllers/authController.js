@@ -115,7 +115,6 @@ exports.updatePhoto = async (req, res) => {
     console.error('[updatePhoto error]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-  }
 };
 
 // ── Refresh Token ─────────────────────────────────────────────────────────────
