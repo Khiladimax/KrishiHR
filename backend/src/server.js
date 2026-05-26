@@ -1,949 +1,927 @@
-// src/routes/index.js — COMPLETE (Updated with Announcements, WFH, Import)
-const express  = require('express');
-const router   = express.Router();
-const multer   = require('multer');
-const { authenticate, authorize } = require('../middleware/auth');
+// src/server.js — MAIN ENTRY POINT
+require('dotenv').config();
+const express = require('express');
+const cors    = require('cors');
+const cron    = require('node-cron');
+const db      = require('./config/db');
+const http    = require('http');
+const { Server: SocketIO } = require('socket.io');
+const jwt_sock = require('jsonwebtoken');
+const routes  = require('./routes/index');
+const chatCtrl   = require('./controllers/chatController');
+const attCtrl = require('./controllers/attendanceController');
+const emailSvc = require('./config/emailService'); // for startup repair
+const offerCtrl  = require('./controllers/offerLetterController');
+const itDeclCtrl = require('./controllers/itDeclarationController');
 
-// ── Controllers ───────────────────────────────────────────────────────────────
-const chatCtrl       = require('../controllers/chatController');
+const app    = express();
+const server = http.createServer(app);
+const PORT   = process.env.PORT || 3000;
 
-const authCtrl       = require('../controllers/authController');
-const empCtrl        = require('../controllers/employeeController');
-const attCtrl        = require('../controllers/attendanceController');
-const leaveCtrl      = require('../controllers/leaveController');
-const advCtrl        = require('../controllers/advanceController');
-const payCtrl        = require('../controllers/payrollController');
-const geoCtrl        = require('../controllers/geofenceController');
-const sepCtrl        = require('../controllers/separationController');
-const empImportCtrl  = require('../controllers/employeeImportController');
-const attImportCtrl  = require('../controllers/attendanceImportController');
-const annCtrl        = require('../controllers/announcementController');
-const gkCtrl         = require('../controllers/gkController');
-const provCtrl       = require('../controllers/provisionController');
-const offerCtrl      = require('../controllers/offerLetterController');
-const itDeclCtrl     = require('../controllers/itDeclarationController');
-const compoffCtrl    = require('../controllers/compoffController');
+// ── Middleware ────────────────────────────────────────────────────────────────
+const corsOptions = {
+  origin: '*',
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-const ADMIN      = ['admin','super_admin'];
-const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
-const ACCOUNTS   = ['accounts','super_admin'];
-const ADMIN_ONLY = ['admin','super_admin'];
-const EMP_MGMT   = ['hr','accounts'];
-const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
+// Request logger (dev only)
+app.use((req, _res, next) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  }
+  next();
+});
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-router.post('/auth/login',                      authCtrl.login);
-router.post('/auth/refresh',                    authCtrl.refreshToken);
-router.post('/auth/forgot-password/verify',     authCtrl.forgotVerify);
-router.post('/auth/forgot-password/verify-pan', authCtrl.forgotVerifyPAN);
-router.post('/auth/forgot-password/reset',      authCtrl.forgotReset);
-router.get ('/auth/me',          authenticate,  authCtrl.getMe);
-router.post('/auth/change-password', authenticate, authCtrl.changePassword);
-router.post('/auth/update-photo',     authenticate, authCtrl.updatePhoto);
-
-// ── Employees ─────────────────────────────────────────────────────────────────
-router.get   ('/employees',               authenticate,                          empCtrl.getAll);
-router.get   ('/employees/export',        authenticate, authorize(...EMP_MGMT), empCtrl.exportExcel || ((req,res) => res.status(501).json({success:false,message:'Not implemented'})));
-router.get   ('/employees/export-master',        authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
-router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin'), empCtrl.exportAttendanceRegister);
-router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
-router.get   ('/employees/contacts',      authenticate,                          empCtrl.getContacts);
-router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
-router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
-router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
-router.patch ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
-router.post  ('/employees/reset-password',authenticate, authorize(...EMP_MGMT), empCtrl.resetPassword);
-router.post  ('/employees/:id/separate',  authenticate, authorize(...EMP_MGMT), (req,res)=>res.json({success:false,message:'Not implemented'}));
-
-// ── Provision Confirmation Workflow ───────────────────────────────────────────
-// Lists & details
-router.get ('/provision',                authenticate, authorize(...PROVISION_APPROVERS), provCtrl.listProvisionEmployees);
-router.get ('/provision/accrual-log',    authenticate, authorize('hr','admin','super_admin'), provCtrl.getAccrualLog);
-router.get ('/provision/:id/status',     authenticate, authorize(...PROVISION_APPROVERS), provCtrl.getConfirmationStatus);
-// Workflow actions
-router.post('/provision/:id/initiate',   authenticate, authorize('hr','admin','super_admin'), provCtrl.initiateConfirmation);
-router.post('/provision/:id/approve',    authenticate, authorize(...PROVISION_APPROVERS),    provCtrl.approveConfirmation);
-// Monthly accrual (run 1st of each month, or manually)
-router.post('/provision/monthly-accrual', authenticate, authorize('hr','admin','super_admin'), provCtrl.runMonthlyAccrual);
-
-// ── Employee Bulk Import (Excel) ──────────────────────────────────────────────
-router.post('/employees/import',
-  authenticate, authorize(...EMP_MGMT),
-  empImportCtrl.uploadMiddleware,
-  empImportCtrl.importEmployees
-);
-
-// ── Attendance ────────────────────────────────────────────────────────────────
-router.post('/attendance/punch-in',         authenticate, attCtrl.punchIn);
-router.post('/attendance/punch-out',        authenticate, attCtrl.punchOut);
-
-// ── Attendance Bulk Import — must be BEFORE generic GET /attendance ───────────
-router.post('/attendance/import',
-  authenticate, authorize(...['hr']),
-  (req, res, next) => {
-    attImportCtrl.uploadMiddleware(req, res, (err) => {
-      if (err) return res.status(400).json({ success: false, message: err.message || 'File upload error' });
-      next();
-    });
-  },
-  attImportCtrl.importAttendance
-);
-
-router.get ('/attendance',                  authenticate, attCtrl.get);
-router.get ('/attendance/summary',          authenticate, attCtrl.getSummary);
-router.get ('/attendance/team-today',       authenticate, attCtrl.getTeamToday);
-router.get ('/attendance/punch-locations',  authenticate, attCtrl.getPunchLocations);
-router.post('/attendance/regularize',       authenticate, attCtrl.requestRegularization);
-router.get ('/attendance/regularizations',  authenticate, attCtrl.getRegularizations);
-router.post('/attendance/regularize/action',authenticate, attCtrl.actionRegularization);
-
-// ── Attendance Bulk Import (Excel) — kept here for reference (defined above) ──
-
-router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
-
-// ── OD / WFH apply (all employees) ───────────────────────────────────────────
-router.post('/attendance/od',              authenticate, attCtrl.applyOD);
-router.get ('/attendance/od',              authenticate, attCtrl.getODRequests);
-router.post('/attendance/od/bulk-action',   authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.bulkActionOD);
-router.post('/attendance/od/:id/action',   authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionOD);
-router.post('/attendance/wfh',             authenticate, attCtrl.applyWFH);
-router.get ('/attendance/wfh',             authenticate, attCtrl.getWFHRequests);
-router.post('/attendance/wfh/:id/action',  authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionWFH);
-router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
-// KC718 / super_admin: mark own attendance for a date range without punch in/out
-router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
-
-// ── Movement Tracking ──────────────────────────────────────────────────────
-router.post('/attendance/movement/log',     authenticate, attCtrl.logMovement);
-router.get ('/attendance/movement/history', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementHistory);
-router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSummary);
-
-// ── WFH (Work From Home) ──────────────────────────────────────────────────────
-router.post('/wfh/apply',       authenticate, attImportCtrl.applyWFH);
-router.get ('/wfh',             authenticate, attImportCtrl.getWFH);
-router.post('/wfh/:id/action',  authenticate, attImportCtrl.actionWFH);
-
-// ── Leave ─────────────────────────────────────────────────────────────────────
-router.get('/leave-types', authenticate, async (req, res) => {
+// ── Routes ────────────────────────────────────────────────────────────────────
+// ── Socket.IO ─────────────────────────────────────────────────────────────────
+const io = new SocketIO(server, { cors: { origin: '*', methods: ['GET','POST'] }, maxHttpBufferSize: 1e6 });
+global.io = io;
+io.use((socket, next) => {
+  const token  = socket.handshake.auth?.token || socket.handshake.query?.token;
+  const device = socket.handshake.auth?.device || socket.handshake.query?.device || 'web';
+  if (!token) return next(new Error('Authentication required'));
   try {
-    const db = require('../config/db');
-    const empId = req.user.id;
+    const decoded = jwt_sock.verify(token, process.env.JWT_SECRET || 'change-me');
+    socket.user   = decoded;
+    socket.device = device;  // 'web' | 'mobile'
+    next();
+  } catch (e) { next(new Error('Invalid token')); }
+});
+// Per-user socket tracking: userId -> Map<socketId, { socket, device }>
+global.userSockets    = new Map();  // userId -> Set of socketIds (legacy, kept for compat)
+global.userSocketsMeta = new Map(); // userId -> Map<socketId, device>
 
-    // Determine if this employee is currently on provisional period
-    const empRes = await db.query(
-      `SELECT employee_category, provision_end_date, joining_date FROM employees WHERE id=$1`,
-      [empId]
-    );
-    const emp = empRes.rows[0];
-    const now = new Date();
+io.on('connection', (socket) => {
+  const user = socket.user;
+  console.log(`[Socket] ${user.first_name || user.id} connected`);
 
-    // Contractual: provisional if still within 6 months of joining
-    const joiningDate = emp?.joining_date ? new Date(emp.joining_date) : null;
-    const sixMonthMark = joiningDate
-      ? new Date(new Date(joiningDate).setMonth(joiningDate.getMonth() + 6))
-      : null;
-    const isContractualProvisional =
-      emp?.employee_category === 'contractual' && sixMonthMark && now < sixMonthMark;
+  // Track socket for this user
+  if (!global.userSockets.has(String(user.id))) global.userSockets.set(String(user.id), new Set());
+  global.userSockets.get(String(user.id)).add(socket.id);
+  // Also track device type per socket
+  if (!global.userSocketsMeta.has(String(user.id))) global.userSocketsMeta.set(String(user.id), new Map());
+  global.userSocketsMeta.get(String(user.id)).set(socket.id, socket.device || 'web');
 
-    // Provision category: provisional until provision_end_date passes
-    const provisionEndDate = emp?.provision_end_date ? new Date(emp.provision_end_date) : null;
-    const isProvisional =
-      isContractualProvisional ||
-      (emp?.employee_category === 'provision' && provisionEndDate && provisionEndDate > now);
+  // Broadcast online presence
+  io.emit('userOnline', { userId: user.id });
 
-    // Provisional employees: only PL. Confirmed employees: everything except PL.
-    const codeFilter = isProvisional
-      ? `AND code = 'PL'`
-      : `AND code != 'PL'`;
+  // Join a chat group room
+  socket.on('joinGroup', (groupId) => {
+    socket.join(`group:${groupId}`);
+  });
+  socket.on('leaveGroup', (groupId) => {
+    socket.leave(`group:${groupId}`);
+  });
 
-    const r = await db.query(
-      `SELECT id, name, code, days_allowed, monthly_accrual,
-              carry_forward, max_carry_forward, is_paid, applicable_gender, is_active
-       FROM leave_types WHERE is_active=true ${codeFilter} ORDER BY name`
-    );
-    res.json({ success: true, data: r.rows });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
+  // Typing indicators
+  socket.on('typing', ({ groupId, name }) => {
+    socket.to(`group:${groupId}`).emit('userTyping', { userId: user.id, name });
+  });
+  socket.on('stopTyping', ({ groupId }) => {
+    socket.to(`group:${groupId}`).emit('userStoppedTyping', { userId: user.id });
+  });
+
+  // Mark messages seen via socket (for DMs — no HTTP roundtrip)
+  socket.on('markSeen', async ({ groupId, messageId }) => {
+    try {
+      const db = require('./config/db');
+      await db.query(`
+        INSERT INTO chat_read_receipts(group_id, employee_id, read_at)
+        VALUES($1,$2,NOW())
+        ON CONFLICT(group_id, employee_id) DO UPDATE SET read_at=NOW()
+      `, [groupId, user.id]);
+      // Notify senders in group
+      const senders = await db.query(
+        `SELECT DISTINCT sender_id FROM chat_messages WHERE group_id=$1 AND sender_id != $2`,
+        [groupId, user.id]
+      );
+      senders.rows.forEach(row => {
+        const ss = global.userSockets.get(String(row.sender_id));
+        if (ss) ss.forEach(sid => io.to(sid).emit('messageSeen', { group_id: groupId, seen_by: user.id }));
+      });
+    } catch(e) { /* non-fatal */ }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket] ${user.first_name || user.id} disconnected`);
+    // Remove socket from tracking
+    const sockets = global.userSockets.get(String(user.id));
+    if (sockets) {
+      sockets.delete(socket.id);
+      if (!sockets.size) {
+        global.userSockets.delete(String(user.id));
+        io.emit('userOffline', { userId: user.id });
+      }
+    }
+    const meta = global.userSocketsMeta.get(String(user.id));
+    if (meta) {
+      meta.delete(socket.id);
+      if (!meta.size) global.userSocketsMeta.delete(String(user.id));
+    }
+  });
 });
 
-router.post('/leave/apply',           authenticate,                        leaveCtrl.apply);
-router.get ('/leave/requests',        authenticate,                        leaveCtrl.getRequests);
-router.get ('/leave/applications',    authenticate,                        leaveCtrl.getRequests);
-router.get ('/leave/balance',         authenticate,                        leaveCtrl.getBalance);
-router.post('/leave/:id/action',      authenticate,                        leaveCtrl.action);
-router.put ('/leave/:id/action',      authenticate,                        leaveCtrl.action);
-router.post('/leave/:id/cancel',      authenticate,                        leaveCtrl.cancel);
-router.post('/leave/:id/revoke',      authenticate,                        leaveCtrl.revoke);
-router.put ('/leave/balance',         authenticate, authorize(...HR_ADMIN), leaveCtrl.updateBalance);
-router.post('/leave/monthly-accrual',        authenticate, authorize(...HR_ADMIN), leaveCtrl.monthlyAccrual);
-router.post('/leave/recalculate/:id',        authenticate, authorize(...HR_ADMIN), leaveCtrl.recalculateEmployee);
-router.get ('/leave/report',                 authenticate,                        leaveCtrl.getLeaveReport);
 
-// ── Comp Off ──────────────────────────────────────────────────────────────────
-router.post  ('/compoff/grant',        authenticate, authorize('hr','admin','super_admin'), compoffCtrl.grantCredit);
-router.post  ('/compoff/bulk-grant',   authenticate, authorize('hr','admin','super_admin'), compoffCtrl.bulkGrant);
-router.get   ('/compoff/credits',      authenticate,                                        compoffCtrl.listCredits);
-router.get   ('/compoff/balance',      authenticate,                                        compoffCtrl.getBalance);
-router.delete('/compoff/:id/revoke',   authenticate, authorize('hr','admin','super_admin'), compoffCtrl.revokeCredit);
+// Static: serve chat uploaded files
+// Served under BOTH paths so old file_url values (/chat/files/...) still work
+// and new uploads (/api/chat/files/...) work too
+const chatUploadDir = require('path').join(__dirname, '..', 'uploads', 'chat');
+if (!require('fs').existsSync(chatUploadDir)) require('fs').mkdirSync(chatUploadDir, { recursive: true });
+app.use('/chat/files',     require('express').static(chatUploadDir));  // legacy
+app.use('/api/chat/files', require('express').static(chatUploadDir));  // new
 
-// ── Advance Salary ────────────────────────────────────────────────────────────
-router.post('/advance/apply',                authenticate, advCtrl.apply);
-router.get ('/advance/mine',                 authenticate, advCtrl.getMine);
-router.get ('/advance',                      authenticate, advCtrl.getAll);
-router.post('/advance/:id/action',           authenticate, advCtrl.action);
-router.post('/advance/:id/revoke',           authenticate, advCtrl.revoke);
-router.delete('/advance/:id/dismiss',        authenticate, advCtrl.dismiss);
-router.post('/advance/:id/edit',             authenticate, advCtrl.edit);
-router.post('/advance/:id/process-payment',  authenticate, authorize('accounts'), advCtrl.processPayment);
-router.get ('/advance/:id/approvals',        authenticate, advCtrl.getApprovals);
+app.use('/api', routes);
 
-// ── Reimbursement ─────────────────────────────────────────────────────────────
-const reimbCtrl = require('../controllers/reimbursementController');
-router.post  ('/reimbursement/apply',               authenticate, reimbCtrl.apply);
-router.post  ('/reimbursement/draft',               authenticate, reimbCtrl.saveDraft);
-router.post  ('/reimbursement/:id/submit-draft',    authenticate, reimbCtrl.submitDraft);
-router.get   ('/reimbursement/export',              authenticate, reimbCtrl.exportData);
-router.get   ('/reimbursement',                     authenticate, reimbCtrl.getAll);
-router.post  ('/reimbursement/:id/action',          authenticate, reimbCtrl.action);
-router.post  ('/reimbursement/:id/revoke',          authenticate, reimbCtrl.revoke);
-router.put   ('/reimbursement/:id/edit',            authenticate, reimbCtrl.edit);
-router.post  ('/reimbursement/:id/disburse',        authenticate, authorize('accounts'), reimbCtrl.disburse);
-router.get   ('/reimbursement/:id/approvals',       authenticate, reimbCtrl.getApprovals);
-router.post  ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.uploadMiddleware, reimbCtrl.uploadAttachment);
-router.get   ('/reimbursement/item/:id/attachment', authenticate, reimbCtrl.getAttachment);
-
-// ── Payroll ───────────────────────────────────────────────────────────────────
-router.get ('/payroll',              authenticate,                     payCtrl.getPayroll);
-router.get ('/payroll/payslip',      authenticate,                     payCtrl.getPayslip);
-router.get ('/my/payslip',           authenticate,                     payCtrl.getPayslip);
-router.get ('/my/payslip-months',    authenticate, async (req, res) => {
-  const db    = require('../config/db');
-  const empId = req.user.id;
-  const r     = await db.query(
-    `SELECT DISTINCT month, year, status FROM payroll WHERE employee_id=$1 ORDER BY year DESC, month DESC LIMIT 6`,
-    [empId]
-  );
-  res.json({ success: true, data: r.rows });
+// Health check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
 });
-router.post('/payroll/process',      authenticate, authorize(...ACCOUNTS), async (req, res) => {
-  res.json({ success: true, message: 'Use /payroll/upload to process payroll via Excel upload.' });
+
+// ── Redirect HTML page requests to Vercel frontend ────────────────────────────
+// Mobile app navigates using backend URL — redirect to correct Vercel frontend
+const FRONTEND_URL = 'https://krishi-hr-mu.vercel.app';
+app.get('/*.html', (req, res) => {
+  res.redirect(301, FRONTEND_URL + req.path);
 });
-router.get ('/payroll/uploads',                   authenticate, authorize(...ACCOUNTS), payCtrl.getUploads);
-router.get ('/payroll/salary-structures',         authenticate, authorize(...HR_ADMIN), payCtrl.getAllSalaryStructures);
-router.get ('/payroll/salary-structure/:employee_id', authenticate,                    payCtrl.getSalaryStructure);
-router.post('/payroll/salary-structure',          authenticate, authorize(...HR_ADMIN), payCtrl.upsertSalaryStructure);
-router.post('/payroll/upload',                    authenticate, authorize('accounts'), payCtrl.uploadMiddleware, payCtrl.uploadPayroll);
-router.get ('/payroll/form16/years',              authenticate,                        payCtrl.getForm16Years);
-router.get ('/payroll/form16',                    authenticate,                        payCtrl.getForm16);
 
+// 404 handler
+app.use((_req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found' });
+});
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-router.get('/dashboard', authenticate, async (req, res) => {
+// Global error handler
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
+});
+
+// ── Cron Jobs ─────────────────────────────────────────────────────────────────
+
+// 1. Monthly leave accrual — runs at 00:01 on the 1st of every month
+cron.schedule('1 0 1 * *', async () => {
+  console.log('⏰ Running monthly leave accrual...');
   try {
-    const db    = require('../config/db');
-    const empId = req.user.id;
-    // FIX: Use IST date — server runs UTC on Render
-    const istToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit'
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const types = await db.query(
+      `SELECT id, code, monthly_accrual, days_allowed FROM leave_types WHERE monthly_accrual > 0 AND is_active=true`
+    );
+    const employees = await db.query(
+      `SELECT id, employee_category, joining_date FROM employees WHERE is_active=true`
+    );
+
+    for (const emp of employees.rows) {
+      // Determine which leave types this employee can accrue this month
+      let allowedCodes = null; // null = use all types (permanent/provision)
+
+      if (emp.employee_category === 'contractual') {
+        const joiningDate  = new Date(emp.joining_date);
+        const sixMonthMark = new Date(joiningDate);
+        sixMonthMark.setMonth(sixMonthMark.getMonth() + 6);
+        // Under 6 months: PL only (provisional period)
+        // Over 6 months: no accrual (LWP+OD are unlimited, no monthly quota)
+        allowedCodes = now < sixMonthMark ? ['PL'] : [];
+      }
+
+      for (const lt of types.rows) {
+        if (allowedCodes !== null && !allowedCodes.includes(lt.code)) continue;
+
+        await db.query(
+          `INSERT INTO leave_balances(employee_id,leave_type_id,year,allocated)
+           VALUES($1,$2,$3,0) ON CONFLICT(employee_id,leave_type_id,year) DO NOTHING`,
+          [emp.id, lt.id, year]
+        );
+        await db.query(
+          `UPDATE leave_balances SET allocated=LEAST(allocated+$1,$2)
+           WHERE employee_id=$3 AND leave_type_id=$4 AND year=$5`,
+          [lt.monthly_accrual, lt.days_allowed, emp.id, lt.id, year]
+        );
+      }
+    }
+    console.log(`✅ Leave accrual done for ${employees.rows.length} employees`);
+  } catch (err) {
+    console.error('❌ Leave accrual cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// 2. Mark absent — runs at 23:55 every weekday for employees who didn't punch in
+cron.schedule('55 23 * * 1-6', async () => {
+  console.log('⏰ Marking absent for employees with no attendance today...');
+  try {
+    // FIX: use IST date — server runs UTC, toISOString() gives wrong date after 18:30 IST
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date()); // "YYYY-MM-DD" in IST
+
+    // Skip if today is a public holiday (applies to ALL employees)
+    const holiday = await db.query('SELECT id FROM holidays WHERE date=$1', [today]);
+    if (holiday.rows.length) { console.log('Holiday today — skipping absent marking'); return; }
+
+    // Check if today is Saturday and which occurrence (1st/2nd/3rd/4th/5th)
+    const dt = new Date(today);
+    const isSaturday = dt.getDay() === 6;
+    let satCount = 0;
+    if (isSaturday) {
+      for (let d = 1; d <= dt.getDate(); d++) {
+        if (new Date(dt.getFullYear(), dt.getMonth(), d).getDay() === 6) satCount++;
+      }
+    }
+    const is2ndOr4thSat = isSaturday && (satCount === 2 || satCount === 4);
+
+    if (is2ndOr4thSat) {
+      // 2nd or 4th Saturday:
+      // - Onsite employees (saturday_policy = '2nd_4th_off') → weekend
+      // - Offsite/Field employees (saturday_policy = 'all_working') → absent if no punch
+      await db.query(
+        `INSERT INTO attendance(employee_id, date, status)
+         SELECT e.id, $1,
+           CASE
+             WHEN COALESCE(e.saturday_policy, '2nd_4th_off') = '2nd_4th_off' THEN 'weekend'
+             ELSE 'absent'
+           END
+         FROM employees e
+         WHERE e.is_active = true
+           AND NOT EXISTS (
+             SELECT 1 FROM attendance a WHERE a.employee_id = e.id AND a.date = $1
+           )
+         ON CONFLICT(employee_id, date) DO NOTHING`,
+        [today]
+      );
+      // Also correct any already-inserted wrong 'absent' for onsite employees today
+      await db.query(
+        `UPDATE attendance
+         SET status = 'weekend'
+         WHERE date = $1
+           AND status = 'absent'
+           AND employee_id IN (
+             SELECT id FROM employees
+             WHERE is_active = true
+               AND COALESCE(saturday_policy, '2nd_4th_off') = '2nd_4th_off'
+           )`,
+        [today]
+      );
+      console.log(`✅ Absent marking done (2nd/4th Saturday: onsite → weekend, offsite → absent if no punch)`);
+    } else {
+      // Normal working day (Mon–Fri, or 1st/3rd/5th Saturday for offsite):
+      // All employees who didn't punch in → absent
+      await db.query(
+        `INSERT INTO attendance(employee_id, date, status)
+         SELECT e.id, $1, 'absent'
+         FROM employees e
+         WHERE e.is_active = true
+           AND NOT EXISTS (
+             SELECT 1 FROM attendance a WHERE a.employee_id = e.id AND a.date = $1
+           )
+         ON CONFLICT(employee_id, date) DO NOTHING`,
+        [today]
+      );
+      console.log('✅ Absent marking done');
+    }
+  } catch (err) {
+    console.error('❌ Absent marking cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Nightly 21:05 IST: mark missing punch-outs ───────────────────────────────
+// Employees who punched in today but never punched out get status = 'missing_punch_out'
+cron.schedule('5 21 * * 1-6', async () => {
+  console.log('⏰ Checking for missing punch-outs...');
+  try {
+    await attCtrl.fixMissingPunchOuts();
+  } catch (err) {
+    console.error('❌ fixMissingPunchOuts cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+async function isNonWorkingDay(today) {
+  const holiday = await db.query('SELECT id FROM holidays WHERE date=$1', [today]);
+  if (holiday.rows.length) return true;
+  const dt = new Date(today);
+  if (dt.getDay() === 6) {
+    const dayOfMonth = dt.getDate();
+    let satCount = 0;
+    for (let d = 1; d <= dayOfMonth; d++) {
+      if (new Date(dt.getFullYear(), dt.getMonth(), d).getDay() === 6) satCount++;
+    }
+    if (satCount === 2 || satCount === 4) return true;
+  }
+  return false;
+}
+
+// ── Cron 1: Auto punch-IN for permanent WFH + super_admin at 9:30 AM IST ─────
+cron.schedule('30 9 * * 1-6', async () => {
+  console.log('⏰ Auto punch-IN for permanent WFH employees and super_admin...');
+  try {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
     }).format(new Date());
 
-    const attRes = await db.query(
-      `SELECT *,
-              TO_CHAR(punch_in::time,'HH12:MI AM')  AS punch_in_time,
-              TO_CHAR(punch_out::time,'HH12:MI AM') AS punch_out_time,
-              TO_CHAR(date,'YYYY-MM-DD')      AS date_str
-       FROM attendance WHERE employee_id=$1 AND date=$2`,
-      [empId, istToday]
+    if (await isNonWorkingDay(today)) { console.log('Non-working day — skipping WFH punch-in'); return; }
+
+    const wfhEmps = await db.query(
+      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+    );
+    if (!wfhEmps.rows.length) { console.log('No permanent WFH/auto-present employees'); return; }
+
+    let marked = 0;
+    for (const emp of wfhEmps.rows) {
+      // super_admin / KC718 → auto present (office), permanent WFH employees → wfh
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
+      await db.query(
+        `INSERT INTO attendance(employee_id, date, status, punch_in, punch_in_location, remarks, wfh_approved)
+         VALUES($1, $2, 'present', '09:30:00', $3, $4, $5)
+         ON CONFLICT(employee_id, date) DO NOTHING`,
+        [emp.id, today,
+          isOfficeUser ? 'Office' : 'Work from Home',
+          isOfficeUser ? 'Auto Present' : 'Auto WFH',
+          isOfficeUser ? false : true]
+      );
+      marked++;
+    }
+    console.log(`✅ Auto punch-IN done for ${marked} employees`);
+  } catch (err) {
+    console.error('❌ WFH auto punch-IN cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Cron 2: Auto punch-OUT for permanent WFH + super_admin at 6:30 PM IST ────
+cron.schedule('30 18 * * 1-6', async () => {
+  console.log('⏰ Auto punch-OUT for permanent WFH employees and super_admin...');
+  try {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+
+    if (await isNonWorkingDay(today)) { console.log('Non-working day — skipping WFH punch-out'); return; }
+
+    const wfhEmps = await db.query(
+      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+    );
+    if (!wfhEmps.rows.length) return;
+
+    for (const emp of wfhEmps.rows) {
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
+      // Only fill punch-out if punch-in exists and punch-out is missing
+      await db.query(
+        `UPDATE attendance
+         SET punch_out='18:30:00', punch_out_location=$3,
+             working_hours=9.0, status='present'
+         WHERE employee_id=$1 AND date=$2
+           AND punch_in IS NOT NULL AND punch_out IS NULL`,
+        [emp.id, today, isOfficeUser ? 'Office' : 'Work from Home']
+      );
+    }
+    console.log(`✅ Auto punch-OUT done`);
+  } catch (err) {
+    console.error('❌ WFH auto punch-OUT cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Run auto-present on startup too (handles Render cold-start missing cron) ──
+(async () => {
+  await new Promise(r => setTimeout(r, 15000)); // wait 15s for DB pool to warm up on cold start
+  try {
+    const now = new Date();
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const istHour = istDate.getHours();
+    const istMin  = istDate.getMinutes();
+    const day = istDate.getDay();
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
+      year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+
+    if (day < 1 || day > 6) return; // skip Sundays
+    if (await isNonWorkingDay(today)) return;
+
+    const wfhEmps = await db.query(
+      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+    );
+    if (!wfhEmps.rows.length) return;
+
+    const afterPunchIn  = istHour > 9 || (istHour === 9 && istMin >= 30);
+    const afterPunchOut = istHour > 18 || (istHour === 18 && istMin >= 30);
+
+    for (const emp of wfhEmps.rows) {
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
+      if (afterPunchIn) {
+        await db.query(
+          `INSERT INTO attendance(employee_id, date, status, punch_in, punch_in_location, remarks, wfh_approved)
+           VALUES($1, $2, 'present', '09:30:00', $3, $4, $5)
+           ON CONFLICT(employee_id, date) DO NOTHING`,
+          [emp.id, today,
+            isOfficeUser ? 'Office' : 'Work from Home',
+            isOfficeUser ? 'Auto Present' : 'Auto WFH',
+            isOfficeUser ? false : true]
+        );
+      }
+      if (afterPunchOut) {
+        await db.query(
+          `UPDATE attendance
+           SET punch_out='18:30:00', punch_out_location=$3,
+               working_hours=9.0, status='present'
+           WHERE employee_id=$1 AND date=$2
+             AND punch_in IS NOT NULL AND punch_out IS NULL`,
+          [emp.id, today, isOfficeUser ? 'Office' : 'Work from Home']
+        );
+      }
+    }
+    if (wfhEmps.rows.length) console.log(`✅ Startup auto-present done for ${wfhEmps.rows.length} employees`);
+  } catch (err) { console.error('Startup WFH error:', err.message); }
+})();
+
+// ── Cleanup: Delete expired notifications every day at 2 AM IST ─────────────
+cron.schedule('0 2 * * *', async () => {
+  try {
+    const result = await db.query(
+      `DELETE FROM notifications WHERE expires_at IS NOT NULL AND expires_at < NOW()`
+    );
+    console.log(`✅ Expired notifications cleaned up: ${result.rowCount} deleted`);
+  } catch (err) {
+    console.error('❌ Notification cleanup cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// 3. Year-end carry forward — runs at 00:30 on Jan 1st
+cron.schedule('30 0 1 1 *', async () => {
+  console.log('⏰ Running year-end carry forward...');
+  try {
+    const prevYear = new Date().getFullYear() - 1;
+    const newYear  = new Date().getFullYear();
+
+    // Get EL (Earned Leave) which has carry forward
+    const elType = await db.query(`SELECT id, max_carry_forward FROM leave_types WHERE code='EL'`);
+    if (!elType.rows.length) return;
+    const { id: elId, max_carry_forward } = elType.rows[0];
+
+    // For each employee, carry forward min(remaining EL, max_carry_forward)
+    const prevBalances = await db.query(
+      `SELECT employee_id,
+              GREATEST(0, allocated + carry_forward - used - pending) AS remaining
+       FROM leave_balances WHERE leave_type_id=$1 AND year=$2`,
+      [elId, prevYear]
     );
 
-    // ── Auto-mark KC718 / super_admin as Present if no record exists today ────
-    // They don't punch in/out; absence of a record = present on working days
-    let todayAtt = attRes.rows[0] || null;
-    const isSpecialUser = req.user.role === 'super_admin' || req.user.employee_code === 'KC718';
-    if (isSpecialUser && !todayAtt) {
-      // Only auto-present on working days (not Sunday, not 2nd/4th Saturday)
-      const todayDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-      const dow = todayDate.getDay();
-      const dayOfMonth = todayDate.getDate();
-      // Rough 2nd/4th Saturday check
-      const isSat = dow === 6;
-      const satNum = Math.ceil(dayOfMonth / 7);
-      const is2nd4thSat = isSat && (satNum === 2 || satNum === 4);
-      const isSun = dow === 0;
-      // Check if today is a public holiday
-      const holCheck = await db.query(
-        `SELECT 1 FROM holidays WHERE date=$1 AND (region='all' OR region='south_west' OR region='north') LIMIT 1`,
-        [istToday]
-      );
-      const isHoliday = holCheck.rows.length > 0;
+    for (const bal of prevBalances.rows) {
+      const cf = Math.min(parseFloat(bal.remaining), max_carry_forward);
+      if (cf > 0) {
+        await db.query(
+          `INSERT INTO leave_balances(employee_id,leave_type_id,year,carry_forward)
+           VALUES($1,$2,$3,$4)
+           ON CONFLICT(employee_id,leave_type_id,year)
+           DO UPDATE SET carry_forward=$4`,
+          [bal.employee_id, elId, newYear, cf]
+        );
+      }
+    }
+    console.log(`✅ Year-end carry forward done for ${prevBalances.rows.length} employees`);
+  } catch (err) {
+    console.error('❌ Carry forward cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
 
-      if (!isSun && !is2nd4thSat && !isHoliday) {
-        // Auto-insert present record
-        try {
+// 4. Auto-deactivate employees whose last_working_date has passed (separation approved)
+// Runs every night at 00:10
+cron.schedule('10 0 * * *', async () => {
+  console.log('⏰ Checking for employees to auto-deactivate...');
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    const result = await db.query(
+      `UPDATE employees
+       SET is_active = false,
+           updated_at = NOW()
+       WHERE is_active = true
+         AND separation_date IS NOT NULL
+         AND separation_date <= $1
+         AND id IN (
+           SELECT employee_id FROM separations
+           WHERE status = 'approved'
+         )
+       RETURNING id, employee_code, first_name, last_name, separation_date`,
+      [today]
+    );
+
+    if (result.rows.length > 0) {
+      console.log(`✅ Auto-deactivated ${result.rows.length} employee(s):`);
+      result.rows.forEach(e =>
+        console.log(`   → ${e.first_name} ${e.last_name} (${e.employee_code}) — LWD: ${e.separation_date}`)
+      );
+
+      for (const emp of result.rows) {
+        await db.query(
+          `UPDATE separations SET status='completed', updated_at=NOW()
+           WHERE employee_id=$1 AND status='approved'`,
+          [emp.id]
+        );
+        const hr = await db.query(
+          `SELECT id FROM employees WHERE role IN ('hr','admin') AND is_active=true LIMIT 1`
+        );
+        if (hr.rows.length) {
           await db.query(
-            `INSERT INTO attendance(employee_id, date, status, remarks, punch_in_location)
-             VALUES($1, $2, 'present', 'Auto-marked', 'Auto')
-             ON CONFLICT(employee_id, date) DO NOTHING`,
-            [empId, istToday]
+            `INSERT INTO notifications(employee_id,title,message,type)
+             VALUES($1,'🔴 Employee Separated',$2,'info')`,
+            [hr.rows[0].id,
+             `${emp.first_name} ${emp.last_name} (${emp.employee_code}) has been auto-deactivated. Last working day: ${emp.separation_date}`]
           );
-          // Re-fetch to return fresh record
-          const freshAtt = await db.query(
-            `SELECT *, TO_CHAR(date,'YYYY-MM-DD') AS date_str FROM attendance WHERE employee_id=$1 AND date=$2`,
-            [empId, istToday]
-          );
-          todayAtt = freshAtt.rows[0] || { status: 'present', date_str: istToday };
-        } catch (_) {
-          // Non-critical: if insert fails just return synthetic present
-          todayAtt = { status: 'present', date_str: istToday };
         }
       }
+    } else {
+      console.log('✅ No employees to deactivate today');
     }
-
-    const now   = new Date();
-    const istParts = new Intl.DateTimeFormat('en-IN', { timeZone:'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit'
-    }).formatToParts(now);
-    const istP = {}; istParts.forEach(({type,value}) => { istP[type]=value; });
-    const month = parseInt(istP.month);
-    const year  = parseInt(istP.year);
-    const msRes = await db.query(
-      `SELECT
-        COUNT(*) FILTER (WHERE status IN ('present','late','half-day')) AS present,
-        COUNT(*) FILTER (WHERE status='absent') AS absent,
-        COALESCE(SUM(working_hours),0) AS total_hours,
-        COALESCE(AVG(working_hours) FILTER (
-          WHERE working_hours > 0
-            AND status IN ('present','late','regularized','od')
-        ), 0) AS avg_hours
-       FROM attendance
-       WHERE employee_id=$1
-         AND EXTRACT(MONTH FROM date)=$2
-         AND EXTRACT(YEAR  FROM date)=$3`,
-      [empId, month, year]
-    );
-
-    let pendingCount = 0;
-    let pendingRegCount = 0;
-    if (['manager','hr','admin','super_admin','tl'].includes(req.user.role)) {
-      const pRes = await db.query(
-        `SELECT COUNT(*) FROM leave_requests
-         WHERE status='pending'
-           AND employee_id != $1
-           AND (
-             current_approver_code = (SELECT employee_code FROM employees WHERE id=$1)
-             OR $2 IN ('hr','super_admin')
-           )`,
-        [empId, req.user.role]
-      );
-      pendingCount = parseInt(pRes.rows[0].count) || 0;
-
-      // Also count pending regularization requests — direct reports only
-      // (Regularization goes to direct manager, not up the full tree)
-      let regCond = '';
-      let regParams = [];
-      if (['super_admin','hr'].includes(req.user.role)) {
-        regParams = [];
-        regCond = `WHERE a.regularization_status='pending'`;
-      } else if (['admin','manager'].includes(req.user.role)) {
-        regParams = [empId];
-        regCond = `WHERE a.regularization_status='pending' AND e.reporting_manager_id=$1`;
-      } else if (req.user.role === 'tl') {
-        regParams = [empId];
-        regCond = `WHERE a.regularization_status='pending' AND (e.team_leader_id=$1 OR e.id=$1)`;
-      }
-      if (regCond) {
-        const rRes = await db.query(
-          `SELECT COUNT(*) FROM attendance a
-           JOIN employees e ON e.id=a.employee_id
-           ${regCond}`, regParams
-        );
-        pendingRegCount = parseInt(rRes.rows[0].count) || 0;
-      }
-    }
-
-    // Count unread notifications for the logged-in employee
-    const unreadNotifRes = await db.query(
-      `SELECT COUNT(*) FROM notifications
-       WHERE employee_id=$1 AND is_read=false
-         AND (expires_at IS NULL OR expires_at > NOW())`,
-      [empId]
-    );
-    const unreadNotifCount = parseInt(unreadNotifRes.rows[0].count) || 0;
-
-    res.json({
-      success: true,
-      data: {
-        today_attendance:             todayAtt,
-        monthly_summary:              msRes.rows[0]  || {},
-        pending_leave_approvals:      pendingCount,
-        pending_regularizations:      pendingRegCount,
-        unread_notifications:         unreadNotifCount,
-      }
-    });
-  } catch(e) {
-    console.error('Dashboard error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+  } catch (err) {
+    console.error('❌ Auto-deactivation cron failed:', err.message);
   }
-});
+}, { timezone: 'Asia/Kolkata' });
 
-// ── Announcements ─────────────────────────────────────────────────────────────
-router.get ('/announcements/feed',               authenticate,                         annCtrl.getFeed);
-router.get ('/announcements',                    authenticate,                         annCtrl.getAll);
-router.post('/announcements',                    authenticate, authorize(...HR_ADMIN), annCtrl.uploadMiddleware, annCtrl.create);
-router.put ('/announcements/:id',                authenticate, authorize(...HR_ADMIN), annCtrl.uploadMiddleware, annCtrl.update);
-router.delete('/announcements/:id',              authenticate, authorize(...HR_ADMIN), annCtrl.delete);
-// Fix 1: Like & Comment
-router.post('/announcements/:id/like',           authenticate,                         annCtrl.toggleLike);
-router.get ('/announcements/:id/comments',       authenticate,                         annCtrl.getComments);
-router.post('/announcements/:id/comments',       authenticate,                         annCtrl.addComment);
-router.delete('/announcements/:id/comments/:commentId', authenticate,                  annCtrl.deleteComment);
-
-// ── GK Quiz ───────────────────────────────────────────────────────────────────
-router.post  ('/gk/answer',             authenticate,                         gkCtrl.submitAnswer);
-router.get   ('/gk/leaderboard',        authenticate,                         gkCtrl.getLeaderboard);
-router.get   ('/gk/question',           authenticate,                         gkCtrl.getQuestion);
-router.get   ('/gk/thought',            authenticate,                         gkCtrl.getThought);
-router.get   ('/gk/my-stats',           authenticate,                         gkCtrl.getMyStats);
-router.get   ('/gk/responses',          authenticate, authorize(...HR_ADMIN), gkCtrl.getResponses);
-router.get   ('/gk/questions',          authenticate, authorize(...HR_ADMIN), gkCtrl.getQuestions);
-router.post  ('/gk/questions',          authenticate, authorize(...HR_ADMIN), gkCtrl.createQuestion);
-router.put   ('/gk/questions/:id',      authenticate, authorize(...HR_ADMIN), gkCtrl.updateQuestion);
-router.delete('/gk/questions/:id',      authenticate, authorize(...HR_ADMIN), gkCtrl.deleteQuestion);
-router.get   ('/gk/thoughts',           authenticate, authorize(...HR_ADMIN), gkCtrl.getThoughts);
-router.post  ('/gk/thoughts',           authenticate, authorize(...HR_ADMIN), gkCtrl.createThought);
-router.delete('/gk/thoughts/:id',       authenticate, authorize(...HR_ADMIN), gkCtrl.deleteThought);
-router.get   ('/gk/export/scores',      authenticate, authorize(...HR_ADMIN), gkCtrl.exportScores);
-router.get   ('/gk/export/yearly',      authenticate, authorize(...HR_ADMIN), gkCtrl.exportYearly);
-router.get   ('/gk/export/responses',   authenticate, authorize(...HR_ADMIN), gkCtrl.exportResponses);
-
-// ── Import Thoughts + GK from Excel (single combined upload) ─────────────────
-router.post('/gk/import',
-  authenticate, authorize(...HR_ADMIN),
-  gkCtrl.uploadMiddleware,
-  gkCtrl.importBoth
-);
-// Individual sheet imports (fallback)
-router.post('/gk/questions/import',
-  authenticate, authorize(...HR_ADMIN),
-  gkCtrl.uploadMiddleware,
-  gkCtrl.importQuestions
-);
-router.post('/gk/thoughts/import',
-  authenticate, authorize(...HR_ADMIN),
-  gkCtrl.uploadMiddleware,
-  gkCtrl.importThoughts
-);
-
-// ── Geofence ──────────────────────────────────────────────────────────────────
-router.get   ('/geofence/locations',                          authenticate,                           geoCtrl.getLocations);
-router.post  ('/geofence/locations',                          authenticate, authorize(...ADMIN_ONLY), geoCtrl.createLocation);
-router.put   ('/geofence/locations/:id',                      authenticate, authorize(...ADMIN_ONLY), geoCtrl.updateLocation);
-router.delete('/geofence/locations/:id',                      authenticate, authorize(...ADMIN_ONLY), geoCtrl.deleteLocation);
-router.get   ('/geofence/locations/:id/employees',            authenticate, authorize(...ADMIN_ONLY), geoCtrl.getLocationEmployees);
-router.get   ('/geofence/locations/:id/unassigned',           authenticate, authorize(...ADMIN_ONLY), geoCtrl.getUnassignedEmployees);
-router.get   ('/geofence/employees',                          authenticate, authorize(...ADMIN_ONLY), geoCtrl.getEmployeesForLocation);
-router.post  ('/geofence/validate',                           authenticate,                           geoCtrl.validatePunch);
-router.get   ('/geofence/my-locations',                       authenticate,                           geoCtrl.getMyLocations);
-router.get   ('/geofence/logs',                               authenticate,                           geoCtrl.getLogs);
-router.get   ('/geofence/employee/:employee_id',              authenticate,                           geoCtrl.getEmployeeGeofence);
-router.post  ('/geofence/assign',                             authenticate, authorize(...ADMIN_ONLY), geoCtrl.assignBuffer);
-router.post  ('/geofence/bulk-assign',                        authenticate, authorize(...ADMIN_ONLY), geoCtrl.bulkAssignBuffer);
-router.patch ('/geofence/:employee_id/:location_id/toggle',   authenticate, authorize(...ADMIN_ONLY), geoCtrl.toggleUniversal);
-router.delete('/geofence/:employee_id/:location_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.removeBuffer);
-
-// ── Buffer Rules ──────────────────────────────────────────────────────────────
-router.post  ('/geofence/validate-buffer',                    authenticate,                           geoCtrl.validateBuffer);
-router.get   ('/geofence/boundary',                           authenticate,                           geoCtrl.getBoundary);
-router.get   ('/geofence/buffer-rules',                       authenticate, authorize(...ADMIN_ONLY), geoCtrl.getAllBufferRules);
-router.get   ('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.getBufferRule);
-router.post  ('/geofence/buffer-rules',                       authenticate, authorize(...ADMIN_ONLY), geoCtrl.upsertBufferRule);
-router.put   ('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.upsertBufferRule);
-router.delete('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.deleteBufferRule);
-
-// ── Separation ────────────────────────────────────────────────────────────────
-// NOTE: Specific/static routes MUST come before generic routes (POST /separations,
-//       GET /separations) to avoid Express matching them against the HR_ADMIN guard.
-router.get ('/separations/notice-period',        authenticate,                                                        sepCtrl.getNoticePeriod);
-router.post('/separations/resign',               authenticate,                                                        sepCtrl.submitResignation);
-router.post('/separations/process-lwd',          authenticate, authorize('super_admin','admin'),                      sepCtrl.processLWD);
-router.get ('/separations/my',                   authenticate,                                                        sepCtrl.getMySeparations);
-router.get ('/separations/:id',                  authenticate,                                                        sepCtrl.getOne);
-router.post('/separations/:id/withdraw',         authenticate,                                                        sepCtrl.withdraw);
-router.post('/separations/:id/manager-action',   authenticate, authorize('manager','tl','admin','super_admin'),       sepCtrl.managerAction);
-router.post('/separations/:id/hr-action',        authenticate, authorize('hr','admin','super_admin'),                 sepCtrl.hrAction);
-router.post('/separations/:id/accounts-action',  authenticate, authorize('accounts','admin','super_admin'),           sepCtrl.accountsAction);
-router.post('/separations/:id/admin-action',     authenticate, authorize('admin','super_admin'),                      sepCtrl.adminAction);
-// Generic routes last
-router.get ('/separations',                      authenticate, authorize(...HR_ADMIN),                                sepCtrl.getAll);
-router.post('/separations',                      authenticate, authorize(...HR_ADMIN),                                sepCtrl.initiate);
-
-// ── Notifications ─────────────────────────────────────────────────────────────
-router.get('/notifications', authenticate, async (req, res) => {
+// ── Auto-initiate provision confirmation — runs at 09:00 AM IST every day ────
+// Finds employees whose provision_end_date is TODAY or in the past (overdue)
+// and no confirmation workflow has been started yet → auto-creates one and
+// notifies the reporting manager by email + in-app notification
+cron.schedule('0 9 * * *', async () => {
+  console.log('⏰ Auto-initiating provision confirmations...');
   try {
-    const db     = require('../config/db');
-    const result = await db.query(
-      `SELECT * FROM notifications WHERE employee_id=$1 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT 50`,
-      [req.user.id]
-    );
-    const unread = result.rows.filter(n => !n.is_read).length;
-    res.json({ success: true, data: result.rows, unread });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayStr = today.toISOString().split('T')[0];
 
-// read-all MUST come before :id/read to prevent route conflict
-router.patch('/notifications/read-all', authenticate, async (req, res) => {
-  try {
-    await require('../config/db').query(
-      `UPDATE notifications SET is_read=true WHERE employee_id=$1`,
-      [req.user.id]
-    );
-    res.json({ success: true });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
-
-router.patch('/notifications/:id/read', authenticate, async (req, res) => {
-  try {
-    await require('../config/db').query(
-      `UPDATE notifications SET is_read=true WHERE id=$1 AND employee_id=$2`,
-      [req.params.id, req.user.id]
-    );
-    res.json({ success: true });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
-
-// ── Departments & Designations ────────────────────────────────────────────────
-router.get('/departments', authenticate, async (req, res) => {
-  const r = await require('../config/db').query('SELECT * FROM departments ORDER BY name');
-  res.json({ success: true, data: r.rows });
-});
-router.get('/designations', authenticate, async (req, res) => {
-  const r = await require('../config/db').query('SELECT * FROM designations ORDER BY title');
-  res.json({ success: true, data: r.rows });
-});
-
-// ── Holidays ──────────────────────────────────────────────────────────────────
-router.get('/holidays', authenticate, async (req, res) => {
-  try {
-    const db   = require('../config/db');
-    const { getEmployeeRegion } = require('../config/regionHelper');
-    const year = parseInt(req.query.year) || new Date().getFullYear();
-
-    // Get employee's city/state
-    const empInfo = await db.query(
-      `SELECT e.city, e.state, e.reporting_manager_id,
-              m.city AS mgr_city, m.state AS mgr_state
+    // Find all provision employees whose period has ended and no workflow yet
+    const due = await db.query(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name,
+              e.provision_end_date, e.reporting_manager_id,
+              m.first_name AS mgr_first, m.last_name AS mgr_last, m.employee_code AS mgr_code
        FROM employees e
        LEFT JOIN employees m ON e.reporting_manager_id = m.id
-       WHERE e.id=$1`, [req.user.id]
-    );
-    const emp = empInfo.rows[0];
-    const city  = emp?.city  || '';
-    const state = emp?.state || '';
-
-    // WFH or blank location → use manager's location as fallback
-    const isWFH = city.toLowerCase().includes('work from home') ||
-                  city.toLowerCase().includes('wfh') ||
-                  (!city.trim() && !state.trim());
-
-    const region = isWFH
-      ? getEmployeeRegion(emp?.mgr_city || '', emp?.mgr_state || '')
-      : getEmployeeRegion(city, state);
-
-    const r = await db.query(
-      `SELECT id, name, TO_CHAR(date,'YYYY-MM-DD') AS date, type, region, description, year
-       FROM holidays
-       WHERE year=$1 AND (region='all' OR region=$2)
-       ORDER BY date ASC`,
-      [year, region]
-    );
-    res.json({ success: true, data: r.rows });
-  } catch(e) { res.status(500).json({ success: false, message: 'Server error' }); }
-});
-
-// ── Birthdays ─────────────────────────────────────────────────────────────────
-
-// GET /birthdays/upcoming — today + next 7 days, with like/wish counts
-router.get('/birthdays/upcoming', authenticate, async (req, res) => {
-  try {
-    const db     = require('../config/db');
-    const empId  = req.user.id;
-    const today  = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    // Fetch employees whose birthday falls in next 7 days (month/day match, ignore year)
-    const result = await db.query(`
-      SELECT
-        e.id,
-        CONCAT(e.first_name,' ',e.last_name) AS full_name,
-        e.employee_code,
-        d.name   AS department_name,
-        des.title AS designation_title,
-        TO_CHAR(e.date_of_birth,'MM-DD') AS birth_md,
-        TO_CHAR(e.date_of_birth,'DD Mon') AS birth_display,
-        gs.offset_days AS days_until,
-        COALESCE((SELECT COUNT(*) FROM birthday_likes  bl WHERE bl.birthday_emp_id=e.id AND bl.like_date=$1),0) AS like_count,
-        COALESCE((SELECT COUNT(*) FROM birthday_wishes bw WHERE bw.birthday_emp_id=e.id AND bw.wish_date=$1),0) AS wish_count,
-        COALESCE(EXISTS(SELECT 1 FROM birthday_likes  bl WHERE bl.birthday_emp_id=e.id AND bl.from_emp_id=$2 AND bl.like_date=$1),false) AS i_liked,
-        COALESCE(EXISTS(SELECT 1 FROM birthday_wishes bw WHERE bw.birthday_emp_id=e.id AND bw.from_emp_id=$2 AND bw.wish_date=$1),false) AS i_wished
-      FROM employees e
-      JOIN generate_series(0, 7) AS gs(offset_days)
-        ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata')::date + (gs.offset_days || ' days')::interval, 'MM-DD')
-      LEFT JOIN departments  d   ON e.department_id  = d.id
-      LEFT JOIN designations des ON e.designation_id = des.id
-      WHERE e.is_active = TRUE
-        AND e.date_of_birth IS NOT NULL
-      ORDER BY gs.offset_days ASC, e.first_name ASC
-    `, [today, empId]);
-
-    res.json({ success: true, data: result.rows });
-  } catch(e) {
-    console.error('Birthday fetch error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// POST /birthdays/:id/like — toggle like for today's birthday
-router.post('/birthdays/:id/like', authenticate, async (req, res) => {
-  try {
-    const db           = require('../config/db');
-    const birthdayEmpId = parseInt(req.params.id);
-    const fromEmpId    = req.user.id;
-    const today        = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    // Check if already liked
-    const existing = await db.query(
-      `SELECT id FROM birthday_likes WHERE birthday_emp_id=$1 AND from_emp_id=$2 AND like_date=$3`,
-      [birthdayEmpId, fromEmpId, today]
+       WHERE e.is_active = TRUE
+         AND e.employee_category = 'provision'
+         AND e.provision_end_date <= $1
+         AND NOT EXISTS (
+           SELECT 1 FROM provision_confirmations pc WHERE pc.employee_id = e.id
+         )`,
+      [todayStr]
     );
 
-    if (existing.rows.length) {
-      // Unlike
-      await db.query(`DELETE FROM birthday_likes WHERE id=$1`, [existing.rows[0].id]);
-      return res.json({ success: true, liked: false, message: 'Like removed' });
+    if (!due.rows.length) {
+      console.log('✅ No provision employees due for auto-initiation today');
+      return;
     }
 
-    // Like
-    await db.query(
-      `INSERT INTO birthday_likes(birthday_emp_id, from_emp_id, like_date) VALUES($1,$2,$3)`,
-      [birthdayEmpId, fromEmpId, today]
+    // Find an HR user to act as initiator
+    const hrRes = await db.query(
+      `SELECT id FROM employees WHERE role IN ('hr','admin','super_admin') AND is_active = TRUE LIMIT 1`
+    );
+    const initiatorId = hrRes.rows[0]?.id || null;
+
+    for (const emp of due.rows) {
+      try {
+        // Create the confirmation record
+        await db.query(
+          `INSERT INTO provision_confirmations
+             (employee_id, manager_id, overall_status, initiated_by, notes)
+           VALUES ($1, $2, 'pending', $3, $4)
+           ON CONFLICT DO NOTHING`,
+          [emp.id, emp.reporting_manager_id, initiatorId,
+           `Auto-initiated by system on ${todayStr} (provision ended ${emp.provision_end_date})`]
+        );
+
+        // In-app notification to manager
+        if (emp.reporting_manager_id) {
+          await db.query(
+            `INSERT INTO notifications (employee_id, type, title, message, is_read)
+             VALUES ($1, 'provision_confirm', '⏳ Provision Confirmation Required',
+                     $2, FALSE)`,
+            [
+              emp.reporting_manager_id,
+              `${emp.first_name} ${emp.last_name} (${emp.employee_code}) has completed their provision period. Please review and approve their permanent confirmation.`
+            ]
+          );
+        }
+
+        // In-app notification to all HR
+        const hrList = await db.query(
+          `SELECT id FROM employees WHERE role IN ('hr','admin','super_admin') AND is_active = TRUE`
+        );
+        for (const hr of hrList.rows) {
+          await db.query(
+            `INSERT INTO notifications (employee_id, type, title, message, is_read)
+             VALUES ($1, 'provision_confirm', '⏳ Provision Period Ended — Confirmation Initiated',
+                     $2, FALSE)`,
+            [
+              hr.id,
+              `Auto-initiated confirmation for ${emp.first_name} ${emp.last_name} (${emp.employee_code}). Provision ended ${emp.provision_end_date}. Awaiting manager approval.`
+            ]
+          );
+        }
+
+        // Email the manager
+        emailSvc.notifyProvisionManagerApprovalNeeded(emp.id, emp).catch(console.error);
+
+        console.log(`✅ Auto-initiated confirmation for ${emp.first_name} ${emp.last_name} (${emp.employee_code})`);
+      } catch (empErr) {
+        console.error(`❌ Failed to auto-initiate for ${emp.employee_code}:`, empErr.message);
+      }
+    }
+
+    console.log(`✅ Provision auto-initiation done. Processed: ${due.rows.length} employee(s)`);
+  } catch (err) {
+    console.error('❌ Provision auto-initiation cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// 5. Birthday notifications — runs at 08:00 AM IST every day
+cron.schedule('0 8 * * *', async () => {
+  console.log('⏰ Running birthday notifications...');
+  try {
+    const istNow    = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayMD   = `${String(istNow.getMonth()+1).padStart(2,'0')}${String(istNow.getDate()).padStart(2,'0')}`;
+    const tomorrow  = new Date(istNow); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowMD = `${String(tomorrow.getMonth()+1).padStart(2,'0')}${String(tomorrow.getDate()).padStart(2,'0')}`;
+
+    // TODAY birthdays
+    const todayBdays = await db.query(
+      `SELECT id, first_name, last_name, employee_code
+       FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+       AND TO_CHAR(date_of_birth,'MMDD') = $1`, [todayMD]
     );
 
-    // Notify the birthday person
-    const liker = await db.query(`SELECT first_name, last_name FROM employees WHERE id=$1`, [fromEmpId]);
-    if (liker.rows.length) {
+    for (const emp of todayBdays.rows) {
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND id != $1`, [emp.id]);
+      for (const r of all.rows) {
+        await db.query(
+          `INSERT INTO notifications(employee_id, title, message, type)
+           VALUES($1,'🎂 Birthday Today!',$2,'birthday')`,
+          [r.id, `🎉 Today is ${emp.first_name} ${emp.last_name}'s birthday! Wish them well.`]
+        );
+      }
       await db.query(
         `INSERT INTO notifications(employee_id, title, message, type)
-         VALUES($1,'❤️ Birthday Like',$2,'birthday')
-         ON CONFLICT DO NOTHING`,
-        [birthdayEmpId, `${liker.rows[0].first_name} ${liker.rows[0].last_name} liked your birthday! 🎂`]
+         VALUES($1,'🎂 Happy Birthday!','Wishing you a very Happy Birthday! 🎉🎂','birthday')`,
+        [emp.id]
       );
+      emailSvc.notifyBirthday(emp.id).catch(console.error);
+      console.log(`[Birthday] Today: ${emp.first_name} ${emp.last_name}`);
     }
 
-    const count = await db.query(
-      `SELECT COUNT(*) FROM birthday_likes WHERE birthday_emp_id=$1 AND like_date=$2`,
-      [birthdayEmpId, today]
-    );
-    res.json({ success: true, liked: true, like_count: parseInt(count.rows[0].count) });
-  } catch(e) {
-    console.error('Birthday like error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// POST /birthdays/:id/wish — send a birthday wish
-router.post('/birthdays/:id/wish', authenticate, async (req, res) => {
-  try {
-    const db            = require('../config/db');
-    const birthdayEmpId = parseInt(req.params.id);
-    const fromEmpId     = req.user.id;
-    const { message }   = req.body;
-    const today         = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    if (!message?.trim())
-      return res.status(400).json({ success: false, message: 'Message required' });
-
-    await db.query(
-      `INSERT INTO birthday_wishes(birthday_emp_id, from_emp_id, wish_date, message)
-       VALUES($1,$2,$3,$4)
-       ON CONFLICT(birthday_emp_id, from_emp_id, wish_date) DO UPDATE SET message=EXCLUDED.message`,
-      [birthdayEmpId, fromEmpId, today, message.trim()]
+    // TOMORROW birthdays — advance notice
+    const tomorrowBdays = await db.query(
+      `SELECT id, first_name, last_name FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+       AND TO_CHAR(date_of_birth,'MMDD') = $1`, [tomorrowMD]
     );
 
-    // Notify birthday person
-    const wisher = await db.query(`SELECT first_name, last_name FROM employees WHERE id=$1`, [fromEmpId]);
-    if (wisher.rows.length) {
-      await db.query(
-        `INSERT INTO notifications(employee_id, title, message, type)
-         VALUES($1,'🎂 Birthday Wish',$2,'birthday')`,
-        [birthdayEmpId, `${wisher.rows[0].first_name} ${wisher.rows[0].last_name}: "${message.trim().slice(0,80)}"`]
-      );
+    for (const emp of tomorrowBdays.rows) {
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND id != $1`, [emp.id]);
+      for (const r of all.rows) {
+        await db.query(
+          `INSERT INTO notifications(employee_id, title, message, type)
+           VALUES($1,'🎂 Upcoming Birthday',$2,'birthday')`,
+          [r.id, `Tomorrow is ${emp.first_name} ${emp.last_name}'s birthday! Don't forget to wish them 🎉`]
+        );
+      }
+      console.log(`[Birthday] Tomorrow: ${emp.first_name} ${emp.last_name}`);
     }
 
-    res.json({ success: true, message: 'Wish sent! 🎉' });
-  } catch(e) {
-    console.error('Birthday wish error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.log(`✅ Birthday cron done. Today: ${todayBdays.rows.length}, Tomorrow: ${tomorrowBdays.rows.length}`);
+  } catch (err) {
+    console.error('❌ Birthday cron failed:', err.message);
   }
-});
+}, { timezone: 'Asia/Kolkata' });
 
-// GET /birthdays/:id/wishes — get all wishes for a birthday person today
-router.get('/birthdays/:id/wishes', authenticate, async (req, res) => {
+// Work Anniversary emails — daily at 8:05 AM IST
+cron.schedule('5 8 * * *', async () => {
+  console.log('⏰ Running work anniversary emails...');
   try {
-    const db = require('../config/db');
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-
-    const result = await db.query(`
-      SELECT bw.id, bw.message, bw.created_at,
-             bw.from_emp_id,
-             CONCAT(e.first_name,' ',e.last_name) AS from_name,
-             e.employee_code AS from_code
-      FROM birthday_wishes bw
-      JOIN employees e ON e.id = bw.from_emp_id
-      WHERE bw.birthday_emp_id=$1 AND bw.wish_date=$2
-      ORDER BY bw.created_at DESC
-    `, [parseInt(req.params.id), today]);
-
-    res.json({ success: true, data: result.rows });
-  } catch(e) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    await emailSvc.sendDailyAnniversaryEmails();
+    console.log('✅ Anniversary emails done');
+  } catch(err) {
+    console.error('❌ Anniversary cron failed:', err.message);
   }
-});
+}, { timezone: 'Asia/Kolkata' });
 
-// DELETE /birthdays/wishes/:id — delete own wish
-router.delete('/birthdays/wishes/:id', authenticate, async (req, res) => {
+async function start() {
   try {
-    const db     = require('../config/db');
-    const wishId = parseInt(req.params.id);
-    const empId  = req.user.id;
-    // Only allow deleting own wishes
-    const result = await db.query(
-      `DELETE FROM birthday_wishes WHERE id=$1 AND from_emp_id=$2 RETURNING id`,
-      [wishId, empId]
-    );
-    if (!result.rows.length)
-      return res.status(403).json({ success: false, message: 'Not found or not your wish' });
-    res.json({ success: true, message: 'Wish deleted' });
-  } catch(e) {
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
+    await db.query('SELECT 1');
+    await chatCtrl.migrate();
+    console.log('✅ Database connected');
 
-// ── Work Anniversaries ────────────────────────────────────────────────────────
-// GET /anniversaries/upcoming — today + next 7 days work anniversaries
-router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
-  try {
-    const db    = require('../config/db');
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
-      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
-    const todayIST   = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const currentYear = todayIST.getFullYear();
-    const fromEmpId  = req.user.id;
+    await db.query(`CREATE TABLE IF NOT EXISTS birthday_likes (
+      id SERIAL PRIMARY KEY,
+      birthday_emp_id INT REFERENCES employees(id) ON DELETE CASCADE,
+      from_emp_id INT REFERENCES employees(id) ON DELETE CASCADE,
+      like_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(birthday_emp_id, from_emp_id, like_date)
+    )`);
+    await db.query(`CREATE TABLE IF NOT EXISTS birthday_wishes (
+      id SERIAL PRIMARY KEY,
+      birthday_emp_id INT REFERENCES employees(id) ON DELETE CASCADE,
+      from_emp_id INT REFERENCES employees(id) ON DELETE CASCADE,
+      message TEXT,
+      wish_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(birthday_emp_id, from_emp_id, wish_date)
+    )`);
+    console.log('✅ Birthday tables ready');
 
-    // Find employees whose joining date MM-DD falls in today → next 7 days
-    const result = await db.query(
-      `SELECT
-         e.id, e.employee_code,
-         CONCAT(e.first_name,' ',e.last_name) AS full_name,
-         e.joining_date,
-         d.name AS department_name,
-         des.title AS designation_title,
-         TO_CHAR(e.joining_date,'MM-DD') AS join_md,
-         TO_CHAR(e.joining_date,'DD Mon') AS join_display,
-         ($1::int - EXTRACT(YEAR FROM e.joining_date)::int) AS years_completed,
-         CASE
-           WHEN TO_CHAR(e.joining_date,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-           THEN 0
-           ELSE (
-             TO_DATE(TO_CHAR($1::int,'9999') || '-' || TO_CHAR(e.joining_date,'MM-DD'), 'YYYY-MM-DD')
-             - CURRENT_DATE
-           )
-         END AS days_until,
-         COALESCE(EXISTS(
-           SELECT 1 FROM birthday_likes bl
-           WHERE bl.birthday_emp_id=e.id AND bl.from_emp_id=$2 AND bl.like_date=$3
-         ),false) AS i_liked,
-         COALESCE((SELECT COUNT(*) FROM birthday_likes bl
-           WHERE bl.birthday_emp_id=e.id AND bl.like_date=$3),0) AS like_count,
-         COALESCE(EXISTS(
-           SELECT 1 FROM birthday_wishes bw
-           WHERE bw.birthday_emp_id=e.id AND bw.from_emp_id=$2 AND bw.wish_date=$3
-         ),false) AS i_wished,
-         COALESCE((SELECT COUNT(*) FROM birthday_wishes bw
-           WHERE bw.birthday_emp_id=e.id AND bw.wish_date=$3),0) AS wish_count
-       FROM employees e
-       LEFT JOIN departments d ON e.department_id = d.id
-       LEFT JOIN designations des ON e.designation_id = des.id
-       WHERE e.is_active = true
-         AND e.joining_date IS NOT NULL
-         AND EXTRACT(YEAR FROM e.joining_date) < $1
-         AND (
-           TO_CHAR(e.joining_date,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-           OR (
-             TO_CHAR(e.joining_date,'MMDD') > TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
-             AND TO_CHAR(e.joining_date,'MMDD') <= TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata' + INTERVAL '7 days'),'MMDD')
-           )
-         )
-       ORDER BY TO_CHAR(e.joining_date,'MMDD') ASC`,
-      [currentYear, fromEmpId, today]
-    );
+    // ── Indexes: already created in pgAdmin, skipped on every startup to avoid table locks ──
+    // ALTER TABLE attendance DROP/ADD CONSTRAINT removed — it locks the attendance table
+    // on every deploy causing all in-flight requests to timeout during redeployment.
+    // Constraint and indexes were applied once manually via pgAdmin. No-op now.
+    console.log('✅ DB schema ready');
 
-    res.json({ success: true, data: result.rows });
-  } catch(e) {
-    console.error('Anniversary fetch error:', e.message);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ── Offer Letters ─────────────────────────────────────────────────────────────
-router.get   ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.getAll);
-router.post  ('/offer-letters',              authenticate, authorize('hr'), offerCtrl.create);
-router.get   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.getOne);
-router.put   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.update);
-router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.remove);
-router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr'), offerCtrl.preview);
-router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
-
-// ── Test Email (debug only) ───────────────────────────────────────────────────
-router.get('/test-email', authenticate, async (req, res) => {
-  try {
-    const emailSvc = require('../config/emailService');
-    const emp = await require('../config/db').query(
-      `SELECT email, first_name FROM employees WHERE id=$1`, [req.user.id]
-    );
-    const email = emp.rows[0]?.email;
-    if (!email) return res.json({ success: false, message: 'No email found for your account' });
-
-    await emailSvc.send({
-      to:      email,
-      toName:  emp.rows[0].first_name,
-      subject: '✅ KrishiHR Email Test',
-      preview: 'Email system is working!',
-      html: `
-        <div style="font-size:24px;text-align:center;padding:20px">✅</div>
-        <div style="font-size:18px;font-weight:700;text-align:center;color:#1B5E20">Email System Working!</div>
-        <p style="text-align:center;color:#555;margin-top:12px">
-          This is a test email from KrishiHR.<br>
-          Sent to: <strong>${email}</strong><br>
-          Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-        </p>
-        <p style="text-align:center;font-size:12px;color:#999">
-          EMAIL_ENABLED=${process.env.EMAIL_ENABLED}<br>
-          EMAIL_FROM=${process.env.EMAIL_FROM}<br>
-          BREVO_USER=${process.env.BREVO_SMTP_USER}
-        </p>`
+    // ✅ Start accepting requests FIRST — don't block login/API on background fixes
+    server.listen(PORT, () => {
+      console.log('');
+      console.log('╔═══════════════════════════════════════╗');
+      console.log(`║  KrishiHR Backend on port ${PORT}         ║`);
+      console.log('╠═══════════════════════════════════════╣');
+      console.log('║  Health:  GET /health                 ║');
+      console.log('║  Login:   POST /api/auth/login        ║');
+      console.log('║  Docs:    See README.md               ║');
+      console.log('╚═══════════════════════════════════════╝');
+      console.log('');
     });
 
-    res.json({ success: true, message: `Test email sent to ${email}` });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
+    // ✅ Run background fixes AFTER server is live — these can be slow with large data
+    // Delay 5s so the pool is fully warm and Render has detected the port
+    setTimeout(async () => {
+      try {
+        await offerCtrl.initTables();
+        await itDeclCtrl.initTables();
+        await attCtrl.fixWrongAbsents();
+        await attCtrl.fixMissingPunchOuts();
+        await attCtrl.fixTimezoneShiftedLeaves(); // can be slow on large data — runs in background
+        // ── Project Budget Tracking tables ──
+        const projCtrl = require('./controllers/projectController');
+        await projCtrl.migrate();
+      } catch (err) {
+        console.error('❌ Background startup fix failed:', err.message);
+      }
+    }, 5000);
+  } catch (err) {
+    console.error('❌ Failed to start:', err.message);
+    console.error('   Make sure PostgreSQL is running and .env is configured');
+    process.exit(1);
   }
-});
+}
 
-// ── IT Declaration & Tax ──────────────────────────────────────────────────────
-router.get   ('/it-declaration',              authenticate,                     itDeclCtrl.getDeclaration);
-router.get   ('/it-declaration/all',          authenticate, authorize('hr','accounts'), itDeclCtrl.getAllDeclarations);
-router.get   ('/it-declaration/tax-preview',  authenticate,                     itDeclCtrl.taxPreview);
-router.get   ('/it-declaration/proofs',       authenticate, authorize('hr','accounts'), itDeclCtrl.getProofsByDeclaration);
-router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
-router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
-router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
-router.get   ('/it-declaration/:id',           authenticate, authorize('hr','accounts','admin','super_admin'), itDeclCtrl.getDeclarationById);
-router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
-router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
+// ── GK End-of-Day Skip Cron — runs at 11:59 PM IST every day ─────────────────
+// Any assigned question with no response yet gets auto-marked as 'skip'
+cron.schedule('59 23 * * *', async () => {
+  console.log('⏰ [GK] Running end-of-day skip marking...');
+  try {
+    const istDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
 
-// ── Project Budget Tracking ───────────────────────────────────────────────────
-const projCtrl = require('../controllers/projectController');
+    // Find all assignments for today that have no response
+    const unanswered = await db.query(
+      `SELECT ea.employee_id, ea.question_id
+       FROM gk_employee_assignments ea
+       WHERE ea.assigned_date = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM gk_daily_responses gr
+           WHERE gr.employee_id = ea.employee_id
+             AND gr.question_id = ea.question_id
+         )`,
+      [istDate]
+    );
 
-router.get   ('/projects/summary',                  authenticate, authorize('accounts','super_admin','admin'), projCtrl.getSummary);
-router.get   ('/projects/pending-reports',          authenticate, projCtrl.pendingReports);
-router.get   ('/projects/employees/:empId/allocation', authenticate, authorize('accounts','super_admin','admin'), projCtrl.getEmployeeAllocation);
-router.put   ('/projects/employees/:empId/allocation', authenticate, authorize('accounts','super_admin','admin'), projCtrl.setSalaryAllocation);
-router.get   ('/projects',                          authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.listProjects);
-router.post  ('/projects',                          authenticate, authorize('accounts','super_admin','admin'), projCtrl.createProject);
-router.get   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin','manager','tl','hr'), projCtrl.getProject);
-router.put   ('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.updateProject);
-router.delete('/projects/:id',                      authenticate, authorize('accounts','super_admin','admin'), projCtrl.deleteProject);
-router.post  ('/projects/:id/assign',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.assignEmployee);
-router.delete('/projects/:id/employees/:empId',     authenticate, authorize('accounts','super_admin','admin'), projCtrl.removeEmployee);
-router.post  ('/projects/:id/expenditure',          authenticate, authorize('accounts','super_admin','admin'), projCtrl.addExpenditure);
-router.get   ('/projects/:id/expenditures',         authenticate, authorize('accounts','super_admin','admin','manager'), projCtrl.getExpenditures);
-router.get   ('/projects/:id/export',               authenticate, authorize('accounts','super_admin','admin'), projCtrl.exportProjectExcel);
-router.get   ('/projects/:id/reports',              authenticate, projCtrl.listReports);
-router.post  ('/projects/:id/reports',              authenticate, projCtrl.submitReport);
-router.patch ('/projects/reports/:reportId',        authenticate, projCtrl.updateReport);
+    if (!unanswered.rows.length) {
+      console.log('[GK] No unanswered assignments to skip today.');
+      return;
+    }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CHAT ROUTES — v3 (WhatsApp + Google Meet grade)
-// ═══════════════════════════════════════════════════════════════════════════════
+    // Bulk insert skip records
+    for (const row of unanswered.rows) {
+      await db.query(
+        `INSERT INTO gk_daily_responses
+           (question_id, employee_id, answer, is_correct, score_change, answered_at)
+         VALUES ($1, $2, 'skip', false, 0, NOW())
+         ON CONFLICT DO NOTHING`,
+        [row.question_id, row.employee_id]
+      );
+    }
 
-// ── Groups ───────────────────────────────────────────────────────────────────
-router.get   ('/chat/groups',                             authenticate, chatCtrl.listGroups);
-router.post  ('/chat/groups',                             authenticate, chatCtrl.createGroup);
-router.get   ('/chat/groups/join/:inviteCode',            authenticate, chatCtrl.joinByLink);
-router.get   ('/chat/groups/:id',                         authenticate, chatCtrl.getGroup);
-router.patch ('/chat/groups/:id',                         authenticate, chatCtrl.updateGroup);
-router.post  ('/chat/groups/:id/members',                 authenticate, chatCtrl.addMembers);
-router.delete('/chat/groups/:id/members/:memberId',       authenticate, chatCtrl.removeMember);
-router.post  ('/chat/groups/:id/invite-link/reset',       authenticate, chatCtrl.resetInviteLink);
-router.post  ('/chat/groups/:id/mute',                    authenticate, chatCtrl.muteGroup);
-router.delete('/chat/groups/:id/mute',                    authenticate, chatCtrl.unmuteGroup);
-router.delete('/chat/groups/:id',                         authenticate, chatCtrl.deleteGroupForMe);
-router.delete('/chat/groups/:id/messages',                authenticate, chatCtrl.clearGroupMessages);
-router.post  ('/chat/groups/:id/promote/:memberId',       authenticate, chatCtrl.promoteAdmin);
-router.post  ('/chat/groups/:id/demote/:memberId',        authenticate, chatCtrl.demoteAdmin);
-router.get   ('/chat/groups/:id/search',                  authenticate, chatCtrl.searchMessages);
+    console.log(`✅ [GK] Auto-skipped ${unanswered.rows.length} unanswered question(s) for ${istDate}`);
+  } catch (err) {
+    console.error('❌ GK end-of-day skip cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
 
-// ── Messages ─────────────────────────────────────────────────────────────────
-router.get   ('/chat/groups/:id/messages',                authenticate, chatCtrl.getMessages);
-router.post  ('/chat/groups/:id/messages',                authenticate, chatCtrl.sendMessage);
-// ── File upload: direct (<=50 MB) + chunked (up to 1 GB) ─────────────────────
-const fileCtrl = require('../controllers/chatFileController');
-router.post  ('/chat/groups/:id/files', authenticate, (req, res, next) => {
-  fileCtrl.directUploadMiddleware(req, res, (err) => {
-    if (err) return res.status(400).json({ success: false, message: err.message });
-    next();
+// ── GK Monthly Top 5 Announcement (last day of every month, 11:59 PM IST) ──────
+cron.schedule('59 23 28-31 * *', async () => {
+  try {
+    // Only fire on the actual last day of the month
+    const now      = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDate() !== 1) return; // not last day — skip
+
+    console.log('[CRON] 📅 Posting monthly GK Top 5 announcement...');
+    const gkCtrl = require('./controllers/gkController');
+    const admin  = await db.query(`SELECT id FROM employees WHERE role IN ('admin','super_admin') AND is_active=true LIMIT 1`);
+    if (!admin.rows.length) return console.warn('[CRON] No admin found for GK announcement');
+
+    await gkCtrl.announceTop5(
+      { body: { period: 'month' }, user: { id: admin.rows[0].id } },
+      { json: (d) => console.log('[CRON] Monthly Top5 result:', d.message) }
+    );
+  } catch (err) {
+    console.error('❌ GK monthly top5 cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── GK Yearly Top 5 Announcement removed — only monthly winners are announced ──
+
+
+// ── Comp Off Auto-Grant Cron — runs at 11:30 PM IST every day ─────────────────
+// Scans today's attendance and grants COMPOFF to eligible employees
+cron.schedule('30 23 * * *', async () => {
+  try {
+    const compoffCtrl = require('./controllers/compoffController');
+    const istDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const dateStr = istDate.toISOString().split('T')[0];
+    console.log(`[CRON] 🗓️  Running COMPOFF auto-grant for ${dateStr}...`);
+    const result = await compoffCtrl.autoGrantForDate(dateStr);
+    console.log(`[CRON] ✅ COMPOFF auto-grant done — granted: ${result.granted}, skipped: ${result.skipped}`);
+  } catch (err) {
+    console.error('❌ COMPOFF auto-grant cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Comp Off Expiry Cron — runs at 12:05 AM IST every day ────────────────────
+// Marks credits past their 30-day expiry as 'expired' and reduces leave_balances
+cron.schedule('5 0 * * *', async () => {
+  try {
+    const compoffCtrl = require('./controllers/compoffController');
+    console.log('[CRON] ⏳ Running COMPOFF expiry check...');
+    await compoffCtrl.expireOldCredits();
+    console.log('[CRON] ✅ COMPOFF expiry check done');
+  } catch (err) {
+    console.error('❌ COMPOFF expiry cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Reimbursement Auto-Delete Cron ───────────────────────────────────────────
+// Rejected: deleted after 24 hours | Approved: deleted after 6 months
+cron.schedule('0 * * * *', async () => {
+  console.log('⏰ Running reimbursement auto-cleanup...');
+  try {
+    // Delete rejected reimbursements older than 24 hours
+    const rejectedResult = await db.query(`
+      DELETE FROM reimbursements
+      WHERE status = 'rejected'
+        AND updated_at < NOW() - INTERVAL '24 hours'
+      RETURNING id
+    `);
+
+    // Delete approved reimbursements older than 6 months
+    const approvedResult = await db.query(`
+      DELETE FROM reimbursements
+      WHERE status = 'approved'
+        AND approved_at < NOW() - INTERVAL '6 months'
+      RETURNING id
+    `);
+
+    const rCount = rejectedResult.rowCount;
+    const aCount = approvedResult.rowCount;
+    if (rCount > 0) console.log(`🗑️ Deleted ${rCount} rejected reimbursement(s) (>24h old)`);
+    if (aCount > 0) console.log(`🗑️ Deleted ${aCount} approved reimbursement(s) (>6 months old)`);
+    if (rCount === 0 && aCount === 0) console.log('✅ No reimbursements to clean up');
+  } catch (err) {
+    console.error('❌ Reimbursement auto-cleanup cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+start();
+
+// ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
+// ── Keep-Alive Ping (prevents Render free tier sleep) ─────────────────────────
+const https = require('https');
+const PING_URL = 'https://krishihr-zuui.onrender.com/health';
+const INTERVAL_MS = 5 * 60 * 1000;     // 5 minutes
+const INITIAL_DELAY_MS = 10 * 1000;    // 10 seconds after start
+function pingServer() {
+  https.get(PING_URL, (res) => {
+    // Silent
+  }).on('error', (err) => {
+    console.error(`[Keep-Alive] ⚠️ ping failed: ${err.message}`);
   });
-}, fileCtrl.sendFile);
-// Chunked upload
-router.post  ('/chat/upload/init',                        authenticate, fileCtrl.initUpload);
-router.post  ('/chat/upload/chunk/:uploadId',             authenticate, fileCtrl.uploadChunk);
-router.post  ('/chat/upload/complete/:uploadId',          authenticate, fileCtrl.completeUpload);
-router.delete('/chat/upload/abort/:uploadId',             authenticate, fileCtrl.abortUpload);
-router.get   ('/chat/upload/status/:uploadId',            authenticate, fileCtrl.uploadStatus);
-// TURN credentials
-router.get   ('/chat/turn-credentials', authenticate, (_req, res) => {
-  res.json({ success: true, iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:80?transport=tcp',  username: 'openrelayproject', credential: 'openrelayproject' },
-  ]});
-});
-router.patch ('/chat/messages/:id',                       authenticate, chatCtrl.editMessage);
-router.delete('/chat/messages/:id/me',                    authenticate, chatCtrl.deleteForMe);
-router.delete('/chat/messages/:id/everyone',              authenticate, chatCtrl.deleteForEveryone);
+}
+setTimeout(() => {
+  pingServer();
+  setInterval(pingServer, INTERVAL_MS);
+}, INITIAL_DELAY_MS);
 
-// ── Delivery / Read receipts ──────────────────────────────────────────────────
-router.post  ('/chat/messages/delivered',                 authenticate, chatCtrl.markDelivered);
-router.post  ('/chat/messages/seen',                      authenticate, chatCtrl.markSeen);
-
-// ── Reactions ─────────────────────────────────────────────────────────────────
-router.post  ('/chat/messages/:id/reactions',             authenticate, chatCtrl.addReaction);
-
-// ── Pinned messages ───────────────────────────────────────────────────────────
-router.post  ('/chat/messages/:id/pin',                   authenticate, chatCtrl.pinMessage);
-router.delete('/chat/messages/:id/pin',                   authenticate, chatCtrl.unpinMessage);
-
-// ── Presence ──────────────────────────────────────────────────────────────────
-router.post  ('/chat/presence',                           authenticate, chatCtrl.updatePresence);
-router.post  ('/chat/presence/offline',                    authenticate, chatCtrl.markOffline);
-router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
-
-
-
-module.exports = router;
+// ── DB Keep-Alive — keeps Neon DB pool warm every 1 minute ───────────────────
+const DB_PING_INTERVAL = 1 * 60 * 1000; // 1 minute
+setInterval(async () => {
+  try {
+    await db.query('SELECT 1');
+    await chatCtrl.migrate();
+  } catch (err) {
+    console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
+  }
+}, DB_PING_INTERVAL);
