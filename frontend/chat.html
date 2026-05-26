@@ -1692,7 +1692,7 @@ function buildMsgEl(m) {
   }
 
   // Content
-  let contentHtml = '';
+  let contentHtml = '', isImgMsg = false;
   // Build the full file URL — always use backend URL directly to avoid Vercel 404
   function buildFileUrl(fileUrl) {
     if (!fileUrl) return '';
@@ -1705,19 +1705,25 @@ function buildMsgEl(m) {
   } else if (m.message_type==='image') {
     const imgToken = localStorage.getItem('krishihr_token') || localStorage.getItem('token') || '';
     const imgSrc = fileFullUrl + (fileFullUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(imgToken);
-    contentHtml = `<div class="msg-img-wrap" style="position:relative;display:inline-block;cursor:pointer" onclick="openImgPreview('${fileFullUrl}')">
+    const _tickColor = m.seen_count>0 ? '#90caf9' : m.delivered_count>0 ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.55)';
+    const _tickIcon  = m.seen_count>0||m.delivered_count>0 ? '✓✓' : '✓';
+    contentHtml = `<div class="msg-img-wrap" style="position:relative;display:inline-block;cursor:pointer;border-radius:10px;overflow:hidden;max-width:300px" onclick="openImgPreview('${fileFullUrl}')">
       <img class="msg-image" src="${imgSrc}" alt="${esc(m.file_name)}" loading="lazy"
         onerror="this.parentElement.querySelector('.img-fallback').style.display='flex';this.style.display='none'">
-      <div class="img-fallback" style="display:none;align-items:center;justify-content:center;width:180px;height:120px;background:#f0f0f0;border-radius:8px;flex-direction:column;gap:4px">
+      <div class="img-fallback" style="display:none;align-items:center;justify-content:center;width:200px;height:130px;background:#f0f0f0;flex-direction:column;gap:4px">
         <span style="font-size:32px">🖼️</span>
-        <span style="font-size:11px;color:#666;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.file_name||'image')}</span>
+        <span style="font-size:11px;color:#666;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.file_name||'image')}</span>
         <button onclick="event.stopPropagation();dlFile('${fileFullUrl}','${esc(m.file_name||'image')}')" style="font-size:11px;background:var(--chat-accent);color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;margin-top:2px">Download</button>
       </div>
-      <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s"
-        onmouseover="this.style.background='rgba(0,0,0,.75)'" onmouseout="this.style.background='rgba(0,0,0,.55)'"
-        onclick="event.stopPropagation();dlFile('${fileFullUrl}','${esc(m.file_name||'image')}')"
-        title="Download"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+      <div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="event.stopPropagation();dlFile('${fileFullUrl}','${esc(m.file_name||'image')}')" title="Download">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div style="position:absolute;bottom:5px;right:6px;display:flex;align-items:center;gap:2px;background:rgba(0,0,0,.45);border-radius:10px;padding:1px 5px;pointer-events:none">
+        <span style="font-size:11px;color:#fff;white-space:nowrap">${fmtMsgTime(m.created_at)}</span>
+        ${isMine ? `<span style="font-size:12px;color:${_tickColor};font-weight:700;letter-spacing:-1px;line-height:1">${_tickIcon}</span>` : ''}
+      </div>
     </div>`;
+    isImgMsg = true;
   } else if (m.message_type==='audio') {
     contentHtml = buildVoiceNote(m);
   } else if (m.message_type==='video') {
@@ -1774,11 +1780,7 @@ function buildMsgEl(m) {
       ${!isMine ? `<div class="msg-sender">${esc(m.sender_name||'')}</div>` : ''}
       <div class="msg-bubble" data-bubble-id="${m.id}" oncontextmenu="showCtxMenuEv(event,${m.id},${isMine})">
         ${fwdHtml}${replyHtml}${contentHtml}
-        <div class="msg-meta">
-          ${editedHtml}
-          <span class="msg-time">${fmtMsgTime(m.created_at)}</span>
-          ${tickHtml}
-        </div>
+        ${!isImgMsg ? `<div class="msg-meta">${editedHtml}<span class="msg-time">${fmtMsgTime(m.created_at)}</span>${tickHtml}</div>` : ''}
       </div>
       ${reactHtml}
     </div>
