@@ -978,16 +978,27 @@ exports.serveFile = async (req, res) => {
     const isNumericId = /^\d+$/.test(idOrName);
 
     if (isNumericId) {
-      // New style: numeric ID → serve from DB (pass as string to avoid JS integer overflow)
+      // New style: numeric ID → serve from DB or disk
       const r = await db.query(
-        `SELECT original_name, mime_type, file_size, file_data FROM chat_file_data WHERE id=$1`, [idOrName]
+        `SELECT original_name, mime_type, file_size, file_data, disk_path FROM chat_file_data WHERE id=$1`, [idOrName]
       );
       if (!r.rows.length) return res.status(404).json({ success: false, message: 'File not found' });
-      const { original_name, mime_type, file_data } = r.rows[0];
+      const { original_name, mime_type, file_data, disk_path } = r.rows[0];
+      const safe = encodeURIComponent(original_name);
       res.setHeader('Content-Type', mime_type || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(original_name)}"`);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${safe}`);
       res.setHeader('Cache-Control', 'public, max-age=31536000');
-      return res.send(file_data);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      if (disk_path) {
+        const fs2 = require('fs');
+        if (!fs2.existsSync(disk_path)) return res.status(404).json({ success: false, message: 'File missing from disk' });
+        return fs2.createReadStream(disk_path).pipe(res);
+      }
+      if (file_data) {
+        const buf = Buffer.isBuffer(file_data) ? file_data : Buffer.from(file_data);
+        return res.send(buf);
+      }
+      return res.status(404).json({ success: false, message: 'File data missing' });
     }
 
     // Legacy style: filename on disk (old uploads before this change)
@@ -1057,7 +1068,8 @@ exports.migrate = async () => {
       original_name TEXT NOT NULL,
       mime_type     TEXT NOT NULL,
       file_size     BIGINT,
-      file_data     BYTEA NOT NULL,
+      file_data     BYTEA,
+      disk_path     TEXT,
       uploaded_at   TIMESTAMPTZ DEFAULT NOW()
     );
 
@@ -1117,6 +1129,10 @@ exports.migrate = async () => {
     `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS deleted_for_everyone BOOLEAN DEFAULT FALSE`,
     `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS deleted_for         INT[] DEFAULT '{}'`,
 
+
+    // chat_file_data — disk_path and nullable file_data added for large file support
+    `ALTER TABLE chat_file_data ADD COLUMN IF NOT EXISTS disk_path TEXT`,
+    `ALTER TABLE chat_file_data ALTER COLUMN file_data DROP NOT NULL`,
 
     // chat_group_members — role column (may have been added later)
     `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS role       TEXT DEFAULT 'member'`,
