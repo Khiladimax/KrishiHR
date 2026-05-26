@@ -418,7 +418,7 @@ exports.getMessages = async (req, res) => {
         ($1 = ANY(COALESCE(cm.deleted_for, '{}'::int[]))) AS deleted_for_me,
         CONCAT(e.first_name,' ',e.last_name) AS sender_name,
         e.employee_code AS sender_code,
-        e.profile_picture AS sender_avatar, e.role AS sender_role,
+        e.profile_picture AS sender_photo, e.role AS sender_role,
         -- Delivery: seen by others?
         (SELECT COUNT(*) FROM message_delivery_status mds
            WHERE mds.message_id=cm.id AND mds.employee_id != $1 AND mds.seen_at IS NOT NULL) AS seen_count,
@@ -503,7 +503,7 @@ exports.sendMessage = async (req, res) => {
 
     const msg = r.rows[0];
     const emp = await db.query(
-      `SELECT CONCAT(first_name,' ',last_name) AS name, employee_code, role FROM employees WHERE id=$1`,
+      `SELECT CONCAT(first_name,' ',last_name) AS name, employee_code, role, profile_picture FROM employees WHERE id=$1`,
       [empId]
     );
 
@@ -526,6 +526,7 @@ exports.sendMessage = async (req, res) => {
       sender_name: emp.rows[0]?.name,
       sender_code: emp.rows[0]?.employee_code,
       sender_role: emp.rows[0]?.role,
+      sender_photo: emp.rows[0]?.profile_picture,
       reply_content,
       reply_sender_name,
       reactions: [],
