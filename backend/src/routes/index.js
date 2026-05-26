@@ -28,7 +28,7 @@ const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
-const EMP_MGMT   = ['hr','accounts'];
+const EMP_MGMT   = ['hr','accounts','admin','super_admin'];
 const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -52,6 +52,7 @@ router.get   ('/employees/:id',           authenticate,                         
 router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
 router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
 router.patch ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
+router.delete('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.deleteEmployee);
 router.post  ('/employees/reset-password',authenticate, authorize(...EMP_MGMT), empCtrl.resetPassword);
 router.post  ('/employees/:id/separate',  authenticate, authorize(...EMP_MGMT), (req,res)=>res.json({success:false,message:'Not implemented'}));
 
