@@ -2929,10 +2929,38 @@ async function executeDangerAction() {
 
   try {
     let data;
+
+    // DEBUG: raw fetch to see exact server response
+    const debugMethod = _dangerAction === 'delete' ? 'DELETE' : 'PUT';
+    const debugBody   = _dangerAction === 'deactivate' ? { is_active: false }
+                      : _dangerAction === 'reactivate' ? { is_active: true }
+                      : null;
+    const debugRes = await fetch(`${API_BASE}/employees/${_dangerEmpId}`, {
+      method: debugMethod,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + Auth.getToken() },
+      body: debugBody ? JSON.stringify(debugBody) : undefined
+    });
+    const debugText = await debugRes.text();
+    console.warn(`[KrishiHR DEBUG] ${debugMethod} /employees/${_dangerEmpId} → HTTP ${debugRes.status}:`, debugText);
+
+    let parsed;
+    try { parsed = JSON.parse(debugText); } catch(e) { parsed = { success: false, message: `HTTP ${debugRes.status}: ${debugText.slice(0,200)}` }; }
+
+    if (debugRes.status === 403) {
+      toast(`❌ Not authorized (403) — redeploy backend index.js`, 'error');
+      btn.disabled = false; btn.textContent = 'Yes, ' + (_dangerAction === 'delete' ? 'Delete' : _dangerAction.charAt(0).toUpperCase() + _dangerAction.slice(1));
+      return;
+    }
+    if (debugRes.status === 401) {
+      toast('❌ Session expired — please log in again', 'error');
+      btn.disabled = false; btn.textContent = 'Yes, Deactivate';
+      return;
+    }
+
+    data = parsed;
+
     if (_dangerAction === 'deactivate') {
-      data = await api('PUT', `/employees/${_dangerEmpId}`, { is_active: false });
-      console.log('[deactivate response]', data);
-      if (!data) { toast('Server error — not authorized or server offline', 'error'); }
+      if (!data) { toast('Server error — null response', 'error'); }
       else if (data?.success) {
         toast('⏸ Employee account deactivated');
         closeModal('emp-danger-modal');
@@ -2942,9 +2970,7 @@ async function executeDangerAction() {
       } else toast('Deactivate failed: ' + (data?.message || 'Unknown error'), 'error');
 
     } else if (_dangerAction === 'reactivate') {
-      data = await api('PUT', `/employees/${_dangerEmpId}`, { is_active: true, separation_date: null, separation_type: null });
-      console.log('[reactivate response]', data);
-      if (!data) { toast('Server error — not authorized or server offline', 'error'); }
+      if (!data) { toast('Server error — null response', 'error'); }
       else if (data?.success) {
         toast('✅ Employee account reactivated');
         closeModal('emp-danger-modal');
@@ -2954,9 +2980,7 @@ async function executeDangerAction() {
       } else toast('Reactivate failed: ' + (data?.message || 'Unknown error'), 'error');
 
     } else if (_dangerAction === 'delete') {
-      data = await api('DELETE', `/employees/${_dangerEmpId}`);
-      console.log('[delete response]', data);
-      if (!data) { toast('Server error — not authorized or server offline', 'error'); }
+      if (!data) { toast('Server error — null response', 'error'); }
       else if (data?.success) {
         toast('🗑️ Employee account deleted permanently');
         closeModal('emp-danger-modal');
