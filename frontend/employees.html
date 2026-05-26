@@ -1049,14 +1049,14 @@
 </div>
 
 <!-- ══ Deactivate / Delete Employee Confirmation Modal ════════════════════ -->
-<div class="modal-backdrop" id="emp-danger-modal">
+<div class="modal-backdrop" id="emp-danger-modal" style="z-index:400">
   <div class="modal" style="width:460px;max-width:96vw">
     <div class="modal-header" id="emp-danger-modal-header" style="background:linear-gradient(135deg,#dc2626,#b91c1c)">
       <div class="modal-title" id="emp-danger-modal-title" style="color:#fff;display:flex;align-items:center;gap:8px">
         <span id="emp-danger-modal-icon" style="font-size:20px">⚠️</span>
         <span id="emp-danger-modal-title-text">Confirm Action</span>
       </div>
-      <button class="modal-close" onclick="closeModal('emp-danger-modal')" style="color:#fff;opacity:.8">✕</button>
+      <button class="modal-close" onclick="closeModal('emp-danger-modal');closeModal('emp-detail-modal')" style="color:#fff;opacity:.8">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px">
       <div id="emp-danger-modal-warn" style="border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:16px"></div>
@@ -1070,7 +1070,7 @@
       </div>
     </div>
     <div class="modal-footer" style="gap:10px">
-      <button class="btn btn-outline" onclick="closeModal('emp-danger-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="closeModal('emp-danger-modal');closeModal('emp-detail-modal')">Cancel</button>
       <button class="btn" id="emp-danger-confirm-btn" onclick="executeDangerAction()" style="min-width:160px">Confirm</button>
     </div>
   </div>
@@ -2877,7 +2877,7 @@ let _dangerAction  = null;
 function openDangerModal(id, name, code, action) {
   _dangerEmpId  = id;
   _dangerAction = action;
-  closeModal('emp-detail-modal');
+  // Keep emp-detail-modal open in background — danger modal sits on top (z-index:400)
 
   const header  = document.getElementById('emp-danger-modal-header');
   const icon    = document.getElementById('emp-danger-modal-icon');
@@ -2963,7 +2963,8 @@ async function executeDangerAction() {
       else if (data?.success) {
         toast('⏸ Employee account deactivated');
         closeModal('emp-danger-modal');
-        _statusFilter = 'inactive';  // set BEFORE reload so list shows inactive
+        closeModal('emp-detail-modal');
+        _statusFilter = 'inactive';
         await loadEmployees();
         setStatusFilter('inactive', document.getElementById('status-pill-inactive'));
         loadSeparatedCount();
@@ -2974,7 +2975,8 @@ async function executeDangerAction() {
       else if (data?.success) {
         toast('✅ Employee account reactivated');
         closeModal('emp-danger-modal');
-        _statusFilter = 'active';  // set BEFORE reload
+        closeModal('emp-detail-modal');
+        _statusFilter = 'active';
         await loadEmployees();
         setStatusFilter('active', document.getElementById('status-pill-active'));
         loadSeparatedCount();
@@ -2985,7 +2987,8 @@ async function executeDangerAction() {
       else if (data?.success) {
         toast('🗑️ Employee account deleted permanently');
         closeModal('emp-danger-modal');
-        _statusFilter = 'active';  // set BEFORE reload
+        closeModal('emp-detail-modal');
+        _statusFilter = 'active';
         await loadEmployees();
         loadSeparatedCount();
       } else toast('Delete failed: ' + (data?.message || 'Unknown error'), 'error');
