@@ -455,7 +455,6 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   padding: 8px 12px 8px 12px; background: var(--wa-panel);
   display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0;
   border-top: 1px solid var(--wa-border);
-  padding-right: 76px; /* clear the floating AI assistant button */
 }
 .chat-input {
   flex: 1; background: var(--wa-surface); border: none; border-radius: 24px;
@@ -894,8 +893,8 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
         oninput="autoResize(this); handleTyping()"
         onkeydown="handleKey(event)"
         rows="1"></textarea>
-      <button class="icon-btn" id="voiceBtn" onmousedown="startVoiceRecord()" onmouseup="stopAudioRecord(true)" ontouchstart="startVoiceRecord()" ontouchend="stopAudioRecord(true)" title="Hold to record voice">🎙️</button>
       <button class="send-btn" onclick="sendMessage()" id="sendBtn">➤</button>
+      <button class="icon-btn" id="voiceBtn" onmousedown="startVoiceRecord()" onmouseup="stopAudioRecord(true)" ontouchstart="startVoiceRecord()" ontouchend="stopAudioRecord(true)" title="Hold to record voice">🎙️</button>
     </div>
   </div>
 
