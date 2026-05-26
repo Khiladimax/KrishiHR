@@ -973,3 +973,455 @@ exports.getPresence = async (req, res) => {
     res.status(500).json({ success: false, message: e.message });
   }
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIDEO MEETINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+exports.createMeeting = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { title, group_id } = req.body;
+    const roomId = uuidv4();
+    const r = await db.query(`
+      INSERT INTO chat_meetings(room_id, title, created_by, group_id, status)
+      VALUES($1,$2,$3,$4,'active') RETURNING *
+    `, [roomId, title || 'Meeting', empId, group_id || null]);
+    const meeting = r.rows[0];
+
+    // Get starter name
+    const empR = await db.query(
+      `SELECT CONCAT(first_name,' ',last_name) AS name FROM employees WHERE id=$1`, [empId]
+    );
+    const starterName = empR.rows[0]?.name || 'Someone';
+
+    if (group_id && global.io) {
+      global.io.to(`group:${group_id}`).emit('meetingStarted', {
+        room_id:      roomId,
+        title:        meeting.title,
+        started_by:   empId,
+        starter_name: starterName,
+        meeting_id:   meeting.id
+      });
+      await db.query(
+        `INSERT INTO meeting_notifications(meeting_id, group_id, notified_at)
+         VALUES($1,$2,NOW()) ON CONFLICT DO NOTHING`,
+        [meeting.id, group_id]
+      );
+    }
+    res.json({ success: true, data: meeting });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.scheduleMeeting = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { title, group_id, scheduled_at, description, agenda } = req.body;
+    if (!scheduled_at) return res.status(400).json({ success: false, message: 'scheduled_at required' });
+    const roomId = uuidv4();
+    const r = await db.query(`
+      INSERT INTO scheduled_meetings(room_id, title, created_by, group_id, scheduled_at, description, agenda, status)
+      VALUES($1,$2,$3,$4,$5,$6,$7,'scheduled') RETURNING *
+    `, [roomId, title || 'Scheduled Meeting', empId, group_id || null, scheduled_at, description || null, agenda || null]);
+
+    const meeting = r.rows[0];
+
+    // Notify group members if group_id
+    if (group_id && global.io) {
+      global.io.to(`group:${group_id}`).emit('meetingScheduled', {
+        ...meeting,
+        scheduled_by: empId
+      });
+    }
+    res.json({ success: true, data: meeting });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.getScheduledMeetings = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const result = await db.query(`
+      SELECT sm.*, CONCAT(e.first_name,' ',e.last_name) AS created_by_name,
+        cg.name AS group_name
+      FROM scheduled_meetings sm
+      JOIN employees e ON e.id=sm.created_by
+      LEFT JOIN chat_groups cg ON cg.id=sm.group_id
+      LEFT JOIN chat_group_members cgm ON cgm.group_id=sm.group_id AND cgm.employee_id=$1
+      WHERE (sm.created_by=$1 OR cgm.employee_id=$1)
+        AND sm.status IN ('scheduled','started')
+        AND sm.scheduled_at > NOW() - INTERVAL '1 hour'
+      ORDER BY sm.scheduled_at ASC
+    `, [empId]);
+    res.json({ success: true, data: result.rows });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.startScheduledMeeting = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { id } = req.params;
+    const r = await db.query(`SELECT * FROM scheduled_meetings WHERE id=$1`, [id]);
+    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+    const sm = r.rows[0];
+
+    // Create the live meeting
+    const liveR = await db.query(`
+      INSERT INTO chat_meetings(room_id, title, created_by, group_id, status, scheduled_meeting_id)
+      VALUES($1,$2,$3,$4,'active',$5) RETURNING *
+    `, [sm.room_id, sm.title, empId, sm.group_id, sm.id]);
+
+    await db.query(`UPDATE scheduled_meetings SET status='started' WHERE id=$1`, [id]);
+
+    if (sm.group_id && global.io) {
+      global.io.to(`group:${sm.group_id}`).emit('scheduledMeetingStarted', {
+        room_id: sm.room_id,
+        title: sm.title,
+        started_by: empId,
+        meeting_id: liveR.rows[0].id
+      });
+    }
+    res.json({ success: true, data: liveR.rows[0] });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.getMeeting = async (req, res) => {
+  try {
+    const r = await db.query(`SELECT * FROM chat_meetings WHERE room_id=$1`, [req.params.roomId]);
+    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Meeting not found' });
+    res.json({ success: true, data: r.rows[0] });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.endMeeting = async (req, res) => {
+  try {
+    await db.query(
+      `UPDATE chat_meetings SET status='ended', ended_at=NOW() WHERE room_id=$1`,
+      [req.params.roomId]
+    );
+    if (global.io) global.io.to(`meeting:${req.params.roomId}`).emit('meetingEnded');
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+// Record meeting participant
+exports.joinMeetingRecord = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { roomId } = req.params;
+    const meet = await db.query(`SELECT id FROM chat_meetings WHERE room_id=$1`, [roomId]);
+    if (!meet.rows.length) return res.status(404).json({ success: false, message: 'Meeting not found' });
+    await db.query(
+      `INSERT INTO meeting_participants(meeting_id, employee_id, joined_at)
+       VALUES($1,$2,NOW()) ON CONFLICT(meeting_id, employee_id) DO UPDATE SET joined_at=NOW(), left_at=NULL`,
+      [meet.rows[0].id, empId]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.leaveMeetingRecord = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { roomId } = req.params;
+    const meet = await db.query(`SELECT id FROM chat_meetings WHERE room_id=$1`, [roomId]);
+    if (!meet.rows.length) return res.json({ success: true });
+    await db.query(
+      `UPDATE meeting_participants SET left_at=NOW() WHERE meeting_id=$1 AND employee_id=$2`,
+      [meet.rows[0].id, empId]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+exports.serveFile = async (req, res) => {
+  try {
+    const idOrName = req.params.filename;
+    // Check if it's a pure numeric ID (may be too large for JS parseInt/32-bit int)
+    const isNumericId = /^\d+$/.test(idOrName);
+
+    if (isNumericId) {
+      // New style: numeric ID → serve from DB (pass as string to avoid JS integer overflow)
+      const r = await db.query(
+        `SELECT original_name, mime_type, file_size, file_data FROM chat_file_data WHERE id=$1`, [idOrName]
+      );
+      if (!r.rows.length) return res.status(404).json({ success: false, message: 'File not found' });
+      const { original_name, mime_type, file_data } = r.rows[0];
+      res.setHeader('Content-Type', mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(original_name)}"`);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      return res.send(file_data);
+    }
+
+    // Legacy style: filename on disk (old uploads before this change)
+    const uploadDir = require('path').join(__dirname, '..', '..', 'uploads', 'chat');
+    const filePath  = require('path').join(uploadDir, idOrName);
+    if (!require('fs').existsSync(filePath))
+      return res.status(404).json({ success: false, message: 'File not found' });
+    res.sendFile(filePath);
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+// ─── DB Migration ─────────────────────────────────────────────────────────────
+exports.migrate = async () => {
+  // ── Step 1: CREATE tables if they don't exist at all ─────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS chat_groups (
+      id          SERIAL PRIMARY KEY,
+      name        TEXT,
+      type        TEXT NOT NULL DEFAULT 'group',
+      created_by  INT REFERENCES employees(id),
+      invite_link TEXT UNIQUE,
+      avatar_url  TEXT,
+      description TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_group_members (
+      id          SERIAL PRIMARY KEY,
+      group_id    INT NOT NULL REFERENCES chat_groups(id) ON DELETE CASCADE,
+      employee_id INT NOT NULL REFERENCES employees(id),
+      role        TEXT DEFAULT 'member',
+      joined_at   TIMESTAMPTZ DEFAULT NOW(),
+      left_at     TIMESTAMPTZ,
+      UNIQUE(group_id, employee_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id                  SERIAL PRIMARY KEY,
+      group_id            INT NOT NULL REFERENCES chat_groups(id) ON DELETE CASCADE,
+      sender_id           INT NOT NULL REFERENCES employees(id),
+      content             TEXT,
+      message_type        TEXT DEFAULT 'text',
+      file_name           TEXT,
+      file_size           BIGINT,
+      file_mime           TEXT,
+      file_url            TEXT,
+      reply_to_id         INT REFERENCES chat_messages(id),
+      forwarded_from_id   INT REFERENCES chat_messages(id),
+      mentions            INT[],
+      created_at          TIMESTAMPTZ DEFAULT NOW(),
+      edited_at           TIMESTAMPTZ,
+      deleted_for_everyone BOOLEAN DEFAULT FALSE,
+      deleted_for         INT[] DEFAULT '{}'
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_read_receipts (
+      group_id    INT NOT NULL REFERENCES chat_groups(id) ON DELETE CASCADE,
+      employee_id INT NOT NULL REFERENCES employees(id),
+      read_at     TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY(group_id, employee_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_file_data (
+      id            BIGSERIAL PRIMARY KEY,
+      original_name TEXT NOT NULL,
+      mime_type     TEXT NOT NULL,
+      file_size     BIGINT,
+      file_data     BYTEA NOT NULL,
+      uploaded_at   TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS call_log (
+      id               SERIAL PRIMARY KEY,
+      room_id          TEXT UNIQUE NOT NULL,
+      call_type        TEXT NOT NULL DEFAULT 'audio',
+      caller_id        INT REFERENCES employees(id),
+      callee_id        INT REFERENCES employees(id),
+      group_id         INT REFERENCES chat_groups(id),
+      started_at       TIMESTAMPTZ DEFAULT NOW(),
+      ended_at         TIMESTAMPTZ,
+      duration_seconds INT,
+      status           TEXT DEFAULT 'answered'
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_meetings (
+      id                   SERIAL PRIMARY KEY,
+      room_id              TEXT UNIQUE NOT NULL,
+      title                TEXT,
+      created_by           INT REFERENCES employees(id),
+      group_id             INT REFERENCES chat_groups(id),
+      status               TEXT DEFAULT 'active',
+      scheduled_meeting_id INT,
+      started_at           TIMESTAMPTZ DEFAULT NOW(),
+      ended_at             TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS message_reactions (
+      id          SERIAL PRIMARY KEY,
+      message_id  INT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+      employee_id INT NOT NULL REFERENCES employees(id),
+      emoji       TEXT NOT NULL,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(message_id, employee_id, emoji)
+    );
+
+    CREATE TABLE IF NOT EXISTS pinned_messages (
+      id         SERIAL PRIMARY KEY,
+      group_id   INT NOT NULL REFERENCES chat_groups(id) ON DELETE CASCADE,
+      message_id INT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+      pinned_by  INT REFERENCES employees(id),
+      pinned_at  TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(group_id, message_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_presence (
+      employee_id INT PRIMARY KEY REFERENCES employees(id),
+      is_online   BOOLEAN DEFAULT FALSE,
+      last_seen   TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS message_delivery_status (
+      message_id   INT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+      employee_id  INT NOT NULL REFERENCES employees(id),
+      delivered_at TIMESTAMPTZ,
+      seen_at      TIMESTAMPTZ,
+      PRIMARY KEY(message_id, employee_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS scheduled_meetings (
+      id           SERIAL PRIMARY KEY,
+      room_id      TEXT UNIQUE NOT NULL,
+      title        TEXT,
+      created_by   INT REFERENCES employees(id),
+      group_id     INT REFERENCES chat_groups(id),
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      description  TEXT,
+      agenda       TEXT,
+      status       TEXT DEFAULT 'scheduled',
+      created_at   TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS meeting_participants (
+      meeting_id   INT NOT NULL REFERENCES chat_meetings(id) ON DELETE CASCADE,
+      employee_id  INT NOT NULL REFERENCES employees(id),
+      joined_at    TIMESTAMPTZ DEFAULT NOW(),
+      left_at      TIMESTAMPTZ,
+      PRIMARY KEY(meeting_id, employee_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS meeting_notifications (
+      id          SERIAL PRIMARY KEY,
+      meeting_id  INT REFERENCES chat_meetings(id),
+      group_id    INT REFERENCES chat_groups(id),
+      notified_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(meeting_id, group_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_group_mutes (
+      group_id    INT NOT NULL REFERENCES chat_groups(id) ON DELETE CASCADE,
+      employee_id INT NOT NULL REFERENCES employees(id),
+      muted_at    TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY(group_id, employee_id)
+    );
+  `);
+
+  // ── Step 2: ALTER existing tables — safely add any missing columns ────────
+  // These run every deploy; IF NOT EXISTS means they're no-ops if column exists.
+  const alters = [
+    // chat_groups — columns added in v2 upgrade
+    `ALTER TABLE chat_groups ADD COLUMN IF NOT EXISTS invite_link  TEXT`,
+    `ALTER TABLE chat_groups ADD COLUMN IF NOT EXISTS avatar_url   TEXT`,
+    `ALTER TABLE chat_groups ADD COLUMN IF NOT EXISTS description  TEXT`,
+
+    // chat_messages — columns added in v2 upgrade
+    `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS reply_to_id        INT REFERENCES chat_messages(id)`,
+    `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS forwarded_from_id  INT REFERENCES chat_messages(id)`,
+    `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS mentions            INT[]`,
+    `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS edited_at           TIMESTAMPTZ`,
+    `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS deleted_for_everyone BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS deleted_for         INT[] DEFAULT '{}'`,
+
+    // chat_meetings — scheduled_meeting_id added in v2
+    `ALTER TABLE chat_meetings ADD COLUMN IF NOT EXISTS scheduled_meeting_id INT`,
+    `ALTER TABLE chat_meetings ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ`,
+
+    // chat_group_members — role column (may have been added later)
+    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS role       TEXT DEFAULT 'member'`,
+    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS left_at    TIMESTAMPTZ`,
+    `ALTER TABLE chat_group_members ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
+
+    // Ensure invite_link unique constraint (safe — CREATE UNIQUE INDEX IF NOT EXISTS)
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_groups_invite_link ON chat_groups(invite_link) WHERE invite_link IS NOT NULL`,
+  ];
+
+  for (const sql of alters) {
+    try { await db.query(sql); }
+    catch (e) { console.warn('[chat migrate] ALTER skipped:', e.message); }
+  }
+
+  // ── Step 3: Indexes ───────────────────────────────────────────────────────
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_group   ON chat_messages(group_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_chat_members_emp      ON chat_group_members(employee_id) WHERE left_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_msg_reactions_msg     ON message_reactions(message_id);
+    CREATE INDEX IF NOT EXISTS idx_msg_delivery_msg      ON message_delivery_status(message_id);
+    CREATE INDEX IF NOT EXISTS idx_pinned_group          ON pinned_messages(group_id);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_meet_group  ON scheduled_meetings(group_id, scheduled_at);
+  `);
+
+  console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
+};
+
+// ─── Call Log ──────────────────────────────────────────────────────────────────
+
+// GET /api/chat/call-log  — returns call history for the logged-in user
+exports.getCallLog = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { rows } = await db.query(`
+      SELECT
+        cl.id, cl.room_id, cl.call_type, cl.started_at, cl.ended_at,
+        cl.duration_seconds, cl.status,
+        -- caller info
+        ce.id   AS caller_id,
+        ce.first_name || ' ' || ce.last_name AS caller_name,
+        ce.profile_picture AS caller_avatar,
+        -- callee info
+        ee.id   AS callee_id,
+        ee.first_name || ' ' || ee.last_name AS callee_name,
+        ee.profile_picture AS callee_avatar
+      FROM call_log cl
+      LEFT JOIN employees ce ON ce.id = cl.caller_id
+      LEFT JOIN employees ee ON ee.id = cl.callee_id
+      WHERE cl.caller_id = $1 OR cl.callee_id = $1
+      ORDER BY cl.started_at DESC
+      LIMIT 100
+    `, [empId]);
+    res.json({ success: true, calls: rows });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+// POST /api/chat/call-log/missed  — save a missed/declined call
+exports.saveCallEvent = async (req, res) => {
+  try {
+    const { room_id, call_type, caller_id, callee_id, group_id, status } = req.body;
+    await db.query(`
+      INSERT INTO call_log (room_id, call_type, caller_id, callee_id, group_id, status, started_at, ended_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+      ON CONFLICT (room_id) DO UPDATE SET status=$6, ended_at=NOW()
+    `, [room_id, call_type||'audio', caller_id, callee_id, group_id||null, status||'missed']);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
