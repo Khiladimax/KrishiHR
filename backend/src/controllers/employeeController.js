@@ -394,6 +394,28 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+// Hard-delete employee (admin/hr/accounts only)
+exports.deleteEmployee = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, message: 'Invalid employee ID' });
+
+    // Prevent deleting yourself
+    if (req.user.id === id)
+      return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+
+    const existing = await db.query(`SELECT id, first_name, last_name, employee_code FROM employees WHERE id=$1`, [id]);
+    if (!existing.rows.length)
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+
+    await db.query(`DELETE FROM employees WHERE id=$1`, [id]);
+    res.json({ success: true, message: `Employee ${existing.rows[0].employee_code} deleted permanently` });
+  } catch (err) {
+    console.error('[delete employee error]', err.message, err.detail || '');
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+};
+
 // Preview next auto-generated employee code (for HR UI)
 exports.previewNextCode = async (req, res) => {
   try {
