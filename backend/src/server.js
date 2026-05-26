@@ -131,10 +131,9 @@ io.on('connection', (socket) => {
 // and new uploads (/api/chat/files/...) work too
 const chatUploadDir = require('path').join(__dirname, '..', 'uploads', 'chat');
 if (!require('fs').existsSync(chatUploadDir)) require('fs').mkdirSync(chatUploadDir, { recursive: true });
-app.use('/chat/files',     require('express').static(chatUploadDir));  // legacy
-app.use('/api/chat/files', require('express').static(chatUploadDir));  // new
+app.use('/chat/files', require('express').static(chatUploadDir));  // legacy disk files only
 
-app.use('/api', routes);
+app.use('/api', routes);  // /api/chat/files/:id served by chatFileController (DB + disk)
 
 // Health check
 app.get('/health', (_req, res) => {
