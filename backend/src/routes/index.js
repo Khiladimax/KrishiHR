@@ -944,25 +944,6 @@ router.post  ('/chat/presence',                           authenticate, chatCtrl
 router.post  ('/chat/presence/offline',                    authenticate, chatCtrl.markOffline);
 router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
 
-// ── Meetings (instant) ───────────────────────────────────────────────────────
-router.post  ('/chat/meetings',                           authenticate, chatCtrl.createMeeting);
-router.get   ('/chat/meetings/:roomId',                   authenticate, chatCtrl.getMeeting);
-router.patch ('/chat/meetings/:roomId/end',               authenticate, chatCtrl.endMeeting);
-router.post  ('/chat/meetings/:roomId/join',              authenticate, chatCtrl.joinMeetingRecord);
-router.post  ('/chat/meetings/:roomId/leave',             authenticate, chatCtrl.leaveMeetingRecord);
-
-// ── Scheduled meetings ────────────────────────────────────────────────────────
-router.post  ('/chat/scheduled-meetings',                 authenticate, chatCtrl.scheduleMeeting);
-router.get   ('/chat/scheduled-meetings',                 authenticate, chatCtrl.getScheduledMeetings);
-router.post  ('/chat/scheduled-meetings/:id/start',       authenticate, chatCtrl.startScheduledMeeting);
-
-// ── Static file serving ───────────────────────────────────────────────────────
-router.get   ('/chat/files/:id',  fileCtrl.serveFile);
-router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
-
-// ── Call History ──────────────────────────────────────────────────────────────
-router.get   ('/chat/call-log',                           authenticate, chatCtrl.getCallLog);
-router.post  ('/chat/call-log/event',                     authenticate, chatCtrl.saveCallEvent);
 
 
 module.exports = router;
