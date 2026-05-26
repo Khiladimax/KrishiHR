@@ -55,6 +55,8 @@ io.use((socket, next) => {
 // Per-user socket tracking: userId -> Map<socketId, { socket, device }>
 global.userSockets    = new Map();  // userId -> Set of socketIds (legacy, kept for compat)
 global.userSocketsMeta = new Map(); // userId -> Map<socketId, device>
+// Track which device is currently on a call: userId -> socketId
+global.activeCallSocket = new Map();
 
 io.on('connection', (socket) => {
   const user = socket.user;
@@ -84,6 +86,207 @@ io.on('connection', (socket) => {
   });
   socket.on('stopTyping', ({ groupId }) => {
     socket.to(`group:${groupId}`).emit('userStoppedTyping', { userId: user.id });
+  });
+
+  // ── Call Invites (WhatsApp-style ring) ────────────────────────────────────
+  // Caller emits this; server fans it out to all sockets of the callee
+  socket.on('callInvite', ({ toUserId, roomId, callType, callerName, callerAvatar, groupId, groupName }) => {
+    const calleeSockets = global.userSockets.get(String(toUserId));
+    if (calleeSockets && calleeSockets.size) {
+      calleeSockets.forEach(sid => {
+        io.to(sid).emit('incomingCall', {
+          roomId,
+          callType,       // 'video' | 'audio'
+          callerName,
+          callerAvatar,
+          callerId: user.id,
+          groupId,
+          groupName
+        });
+      });
+    } else {
+      // Callee offline — notify caller
+      socket.emit('calleeOffline', { toUserId, roomId });
+    }
+  });
+
+  // Callee accepted — tell caller + save call_log record + suspend other devices
+  socket.on('callAccepted', async ({ roomId, callerId, callType, groupId }) => {
+    const callerSockets = global.userSockets.get(String(callerId));
+    const meetingRoom   = `meeting:${roomId}`;
+    const roomMembers   = io.sockets.adapter.rooms.get(meetingRoom) || new Set();
+
+    if (callerSockets) {
+      callerSockets.forEach(sid => {
+        // Always notify caller their call was accepted
+        io.to(sid).emit('callAccepted', { roomId, byUserId: user.id, byName: user.first_name });
+        // Only dismiss caller's OTHER sockets that are NOT already in the meeting room
+        if (!roomMembers.has(sid)) {
+          io.to(sid).emit('callAnsweredElsewhere', { roomId });
+        }
+      });
+    }
+    // Dismiss incoming call UI on callee's other devices not already in the meeting
+    const myAllSockets = global.userSockets.get(String(user.id));
+    if (myAllSockets) {
+      myAllSockets.forEach(sid => {
+        if (sid !== socket.id && !roomMembers.has(sid)) {
+          io.to(sid).emit('callAnsweredElsewhere', { roomId });
+        }
+      });
+    }
+    global.activeCallSocket.set(`${user.id}:${roomId}`, socket.id);
+    global.activeCallSocket.set(`${callerId}:${roomId}`, null); // will be set when caller joins meeting
+    // Persist call history so both users can see it later
+    try {
+      const db = require('./config/db');
+      await db.query(
+        `INSERT INTO call_log (room_id, call_type, caller_id, callee_id, group_id, started_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (room_id) DO NOTHING`,
+        [roomId, callType || 'audio', callerId, user.id, groupId || null]
+      );
+    } catch (_) { /* non-fatal */ }
+  });
+
+  // Callee declined — tell caller
+  socket.on('callDeclined', ({ roomId, callerId }) => {
+    const callerSockets = global.userSockets.get(String(callerId));
+    if (callerSockets) {
+      callerSockets.forEach(sid => io.to(sid).emit('callDeclined', { roomId, byUserId: user.id, byName: user.first_name }));
+    }
+  });
+
+  // Caller cancelled before answer
+  socket.on('callCancelled', ({ roomId, toUserId }) => {
+    const calleeSockets = global.userSockets.get(String(toUserId));
+    if (calleeSockets) {
+      calleeSockets.forEach(sid => io.to(sid).emit('callCancelled', { roomId }));
+    }
+  });
+
+  // ── Group call invite (fans out to ALL group members) ────────────────────
+  socket.on('groupCallInvite', async ({ groupId, roomId, callType, callerName, callerAvatar, groupName }) => {
+    try {
+      const dbInst = require('./config/db');
+      const members = await dbInst.query(
+        `SELECT employee_id FROM chat_group_members WHERE group_id=$1 AND left_at IS NULL AND employee_id != $2`,
+        [groupId, user.id]
+      );
+      members.rows.forEach(({ employee_id }) => {
+        const calleeSockets = global.userSockets.get(String(employee_id));
+        if (calleeSockets) {
+          calleeSockets.forEach(sid => {
+            io.to(sid).emit('incomingCall', {
+              roomId, callType, callerName, callerAvatar,
+              callerId: user.id, groupId, groupName, isGroupCall: true
+            });
+          });
+        }
+      });
+    } catch (e) { console.error('[groupCallInvite]', e.message); }
+  });
+
+  // ── Video / Audio Meeting — WebRTC Signalling ─────────────────────────────
+  socket.on('joinMeeting', async ({ roomId, displayName, callType }) => {
+    socket.join(`meeting:${roomId}`);
+    socket.to(`meeting:${roomId}`).emit('peerJoined', {
+      peerId: socket.id,
+      userId: user.id,
+      displayName: displayName || user.first_name || 'Guest'
+    });
+    // Tell the new joiner who's already in the room
+    const existingPeers = [...(io.sockets.adapter.rooms.get(`meeting:${roomId}`) || [])].filter(id => id !== socket.id);
+    // Build peer info map so new joiner knows names
+    const peerInfos = existingPeers.map(pid => {
+      const peerSocket = io.sockets.sockets.get(pid);
+      return { peerId: pid, displayName: peerSocket?._displayName || 'Guest' };
+    });
+    socket.emit('existingPeers', existingPeers);
+    socket.emit('existingPeerInfos', peerInfos);
+    // Store display name on socket for others to reference
+    socket._displayName = displayName || user.first_name || 'Guest';
+    // NOTE: We intentionally do NOT send callAnsweredElsewhere here.
+    // Once someone is in a meeting room they must never be kicked out by another
+    // device joining. callAnsweredElsewhere is only for the ringing phase (callAccepted).
+    // Save call log when 2nd person joins a 1-to-1 room (call_TIMESTAMP_random format)
+    if (existingPeers.length === 1 && roomId.startsWith('call_')) {
+      try {
+        const db = require('./config/db');
+        const callerSocket = io.sockets.sockets.get(existingPeers[0]);
+        const callerId = callerSocket?.user?.id;
+        if (callerId && callerId !== user.id) {
+          await db.query(
+            `INSERT INTO call_log (room_id, call_type, caller_id, callee_id, started_at, status)
+             VALUES ($1,$2,$3,$4,NOW(),'answered')
+             ON CONFLICT (room_id) DO NOTHING`,
+            [roomId, callType || 'video', callerId, user.id]
+          );
+        }
+      } catch(_) { /* non-fatal */ }
+    }
+  });
+
+  socket.on('leaveMeeting', async ({ roomId }) => {
+    socket.to(`meeting:${roomId}`).emit('peerLeft', { peerId: socket.id, userId: user.id });
+    socket.leave(`meeting:${roomId}`);
+    // Mark call ended if this is a 1-to-1 call room
+    try {
+      const db = require('./config/db');
+      await db.query(
+        `UPDATE call_log SET ended_at=NOW(),
+         duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INT
+         WHERE room_id=$1 AND ended_at IS NULL`,
+        [roomId]
+      );
+    } catch (_) { /* non-fatal */ }
+  });
+
+  // WebRTC offer
+  socket.on('offer', ({ to, offer, roomId }) => {
+    io.to(to).emit('offer', { from: socket.id, userId: user.id, offer, roomId });
+  });
+  // WebRTC answer
+  socket.on('answer', ({ to, answer }) => {
+    io.to(to).emit('answer', { from: socket.id, answer });
+  });
+  // ICE candidates
+  socket.on('ice-candidate', ({ to, candidate }) => {
+    io.to(to).emit('ice-candidate', { from: socket.id, candidate });
+  });
+
+  // Screen share toggle notification
+  socket.on('screenShare', ({ roomId, sharing, displayName }) => {
+    socket.to(`meeting:${roomId}`).emit('peerScreenShare', {
+      peerId: socket.id,
+      sharing,
+      displayName: displayName || user.first_name || 'Someone'
+    });
+  });
+
+  // Raise hand
+  socket.on('raiseHand', ({ roomId, raised, displayName }) => {
+    socket.to(`meeting:${roomId}`).emit('raiseHand', { peerId: socket.id, raised, displayName });
+  });
+
+  // Relay mic/cam mute state to peers in the room
+  socket.on('peerMuteState', ({ roomId, micEnabled, camEnabled }) => {
+    socket.to(`meeting:${roomId}`).emit('peerMuteState', {
+      peerId: socket.id,
+      micEnabled,
+      camEnabled
+    });
+  });
+
+  // Meeting chat
+  socket.on('meetingChat', ({ roomId, message }) => {
+    io.to(`meeting:${roomId}`).emit('meetingChat', {
+      from: socket.id,
+      userId: user.id,
+      name: user.first_name || 'User',
+      message,
+      at: new Date().toISOString()
+    });
   });
 
   // Mark messages seen via socket (for DMs — no HTTP roundtrip)
