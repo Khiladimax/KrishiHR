@@ -932,7 +932,7 @@ router.post  ('/chat/presence',                           authenticate, chatCtrl
 router.post  ('/chat/presence/offline',                    authenticate, chatCtrl.markOffline);
 router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
 
-// ── Meetings (instant) ───────────────────────────────────────────────────────
+// ── Scheduled meetings ────────────────────────────────────────────────────────
 
 // ── Static file serving ───────────────────────────────────────────────────────
 router.get   ('/chat/files/:id',  fileCtrl.serveFile);
