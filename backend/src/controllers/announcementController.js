@@ -282,16 +282,23 @@ exports.getFeed = async (req, res) => {
     // Birthdays — upcoming 7 days (handles month boundary correctly)
     // Generate series of next 7 dates and match birthdays by MM-DD
     const bdResult = await db.query(
-      `SELECT DISTINCT e.id, e.first_name, e.last_name, e.employee_code, e.date_of_birth,
-              e.department_id,
-              TO_CHAR(e.date_of_birth,'DD-Mon') AS birth_day
-       FROM employees e
-       JOIN generate_series(0, 7) AS gs(offset_days)
-         ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR(CURRENT_DATE + (gs.offset_days || ' days')::interval, 'MM-DD')
-       WHERE e.is_active=true
-         AND e.date_of_birth IS NOT NULL
-       ORDER BY TO_CHAR(e.date_of_birth,'MM-DD') = TO_CHAR(CURRENT_DATE,'MM-DD') DESC,
-                gs.offset_days ASC`
+      `SELECT id, first_name, last_name, employee_code, date_of_birth,
+              department_id, birth_day
+       FROM (
+         SELECT DISTINCT ON (e.id)
+                e.id, e.first_name, e.last_name, e.employee_code, e.date_of_birth,
+                e.department_id,
+                TO_CHAR(e.date_of_birth,'DD-Mon') AS birth_day,
+                (TO_CHAR(e.date_of_birth,'MM-DD') = TO_CHAR(CURRENT_DATE,'MM-DD')) AS is_today,
+                MIN(gs.offset_days) AS offset_days
+         FROM employees e
+         JOIN generate_series(0, 7) AS gs(offset_days)
+           ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR(CURRENT_DATE + (gs.offset_days || ' days')::interval, 'MM-DD')
+         WHERE e.is_active=true
+           AND e.date_of_birth IS NOT NULL
+         GROUP BY e.id, e.first_name, e.last_name, e.employee_code, e.date_of_birth, e.department_id
+       ) sub
+       ORDER BY is_today DESC, offset_days ASC`
     );
 
     // Upcoming holidays (next 30 days) — filtered by employee's region
