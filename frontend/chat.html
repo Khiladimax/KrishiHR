@@ -1298,7 +1298,6 @@ async function loadGroups() {
     groups = allFetched;
   }
   renderGroupList();
-  if (currentMode === 'meetings') renderMeetGroupPicker();
   // Load presence for all DM peers
   const peerIds = groups.filter(g => g.type === 'dm' && g.dm_peer_id).map(g => g.dm_peer_id);
   if (peerIds.length) {
@@ -2599,7 +2598,58 @@ async function resetInviteLink() {
 })();
 
 
-// ── Utility helpers ───────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+    document.getElementById('ctxMenu').classList.remove('open');
+    document.getElementById('emojiQuick').classList.remove('open');
+    if (document.getElementById('chatSearchBar').classList.contains('visible')) toggleChatSearch();
+    closeImgPreview();
+  }
+});
+
+// ── File Download (WhatsApp-style) ────────────────────────────────────────────
+// Uses fetch+blob so cross-origin files download instead of opening in browser
+async function dlFile(url, filename) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // Try to read error message from backend
+      let msg = 'Download failed';
+      try {
+        const j = await res.json();
+        if (j.message === 'File not found') {
+          msg = '⚠️ This file was uploaded before persistent storage was enabled and is no longer available. Please ask the sender to re-upload it.';
+        } else {
+          msg = j.message || msg;
+        }
+      } catch(_) {}
+      return showToast('Download failed', msg, null);
+    }
+    const blob = await res.blob();
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = filename || 'file';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch(e) {
+    showToast('Download failed', 'Could not reach server. Check your connection.', null);
+  }
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function safeStr(s) {
+  return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,' ').slice(0,100);
+}
 function fmtTime(ts) {
   if (!ts) return '';
   const d = new Date(ts.endsWith('Z')||ts.includes('+')?ts:ts+'Z');
@@ -2643,12 +2693,75 @@ function fileIcon(mime) {
   if (mime.startsWith('audio/'))  return '🎵';
   if (mime.startsWith('video/'))  return '🎬';
   if (mime.includes('pdf'))       return '📕';
-  if (mime.includes('sheet')||mime.includes('excel'))   return '📊';
-  if (mime.includes('word')||mime.includes('document')) return '📝';
+  if (mime.includes('sheet')||mime.includes('excel'))  return '📊';
+  if (mime.includes('word')||mime.includes('document'))return '📝';
   if (mime.includes('zip')||mime.includes('compressed'))return '🗜️';
   return '📄';
 }
+function linkify(text) {
+  // Check if this is a meeting announcement (contains meetjoin= URL)
+  const meetMatch = text.match(/[?&]meetjoin=([a-zA-Z0-9_-]+)/);
+  if (meetMatch) {
+    const roomId = meetMatch[1];
+    const lines = text.split('\n');
+    const header   = (lines[0] || '').replace(/^📹\s*/, '');
+    const timeLine = (lines[1] || '').replace(/^🕐\s*/, '');
 
+    return `<div class="meet-invite-card">
+      <div class="meet-invite-header">
+        <span class="meet-invite-icon">📹</span>
+        <div>
+          <div class="meet-invite-title">${esc(header)}</div>
+          ${timeLine ? `<div class="meet-invite-time">🕐 ${esc(timeLine)}</div>` : ''}
+        </div>
+      </div>
+      <button class="meet-invite-btn" onclick="showToast('Meetings removed','Video meetings have been removed.',null)">
+        Join Now
+      </button>
+    </div>`;
+  }
+
+  // Regular text with URLs — escape text, linkify URLs
+  return esc(text).replace(/(https?:\/\/[^\s&lt;&gt;"]+)/g, (url) => {
+    // Decode back for display
+    const displayUrl = url.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+    return `<a href="${displayUrl}" target="_blank" rel="noopener" style="color:#1565c0;text-decoration:underline;word-break:break-all">${url}</a>`;
+  });
+}
+
+function showLeftMenu() {
+  const opts = ['Dark/light mode (uses system)', 'Starred messages (coming soon)', 'Settings (coming soon)'];
+  alert(opts.join('\n'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOUND ENGINE — Web Audio API (no external files needed)
+// ═══════════════════════════════════════════════════════════════════════════════
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+
+// Play a short WhatsApp-style "ding" for incoming messages
+function playMsgSound() {
+  try {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.25);
+  } catch(e) {}
+}
+
+// Repeating ring tone for incoming calls
+let _ringInterval = null;
 // ── Presence heartbeat — every 60s (backend expires after 2min of silence) ───
 setInterval(() => { if (!document.hidden) updatePresence(true); }, 60000);
 
@@ -2699,17 +2812,17 @@ loadGroups().then(async () => {
   // If it's a call (not dm_only), trigger once socket is fully connected
   if (callType && callType !== 'dm_only') {
     const doCall = () => {
-      setTimeout(() => { if (activeGroup) initiateCall(callType); }, 500);
+      setTimeout(() => { if (activeGroup) // initiateCall(callType); }, 500);
     };
     if (socket && socket.connected) {
-      doCall();
+      // doCall();
     } else {
       let waited = 0;
       const poll = setInterval(() => {
         waited += 300;
         if (socket && socket.connected) {
           clearInterval(poll);
-          doCall();
+          // doCall();
         } else if (waited >= 10000) {
           clearInterval(poll);
           console.warn('[AI Call] socket never connected');
