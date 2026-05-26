@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title id="page-title">Chat</title>
+<title id="page-title">Chat & Meetings</title>
 <link rel="stylesheet" href="style.css">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="config.js?v=2"></script>
@@ -507,15 +507,30 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 .file-preview-name { flex: 1; font-size: 13px; color: var(--wa-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ── MEETINGS LIST PANEL ── */
-
-
+.meetings-panel-left { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.meetings-panel-left.active { display: flex; }
+.meetings-section { padding: 12px 16px; }
+.meetings-section-title { font-size: 11px; font-weight: 800; color: var(--chat-accent); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.meeting-card {
+  background: var(--wa-surface); border-radius: 12px; padding: 12px 14px;
+  margin-bottom: 8px; cursor: pointer; transition: background .15s;
+  border-left: 3px solid var(--chat-accent);
+}
+.meeting-card:hover { background: var(--wa-hover); }
+.meeting-card.live { border-left-color: #ef5350; animation: liveGlow 2s infinite; }
 @keyframes liveGlow {
   0%,100% { box-shadow: 0 0 0 rgba(234,67,53,0); }
   50% { box-shadow: 0 0 12px rgba(234,67,53,.25); }
 }
-
-
-
+.meeting-card-title { font-size: 14px; font-weight: 700; color: var(--wa-text); }
+.meeting-card-sub { font-size: 12px; color: var(--wa-text2); margin-top: 3px; }
+.meeting-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+.meet-card-btn {
+  padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 700; transition: .15s; font-family: var(--font);
+}
+.meet-card-btn.join { background: var(--chat-accent); color: #fff; }
+.meet-card-btn.join:hover { background: var(--chat-accent-h); }
 .live-badge {
   display: inline-flex; align-items: center; gap: 4px;
   background: rgba(234,67,53,.15); color: #ef5350;
@@ -526,18 +541,43 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 /* ══════════════════════════════════════════════════════
    MEETING PANEL — Google Meet style (exact match)
    ══════════════════════════════════════════════════════ */
+.meeting-panel {
+  position: fixed; inset: 0; z-index: 500;
+  background: #202124;
+  display: none; flex-direction: column;
+  font-family: 'Google Sans', var(--font), sans-serif;
+}
+.meeting-panel.open { display: flex; }
+.meeting-panel.minimized {
+  position: fixed; bottom: 20px; right: 20px; inset: auto;
+  width: 340px; height: 200px; border-radius: 16px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.7); overflow: hidden;
+  z-index: 9000;
+}
 
 /* ── Top bar (slim, like Google Meet) ── */
-
-
-
-
-
-
-
+.meet-header {
+  background: #202124; padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  position: relative; z-index: 10;
+}
+.meet-header-info { flex: 1; }
+.meet-header-title { font-size: 14px; font-weight: 600; color: #e8eaed; }
+.meet-header-sub { font-size: 11px; color: #9aa0a6; }
+.meet-header-actions { display: flex; gap: 6px; }
+.meet-icon-btn {
+  width: 36px; height: 36px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,.08); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #e8eaed; font-size: 15px; transition: background .15s;
+}
+.meet-icon-btn:hover { background: rgba(255,255,255,.18); }
 
 /* ── Main area: video + optional side panel ── */
-
+.meet-body {
+  flex: 1; display: flex; min-height: 0; overflow: hidden;
+  position: relative;
+}
 
 /* ── Video area: fills everything, no margins ── */
 .meet-videos-area {
@@ -645,13 +685,17 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   background: rgba(0,0,0,.55); color: #fff; font-size: 11px;
   padding: 2px 6px; border-radius: 4px;
 }
+.meeting-panel.minimized .self-float { display: none; }
 
 /* ── Alone warning ── */
-
-
-
-
-
+.meet-alone-warn {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-60%);
+  text-align: center; color: #9aa0a6; display: none; z-index: 3; width: 320px;
+}
+.meet-alone-warn.visible { display: block; }
+.meet-alone-warn-icon { font-size: 52px; margin-bottom: 16px; }
+.meet-alone-warn-text { font-size: 18px; font-weight: 600; color: #e8eaed; margin-bottom: 8px; }
+.meet-alone-warn-sub { font-size: 13px; line-height: 1.5; }
 
 /* ── Controls bar — centered like Google Meet ── */
 .meet-controls {
@@ -660,17 +704,23 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   display: flex; align-items: center; justify-content: center; gap: 8px;
   flex-shrink: 0; position: relative; z-index: 10;
 }
-
-
-
-
-
-
-
-
-
-
-
+.meet-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 18px; border-radius: 50px; border: none; cursor: pointer;
+  background: #3c4043; color: #e8eaed;
+  transition: background .15s, transform .1s;
+  min-width: 72px; font-family: inherit;
+}
+.meet-btn:hover { background: #4a4d51; transform: scale(1.04); }
+.meet-btn.on  { background: rgba(255,255,255,.12); }
+.meet-btn.off { background: #ea4335; }
+.meet-btn.off:hover { background: #c5221f; }
+.meet-btn.danger { background: #ea4335; min-width: 56px; padding: 12px 20px; }
+.meet-btn.danger:hover { background: #c5221f; }
+.meet-btn.active-screen { background: #34a853; }
+.meet-btn.active-screen:hover { background: #2d9248; }
+.meet-btn-icon { font-size: 20px; line-height: 1; }
+.meet-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .4px; white-space: nowrap; color: #e8eaed; }
 
 /* Raise hand indicator */
 .raised-hand-badge {
@@ -684,11 +734,17 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 }
 
 /* Side panels */
-
-
-
-
-
+.meet-side {
+  width: 320px; background: var(--meet-bg); border-left: 1px solid rgba(255,255,255,.08);
+  display: none; flex-direction: column; flex-shrink: 0;
+}
+.meet-side.open { display: flex; }
+.meet-side-header {
+  padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex; align-items: center; gap: 8px;
+}
+.meet-side-title { font-size: 15px; font-weight: 700; color: #e8eaed; flex: 1; }
+.meet-side-content { flex: 1; overflow-y: auto; padding: 8px; }
 
 /* Participant list */
 .participant-row {
@@ -710,13 +766,25 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   background: rgba(52,168,83,.15); padding: 1px 6px; border-radius: 8px;
 }
 
-
-
-
-
-
-
-
+/* In-meeting chat */
+.meet-chat-msgs { flex: 1; overflow-y: auto; padding: 10px; }
+.meet-chat-msg { margin-bottom: 10px; }
+.meet-chat-sender { font-size: 11px; font-weight: 700; color: var(--chat-accent); margin-bottom: 2px; }
+.meet-chat-text { font-size: 13px; color: #e8eaed; background: rgba(255,255,255,.06); padding: 6px 10px; border-radius: 8px; display: inline-block; }
+.meet-chat-input-wrap {
+  padding: 10px; border-top: 1px solid rgba(255,255,255,.08);
+  display: flex; gap: 8px; flex-shrink: 0;
+}
+.meet-chat-input {
+  flex: 1; background: rgba(255,255,255,.08); border: none; border-radius: 8px;
+  padding: 8px 12px; color: #e8eaed; font-size: 13px; outline: none;
+  font-family: var(--font);
+}
+.meet-chat-send {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--chat-accent);
+  border: none; cursor: pointer; color: #fff; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
 
 /* Waiting room notice */
 .waiting-room-overlay {
@@ -750,6 +818,24 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 .toast-msg { font-size: 12px; color: var(--wa-text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .toast-dismiss { color: var(--wa-text2); font-size: 16px; cursor: pointer; padding: 2px 4px; }
 
+/* Meeting join banner */
+.meet-banner {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-120px);
+  z-index: 8000; background: var(--surface,#fff); border: 1px solid var(--chat-accent);
+  border-radius: 14px; padding: 12px 20px; display: flex; align-items: center; gap: 14px;
+  box-shadow: 0 8px 32px rgba(74,140,28,.2); transition: transform .4s ease;
+  min-width: 320px;
+}
+.meet-banner.visible { transform: translateX(-50%) translateY(0); }
+.meet-banner-icon { font-size: 28px; }
+.meet-banner-content { flex: 1; }
+.meet-banner-title { font-size: 14px; font-weight: 700; color: var(--chat-accent); }
+.meet-banner-sub { font-size: 12px; color: var(--wa-text2); }
+.meet-banner-btn {
+  padding: 8px 18px; background: var(--chat-accent); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px;
+  white-space: nowrap; font-family: var(--font);
+}
 
 /* ── MODALS ── */
 .modal-overlay {
@@ -877,6 +963,10 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 }
 .drop-overlay.visible { display: flex; }
 
+/* Schedule meeting calendar */
+.meeting-calendar {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 12px 0;
+}
 .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
 .cal-header-day { font-size: 10px; font-weight: 700; color: var(--wa-text2); text-align: center; padding: 2px; letter-spacing: .5px; }
 .cal-day {
@@ -893,15 +983,51 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--wa-surface); border-radius: 4px; }
 
-.msg-row.mine 
-
+/* ── Meeting invite card (shown in chat when someone starts a meeting) ── */
+.meet-invite-card {
+  background: #ffffff;
+  border: 1.5px solid #B8E4F5;
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-width: 240px;
+  max-width: 320px;
+  margin: 2px 0;
+}
+.msg-row.mine .meet-invite-card {
+  background: rgba(255,255,255,0.85);
+  border-color: rgba(0,0,0,.12);
+}
+.meet-invite-header {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px;
+}
+.meet-invite-icon {
+  font-size: 28px; flex-shrink: 0; line-height: 1;
+}
+.meet-invite-title {
+  font-size: 13px; font-weight: 700; color: #0F1A38; line-height: 1.4;
+}
+.meet-invite-time {
+  font-size: 11px; color: #5a6a8a; margin-top: 3px; font-weight: 500;
+}
+.meet-invite-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 10px 0;
+  background: #4a8c1c; color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-weight: 700; font-size: 14px; font-family: inherit;
+  transition: background .15s;
+  letter-spacing: .3px;
+}
+.meet-invite-btn::before { content: '📹'; font-size: 16px; }
+.meet-invite-btn:hover { background: #2d5a0e; }
 
 /* ── Responsive tweaks ── */
 @media (max-width: 768px) {
   .chat-page { width: 100%; }
   .chat-left { width: 100%; max-width: 100%; position: absolute; z-index: 10; height: 100%; }
   .chat-left.hidden { display: none; }
-  }
+  .meeting-panel.open { position: fixed; inset: 0; z-index: 300; }
+}
 </style>
 </head>
 <body>
@@ -937,7 +1063,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   <div class="topbar" style="flex-shrink:0;">
     <div class="topbar-left">
       <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
-      <div class="topbar-title">💬 Chat</div>
+      <div class="topbar-title">💬 Chat &amp; Meetings</div>
     </div>
     <div class="topbar-right">
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications" onclick="openNotifications()">🔔<span id="notif-badge"></span></button>
@@ -963,6 +1089,9 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <button class="mode-tab active" id="modeChatTab" onclick="setMode('chat')">
         💬 Chats <span class="notif-pip"></span>
       </button>
+      <button class="mode-tab" id="modeMeetTab" onclick="setMode('meetings')">
+        📹 Meetings <span class="notif-pip"></span>
+      </button>
     </div>
 
     <!-- CHAT LIST PANEL -->
@@ -979,7 +1108,29 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <div class="group-list" id="groupList"></div>
     </div>
 
-    <!-- MEETINGS LIST PANEL --><!-- ══ MIDDLE PANEL ══════════════════════════════════════════════════ -->
+    <!-- MEETINGS LIST PANEL -->
+      <div class="meetings-section" style="overflow-y:auto;flex:1">
+        <div class="meetings-section-title">⚡ Live Now</div>
+        <div id="liveMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">No active meetings</div></div>
+        <div class="meetings-section-title" style="margin-top:16px">📅 Scheduled</div>
+        <div id="scheduledMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">Loading…</div></div>
+        <div class="meetings-section-title" style="margin-top:16px">📞 Call History</div>
+        <div id="callHistoryList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">Loading…</div></div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--wa-border);display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+        <button class="btn-primary" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openScheduleMeetingModal()">
+          📅 Schedule Meeting
+        </button>
+        <button style="width:100%;padding:10px;background:var(--wa-surface);border:1px solid var(--wa-border);border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;color:var(--wa-text);display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit" onclick="startInstantMeeting()">
+          ▶ Start Instant Meeting
+        </button>
+      </div>
+    </div>
+
+    <button class="new-chat-fab" id="newChatFab" onclick="openNewGroupModal()" title="New chat">✏️</button>
+  </div>
+
+  <!-- ══ MIDDLE PANEL ══════════════════════════════════════════════════ -->
   <div class="chat-main" id="chatMain">
 
     <!-- Empty state -->
@@ -998,6 +1149,8 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       </div>
       <div class="chat-header-actions">
         <button class="icon-btn" title="Search in chat" onclick="toggleChatSearch()">🔍</button>
+        <button class="icon-btn" title="Video call" onclick="initiateCall('video')" id="videoCallBtn">📹</button>
+        <button class="icon-btn" title="Voice call"  onclick="initiateCall('audio')" id="audioCallBtn">📞</button>
         <button class="icon-btn" title="More options" id="chatMoreBtn" onclick="showChatMoreMenu(event)">⋮</button>
       </div>
     </div>
@@ -1282,13 +1435,6 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   </div>
 </div>
 
-<!-- Audio elements for sounds (generated via Web Audio API — no external files needed) -->
-<audio id="msgNotifAudio"  loop></audio>
-<style>
-  50%      { box-shadow: 0 0 0 20px rgba(0,168,132,0); }
-}
-</style>
-
 <script src="app.js"></script>
 <script>
 'use strict';
@@ -1358,6 +1504,7 @@ function setMode(mode) {
   currentMode = mode;
   document.getElementById('chatListPanel').style.display = '';
 }
+}
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 let socket = null;
@@ -1404,7 +1551,43 @@ function connectSocket() {
     onlineUsers.delete(String(userId));
     updatePresenceUI(userId, false);
   });
+  socket.on('meetingEnded', () => { hideMeetBanner(); });
 
+  // ── Call events ─────────────────────────────────────────────────────────
+  socket.on('incomingCall',           onIncomingCall);
+  socket.on('callAccepted',           onCallAccepted);
+  socket.on('callDeclined',           onCallDeclined);
+  socket.on('callCancelled',          onCallCancelled);
+  socket.on('callAnsweredElsewhere',  onCallAnsweredElsewhere);
+  socket.on('calleeOffline', () => {
+    cancelOutgoingCall();
+    showBriefStatus('User is offline or unavailable');
+  });
+
+  // WebRTC
+  socket.on('peerJoined',       onPeerJoined);
+  socket.on('existingPeers',    onExistingPeers);
+  socket.on('existingPeerInfos', (peerInfos) => {
+    // Pre-populate peerNames AND create tiles so peers are visible immediately
+    peerInfos.forEach(({ peerId, displayName }) => {
+      if (peerId !== socket.id) {
+        peerNames[peerId] = displayName;
+        if (!document.getElementById('tile-' + peerId)) addVideoTile(peerId, displayName);
+      }
+    });
+    updateParticipantCount();
+    updateParticipantList();
+  });
+  socket.on('peerLeft',      onPeerLeft);
+  socket.on('offer',         onOffer);
+  socket.on('answer',        onAnswer);
+  socket.on('ice-candidate', onIceCandidate);
+  socket.on('peerScreenShare', onPeerScreenShare);
+  socket.on('meetingChat',   onMeetingChat);
+  socket.on('raiseHand',     onRaiseHand);
+  socket.on('peerMuteState', onPeerMuteState);
+
+  socket.on('groupUpdated',  ({ id }) => { if (id === activeGid) openGroup(id); });
   socket.on('membersAdded',  () => { if (activeGid) loadGroups(); });
   socket.on('memberRemoved', ({ employee_id }) => {
     if (employee_id === me.id) { activeGid = null; showChatEmpty(); loadGroups(); }
@@ -1477,6 +1660,7 @@ async function loadGroups() {
     groups = allFetched;
   }
   renderGroupList();
+  if (currentMode === 'meetings') renderMeetGroupPicker();
   // Load presence for all DM peers
   const peerIds = groups.filter(g => g.type === 'dm' && g.dm_peer_id).map(g => g.dm_peer_id);
   if (peerIds.length) {
@@ -2149,7 +2333,7 @@ function clearFilePreview() {
 // ── Chunked 1 GB upload engine ────────────────────────────────────────────────
 const CHUNK_SIZE       = 5 * 1024 * 1024;  // 5 MB per chunk
 const MAX_FILE_BYTES   = 1024 * 1024 * 1024; // 1 GB hard limit
-const DIRECT_THRESHOLD = 50 * 1024 * 1024;  // files ≤ 1 GB → direct POST
+const DIRECT_THRESHOLD = 50 * 1024 * 1024;  // files ≤ 50 MB → direct POST
 
 let activeUpload = null; // { uploadId, abortController, msgPlaceholderId }
 
@@ -2826,6 +3010,7 @@ loadGroups().then(async () => {
   // If it's a call (not dm_only), trigger once socket is fully connected
   if (callType && callType !== 'dm_only') {
     const doCall = () => {
+      setTimeout(() => { if (activeGroup) initiateCall(callType); }, 500);
     };
     if (socket && socket.connected) {
       doCall();
@@ -2846,6 +3031,7 @@ loadGroups().then(async () => {
 });
 loadCallHistory();
 setInterval(loadGroups, 30000);
+setInterval(loadScheduledMeetings, 60000); // refresh every minute
 </script>
 
   </div><!-- end flex wrapper -->
