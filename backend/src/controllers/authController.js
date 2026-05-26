@@ -101,88 +101,20 @@ exports.updatePhoto = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid image format' });
     }
 
-    const db     = require('../config/db');
-    const https  = require('https');
-    const crypto = require('crypto');
-    let finalUrl = profile_photo; // fallback: store base64 if Cloudinary not configured
+    const db = require('../config/db');
 
-    // ── Upload to Cloudinary if configured ───────────────────────────────────
-    const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
-    const API_KEY    = process.env.CLOUDINARY_API_KEY;
-    const API_SECRET = process.env.CLOUDINARY_API_SECRET;
-
-    if (CLOUD_NAME && API_KEY && API_SECRET && profile_photo.startsWith('data:image/')) {
-      try {
-        const timestamp = Math.floor(Date.now() / 1000);
-        // public_id = krishihr/employees/KC{code} — overwriting replaces the old photo automatically
-        const publicId  = `krishihr/employees/${req.user.employee_code || req.user.id}`;
-        const toSign    = `overwrite=true&public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`;
-        const signature = crypto.createHash('sha1').update(toSign).digest('hex');
-
-        // Build multipart form body (no extra npm packages needed)
-        const boundary = '----KrishiHRBoundary' + Date.now();
-        const CRLF     = '\r\n';
-        const parts = [
-          { name: 'file',      value: profile_photo },
-          { name: 'api_key',   value: API_KEY },
-          { name: 'timestamp', value: String(timestamp) },
-          { name: 'public_id', value: publicId },
-          { name: 'signature', value: signature },
-          { name: 'overwrite', value: 'true' },
-        ];
-        let body = '';
-        for (const p of parts) {
-          body += `--${boundary}${CRLF}`;
-          body += `Content-Disposition: form-data; name="${p.name}"${CRLF}${CRLF}`;
-          body += `${p.value}${CRLF}`;
-        }
-        body += `--${boundary}--${CRLF}`;
-
-        const cloudUrl = await new Promise((resolve, reject) => {
-          const options = {
-            hostname: 'api.cloudinary.com',
-            path: `/v1_1/${CLOUD_NAME}/image/upload`,
-            method: 'POST',
-            headers: {
-              'Content-Type': `multipart/form-data; boundary=${boundary}`,
-              'Content-Length': Buffer.byteLength(body),
-            },
-          };
-          const cloudReq = https.request(options, (cloudRes) => {
-            let data = '';
-            cloudRes.on('data', chunk => data += chunk);
-            cloudRes.on('end', () => {
-              try {
-                const json = JSON.parse(data);
-                if (json.secure_url) resolve(json.secure_url);
-                else reject(new Error(json.error?.message || 'Upload failed'));
-              } catch (e) { reject(e); }
-            });
-          });
-          cloudReq.on('error', reject);
-          cloudReq.write(body);
-          cloudReq.end();
-        });
-
-        finalUrl = cloudUrl;
-        console.log(`✅ Photo uploaded to Cloudinary for ${req.user.employee_code}: ${finalUrl}`);
-      } catch (cloudErr) {
-        // Cloudinary failed — fall back to base64 in DB
-        console.error('Cloudinary upload failed, using base64 fallback:', cloudErr.message);
-        finalUrl = profile_photo;
-      }
-    }
-
-    // Save Cloudinary URL (or base64 fallback) to DB
+    // Save base64 image directly to PostgreSQL DB
     await db.query(
-      'UPDATE employees SET profile_photo=$1, updated_at=NOW() WHERE id=$2',
-      [finalUrl, req.user.id]
+      'UPDATE employees SET profile_picture=$1, updated_at=NOW() WHERE id=$2',
+      [profile_photo, req.user.id]
     );
 
-    res.json({ success: true, message: 'Photo updated', data: { photo_url: finalUrl } });
+    console.log(`✅ Profile photo saved to DB for ${req.user.employee_code}`);
+    res.json({ success: true, message: 'Photo updated', data: { photo_url: profile_photo } });
   } catch (err) {
-    console.error(err);
+    console.error('[updatePhoto error]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
   }
 };
 
