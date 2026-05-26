@@ -913,16 +913,6 @@ router.post  ('/chat/upload/complete/:uploadId',          authenticate, fileCtrl
 router.delete('/chat/upload/abort/:uploadId',             authenticate, fileCtrl.abortUpload);
 router.get   ('/chat/upload/status/:uploadId',            authenticate, fileCtrl.uploadStatus);
 // TURN credentials
-router.get   ('/chat/turn-credentials', authenticate, (_req, res) => {
-  res.json({ success: true, iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:80?transport=tcp',  username: 'openrelayproject', credential: 'openrelayproject' },
-  ]});
 });
 router.patch ('/chat/messages/:id',                       authenticate, chatCtrl.editMessage);
 router.delete('/chat/messages/:id/me',                    authenticate, chatCtrl.deleteForMe);
@@ -945,24 +935,12 @@ router.post  ('/chat/presence/offline',                    authenticate, chatCtr
 router.get   ('/chat/presence',                           authenticate, chatCtrl.getPresence);
 
 // ── Meetings (instant) ───────────────────────────────────────────────────────
-router.post  ('/chat/meetings',                           authenticate, chatCtrl.createMeeting);
-router.get   ('/chat/meetings/:roomId',                   authenticate, chatCtrl.getMeeting);
-router.patch ('/chat/meetings/:roomId/end',               authenticate, chatCtrl.endMeeting);
-router.post  ('/chat/meetings/:roomId/join',              authenticate, chatCtrl.joinMeetingRecord);
-router.post  ('/chat/meetings/:roomId/leave',             authenticate, chatCtrl.leaveMeetingRecord);
-
-// ── Scheduled meetings ────────────────────────────────────────────────────────
-router.post  ('/chat/scheduled-meetings',                 authenticate, chatCtrl.scheduleMeeting);
-router.get   ('/chat/scheduled-meetings',                 authenticate, chatCtrl.getScheduledMeetings);
-router.post  ('/chat/scheduled-meetings/:id/start',       authenticate, chatCtrl.startScheduledMeeting);
 
 // ── Static file serving ───────────────────────────────────────────────────────
 router.get   ('/chat/files/:id',  fileCtrl.serveFile);
 router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 
 // ── Call History ──────────────────────────────────────────────────────────────
-router.get   ('/chat/call-log',                           authenticate, chatCtrl.getCallLog);
-router.post  ('/chat/call-log/event',                     authenticate, chatCtrl.saveCallEvent);
 
 
 module.exports = router;
