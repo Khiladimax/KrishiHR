@@ -99,7 +99,7 @@ exports.listGroups = async (req, res) => {
         (SELECT e2.role FROM chat_group_members m2
            JOIN employees e2 ON e2.id=m2.employee_id
            WHERE m2.group_id=g.id AND m2.employee_id != $1 AND g.type='dm' LIMIT 1) AS dm_peer_role,
-        (SELECT e2.profile_picture FROM chat_group_members m2
+        (SELECT e2.profile_photo FROM chat_group_members m2
            JOIN employees e2 ON e2.id=m2.employee_id
            WHERE m2.group_id=g.id AND m2.employee_id != $1 AND g.type='dm' LIMIT 1) AS dm_peer_avatar
       FROM chat_groups g
@@ -418,7 +418,7 @@ exports.getMessages = async (req, res) => {
         ($1 = ANY(COALESCE(cm.deleted_for, '{}'::int[]))) AS deleted_for_me,
         CONCAT(e.first_name,' ',e.last_name) AS sender_name,
         e.employee_code AS sender_code,
-        e.profile_picture AS sender_avatar, e.role AS sender_role,
+        e.profile_photo AS sender_avatar, e.role AS sender_role,
         -- Delivery: seen by others?
         (SELECT COUNT(*) FROM message_delivery_status mds
            WHERE mds.message_id=cm.id AND mds.employee_id != $1 AND mds.seen_at IS NOT NULL) AS seen_count,
