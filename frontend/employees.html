@@ -1032,6 +1032,34 @@
   </div>
 </div>
 
+<!-- ══ Deactivate / Delete Employee Confirmation Modal ════════════════════ -->
+<div class="modal-backdrop" id="emp-danger-modal">
+  <div class="modal" style="width:460px;max-width:96vw">
+    <div class="modal-header" id="emp-danger-modal-header" style="background:linear-gradient(135deg,#dc2626,#b91c1c)">
+      <div class="modal-title" id="emp-danger-modal-title" style="color:#fff;display:flex;align-items:center;gap:8px">
+        <span id="emp-danger-modal-icon" style="font-size:20px">⚠️</span>
+        <span id="emp-danger-modal-title-text">Confirm Action</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('emp-danger-modal')" style="color:#fff;opacity:.8">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px">
+      <div id="emp-danger-modal-warn" style="border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:16px"></div>
+      <p id="emp-danger-modal-msg" style="font-size:14px;color:var(--text);margin:0 0 10px"></p>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">👤</span>
+        <div>
+          <div id="emp-danger-modal-name" style="font-weight:700;font-size:14px;color:var(--text)"></div>
+          <div id="emp-danger-modal-code" style="font-size:12px;color:var(--muted)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="gap:10px">
+      <button class="btn btn-outline" onclick="closeModal('emp-danger-modal')">Cancel</button>
+      <button class="btn" id="emp-danger-confirm-btn" onclick="executeDangerAction()" style="min-width:160px">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -1346,6 +1374,7 @@ async function showEmpDetail(id) {
   // Build all buttons in ONE assignment — multiple innerHTML+= re-parses the DOM each time
   // which can cause button misalignment / double-firing issues
   const canManage = Role.is('hr', 'accounts');
+  const canDanger = Role.is('admin', 'hr', 'accounts');
   const hrButtons = canManage ? `
     <button class="btn btn-outline btn-sm" id="btn-reset-pwd">🔑 Reset Password</button>
     <button class="btn btn-outline btn-sm" id="btn-toggle-wfh" style="${e.is_wfh_permanent ? 'background:#e0f2fe;color:#0369a1;border-color:#7dd3fc' : ''}">
@@ -1353,7 +1382,15 @@ async function showEmpDetail(id) {
     </button>
     <button class="btn btn-primary btn-sm" id="btn-edit-emp">✏️ Edit Employee</button>
   ` : '';
-  footer.innerHTML = `<button class="btn btn-outline" id="btn-close-detail">Close</button>${hrButtons}`;
+  const dangerButtons = canDanger ? `
+    <button class="btn btn-sm" id="btn-deactivate-emp" style="background:#fff7ed;color:#c2410c;border:1.5px solid #fed7aa">
+      ${e.is_active === false ? '✅ Reactivate Account' : '⏸ Deactivate Account'}
+    </button>
+    <button class="btn btn-sm" id="btn-delete-emp" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca">
+      🗑️ Delete Account
+    </button>
+  ` : '';
+  footer.innerHTML = `<button class="btn btn-outline" id="btn-close-detail">Close</button>${dangerButtons}${hrButtons}`;
 
   // Attach event listeners directly — no inline onclick, no string injection
   footer.querySelector('#btn-close-detail').onclick = () => closeModal('emp-detail-modal');
@@ -1361,6 +1398,12 @@ async function showEmpDetail(id) {
     footer.querySelector('#btn-reset-pwd').onclick    = () => resetPassword(e.id, e.email);
     footer.querySelector('#btn-toggle-wfh').onclick   = () => toggleWFH(e.id, e.is_wfh_permanent);
     footer.querySelector('#btn-edit-emp').onclick     = (ev) => { ev.stopPropagation(); openEditEmp(e.id); };
+  }
+  if (canDanger) {
+    footer.querySelector('#btn-deactivate-emp').onclick = () =>
+      openDangerModal(e.id, `${e.first_name} ${e.last_name}`, e.employee_code, e.is_active === false ? 'reactivate' : 'deactivate');
+    footer.querySelector('#btn-delete-emp').onclick = () =>
+      openDangerModal(e.id, `${e.first_name} ${e.last_name}`, e.employee_code, 'delete');
   }
   openModal('emp-detail-modal');
 }
@@ -2749,6 +2792,103 @@ function brMsg(msg,type) {
   if(!el) return;
   el.textContent=msg; el.style.display='block';
   el.style.color = type==='error' ? 'var(--red,#dc2626)' : 'var(--green,#16a34a)';
+}
+// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  DEACTIVATE / DELETE EMPLOYEE
+// ══════════════════════════════════════════════════════════════════
+let _dangerEmpId   = null;
+let _dangerAction  = null;
+
+function openDangerModal(id, name, code, action) {
+  _dangerEmpId  = id;
+  _dangerAction = action;
+  closeModal('emp-detail-modal');
+
+  const header  = document.getElementById('emp-danger-modal-header');
+  const icon    = document.getElementById('emp-danger-modal-icon');
+  const titleTxt= document.getElementById('emp-danger-modal-title-text');
+  const warn    = document.getElementById('emp-danger-modal-warn');
+  const msg     = document.getElementById('emp-danger-modal-msg');
+  const btn     = document.getElementById('emp-danger-confirm-btn');
+
+  document.getElementById('emp-danger-modal-name').textContent = name;
+  document.getElementById('emp-danger-modal-code').textContent = code;
+
+  if (action === 'deactivate') {
+    header.style.background = 'linear-gradient(135deg,#d97706,#b45309)';
+    icon.textContent        = '⏸';
+    titleTxt.textContent    = 'Deactivate Account';
+    warn.style.cssText      = 'background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:16px';
+    warn.textContent        = '⚠️ This employee will no longer be able to log in to the app.';
+    msg.textContent         = 'Are you sure you want to deactivate this employee account?';
+    btn.style.cssText       = 'background:#d97706;color:#fff;border:none;min-width:160px';
+    btn.textContent         = 'Yes, Deactivate';
+  } else if (action === 'reactivate') {
+    header.style.background = 'linear-gradient(135deg,#2e7d32,#4a8c1c)';
+    icon.textContent        = '✅';
+    titleTxt.textContent    = 'Reactivate Account';
+    warn.style.cssText      = 'background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:16px';
+    warn.textContent        = '✅ This employee will regain access to the app.';
+    msg.textContent         = 'Are you sure you want to reactivate this employee account?';
+    btn.style.cssText       = 'background:#16a34a;color:#fff;border:none;min-width:160px';
+    btn.textContent         = 'Yes, Reactivate';
+  } else if (action === 'delete') {
+    header.style.background = 'linear-gradient(135deg,#dc2626,#b91c1c)';
+    icon.textContent        = '🗑️';
+    titleTxt.textContent    = 'Delete Account Permanently';
+    warn.style.cssText      = 'background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:16px';
+    warn.textContent        = '🚨 WARNING: This action is permanent and CANNOT be undone. All data for this employee will be deleted.';
+    msg.textContent         = 'Are you absolutely sure you want to permanently DELETE this employee?';
+    btn.style.cssText       = 'background:#dc2626;color:#fff;border:none;min-width:160px';
+    btn.textContent         = 'Yes, Delete Permanently';
+  }
+
+  openModal('emp-danger-modal');
+}
+
+async function executeDangerAction() {
+  const btn = document.getElementById('emp-danger-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Processing…';
+
+  try {
+    let data;
+    if (_dangerAction === 'deactivate') {
+      data = await api('PUT', `/employees/${_dangerEmpId}`, { is_active: false });
+      if (data?.success) {
+        toast('⏸ Employee account deactivated');
+        closeModal('emp-danger-modal');
+        loadEmployees();
+        loadSeparatedCount();
+      } else toast(data?.message || 'Failed to deactivate', 'error');
+
+    } else if (_dangerAction === 'reactivate') {
+      data = await api('PUT', `/employees/${_dangerEmpId}`, { is_active: true, separation_date: null, separation_type: null });
+      if (data?.success) {
+        toast('✅ Employee account reactivated');
+        closeModal('emp-danger-modal');
+        loadEmployees();
+        loadSeparatedCount();
+      } else toast(data?.message || 'Failed to reactivate', 'error');
+
+    } else if (_dangerAction === 'delete') {
+      data = await api('DELETE', `/employees/${_dangerEmpId}`);
+      if (data?.success) {
+        toast('🗑️ Employee account deleted permanently');
+        closeModal('emp-danger-modal');
+        loadEmployees();
+        loadSeparatedCount();
+      } else toast(data?.message || 'Failed to delete', 'error');
+    }
+  } catch (err) {
+    toast('Network error. Please try again.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = _dangerAction === 'delete' ? 'Yes, Delete Permanently'
+                  : _dangerAction === 'reactivate' ? 'Yes, Reactivate'
+                  : 'Yes, Deactivate';
 }
 // ══════════════════════════════════════════════════════════════════
 
