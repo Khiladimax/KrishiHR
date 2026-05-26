@@ -1109,6 +1109,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
     </div>
 
     <!-- MEETINGS LIST PANEL -->
+    <div class="meetings-panel-left" id="meetingsListPanel">
       <div class="meetings-section" style="overflow-y:auto;flex:1">
         <div class="meetings-section-title">⚡ Live Now</div>
         <div id="liveMeetingsList"><div style="color:var(--wa-text2);font-size:13px;padding:8px 0">No active meetings</div></div>
@@ -1226,6 +1227,157 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
       <button class="send-btn" onclick="sendMessage()" id="sendBtn">➤</button>
     </div>
   </div>
+
+  <!-- ══ MEETING PANEL ═══════════════════════════════════════════════════ -->
+  <div class="meeting-panel" id="meetingPanel">
+
+    <!-- Waiting room -->
+    <div class="waiting-room-overlay" id="waitingRoom">
+      <div class="waiting-icon">🚪</div>
+      <div style="font-size:20px;font-weight:800;color:#e8eaed">Waiting to join…</div>
+      <div style="color:#9aa0a6;font-size:14px">The host will admit you shortly</div>
+    </div>
+
+    <!-- Meet header -->
+    <div class="meet-header">
+      <div class="meet-header-info">
+        <div class="meet-header-title" id="meetingTitle">Meeting</div>
+        <div class="meet-header-sub" id="meetingParticipantCount">Setting up…</div>
+      </div>
+      <div class="meet-header-actions">
+        <button class="meet-icon-btn" title="Copy meeting link" onclick="copyMeetingLink()">🔗</button>
+        <button class="meet-icon-btn" title="Participants" onclick="toggleMeetSide('participants')">👥</button>
+        <button class="meet-icon-btn" title="Meeting chat" onclick="toggleMeetSide('chat')">💬</button>
+        <button class="meet-icon-btn" title="Minimize" onclick="toggleMinimizeMeeting()">⬛</button>
+        <button class="meet-icon-btn" title="PiP mode" onclick="enterPiP()">🪟</button>
+      </div>
+    </div>
+
+    <!-- Recording indicator bar -->
+    <div id="meetRecBar" style="display:none;align-items:center;gap:10px;padding:6px 20px;background:rgba(234,67,53,.15);border-bottom:1px solid rgba(234,67,53,.3);">
+      <span style="width:8px;height:8px;border-radius:50%;background:#ea4335;animation:recBlink 1s infinite;flex-shrink:0"></span>
+      <span style="font-size:12px;color:#ea4335;font-weight:700;">Recording</span>
+      <span id="meetRecTime" style="font-size:12px;color:#ea4335;font-weight:600;font-variant-numeric:tabular-nums;">00:00</span>
+      <button onclick="toggleMeetRecording()" style="margin-left:auto;padding:4px 12px;background:#ea4335;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">Stop & Save</button>
+    </div>
+
+    <!-- Meet body -->
+    <div class="meet-body" id="meetBody">
+      <!-- Video area -->
+      <div class="meet-videos-area" id="meetVideosArea">
+
+        <!-- Alone warning -->
+        <div class="meet-alone-warn" id="meetAloneWarn">
+          <div class="meet-alone-warn-icon">👋</div>
+          <div class="meet-alone-warn-text">You're the only one here</div>
+          <div class="meet-alone-warn-sub">Share the meeting link to invite others</div>
+          <button class="meet-card-btn join" onclick="copyMeetingLink()" style="margin-top:14px">Copy meeting link</button>
+        </div>
+
+        <!-- Screen share container (fills 100% like Google Meet) -->
+        <div class="screenshare-container" id="screenshareContainer">
+          <div class="screenshare-main">
+            <video id="screenShareVideo" autoplay playsinline></video>
+            <div class="screenshare-label" id="screenshareLabel">Your screen</div>
+          </div>
+          <!-- Participant thumbnail strip on right -->
+          <div class="screenshare-side" id="screenshareSide">
+            <!-- Self thumb -->
+            <div class="side-thumb no-cam" id="selfThumb">
+              <video id="localVideoStrip" autoplay muted playsinline></video>
+              <div class="side-thumb-avatar" id="selfThumbAvatar"></div>
+              <div class="side-thumb-label" id="selfThumbLabel">You</div>
+            </div>
+            <!-- Peer thumbs injected here -->
+            <div id="peerStripContainer"></div>
+          </div>
+        </div>
+
+        <!-- Main video grid (hidden when screensharing) -->
+        <div class="meet-grid" id="meetGrid">
+          <!-- Tiles injected here -->
+        </div>
+
+        <!-- Self floating video (normal mode) -->
+        <div class="self-float" id="selfFloat">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <div class="self-float-label" id="selfFloatLabel">You</div>
+        </div>
+      </div>
+
+      <!-- Side panels -->
+      <div class="meet-side" id="meetSideParticipants">
+        <div class="meet-side-header">
+          <div class="meet-side-title">👥 Participants (<span id="participantListCount">1</span>)</div>
+          <button class="meet-icon-btn" onclick="toggleMeetSide('participants')">✕</button>
+        </div>
+        <div class="meet-side-content" id="participantList"></div>
+        <div style="padding:10px;border-top:1px solid rgba(255,255,255,.08)">
+          <button class="btn-primary" style="width:100%;background:var(--wa-surface);color:var(--wa-text)" onclick="copyMeetingLink()">🔗 Copy invite link</button>
+        </div>
+      </div>
+
+      <div class="meet-side" id="meetSideChat">
+        <div class="meet-side-header">
+          <div class="meet-side-title">💬 In-Meeting Chat</div>
+          <button class="meet-icon-btn" onclick="toggleMeetSide('chat')">✕</button>
+        </div>
+        <div class="meet-chat-msgs" id="meetChatMsgs"></div>
+        <div class="meet-chat-input-wrap">
+          <input class="meet-chat-input" id="meetChatInput" placeholder="Send a message…" onkeydown="if(event.key==='Enter')sendMeetingChat()">
+          <button class="meet-chat-send" onclick="sendMeetingChat()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="meet-controls">
+      <button class="meet-btn on" id="btnMic" onclick="toggleMic()">
+        <span class="meet-btn-icon" id="micIcon">🎙️</span>
+        <span class="meet-btn-label" id="micLabel">Mic</span>
+      </button>
+      <button class="meet-btn on" id="btnCam" onclick="toggleCam()">
+        <span class="meet-btn-icon" id="camIcon">📷</span>
+        <span class="meet-btn-label" id="camLabel">Camera</span>
+      </button>
+      <button class="meet-btn" id="btnScreen" onclick="toggleScreen()">
+        <span class="meet-btn-icon">🖥️</span>
+        <span class="meet-btn-label" id="screenLabel">Share</span>
+      </button>
+      <button class="meet-btn" id="btnHand" onclick="toggleRaiseHand()">
+        <span class="meet-btn-icon" id="handIcon">✋</span>
+        <span class="meet-btn-label" id="handLabel">Raise hand</span>
+      </button>
+      <button class="meet-btn" onclick="toggleMeetSide('participants')">
+        <span class="meet-btn-icon">👥</span>
+        <span class="meet-btn-label">People</span>
+      </button>
+      <button class="meet-btn" onclick="toggleMeetSide('chat')">
+        <span class="meet-btn-icon">💬</span>
+        <span class="meet-btn-label">Chat</span>
+      </button>
+      <button class="meet-btn" onclick="openMeetingMoreOptions()">
+        <span class="meet-btn-icon">⋯</span>
+        <span class="meet-btn-label">More</span>
+      </button>
+      <button class="meet-btn danger" onclick="leaveMeeting()">
+        <span class="meet-btn-icon">📵</span>
+        <span class="meet-btn-label">Leave</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Meeting banner -->
+<div class="meet-banner" id="meetBanner">
+  <div class="meet-banner-icon">📹</div>
+  <div class="meet-banner-content">
+    <div class="meet-banner-title" id="meetBannerTitle">Meeting started</div>
+    <div class="meet-banner-sub" id="meetBannerSub">Tap to join</div>
+  </div>
+  <button class="meet-banner-btn" onclick="joinMeetingFromBanner()">Join now</button>
+  <button class="icon-btn" style="color:var(--wa-text2);margin-left:4px" onclick="hideMeetBanner()">✕</button>
+</div>
 
 <!-- Toast notification -->
 <div class="notif-toast" id="notifToast" onclick="dismissToast()">
@@ -1435,6 +1587,81 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   </div>
 </div>
 
+<!-- Schedule Meeting -->
+<div class="modal-overlay" id="scheduleMeetingModal">
+  <div class="modal">
+    <div class="modal-title">📅 Schedule Meeting</div>
+    <div class="form-row">
+      <div class="form-label">Meeting title</div>
+      <input class="form-input" id="scheduleMeetTitle" placeholder="e.g. Weekly standup">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Date & Time</div>
+      <input class="form-input" id="scheduleMeetDate" type="datetime-local">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Group (notify all members)</div>
+      <select class="form-input" id="scheduleMeetGroup">
+        <option value="">— No group —</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Agenda (optional)</div>
+      <textarea class="form-input" id="scheduleMeetAgenda" rows="3" placeholder="What will be discussed?"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('scheduleMeetingModal')">Cancel</button>
+      <button class="btn-primary" onclick="scheduleMeeting()">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ INCOMING CALL OVERLAY (WhatsApp style) ═══════ -->
+<div id="incomingCallOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:var(--surface,#fff);border-radius:24px;padding:40px 48px;text-align:center;min-width:300px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+    <div id="incomingCallAvatar" style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg, var(--chat-accent,#4a8c1c), color-mix(in srgb, var(--chat-accent,#4a8c1c) 70%, #000));font-size:36px;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;animation:callPulse 1.5s infinite;"></div>
+    <div id="incomingCallType" style="font-size:12px;color:var(--wa-text2);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;font-weight:700;"></div>
+    <div id="incomingCallName" style="font-size:22px;font-weight:800;color:var(--wa-text);margin-bottom:4px;"></div>
+    <div id="incomingCallSub" style="font-size:13px;color:var(--wa-text2);margin-bottom:32px;">Incoming call…</div>
+    <div style="display:flex;justify-content:center;gap:48px;">
+      <div style="text-align:center;cursor:pointer;" onclick="declineIncomingCall()">
+        <div style="width:64px;height:64px;border-radius:50%;background:#ea4335;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px;transition:.2s;" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform=''">📵</div>
+        <div style="font-size:12px;color:var(--wa-text2);font-weight:600;">Decline</div>
+      </div>
+      <div style="text-align:center;cursor:pointer;" onclick="acceptIncomingCall()">
+        <div style="width:64px;height:64px;border-radius:50%;background:var(--chat-accent,#4a8c1c);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px;transition:.2s;animation:callPulse 1.5s infinite;" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform=''">📞</div>
+        <div style="font-size:12px;color:var(--wa-text2);font-weight:600;">Accept</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ OUTGOING CALL OVERLAY (ringing the other person) ═══════ -->
+<div id="outgoingCallOverlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.8);align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:var(--surface,#fff);border-radius:24px;padding:40px 48px;text-align:center;min-width:300px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+    <div id="outgoingCallAvatar" style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg, var(--chat-accent,#4a8c1c), color-mix(in srgb, var(--chat-accent,#4a8c1c) 70%, #000));font-size:36px;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;animation:callPulse 1.5s infinite;"></div>
+    <div id="outgoingCallType" style="font-size:12px;color:var(--wa-text2);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;font-weight:700;"></div>
+    <div id="outgoingCallName" style="font-size:22px;font-weight:800;color:var(--wa-text);margin-bottom:4px;"></div>
+    <div id="outgoingCallStatus" style="font-size:13px;color:var(--wa-text2);margin-bottom:32px;">Calling…</div>
+    <div style="text-align:center;cursor:pointer;" onclick="cancelOutgoingCall()">
+      <div style="width:64px;height:64px;border-radius:50%;background:#ea4335;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px;transition:.2s;" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform=''">📵</div>
+      <div style="font-size:12px;color:var(--wa-text2);font-weight:600;">Cancel</div>
+    </div>
+  </div>
+</div>
+
+<!-- Audio elements for sounds (generated via Web Audio API — no external files needed) -->
+<audio id="msgNotifAudio"  loop></audio>
+<audio id="callRingAudio"  loop></audio>
+<audio id="callEndAudio"></audio>
+
+<style>
+@keyframes callPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,168,132,.5); }
+  50%      { box-shadow: 0 0 0 20px rgba(0,168,132,0); }
+}
+</style>
+
 <script src="app.js"></script>
 <script>
 'use strict';
@@ -1449,7 +1676,7 @@ buildSidebar('chat.html');
 if (typeof loadNotifBadge === "function") loadNotifBadge();
 
 if (window.CFG) {
-  document.getElementById('page-title').textContent = 'KrishiHR — Chat';
+  document.getElementById('page-title').textContent = 'KrishiHR — Chat & Meetings';
   const lt = document.getElementById('sidebar-logo-text');
   
   const cs = document.getElementById('sidebar-company-short');
@@ -1471,11 +1698,15 @@ let createType = 'group';
 let mediaRecorder = null, audioChunks = [], recordingInterval = null, recordingSeconds = 0;
 let loadingMore = false, noMoreMessages = false, oldestMsgAt = null;
 let ctxMsgId = null, ctxMsgEl = null;
+let activeMeetRoomId = null;
 let pendingFile = null;
 let presenceMap = {}; // empId -> { is_online, last_seen }
 let onlineUsers = new Set();
 let pinnedMessages = [];
 let searchResults = [], searchIndex = 0;
+let handRaised = false;
+let meetSideOpen = null;
+let isMinimized = false;
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 let toastTimer = null;
@@ -1502,8 +1733,16 @@ function dismissToast() {
 // ── Mode ──────────────────────────────────────────────────────────────────────
 function setMode(mode) {
   currentMode = mode;
-  document.getElementById('chatListPanel').style.display = '';
-}
+  document.getElementById('modeChatTab').classList.toggle('active', mode==='chat');
+  document.getElementById('modeMeetTab').classList.toggle('active', mode==='meetings');
+  document.getElementById('chatListPanel').style.display = mode==='chat' ? '' : 'none';
+  document.getElementById('meetingsListPanel').classList.toggle('active', mode==='meetings');
+  document.getElementById('leftTitle').textContent = mode==='chat' ? 'Chats' : 'Meetings';
+  document.getElementById('newChatFab').style.display = mode==='meetings' ? 'none' : '';
+  if (mode==='meetings') {
+    document.getElementById('modeMeetTab').classList.remove('has-notif');
+    loadScheduledMeetings();
+  }
 }
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
@@ -1550,6 +1789,23 @@ function connectSocket() {
   socket.on('userOffline', ({ userId }) => {
     onlineUsers.delete(String(userId));
     updatePresenceUI(userId, false);
+  });
+
+  socket.on('meetingStarted', ({ room_id, title, started_by, starter_name }) => {
+    if (started_by !== me.id) {
+      const who = starter_name || 'Someone';
+      showMeetBanner(room_id, title, `${who} started a meeting — tap to join`);
+      document.getElementById('modeMeetTab').classList.add('has-notif');
+      startRingTone(); setTimeout(stopRingTone, 4000);
+    }
+  });
+  socket.on('meetingScheduled', data => {
+    loadScheduledMeetings();
+    showToast('📅 Meeting Scheduled', data.title, null);
+  });
+  socket.on('scheduledMeetingStarted', ({ room_id, title, starter_name }) => {
+    showMeetBanner(room_id, title, `${starter_name || 'Scheduled'} meeting started — tap to join`);
+    document.getElementById('modeMeetTab').classList.add('has-notif');
   });
   socket.on('meetingEnded', () => { hideMeetBanner(); });
 
@@ -2960,6 +3216,1343 @@ async function resetInviteLink() {
   else alert('Invalid or expired invite link.');
 })();
 
+// ── Meet banner ───────────────────────────────────────────────────────────────
+function showMeetBanner(roomId, title, sub) {
+  activeMeetRoomId = roomId;
+  document.getElementById('meetBannerTitle').textContent = title||'Meeting started';
+  document.getElementById('meetBannerSub').textContent   = sub||'Tap to join';
+  const banner = document.getElementById('meetBanner');
+  banner.classList.add('visible');
+  banner._joinRoomId = roomId;
+  banner._joinTitle  = title;
+  clearTimeout(banner._hideTimer);
+  banner._hideTimer = setTimeout(hideMeetBanner, 30000);
+}
+function hideMeetBanner() {
+  const banner = document.getElementById('meetBanner');
+  banner.classList.remove('visible');
+  clearTimeout(banner._hideTimer);
+}
+function joinMeetingFromBanner() {
+  const banner  = document.getElementById('meetBanner');
+  const roomId  = banner._joinRoomId || activeMeetRoomId;
+  const title   = banner._joinTitle  || document.getElementById('meetBannerTitle').textContent;
+  hideMeetBanner();
+  if (roomId) openMeetingPanel(roomId, title);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIDEO MEETING — Google Meet style WebRTC
+// ═══════════════════════════════════════════════════════════════════════════════
+let localStream = null, screenStream = null;
+let peerConnections = {}, peerNames = {}, peerStreams = {};
+let micEnabled = true, camEnabled = true, screenSharing = false;
+let currentMeetRoomId = null;
+// ── ICE Servers (STUN + TURN) — fetched fresh from backend ──────────────────
+// Falls back to hardcoded list if fetch fails
+let ICE_SERVERS = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // TURN relay servers — essential for mobile-to-mobile / symmetric NAT
+  // (Android ↔ Android, Android ↔ Web, Web ↔ Web across different networks)
+  { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:80?transport=tcp',  username: 'openrelayproject', credential: 'openrelayproject' },
+]};
+
+// Refresh ICE servers from backend every 30 min (for time-limited TURN credentials)
+async function refreshIceServers() {
+  try {
+    const r = await fetch(chatUrl('/chat/turn-credentials'), { headers: authHeaders() });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.success && j.iceServers?.length) {
+        ICE_SERVERS = { iceServers: j.iceServers };
+        console.log('[WebRTC] TURN credentials refreshed:', j.iceServers.length, 'servers');
+      }
+    }
+  } catch (e) { console.warn('[WebRTC] Could not refresh TURN servers, using fallback:', e.message); }
+}
+refreshIceServers();
+setInterval(refreshIceServers, 30 * 60 * 1000);
+
+function startInstantMeeting() {
+  if (!activeGid) {
+    setMode('chat');
+    if (groups.length) { openGroup(groups[0].id); setTimeout(() => startMeeting('video'), 400); }
+    else alert('Open a chat first, then start a meeting.');
+    return;
+  }
+  startMeeting('video');
+}
+
+async function startMeeting(callType) {
+  if (!activeGid) return;
+  const now   = new Date();
+  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const title = (activeGroup?.name || 'Meeting') + ' · ' + timeStr;
+
+  const res = await chatApi('POST', '/chat/meetings', { title, group_id: activeGid });
+  if (!res.success) { alert('Could not start meeting: ' + (res.message || 'Unknown')); return; }
+
+  const roomId   = res.data.room_id;
+  const joinLink = `${FRONTEND_URL}/chat.html?meetjoin=${roomId}`;
+  const hostName = (me.first_name || '') + (me.last_name ? ' ' + me.last_name : '');
+
+  // Send a rich meeting announcement message to the group
+  const inviteMsg = `📹 ${hostName} has started a meeting!\n🕐 ${dateStr} at ${timeStr}\n🔗 ${joinLink}`;
+  await chatApi('POST', `/chat/groups/${activeGid}/messages`, { content: inviteMsg }).catch(() => {});
+
+  await openMeetingPanel(roomId, title, callType === 'audio');
+}
+
+async function openMeetingPanel(roomId, title, audioOnly = false) {
+  currentMeetRoomId = roomId;
+  document.getElementById('meetingTitle').textContent = title||'Meeting';
+  document.getElementById('meetingPanel').classList.add('open');
+  document.getElementById('meetGrid').innerHTML = '';
+  document.getElementById('meetChatMsgs').innerHTML = '';
+  peerConnections = {}; peerNames = {}; peerStreams = {};
+  micEnabled = true; camEnabled = !audioOnly;
+  updateParticipantCount();
+  updateParticipantList();
+
+  // Request media with noise suppression built-in from the start
+  // (don't replace tracks later — that breaks peer connections)
+  const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  try {
+    if (audioOnly) {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+    } else {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: audioConstraints
+      });
+    }
+  } catch {
+    // Camera failed — try audio only
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      camEnabled = false;
+    } catch {
+      alert('Could not access microphone. Please allow microphone access and try again.');
+      return;
+    }
+  }
+
+  // Attach local preview
+  const localVid = document.getElementById('localVideo');
+  localVid.srcObject = localStream;
+  localVid.muted = true; // always mute self-preview to avoid echo
+  document.getElementById('selfFloatLabel').textContent = 'You · ' + (me.first_name||'Me');
+
+  // Update self-float cam state
+  const selfFloat = document.getElementById('selfFloat');
+  if (selfFloat) selfFloat.style.opacity = camEnabled ? '1' : '0.4';
+
+  if (socket) socket.emit('joinMeeting', { roomId, displayName: me.first_name||'User' });
+  await chatApi('POST', `/chat/meetings/${roomId}/join`).catch(()=>{});
+  updateMeetBtns();
+}
+
+// Noise suppression is now requested inline with getUserMedia constraints
+// (replacing tracks post-connection breaks peer video/audio)
+function checkNoiseSuppression() { /* no-op — handled at getUserMedia time */ }
+
+function updateParticipantCount() {
+  const peerCount = Object.keys(peerNames).length;
+  const count = 1 + peerCount;
+  document.getElementById('meetingParticipantCount').textContent =
+    count===1 ? 'Just you' : `${count} participants`;
+  document.getElementById('participantListCount').textContent = count;
+  // Hide "alone" warn as soon as any peer is known — even before video connects
+  document.getElementById('meetAloneWarn').classList.toggle('visible', peerCount === 0);
+}
+
+function updateParticipantList() {
+  const list = document.getElementById('participantList');
+  let html = `<div class="participant-row">
+    <div class="participant-avatar">${(me.first_name||'Y').charAt(0)}</div>
+    <div class="participant-name">${esc(me.first_name||'You')} <span class="host-badge">Host</span></div>
+    <div class="participant-status">
+      <span class="status-icon">${micEnabled?'🎙️':'🔇'}</span>
+      <span class="status-icon">${camEnabled?'📷':'🚫'}</span>
+    </div>
+  </div>`;
+  Object.entries(peerNames).forEach(([peerId, name]) => {
+    html += `<div class="participant-row" id="peer-row-${peerId}">
+      <div class="participant-avatar">${(name||'?').charAt(0).toUpperCase()}</div>
+      <div class="participant-name">${esc(name||'Peer')}</div>
+      <div class="participant-status"><span class="status-icon">🎙️</span></div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+async function onExistingPeers(peerIds) {
+  for (const pid of peerIds) {
+    // Ensure name/tile exist (peerInfos may arrive after existingPeers on slow connections)
+    if (!peerNames[pid]) peerNames[pid] = 'Peer';
+    if (!document.getElementById('tile-' + pid)) addVideoTile(pid, peerNames[pid]);
+    const pc = createPeerConnection(pid);
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (socket) socket.emit('offer', { to: pid, offer: pc.localDescription, roomId: currentMeetRoomId });
+    } catch(e) {
+      console.warn('onExistingPeers offer error for', pid, e);
+    }
+  }
+  updateParticipantCount();
+  updateParticipantList();
+}
+
+function onPeerJoined({ peerId, userId, displayName }) {
+  if (peerId === socket?.id) return;
+  peerNames[peerId] = displayName;
+  addVideoTile(peerId, displayName);
+  updateParticipantCount();
+  updateParticipantList();
+  // Add system message in meet chat
+  addMeetChatSys(`${displayName} joined`);
+}
+
+function onPeerLeft({ peerId }) {
+  const name = peerNames[peerId]||'Someone';
+  if (peerConnections[peerId]) { peerConnections[peerId].close(); delete peerConnections[peerId]; }
+  delete peerNames[peerId];
+  const el = document.getElementById('tile-'+peerId);
+  if (el) el.remove();
+  updateParticipantCount();
+  updateParticipantList();
+  addMeetChatSys(`${name} left`);
+}
+
+function createPeerConnection(peerId) {
+  if (peerConnections[peerId]) return peerConnections[peerId];
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConnections[peerId] = pc;
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.onicecandidate = ({ candidate }) => {
+    if (candidate && socket) socket.emit('ice-candidate', { to: peerId, candidate });
+  };
+  pc.ontrack = (event) => {
+    const stream = event.streams[0];
+    if (!stream) return;
+    peerStreams[peerId] = stream;
+
+    let tile = document.getElementById('tile-'+peerId);
+    if (!tile) tile = addVideoTile(peerId, peerNames[peerId]||'Peer');
+    const video = tile.querySelector('video');
+    if (video) {
+      video.srcObject = stream;
+      // Check video immediately and also once tracks are confirmed live
+      const refreshCamState = () => {
+        const hasVideo = stream.getVideoTracks().some(t => t.enabled);
+        tile.classList.toggle('has-cam', hasVideo);
+        tile.classList.toggle('no-cam', !hasVideo);
+      };
+      refreshCamState();
+      // Re-check after a short delay — readyState may not be live yet at ontrack time
+      setTimeout(refreshCamState, 500);
+      stream.getVideoTracks().forEach(t => { t.onunmute = refreshCamState; t.onmute = refreshCamState; });
+    }
+    // Audio level detection (active speaker)
+    setupAudioDetection(stream, peerId);
+  };
+  pc.onconnectionstatechange = () => {
+    if (['disconnected','failed'].includes(pc.connectionState)) onPeerLeft({ peerId });
+  };
+  return pc;
+}
+
+async function onOffer({ from, offer }) {
+  const pc = createPeerConnection(from);
+  // Android may send offer as plain string (old) or {type,sdp} object (fixed).
+  // Handle both formats defensively.
+  const sdpObj = (typeof offer === 'string')
+    ? { type: 'offer', sdp: offer }
+    : offer;
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  if (socket) socket.emit('answer', { to: from, answer: pc.localDescription });
+}
+async function onAnswer({ from, answer }) {
+  const pc = peerConnections[from];
+  if (!pc) return;
+  // Android may send answer as plain string (old) or {type,sdp} object (fixed).
+  const sdpObj = (typeof answer === 'string')
+    ? { type: 'answer', sdp: answer }
+    : answer;
+  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
+}
+async function onIceCandidate({ from, candidate }) {
+  const pc = peerConnections[from];
+  if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+}
+
+// Active speaker detection via audio levels
+function setupAudioDetection(stream, peerId) {
+  try {
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(stream);
+    const analyzer = ctx.createAnalyser();
+    analyzer.fftSize = 512;
+    src.connect(analyzer);
+    const data = new Uint8Array(analyzer.frequencyBinCount);
+    let lastSpeak = 0;
+    const check = () => {
+      analyzer.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      const tile = document.getElementById('tile-'+peerId);
+      if (tile) {
+        if (avg > 15) { tile.classList.add('speaking'); lastSpeak = Date.now(); }
+        else if (Date.now()-lastSpeak > 500) tile.classList.remove('speaking');
+      }
+      if (peerConnections[peerId]) requestAnimationFrame(check);
+    };
+    check();
+  } catch {}
+}
+
+function addVideoTile(peerId, displayName) {
+  const existing = document.getElementById('tile-'+peerId);
+  if (existing) return existing;
+  const tile = document.createElement('div');
+  tile.className = 'video-tile no-cam';
+  tile.id = 'tile-'+peerId;
+  tile.innerHTML = `
+    <video autoplay playsinline></video>
+    <div class="video-tile-avatar"><div class="tile-avatar-circle">${(displayName||'?').charAt(0).toUpperCase()}</div></div>
+    <div class="video-tile-label">${esc(displayName||'Peer')}<span class="tile-muted-icon" id="muted-${peerId}"></span></div>
+    <div class="raised-hand-badge" id="hand-${peerId}">✋</div>
+  `;
+  document.getElementById('meetGrid').appendChild(tile);
+  updateMeetGridLayout();
+  return tile;
+}
+
+function updateMeetGridLayout() {
+  const grid  = document.getElementById('meetGrid');
+  const tiles = grid.querySelectorAll('.video-tile');
+  const n = tiles.length;
+  grid.className = 'meet-grid ' + (n<=1?'solo':n===2?'two':n===3?'three':'four');
+}
+
+function onPeerScreenShare({ peerId, sharing, displayName }) {
+  const cont    = document.getElementById('screenshareContainer');
+  const grid    = document.getElementById('meetGrid');
+  const selfFlt = document.getElementById('selfFloat');
+  if (sharing) {
+    // The peer's track is coming through their existing PeerConnection.
+    // Listen for the next ontrack event which carries the screen track.
+    const pc = peerConnections[peerId];
+    if (pc) {
+      // Use addEventListener so we don't overwrite the existing ontrack handler
+      const screenTrackListener = (event) => {
+        const stream = event.streams[0];
+        if (stream) {
+          peerStreams[peerId] = stream;
+          const ssv = document.getElementById('screenShareVideo');
+          if (ssv) ssv.srcObject = stream;
+          const stripVid = document.querySelector('#strip-' + peerId + ' video');
+          if (stripVid) stripVid.srcObject = stream;
+        }
+        pc.removeEventListener('track', screenTrackListener);
+      };
+      pc.addEventListener('track', screenTrackListener);
+    }
+    // If stream already updated (slow network — track arrived before signal), use it
+    const stream = peerStreams[peerId];
+    if (stream) document.getElementById('screenShareVideo').srcObject = stream;
+    document.getElementById('screenshareLabel').textContent = (displayName||'Someone') + "'s screen";
+    document.getElementById('localVideoStrip').srcObject = localStream;
+    updateSelfThumb();
+    syncPeerStrip();
+    cont.classList.add('visible');
+    grid.style.display = 'none';
+    selfFlt.style.display = 'none';
+  } else {
+    cont.classList.remove('visible');
+    grid.style.display = '';
+    selfFlt.style.display = '';
+    document.getElementById('screenShareVideo').srcObject = null;
+    // Re-attach peer's camera stream to their tile
+    const stream = peerStreams[peerId];
+    const tile = document.getElementById('tile-' + peerId);
+    if (tile && stream) {
+      const vid = tile.querySelector('video');
+      if (vid) vid.srcObject = stream;
+    }
+  }
+}
+
+async function toggleMic() {
+  micEnabled = !micEnabled;
+  if (localStream) {
+    localStream.getAudioTracks().forEach(t => { t.enabled = micEnabled; });
+  }
+  // Notify peers of mute state
+  if (socket && currentMeetRoomId) {
+    socket.emit('peerMuteState', { roomId: currentMeetRoomId, micEnabled, camEnabled });
+  }
+  updateMeetBtns();
+  updateParticipantList();
+}
+async function toggleCam() {
+  camEnabled = !camEnabled;
+  if (localStream) {
+    localStream.getVideoTracks().forEach(t => { t.enabled = camEnabled; });
+  }
+  const self = document.getElementById('selfFloat');
+  if (self) self.style.opacity = camEnabled ? '1' : '0.4';
+  // Notify peers of cam state change
+  if (socket && currentMeetRoomId) {
+    socket.emit('peerMuteState', { roomId: currentMeetRoomId, micEnabled, camEnabled });
+  }
+  updateMeetBtns();
+  updateParticipantList();
+}
+async function toggleScreen() {
+  const cont    = document.getElementById('screenshareContainer');
+  const grid    = document.getElementById('meetGrid');
+  const selfFlt = document.getElementById('selfFloat');
+
+  if (screenSharing) {
+    // ── Stop ──────────────────────────────────────────────────────────────
+    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+    if (localStream) {
+      const vt = localStream.getVideoTracks()[0];
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s && vt) s.replaceTrack(vt);
+      });
+      document.getElementById('localVideo').srcObject = localStream;
+    }
+    cont.classList.remove('visible');
+    grid.style.display = '';
+    selfFlt.style.display = '';
+    document.getElementById('screenShareVideo').srcObject = null;
+    screenSharing = false;
+    if (socket && currentMeetRoomId) socket.emit('screenShare', { roomId: currentMeetRoomId, sharing: false, displayName: me.first_name });
+
+  } else {
+    // ── Start ──────────────────────────────────────────────────────────────
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: true });
+      const track  = screenStream.getVideoTracks()[0];
+
+      document.getElementById('screenShareVideo').srcObject = screenStream;
+      document.getElementById('screenshareLabel').textContent = 'Your screen';
+      document.getElementById('localVideoStrip').srcObject = localStream;
+      updateSelfThumb();
+      syncPeerStrip();
+      cont.classList.add('visible');
+      grid.style.display = 'none';
+      selfFlt.style.display = 'none'; // self is now in the right strip
+
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s) s.replaceTrack(track);
+      });
+
+      track.onended = () => { screenSharing = true; toggleScreen(); };
+      screenSharing = true;
+      if (socket && currentMeetRoomId) socket.emit('screenShare', { roomId: currentMeetRoomId, sharing: true, displayName: me.first_name });
+    } catch(e) { console.warn('Screen share cancelled or failed:', e.message); }
+  }
+  updateMeetBtns();
+}
+
+function updateSelfThumb() {
+  const selfName = (me.first_name || 'You') + (me.last_name ? ' ' + me.last_name : '');
+  const strip    = document.getElementById('localVideoStrip');
+  const thumb    = document.getElementById('selfThumb');
+  const avatar   = document.getElementById('selfThumbAvatar');
+  const label    = document.getElementById('selfThumbLabel');
+  if (strip) strip.srcObject = localStream;
+  if (label) label.textContent = 'You · ' + (me.first_name || 'Me');
+  if (avatar) avatar.textContent = (me.first_name || 'Y').charAt(0).toUpperCase();
+  if (thumb) {
+    const hasCam = localStream?.getVideoTracks().some(t => t.enabled);
+    thumb.classList.toggle('has-cam', hasCam);
+    thumb.classList.toggle('no-cam', !hasCam);
+  }
+}
+
+// Build/sync the peer thumbnail strip when screensharing
+function syncPeerStrip() {
+  const strip = document.getElementById('peerStripContainer');
+  if (!strip) return;
+  strip.innerHTML = '';
+  Object.entries(peerNames).forEach(([peerId, name]) => {
+    const stream = peerStreams[peerId];
+    const div = document.createElement('div');
+    div.className = 'side-thumb ' + (stream ? 'has-cam' : 'no-cam');
+    div.id = 'strip-' + peerId;
+    const vid = document.createElement('video');
+    vid.autoplay = true; vid.playsInline = true;
+    if (stream) vid.srcObject = stream;
+    const avatar = document.createElement('div');
+    avatar.className = 'side-thumb-avatar';
+    avatar.textContent = (name || '?').charAt(0).toUpperCase();
+    const label = document.createElement('div');
+    label.className = 'side-thumb-label';
+    label.textContent = name || 'Peer';
+    div.appendChild(vid); div.appendChild(avatar); div.appendChild(label);
+    strip.appendChild(div);
+  });
+}
+
+function toggleRaiseHand() {
+  handRaised = !handRaised;
+  if (socket && currentMeetRoomId) socket.emit('raiseHand', { roomId: currentMeetRoomId, raised: handRaised, displayName: me.first_name });
+  updateMeetBtns();
+}
+
+function onRaiseHand({ peerId, raised, displayName }) {
+  const tile = document.getElementById('tile-'+peerId);
+  if (tile) tile.classList.toggle('hand-raised', raised);
+  if (raised) addMeetChatSys(`${displayName} raised their hand ✋`);
+}
+
+// Update peer tile cam state when they toggle mic/cam
+function onPeerMuteState({ peerId, micEnabled: pMic, camEnabled: pCam }) {
+  const tile = document.getElementById('tile-' + peerId);
+  if (!tile) return;
+  // Update mute icon
+  const muteIcon = document.getElementById('muted-' + peerId);
+  if (muteIcon) muteIcon.textContent = pMic ? '' : '🔇';
+  // Update camera state
+  if (pCam !== undefined) {
+    const vid = tile.querySelector('video');
+    if (vid && vid.srcObject) {
+      const hasVideo = pCam && vid.srcObject.getVideoTracks().length > 0;
+      tile.classList.toggle('has-cam', hasVideo);
+      tile.classList.toggle('no-cam', !hasVideo);
+    } else if (!pCam) {
+      tile.classList.remove('has-cam');
+      tile.classList.add('no-cam');
+    }
+  }
+}
+
+function toggleMeetSide(panel) {
+  const pMap = { participants: 'meetSideParticipants', chat: 'meetSideChat' };
+  const sid  = pMap[panel];
+  if (!sid) return;
+  if (meetSideOpen===panel) {
+    document.getElementById(sid).classList.remove('open');
+    meetSideOpen = null;
+  } else {
+    Object.values(pMap).forEach(id => document.getElementById(id).classList.remove('open'));
+    document.getElementById(sid).classList.add('open');
+    meetSideOpen = panel;
+  }
+}
+
+function toggleMinimizeMeeting() {
+  isMinimized = !isMinimized;
+  document.getElementById('meetingPanel').classList.toggle('minimized', isMinimized);
+}
+
+async function enterPiP() {
+  const video = document.getElementById('localVideo');
+  if (video && document.pictureInPictureEnabled) {
+    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+    else await video.requestPictureInPicture().catch(()=>{});
+  }
+}
+
+// ── Meeting Recording (browser MediaRecorder) ─────────────────────────────────
+let _meetRecorder = null, _meetRecChunks = [], _meetRecTimer = null, _meetRecSecs = 0;
+
+function openMeetingMoreOptions() {
+  const isRecording = _meetRecorder && _meetRecorder.state === 'recording';
+  const opts = [
+    isRecording ? '⏹ Stop Recording' : '🔴 Start Recording',
+    '📋 Copy meeting link',
+    '🔇 Mute all (host)',
+    '📊 Change layout'
+  ];
+  // Build a quick in-meeting dropdown instead of prompt()
+  const existing = document.getElementById('meetMoreMenu');
+  if (existing) { existing.remove(); return; }
+  const menu = document.createElement('div');
+  menu.id = 'meetMoreMenu';
+  menu.style.cssText = `position:fixed;bottom:90px;right:80px;z-index:9999;
+    background:#2d2d2d;border:1px solid rgba(255,255,255,.15);border-radius:12px;
+    padding:6px;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.6)`;
+  opts.forEach((label, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = `display:block;width:100%;text-align:left;padding:10px 14px;
+      background:none;border:none;color:#e8eaed;font-size:13px;cursor:pointer;
+      border-radius:8px;font-family:inherit;`;
+    btn.onmouseenter = () => btn.style.background = 'rgba(255,255,255,.1)';
+    btn.onmouseleave = () => btn.style.background = 'none';
+    btn.onclick = () => {
+      menu.remove();
+      if (i === 0) toggleMeetRecording();
+      if (i === 1) copyMeetingLink();
+    };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 100);
+}
+
+async function toggleMeetRecording() {
+  if (_meetRecorder && _meetRecorder.state === 'recording') {
+    // Stop and download
+    _meetRecorder.stop();
+    return;
+  }
+  // Start recording — capture the whole meeting video area
+  try {
+    // Combine all streams: local + all peers
+    const canvas  = document.createElement('canvas');
+    canvas.width  = 1280; canvas.height = 720;
+    const ctx     = canvas.getContext('2d');
+    const canvasStream = canvas.captureStream(30);
+
+    // Mix audio from all streams
+    const audioCtx = new AudioContext();
+    const dest     = audioCtx.createMediaStreamDestination();
+    const addAudio = (stream) => {
+      if (!stream) return;
+      const src = audioCtx.createMediaStreamSource(stream);
+      src.connect(dest);
+    };
+    if (localStream) addAudio(localStream);
+    Object.values(peerStreams).forEach(addAudio);
+
+    // Draw frames
+    const videos = [];
+    if (localStream) {
+      const v = document.getElementById('localVideo');
+      if (v) videos.push(v);
+    }
+    Object.entries(peerStreams).forEach(([pid]) => {
+      const tile = document.getElementById('tile-' + pid);
+      const v = tile?.querySelector('video');
+      if (v) videos.push(v);
+    });
+
+    const drawFrame = () => {
+      if (!_meetRecorder || _meetRecorder.state !== 'recording') return;
+      ctx.fillStyle = '#1c2025';
+      ctx.fillRect(0, 0, 1280, 720);
+      const count = videos.length || 1;
+      const cols  = Math.ceil(Math.sqrt(count));
+      const rows  = Math.ceil(count / cols);
+      const w = 1280 / cols, h = 720 / rows;
+      videos.forEach((v, i) => {
+        const x = (i % cols) * w, y = Math.floor(i / cols) * h;
+        try { ctx.drawImage(v, x, y, w, h); } catch {}
+      });
+      requestAnimationFrame(drawFrame);
+    };
+
+    // Merge canvas video + audio
+    const finalStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks()
+    ]);
+
+    _meetRecChunks = [];
+    _meetRecorder  = new MediaRecorder(finalStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    _meetRecorder.ondataavailable = e => { if (e.data.size) _meetRecChunks.push(e.data); };
+    _meetRecorder.onstop = () => {
+      clearInterval(_meetRecTimer);
+      const blob = new Blob(_meetRecChunks, { type: 'video/webm' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `Meeting_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+      _meetRecorder = null;
+      updateRecordingUI(false);
+    };
+    _meetRecorder.start(1000);
+    drawFrame();
+
+    // Timer
+    _meetRecSecs = 0;
+    updateRecordingUI(true);
+    _meetRecTimer = setInterval(() => {
+      _meetRecSecs++;
+      const m = String(Math.floor(_meetRecSecs/60)).padStart(2,'0');
+      const s = String(_meetRecSecs%60).padStart(2,'0');
+      const el = document.getElementById('meetRecTime');
+      if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+  } catch(e) {
+    alert('Recording failed: ' + e.message + '\n\nTip: Use Chrome for best recording support.');
+  }
+}
+
+function updateRecordingUI(isRecording) {
+  const bar = document.getElementById('meetRecBar');
+  if (!bar) return;
+  bar.style.display = isRecording ? 'flex' : 'none';
+}
+
+
+function updateMeetBtns() {
+  const mic  = document.getElementById('btnMic');
+  const cam  = document.getElementById('btnCam');
+  const scr  = document.getElementById('btnScreen');
+  const hand = document.getElementById('btnHand');
+
+  // Mic: green ring = ON, red ring = muted
+  mic.className = 'meet-btn ' + (micEnabled ? 'on' : 'off');
+  document.getElementById('micIcon').textContent  = micEnabled ? '🎙️' : '🔇';
+  document.getElementById('micLabel').textContent = micEnabled ? 'Mic' : 'Muted';
+
+  // Cam: green ring = ON, red ring = camera off
+  cam.className = 'meet-btn ' + (camEnabled ? 'on' : 'off');
+  document.getElementById('camIcon').textContent  = camEnabled ? '📷' : '📵';
+  document.getElementById('camLabel').textContent = camEnabled ? 'Camera' : 'Cam off';
+
+  // Screen share
+  scr.className = 'meet-btn ' + (screenSharing ? 'active-screen' : '');
+  document.getElementById('screenLabel').textContent = screenSharing ? 'Stop share' : 'Share';
+
+  // Hand
+  hand.className = 'meet-btn ' + (handRaised ? 'on' : '');
+  document.getElementById('handLabel').textContent = handRaised ? 'Lower hand' : 'Raise hand';
+
+  // Visual self-preview opacity
+  const selfFloat = document.getElementById('selfFloat');
+  if (selfFloat) selfFloat.style.opacity = camEnabled ? '1' : '0.4';
+}
+
+async function leaveMeeting() {
+  if (socket && currentMeetRoomId) socket.emit('leaveMeeting', { roomId: currentMeetRoomId });
+  await chatApi('POST', `/chat/meetings/${currentMeetRoomId}/leave`).catch(()=>{});
+  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  if (screenStream) { screenStream.getTracks().forEach(t=>t.stop()); screenStream=null; }
+  Object.values(peerConnections).forEach(pc=>pc.close());
+  peerConnections={}; peerNames={}; peerStreams={};
+  // Reset all panels
+  document.getElementById('meetingPanel').classList.remove('open','minimized');
+  document.getElementById('screenshareContainer').classList.remove('visible');
+  document.getElementById('meetGrid').style.display = '';
+  document.getElementById('selfFloat').style.display = '';
+  document.getElementById('meetSideParticipants').classList.remove('open');
+  document.getElementById('meetSideChat').classList.remove('open');
+  document.getElementById('meetGrid').innerHTML = '';
+  // Stop recording if active
+  if (_meetRecorder && _meetRecorder.state === 'recording') _meetRecorder.stop();
+  currentMeetRoomId=null; handRaised=false; screenSharing=false;
+  meetSideOpen=null; isMinimized=false;
+}
+
+function sendMeetingChat() {
+  const input = document.getElementById('meetChatInput');
+  const msg   = input.value.trim();
+  if (!msg || !socket || !currentMeetRoomId) return;
+  socket.emit('meetingChat', { roomId: currentMeetRoomId, message: msg });
+  input.value = '';
+}
+
+function onMeetingChat({ name, message, at }) {
+  const area = document.getElementById('meetChatMsgs');
+  const div  = document.createElement('div');
+  div.className = 'meet-chat-msg';
+  div.innerHTML = `<div class="meet-chat-sender">${esc(name)}</div><div class="meet-chat-text">${esc(message)}</div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  // Badge on chat button
+  if (meetSideOpen !== 'chat') {
+    const chatBtn = document.querySelector('.meet-btn:nth-child(6)');
+    if (chatBtn) chatBtn.querySelector('.meet-btn-icon').textContent = '💬🔴';
+    setTimeout(() => { if (chatBtn) chatBtn.querySelector('.meet-btn-icon').textContent = '💬'; }, 3000);
+  }
+}
+
+function addMeetChatSys(text) {
+  const area = document.getElementById('meetChatMsgs');
+  const div  = document.createElement('div');
+  div.style.cssText = 'text-align:center;font-size:11px;color:#5f6368;padding:4px 0;';
+  div.textContent = text;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function copyMeetingLink() {
+  const link = `${FRONTEND_URL}/chat.html?meetjoin=${currentMeetRoomId}`;
+  navigator.clipboard.writeText(link).then(() => {
+    // Brief feedback
+    const btn = document.querySelector('.meet-header-actions .meet-icon-btn');
+    if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '🔗', 1500); }
+  });
+}
+
+// ── Schedule meetings ─────────────────────────────────────────────────────────
+function openScheduleMeetingModal() {
+  // Pre-fill datetime to 1hr from now
+  const dt = new Date(Date.now() + 3600000);
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('scheduleMeetDate').value =
+    `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  // Fill groups
+  const sel = document.getElementById('scheduleMeetGroup');
+  sel.innerHTML = '<option value="">— No group —</option>' +
+    groups.filter(g=>g.type==='group').map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  if (activeGid && activeGroup?.type==='group') sel.value = activeGid;
+  openModal('scheduleMeetingModal');
+}
+
+async function scheduleMeeting() {
+  const title       = document.getElementById('scheduleMeetTitle').value.trim();
+  const localDt     = document.getElementById('scheduleMeetDate').value;
+  const group_id    = document.getElementById('scheduleMeetGroup').value || null;
+  const agenda      = document.getElementById('scheduleMeetAgenda').value.trim();
+  if (!title)   { alert('Meeting title required'); return; }
+  if (!localDt) { alert('Date/time required'); return; }
+  // Convert local datetime-local to ISO string (preserves local timezone intent)
+  const scheduled_at = new Date(localDt).toISOString();
+  const res = await chatApi('POST', '/chat/scheduled-meetings', { title, scheduled_at, group_id, agenda });
+  if (!res.success) { alert(res.message || 'Failed to schedule'); return; }
+  closeModal('scheduleMeetingModal');
+  loadScheduledMeetings();
+  // Show nice toast instead of browser alert
+  showToast('📅 Meeting Scheduled', `"${title}" — all group members notified`, null);
+}
+
+async function loadScheduledMeetings() {
+  const res = await chatApi('GET', '/chat/scheduled-meetings');
+  const list = document.getElementById('scheduledMeetingsList');
+  const live = document.getElementById('liveMeetingsList');
+
+  if (!res.success) {
+    list.innerHTML = '<div style="color:#ef5350;font-size:13px;padding:8px">Failed to load meetings</div>';
+    return;
+  }
+
+  if (!res.data.length) {
+    list.innerHTML = `<div style="color:var(--wa-text2);font-size:13px;padding:12px 0;text-align:center">
+      No upcoming meetings<br><span style="font-size:11px;opacity:.6">Schedule one using the button below</span>
+    </div>`;
+    return;
+  }
+
+  const now = Date.now();
+  list.innerHTML = res.data.map(m => {
+    const dt       = new Date(m.scheduled_at);
+    const isPast   = dt.getTime() < now;
+    const isToday  = dt.toDateString() === new Date().toDateString();
+    const timeStr  = dt.toLocaleString('en-IN', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:true });
+    const started  = m.status === 'started';
+    const groupBadge = m.group_name ? `<span style="background:rgba(74,140,28,.1);color:var(--chat-accent);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px">${esc(m.group_name)}</span>` : '';
+
+    return `<div class="meeting-card ${started?'live':''}">
+      <div style="display:flex;align-items:center;margin-bottom:4px">
+        <div class="meeting-card-title">${esc(m.title)}</div>${groupBadge}
+        ${started ? '<span class="live-badge" style="margin-left:auto">🔴 LIVE</span>' : ''}
+      </div>
+      <div class="meeting-card-sub">
+        🕐 ${timeStr}${isPast && !started ? ' <span style="color:#ef5350;font-size:10px">(overdue)</span>' : ''}
+      </div>
+      ${m.created_by_name ? `<div style="font-size:11px;color:var(--wa-text2);margin-top:2px">by ${esc(m.created_by_name)}</div>` : ''}
+      ${m.agenda ? `<div style="font-size:11px;color:var(--wa-text2);margin-top:4px;font-style:italic">${esc(m.agenda.slice(0,80))}</div>` : ''}
+      <div class="meeting-card-actions" style="margin-top:10px">
+        ${started
+          ? `<button class="meet-card-btn join" onclick="joinMeetingFromLink('${m.room_id}')">▶ Join Now</button>`
+          : `<button class="meet-card-btn join" onclick="startScheduledMeeting(${m.id})">▶ Start Now</button>`
+        }
+        <button class="meet-card-btn" style="background:var(--wa-surface);color:var(--wa-text2);border:1px solid var(--wa-border)" onclick="copyScheduledLink('${m.room_id}')">🔗 Copy link</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCallHistory() {
+  const el = document.getElementById('callHistoryList');
+  if (!el) return;
+  try {
+    const res = await chatApi('GET', '/chat/call-log');
+    if (!res.success || !res.calls.length) {
+      el.innerHTML = '<div style="color:var(--wa-text2);font-size:13px;padding:12px 0;text-align:center">No call history yet</div>';
+      return;
+    }
+    el.innerHTML = res.calls.map(c => {
+      const isMeCaller = c.caller_id === me?.id;
+      const otherName  = isMeCaller ? (c.callee_name || 'Unknown') : (c.caller_name || 'Unknown');
+      const icon       = c.call_type === 'video' ? '📹' : '📞';
+      const statusIcon = c.status === 'missed' ? '⬇️' : c.status === 'declined' ? '❌' : isMeCaller ? '⬆️' : '⬇️';
+      const statusColor= c.status === 'missed' || c.status === 'declined' ? '#ef5350' : 'var(--wa-text2)';
+      const dt         = new Date(c.started_at);
+      const timeStr    = dt.toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:true });
+      const dur        = c.duration_seconds ? ` · ${Math.floor(c.duration_seconds/60)}m ${c.duration_seconds%60}s` : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--wa-border)">
+        <div style="font-size:22px">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px;color:var(--wa-text)">${esc(otherName)}</div>
+          <div style="font-size:12px;color:${statusColor}">${statusIcon} ${c.status||'answered'}${dur}</div>
+        </div>
+        <div style="font-size:11px;color:var(--wa-text2);text-align:right">${timeStr}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:#ef5350;font-size:13px;padding:8px">Failed to load call history</div>';
+  }
+}
+
+function copyScheduledLink(roomId) {
+  const link = `${FRONTEND_URL}/chat.html?meetjoin=${roomId}`;
+  navigator.clipboard.writeText(link).then(() => showToast('🔗 Link copied', 'Share this link to invite others', null));
+}
+
+async function startScheduledMeeting(id) {
+  const res = await chatApi('POST', `/chat/scheduled-meetings/${id}/start`);
+  if (!res.success) { alert(res.message||'Failed'); return; }
+  await openMeetingPanel(res.data.room_id, res.data.title);
+}
+
+function renderMeetGroupPicker() {
+  // Handled by meetings tab
+}
+
+(async function checkMeetJoin() {
+  const params = new URLSearchParams(window.location.search);
+  const roomId = params.get('meetjoin');
+  if (!roomId) return;
+  // Clean URL immediately
+  window.history.replaceState({}, '', 'chat.html');
+  // Wait for page to fully initialize (auth + groups loaded)
+  await new Promise(r => setTimeout(r, 1200));
+  const res = await chatApi('GET', `/chat/meetings/${roomId}`).catch(() => ({ success: false }));
+  if (!res.success || !res.data) {
+    showJoinBanner(null, null, 'Meeting not found or already ended.');
+    return;
+  }
+  if (res.data.status !== 'active') {
+    showJoinBanner(null, null, `Meeting "${res.data.title}" has already ended.`);
+    return;
+  }
+  // Show a prominent join prompt instead of browser confirm()
+  showJoinBanner(roomId, res.data.title);
+})();
+
+async function joinMeetingFromLink(roomId) {
+  const res = await chatApi('GET', `/chat/meetings/${roomId}`).catch(() => ({ success: false }));
+  if (!res.success || !res.data) { alert('Meeting not found.'); return; }
+  if (res.data.status !== 'active') { alert(`Meeting "${res.data.title}" has already ended.`); return; }
+  await openMeetingPanel(roomId, res.data.title);
+}
+
+function showJoinBanner(roomId, title, errorMsg) {
+  if (errorMsg) { setTimeout(() => alert(errorMsg), 300); return; }
+  showMeetBanner(roomId, title, 'You were invited — tap "Join now" to enter');
+}
+
+// ── AI Voice Deep-Link Handler ───────────────────────────────────────────────
+// AI Voice deep-link handled via sessionStorage (see init section below)
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+    document.getElementById('ctxMenu').classList.remove('open');
+    document.getElementById('emojiQuick').classList.remove('open');
+    if (document.getElementById('chatSearchBar').classList.contains('visible')) toggleChatSearch();
+    closeImgPreview();
+  }
+});
+
+// ── File Download (WhatsApp-style) ────────────────────────────────────────────
+// Uses fetch+blob so cross-origin files download instead of opening in browser
+async function dlFile(url, filename) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // Try to read error message from backend
+      let msg = 'Download failed';
+      try {
+        const j = await res.json();
+        if (j.message === 'File not found') {
+          msg = '⚠️ This file was uploaded before persistent storage was enabled and is no longer available. Please ask the sender to re-upload it.';
+        } else {
+          msg = j.message || msg;
+        }
+      } catch(_) {}
+      return showToast('Download failed', msg, null);
+    }
+    const blob = await res.blob();
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = filename || 'file';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch(e) {
+    showToast('Download failed', 'Could not reach server. Check your connection.', null);
+  }
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function safeStr(s) {
+  return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,' ').slice(0,100);
+}
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.endsWith('Z')||ts.includes('+')?ts:ts+'Z');
+  const now = new Date();
+  if (d.toDateString()===now.toDateString()) return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  if (now-d<604800000) return d.toLocaleDateString('en-IN',{weekday:'short'});
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+}
+function fmtMsgTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.endsWith('Z')||ts.includes('+')?ts:ts+'Z');
+  return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function fmtDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.endsWith('Z')||ts.includes('+')?ts:ts+'Z');
+  const now = new Date();
+  if (d.toDateString()===now.toDateString()) return 'Today';
+  const yes = new Date(now); yes.setDate(yes.getDate()-1);
+  if (d.toDateString()===yes.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+}
+function fmtRelTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.endsWith('Z')||ts.includes('+')?ts:ts+'Z');
+  const diff = Date.now()-d.getTime();
+  if (diff<60000)    return 'just now';
+  if (diff<3600000)  return Math.floor(diff/60000) + 'm ago';
+  if (diff<86400000) return Math.floor(diff/3600000) + 'h ago';
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+}
+function fmtBytes(b) {
+  if (b<1024) return b+' B';
+  if (b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(1)+' MB';
+}
+function fileIcon(mime) {
+  if (!mime) return '📄';
+  if (mime.startsWith('image/'))  return '🖼️';
+  if (mime.startsWith('audio/'))  return '🎵';
+  if (mime.startsWith('video/'))  return '🎬';
+  if (mime.includes('pdf'))       return '📕';
+  if (mime.includes('sheet')||mime.includes('excel'))  return '📊';
+  if (mime.includes('word')||mime.includes('document'))return '📝';
+  if (mime.includes('zip')||mime.includes('compressed'))return '🗜️';
+  return '📄';
+}
+function linkify(text) {
+  // Check if this is a meeting announcement (contains meetjoin= URL)
+  const meetMatch = text.match(/[?&]meetjoin=([a-zA-Z0-9_-]+)/);
+  if (meetMatch) {
+    const roomId = meetMatch[1];
+    const lines = text.split('\n');
+    const header   = (lines[0] || '').replace(/^📹\s*/, '');
+    const timeLine = (lines[1] || '').replace(/^🕐\s*/, '');
+
+    return `<div class="meet-invite-card">
+      <div class="meet-invite-header">
+        <span class="meet-invite-icon">📹</span>
+        <div>
+          <div class="meet-invite-title">${esc(header)}</div>
+          ${timeLine ? `<div class="meet-invite-time">🕐 ${esc(timeLine)}</div>` : ''}
+        </div>
+      </div>
+      <button class="meet-invite-btn" onclick="joinMeetingFromLink('${roomId}')">
+        Join Now
+      </button>
+    </div>`;
+  }
+
+  // Regular text with URLs — escape text, linkify URLs
+  return esc(text).replace(/(https?:\/\/[^\s&lt;&gt;"]+)/g, (url) => {
+    // Decode back for display
+    const displayUrl = url.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+    return `<a href="${displayUrl}" target="_blank" rel="noopener" style="color:#1565c0;text-decoration:underline;word-break:break-all">${url}</a>`;
+  });
+}
+
+function showLeftMenu() {
+  const opts = ['Dark/light mode (uses system)', 'Starred messages (coming soon)', 'Settings (coming soon)'];
+  alert(opts.join('\n'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOUND ENGINE — Web Audio API (no external files needed)
+// ═══════════════════════════════════════════════════════════════════════════════
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+
+// Play a short WhatsApp-style "ding" for incoming messages
+function playMsgSound() {
+  try {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.25);
+  } catch(e) {}
+}
+
+// Repeating ring tone for incoming calls
+let _ringInterval = null;
+function startRingTone() {
+  stopRingTone();
+  _playRingChime();
+  _ringInterval = setInterval(_playRingChime, 3000);
+}
+function stopRingTone() {
+  clearInterval(_ringInterval); _ringInterval = null;
+}
+function _playRingChime() {
+  try {
+    const ctx  = getAudioCtx();
+    const notes = [880, 1100, 880, 1100];
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.18;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.35, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      osc.start(t); osc.stop(t + 0.15);
+    });
+  } catch(e) {}
+}
+function playCallEndSound() {
+  try {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.4);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALL SYSTEM — WhatsApp-style (ring → accept → WebRTC meeting)
+// ═══════════════════════════════════════════════════════════════════════════════
+let _pendingCall  = null;  // { roomId, callerId, callType }
+let _outgoingCall = null;  // { roomId, toUserId, callType }
+let _callTimeout  = null;
+
+// Called when user clicks 📹 or 📞 in chat header
+async function initiateCall(callType) {
+  if (!activeGroup) return;
+  if (!socket) { alert('Not connected — please refresh.'); return; }
+
+  // For group chats: ring all members AND open a meeting (multi-person)
+  if (activeGroup.type === 'group') {
+    const roomId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const callerName = (me.first_name || '') + ' ' + (me.last_name || '');
+    // Notify all group members (backend fans out)
+    socket.emit('groupCallInvite', {
+      groupId:    activeGid,
+      roomId,
+      callType,
+      callerName,
+      groupName:  activeGroup.name
+    });
+    // Caller directly opens the meeting panel
+    await openMeetingPanel(roomId, (activeGroup.name || 'Group') + ' · ' + callType, callType === 'audio');
+    return;
+  }
+
+  // DM — ring the other person
+  const peerId   = activeGroup.dm_peer_id;
+  const peerName = activeGroup.dm_peer_name || 'User';
+  if (!peerId) return;
+
+  const roomId = 'call_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  _outgoingCall = { roomId, toUserId: peerId, callType };
+
+  // Show outgoing ring UI
+  document.getElementById('outgoingCallAvatar').textContent = (peerName||'?').charAt(0).toUpperCase();
+  document.getElementById('outgoingCallName').textContent   = peerName;
+  document.getElementById('outgoingCallType').textContent   = callType === 'video' ? '📹 Video Call' : '📞 Voice Call';
+  document.getElementById('outgoingCallStatus').textContent = 'Calling…';
+  const ov = document.getElementById('outgoingCallOverlay');
+  ov.style.display = 'flex';
+
+  // Start outgoing ring sound
+  startRingTone();
+
+  // Emit call invite
+  socket.emit('callInvite', {
+    toUserId:    peerId,
+    roomId,
+    callType,
+    callerName:  (me.first_name || '') + ' ' + (me.last_name || ''),
+    groupId:     activeGid,
+    groupName:   activeGroup.name
+  });
+
+  // Auto-cancel after 30s
+  _callTimeout = setTimeout(() => {
+    cancelOutgoingCall();
+    document.getElementById('outgoingCallStatus').textContent = 'No answer';
+  }, 30000);
+}
+
+function cancelOutgoingCall() {
+  clearTimeout(_callTimeout);
+  stopRingTone();
+  playCallEndSound();
+  if (socket && _outgoingCall) {
+    socket.emit('callCancelled', { roomId: _outgoingCall.roomId, toUserId: _outgoingCall.toUserId });
+  }
+  _outgoingCall = null;
+  document.getElementById('outgoingCallOverlay').style.display = 'none';
+}
+
+// Called when the other person accepts our call
+function onCallAccepted({ roomId, byName }) {
+  clearTimeout(_callTimeout);
+  stopRingTone();
+  document.getElementById('outgoingCallOverlay').style.display = 'none';
+  // Only open meeting panel if WEB initiated this call
+  // If _outgoingCall is null, this call was started from mobile — web should stay silent
+  if (!_outgoingCall) return;
+  const ct = _outgoingCall.callType || 'video';
+  _outgoingCall = null;
+  // Join the meeting room
+  openMeetingPanel(roomId, (byName||'') + '\'s call', ct === 'audio');
+}
+
+// Called when the other person declines
+function onCallDeclined({ byName, roomId }) {
+  clearTimeout(_callTimeout);
+  stopRingTone();
+  playCallEndSound();
+  // Save declined call to history
+  if (_outgoingCall) {
+    chatApi('POST', '/chat/call-log/event', {
+      room_id: _outgoingCall.roomId || roomId,
+      call_type: _outgoingCall.callType || 'audio',
+      caller_id: me?.id,
+      callee_id: activeGroup?.dm_peer_id,
+      group_id: activeGid,
+      status: 'declined'
+    }).catch(() => {});
+  }
+  _outgoingCall = null;
+  document.getElementById('outgoingCallOverlay').style.display = 'none';
+  showBriefStatus('Call declined by ' + (byName || 'the other person'));
+}
+
+// Called when the other person cancels before we answer
+function onCallCancelled({ roomId }) {
+  if (_pendingCall?.roomId === roomId) {
+    stopRingTone();
+    // Save missed call to history (callee side)
+    chatApi('POST', '/chat/call-log/event', {
+      room_id: roomId,
+      call_type: _pendingCall.callType || 'audio',
+      caller_id: _pendingCall.callerId,
+      callee_id: me?.id,
+      status: 'missed'
+    }).catch(() => {});
+    _pendingCall = null;
+    document.getElementById('incomingCallOverlay').style.display = 'none';
+    showBriefStatus('Call cancelled');
+  }
+}
+
+// We receive an incoming call
+// Called when the same user answered this call on another device
+function onCallAnsweredElsewhere({ roomId }) {
+  stopRingTone();
+  clearTimeout(_callTimeout);
+  // Dismiss incoming call overlay
+  if (_pendingCall) {
+    _pendingCall = null;
+    document.getElementById('incomingCallOverlay').style.display = 'none';
+  }
+  // Dismiss outgoing call overlay — another device of mine answered/initiated
+  if (_outgoingCall) {
+    _outgoingCall = null;
+    document.getElementById('outgoingCallOverlay').style.display = 'none';
+  }
+  // Only close meeting panel if:
+  // 1. It's for the same room AND
+  // 2. We have no active peer connections (not already in a call with people)
+  const inSameRoom    = currentMeetRoomId === roomId || !roomId;
+  const hasPeers      = Object.keys(peerConnections).length > 0;
+  if (inSameRoom && !hasPeers) {
+    leaveMeeting();
+  }
+}
+
+function onIncomingCall({ roomId, callType, callerName, callerId, groupId, groupName }) {
+  _pendingCall = { roomId, callerId, callType };
+  document.getElementById('incomingCallAvatar').textContent = (callerName||'?').charAt(0).toUpperCase();
+  document.getElementById('incomingCallName').textContent   = callerName || 'Unknown';
+  document.getElementById('incomingCallType').textContent   = callType === 'video' ? '📹 Incoming Video Call' : '📞 Incoming Voice Call';
+  document.getElementById('incomingCallSub').textContent    = groupName ? `from ${groupName}` : 'Incoming call…';
+  document.getElementById('incomingCallOverlay').style.display = 'flex';
+  startRingTone();
+}
+
+function acceptIncomingCall() {
+  if (!_pendingCall) return;
+  stopRingTone();
+  const { roomId, callerId, callType } = _pendingCall;
+  _pendingCall = null;
+  document.getElementById('incomingCallOverlay').style.display = 'none';
+  // Tell caller we accepted
+  if (socket) socket.emit('callAccepted', { roomId, callerId });
+  // Join meeting
+  openMeetingPanel(roomId, 'Call', callType === 'audio');
+}
+
+function declineIncomingCall() {
+  if (!_pendingCall) return;
+  stopRingTone();
+  playCallEndSound();
+  const { roomId, callerId } = _pendingCall;
+  _pendingCall = null;
+  document.getElementById('incomingCallOverlay').style.display = 'none';
+  if (socket) socket.emit('callDeclined', { roomId, callerId });
+}
+
+function showBriefStatus(msg) {
+  // Reuse existing toast
+  showToast('Call', msg, null);
+}
+
 // ── Presence heartbeat — every 60s (backend expires after 2min of silence) ───
 setInterval(() => { if (!document.hidden) updatePresence(true); }, 60000);
 
@@ -3029,6 +4622,7 @@ loadGroups().then(async () => {
     }
   }
 });
+loadScheduledMeetings();
 loadCallHistory();
 setInterval(loadGroups, 30000);
 setInterval(loadScheduledMeetings, 60000); // refresh every minute
