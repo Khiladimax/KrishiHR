@@ -76,6 +76,22 @@
           <button class="btn btn-outline btn-sm" onclick="clearFilters()">✕ Clear</button>
           <span id="emp-count" class="text-muted" style="padding:8px 0;font-size:13px;margin-left:4px"></span>
         </div>
+        <!-- Active / Inactive status pills -->
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.3px">STATUS:</span>
+          <button id="status-pill-all" class="status-pill active-pill" onclick="setStatusFilter('all',this)"
+            style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--accent);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">
+            All <span id="status-count-all" style="opacity:.8"></span>
+          </button>
+          <button id="status-pill-active" class="status-pill" onclick="setStatusFilter('active',this)"
+            style="padding:5px 14px;border-radius:20px;border:1.5px solid #86efac;background:#f0fdf4;color:#15803d;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">
+            ✅ Active <span id="status-count-active" style="opacity:.8"></span>
+          </button>
+          <button id="status-pill-inactive" class="status-pill" onclick="setStatusFilter('inactive',this)"
+            style="padding:5px 14px;border-radius:20px;border:1.5px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">
+            ⏸ Inactive <span id="status-count-inactive" style="opacity:.8"></span>
+          </button>
+        </div>
       </div>
       <div id="dept-tabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px"></div>
       <div class="card" style="padding:0">
@@ -83,7 +99,7 @@
           <table>
             <thead><tr>
               <th>Employee</th><th>Code</th><th>Department</th><th>Designation</th>
-              <th>Role</th><th>Category</th><th>Reporting To</th><th>Joining Date</th><th>App Ver.</th><th></th>
+              <th>Role</th><th>Category</th><th>Status</th><th>Reporting To</th><th>Joining Date</th><th>App Ver.</th><th></th>
             </tr></thead>
             <tbody id="emp-tbody"></tbody>
           </table>
@@ -1120,15 +1136,58 @@ async function loadDepartments() {
 
 // ── Employees ─────────────────────────────────────────────────────────────────
 async function loadEmployees() {
-  const data = await api('GET', '/employees');
-  if (!data?.success) return;
-  empData = data.data;
-  renderEmployees(empData);
-  const counts = empData.reduce((a, e) => { a[e.department_id] = (a[e.department_id] || 0) + 1; return a; }, {});
+  // Fetch active employees + inactive employees in parallel
+  const [activeRes, inactiveRes] = await Promise.all([
+    api('GET', '/employees'),
+    api('GET', '/employees?is_active=false')
+  ]);
+  if (!activeRes?.success) return;
+  const activeList   = activeRes.data || [];
+  const inactiveList = (inactiveRes?.data || []).filter(e => !activeList.find(a => a.id === e.id));
+  // Mark is_active explicitly on each
+  activeList.forEach(e => { if (e.is_active === undefined) e.is_active = true; });
+  inactiveList.forEach(e => { e.is_active = false; });
+  empData = [...activeList, ...inactiveList];
+
+  // Update status pill counts
+  const inactiveCnt = empData.filter(e => e.is_active === false).length;
+  const activeCnt   = empData.filter(e => e.is_active !== false).length;
+  document.getElementById('status-count-all').textContent     = `(${empData.length})`;
+  document.getElementById('status-count-active').textContent  = `(${activeCnt})`;
+  document.getElementById('status-count-inactive').textContent= `(${inactiveCnt})`;
+
+  // Default view: show active only
+  filterEmployees();
+
+  const counts = activeList.reduce((a, e) => { a[e.department_id] = (a[e.department_id] || 0) + 1; return a; }, {});
   Object.entries(counts).forEach(([id, cnt]) => {
     const el = document.getElementById('dept-cnt-' + id);
     if (el) el.textContent = cnt;
   });
+}
+
+let _statusFilter = 'active'; // default: show active only
+
+function setStatusFilter(val, btn) {
+  _statusFilter = val;
+  // Update pill styles
+  document.querySelectorAll('.status-pill').forEach(p => {
+    p.style.fontWeight = '700';
+    p.style.opacity = '1';
+  });
+  const isAll      = val === 'all';
+  const isActive   = val === 'active';
+  const isInactive = val === 'inactive';
+  document.getElementById('status-pill-all').style.background      = isAll      ? 'var(--accent)' : 'var(--surface2)';
+  document.getElementById('status-pill-all').style.color           = isAll      ? '#fff'          : 'var(--muted)';
+  document.getElementById('status-pill-all').style.borderColor     = isAll      ? 'var(--accent)'  : 'var(--border)';
+  document.getElementById('status-pill-active').style.background   = isActive   ? '#16a34a'        : '#f0fdf4';
+  document.getElementById('status-pill-active').style.color        = isActive   ? '#fff'           : '#15803d';
+  document.getElementById('status-pill-active').style.borderColor  = isActive   ? '#16a34a'        : '#86efac';
+  document.getElementById('status-pill-inactive').style.background = isInactive ? '#dc2626'        : '#fef2f2';
+  document.getElementById('status-pill-inactive').style.color      = isInactive ? '#fff'           : '#dc2626';
+  document.getElementById('status-pill-inactive').style.borderColor= isInactive ? '#dc2626'        : '#fca5a5';
+  filterEmployees();
 }
 
 function filterByDept(deptId, btn) {
@@ -1142,11 +1201,17 @@ function filterEmployees() {
   const q    = document.getElementById('search').value.toLowerCase();
   const dept = document.getElementById('dept-filter').value;
   const role = document.getElementById('role-filter').value;
-  const filtered = empData.filter(e =>
-    (!q    || `${e.first_name} ${e.last_name} ${e.employee_code} ${e.email}`.toLowerCase().includes(q)) &&
-    (!dept || String(e.department_id) === dept) &&
-    (!role || e.role === role)
-  );
+  const filtered = empData.filter(e => {
+    const matchStatus = _statusFilter === 'all'
+      ? true
+      : _statusFilter === 'inactive'
+      ? e.is_active === false
+      : e.is_active !== false;
+    return matchStatus &&
+      (!q    || `${e.first_name} ${e.last_name} ${e.employee_code} ${e.email}`.toLowerCase().includes(q)) &&
+      (!dept || String(e.department_id) === dept) &&
+      (!role || e.role === role);
+  });
   document.getElementById('emp-count').textContent = `${filtered.length} employee${filtered.length !== 1 ? 's' : ''}`;
   renderEmployees(filtered);
 }
@@ -1156,18 +1221,21 @@ function clearFilters() {
   document.getElementById('dept-filter').value = '';
   document.getElementById('role-filter').value = '';
   document.querySelectorAll('#dept-tabs .dept-pill').forEach((b, i) => b.classList.toggle('active', i === 0));
-  renderEmployees(empData);
+  setStatusFilter('active', document.getElementById('status-pill-active'));
 }
 
 function renderEmployees(list) {
   document.getElementById('emp-count').textContent = `${list.length} employee${list.length !== 1 ? 's' : ''}`;
-  document.getElementById('emp-tbody').innerHTML = list.length ? list.map(e => `
-    <tr style="cursor:pointer" onclick="showEmpDetail(${e.id})">
+  document.getElementById('emp-tbody').innerHTML = list.length ? list.map(e => {
+    const inactive = e.is_active === false;
+    const rowStyle = inactive ? 'cursor:pointer;opacity:.65;background:rgba(239,68,68,.03)' : 'cursor:pointer';
+    return `
+    <tr style="${rowStyle}" onclick="showEmpDetail(${e.id})">
       <td>
         <div class="flex gap-2">
-          <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--purple))">${e.first_name?.[0]}${e.last_name?.[0] || ''}</div>
+          <div class="avatar" style="background:${inactive ? 'linear-gradient(135deg,#94a3b8,#64748b)' : 'linear-gradient(135deg,var(--accent),var(--purple))'}">${e.first_name?.[0]}${e.last_name?.[0] || ''}</div>
           <div>
-            <div style="font-weight:700;font-size:13.5px">${e.first_name} ${e.last_name}</div>
+            <div style="font-weight:700;font-size:13.5px;${inactive ? 'color:var(--muted);text-decoration:line-through' : ''}">${e.first_name} ${e.last_name}</div>
             <div class="text-muted">${e.email}</div>
           </div>
         </div>
@@ -1182,14 +1250,21 @@ function renderEmployees(list) {
         const labels = { permanent:'Permanent', provision:'⏳ Provision', contractual:'Contractual' };
         return `<span class="badge" style="${styles[cat]}">${labels[cat]||cat}</span>`;
       })()}</td>
+      <td>
+        ${inactive
+          ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">⏸ Inactive</span>`
+          : `<span style="display:inline-flex;align-items:center;gap:4px;background:#f0fdf4;color:#15803d;border:1.5px solid #86efac;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">✅ Active</span>`
+        }
+      </td>
       <td>${e.manager_name || '—'}</td>
       <td>${fmt.date(e.joining_date)}</td>
       <td style="font-size:12px;color:var(--muted);">${e.app_version ? `<span style="background:#ede9fe;color:#6d28d9;padding:2px 7px;border-radius:10px;font-size:11px;">v${e.app_version}</span>` : '<span style="color:var(--muted)">Web</span>'}</td>
       <td onclick="event.stopPropagation()">
         <button class="btn btn-ghost btn-sm" onclick="showEmpDetail(${e.id})">View →</button>
       </td>
-    </tr>`).join('')
-  : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:48px"><div style="font-size:32px;margin-bottom:10px">👥</div>No employees found</td></tr>';
+    </tr>`;
+  }).join('')
+  : '<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:48px"><div style="font-size:32px;margin-bottom:10px">👥</div>No employees found</td></tr>';
 }
 
 async function showEmpDetail(id) {
@@ -2859,7 +2934,8 @@ async function executeDangerAction() {
       if (data?.success) {
         toast('⏸ Employee account deactivated');
         closeModal('emp-danger-modal');
-        loadEmployees();
+        await loadEmployees();
+        setStatusFilter('inactive', document.getElementById('status-pill-inactive'));
         loadSeparatedCount();
       } else toast(data?.message || 'Failed to deactivate', 'error');
 
@@ -2868,7 +2944,8 @@ async function executeDangerAction() {
       if (data?.success) {
         toast('✅ Employee account reactivated');
         closeModal('emp-danger-modal');
-        loadEmployees();
+        await loadEmployees();
+        setStatusFilter('active', document.getElementById('status-pill-active'));
         loadSeparatedCount();
       } else toast(data?.message || 'Failed to reactivate', 'error');
 
@@ -2877,7 +2954,7 @@ async function executeDangerAction() {
       if (data?.success) {
         toast('🗑️ Employee account deleted permanently');
         closeModal('emp-danger-modal');
-        loadEmployees();
+        await loadEmployees();
         loadSeparatedCount();
       } else toast(data?.message || 'Failed to delete', 'error');
     }
