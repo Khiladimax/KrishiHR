@@ -1136,7 +1136,7 @@ async function loadDepartments() {
 
 // ── Employees ─────────────────────────────────────────────────────────────────
 async function loadEmployees() {
-  // Fetch active employees + inactive employees in parallel
+  // Fetch active + inactive employees in parallel
   const [activeRes, inactiveRes] = await Promise.all([
     api('GET', '/employees'),
     api('GET', '/employees?is_active=false')
@@ -1144,7 +1144,6 @@ async function loadEmployees() {
   if (!activeRes?.success) return;
   const activeList   = activeRes.data || [];
   const inactiveList = (inactiveRes?.data || []).filter(e => !activeList.find(a => a.id === e.id));
-  // Mark is_active explicitly on each
   activeList.forEach(e => { if (e.is_active === undefined) e.is_active = true; });
   inactiveList.forEach(e => { e.is_active = false; });
   empData = [...activeList, ...inactiveList];
@@ -1152,11 +1151,11 @@ async function loadEmployees() {
   // Update status pill counts
   const inactiveCnt = empData.filter(e => e.is_active === false).length;
   const activeCnt   = empData.filter(e => e.is_active !== false).length;
-  document.getElementById('status-count-all').textContent     = `(${empData.length})`;
-  document.getElementById('status-count-active').textContent  = `(${activeCnt})`;
-  document.getElementById('status-count-inactive').textContent= `(${inactiveCnt})`;
+  document.getElementById('status-count-all').textContent      = `(${empData.length})`;
+  document.getElementById('status-count-active').textContent   = `(${activeCnt})`;
+  document.getElementById('status-count-inactive').textContent = `(${inactiveCnt})`;
 
-  // Default view: show active only
+  // Render using CURRENT _statusFilter (caller sets it before calling us)
   filterEmployees();
 
   const counts = activeList.reduce((a, e) => { a[e.department_id] = (a[e.department_id] || 0) + 1; return a; }, {});
@@ -2964,6 +2963,7 @@ async function executeDangerAction() {
       else if (data?.success) {
         toast('⏸ Employee account deactivated');
         closeModal('emp-danger-modal');
+        _statusFilter = 'inactive';  // set BEFORE reload so list shows inactive
         await loadEmployees();
         setStatusFilter('inactive', document.getElementById('status-pill-inactive'));
         loadSeparatedCount();
@@ -2974,6 +2974,7 @@ async function executeDangerAction() {
       else if (data?.success) {
         toast('✅ Employee account reactivated');
         closeModal('emp-danger-modal');
+        _statusFilter = 'active';  // set BEFORE reload
         await loadEmployees();
         setStatusFilter('active', document.getElementById('status-pill-active'));
         loadSeparatedCount();
@@ -2984,6 +2985,7 @@ async function executeDangerAction() {
       else if (data?.success) {
         toast('🗑️ Employee account deleted permanently');
         closeModal('emp-danger-modal');
+        _statusFilter = 'active';  // set BEFORE reload
         await loadEmployees();
         loadSeparatedCount();
       } else toast('Delete failed: ' + (data?.message || 'Unknown error'), 'error');
