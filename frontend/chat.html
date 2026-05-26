@@ -455,7 +455,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
   padding: 8px 12px 8px 12px; background: var(--wa-panel);
   display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0;
   border-top: 1px solid var(--wa-border);
-  margin-right: 90px; /* keep clear of fixed Voice Assistant bubble */
+  margin-right: 110px; /* keep clear of fixed Voice Assistant bubble */
 }
 .chat-input {
   flex: 1; background: var(--wa-surface); border: none; border-radius: 24px;
@@ -1482,7 +1482,7 @@ function renderGroupList() {
     const isMe    = g.last_message_sender === me.id;
     return `<div class="group-item ${g.id===activeGid?'active':''}" onclick="openGroup(${g.id})" oncontextmenu="showSidebarCtx(event,${g.id})">
       <div class="group-avatar ${isDM?'dm':''} ${isOnline?'online':''}" data-peer-id="${g.dm_peer_id||''}">
-        ${name.charAt(0).toUpperCase()}
+        ${(isDM && g.dm_peer_avatar) ? `<img src="${WS_URL}${g.dm_peer_avatar.startsWith('http')?g.dm_peer_avatar.replace(WS_URL,''):g.dm_peer_avatar}" onerror="this.style.display='none';this.parentElement.dataset.initial='${name.charAt(0).toUpperCase()}'">` : (!isDM && g.avatar_url) ? `<img src="${g.avatar_url.startsWith('http')?g.avatar_url:WS_URL+g.avatar_url}" onerror="this.style.display='none'">` : name.charAt(0).toUpperCase()}
         <div class="online-ring"></div>
       </div>
       <div class="group-info">
@@ -1537,8 +1537,14 @@ async function openGroup(gid) {
   const name  = isDM ? (activeGroup.dm_peer_name||'DM') : (activeGroup.name||'Group');
 
   const av = document.getElementById('chatHeaderAvatar');
-  av.textContent = name.charAt(0).toUpperCase();
-  av.className   = `chat-header-avatar ${isDM?'dm':''}`;
+  av.className = `chat-header-avatar ${isDM?'dm':''}`;
+  const _avatarUrl = isDM ? activeGroup.dm_peer_avatar : activeGroup.avatar_url;
+  if (_avatarUrl) {
+    const _src = _avatarUrl.startsWith('http') ? _avatarUrl : WS_URL + _avatarUrl;
+    av.innerHTML = `<img src="${_src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.textContent='${name.charAt(0).toUpperCase()}'">`;
+  } else {
+    av.textContent = name.charAt(0).toUpperCase();
+  }
   document.getElementById('chatHeaderName').textContent = name;
 
   const subEl = document.getElementById('chatHeaderSub');
@@ -1776,7 +1782,9 @@ function buildMsgEl(m) {
   const editedHtml = m.edited_at && !isDeleted ? `<span class="msg-edited">(edited)</span>` : '';
 
   wrap.innerHTML = `
-    ${!isMine ? `<div class="msg-avatar">${(m.sender_name||'?').charAt(0)}</div>` : ''}
+    ${!isMine ? `<div class="msg-avatar" style="background:${m.sender_avatar?'transparent':'linear-gradient(135deg,var(--chat-accent),#1a6b4a)'}">
+      ${m.sender_avatar ? `<img src="${m.sender_avatar.startsWith('http')?m.sender_avatar:WS_URL+m.sender_avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.display='none'">` : (m.sender_name||'?').charAt(0)}
+    </div>` : ''}
     <div class="msg-content-wrap">
       ${!isMine ? `<div class="msg-sender">${esc(m.sender_name||'')}</div>` : ''}
       <div class="msg-bubble" data-bubble-id="${m.id}" oncontextmenu="showCtxMenuEv(event,${m.id},${isMine})">
