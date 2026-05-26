@@ -1691,16 +1691,24 @@ function buildMsgEl(m) {
   // Content
   let contentHtml = '';
   // Build the full file URL — always use backend URL directly to avoid Vercel 404
-  const fileFullUrl = m.file_url ? (m.file_url.startsWith('http') ? m.file_url : `${WS_URL}${m.file_url}`) : '';
+  function buildFileUrl(fileUrl) {
+    if (!fileUrl) return '';
+    const base = fileUrl.startsWith('http') ? fileUrl : `${WS_URL}${fileUrl}`;
+    return base;
+  }
+  const fileFullUrl = buildFileUrl(m.file_url);
   if (isDeleted) {
     contentHtml = `<span class="msg-deleted">🚫 ${m.deleted_for_everyone ? 'This message was deleted' : 'You deleted this message'}</span>`;
   } else if (m.message_type==='image') {
+    const imgToken = localStorage.getItem('krishihr_token') || localStorage.getItem('token') || '';
+    const imgSrc = fileFullUrl + (fileFullUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(imgToken);
     contentHtml = `<div class="msg-img-wrap" style="position:relative;display:inline-block;cursor:pointer" onclick="openImgPreview('${fileFullUrl}')">
-      <img class="msg-image" src="${fileFullUrl}" alt="${esc(m.file_name)}" loading="lazy"
-        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div style="display:none;align-items:center;justify-content:center;width:160px;height:100px;background:#f0f0f0;border-radius:8px;flex-direction:column;gap:4px">
-        <span style="font-size:28px">🖼️</span>
-        <span style="font-size:11px;color:#666">${esc(m.file_name||'image')}</span>
+      <img class="msg-image" src="${imgSrc}" alt="${esc(m.file_name)}" loading="lazy"
+        onerror="this.parentElement.querySelector('.img-fallback').style.display='flex';this.style.display='none'">
+      <div class="img-fallback" style="display:none;align-items:center;justify-content:center;width:180px;height:120px;background:#f0f0f0;border-radius:8px;flex-direction:column;gap:4px">
+        <span style="font-size:32px">🖼️</span>
+        <span style="font-size:11px;color:#666;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.file_name||'image')}</span>
+        <button onclick="event.stopPropagation();dlFile('${fileFullUrl}','${esc(m.file_name||'image')}')" style="font-size:11px;background:var(--chat-accent);color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;margin-top:2px">Download</button>
       </div>
       <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.45);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center"
         onclick="event.stopPropagation();dlFile('${fileFullUrl}','${esc(m.file_name||'image')}')">⬇️</div>
@@ -2049,9 +2057,24 @@ async function chunkedUpload(file) {
   showUploadProgress(file.name, 0, file.size);
 
   // 1. Init session
+  // Detect mime type from extension if browser doesn't provide it
+  function guessMime(f) {
+    if (f.type) return f.type;
+    const ext = f.name.split('.').pop().toLowerCase();
+    const map = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
+                  webp:'image/webp', heic:'image/heic', heif:'image/heif',
+                  mp4:'video/mp4', mov:'video/quicktime', avi:'video/x-msvideo',
+                  mp3:'audio/mpeg', wav:'audio/wav', ogg:'audio/ogg', m4a:'audio/mp4',
+                  pdf:'application/pdf', doc:'application/msword',
+                  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                  xls:'application/vnd.ms-excel',
+                  xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  zip:'application/zip', txt:'text/plain' };
+    return map[ext] || 'application/octet-stream';
+  }
   const initRes = await chatApi('POST', '/chat/upload/init', {
     groupId: activeGid, fileName: file.name, fileSize: file.size,
-    mimeType: file.type || 'application/octet-stream', totalChunks
+    mimeType: guessMime(file), totalChunks
   });
   if (!initRes.success) { hideUploadProgress(); alert('Upload init failed: ' + initRes.message); return; }
 
