@@ -2931,35 +2931,42 @@ async function executeDangerAction() {
     let data;
     if (_dangerAction === 'deactivate') {
       data = await api('PUT', `/employees/${_dangerEmpId}`, { is_active: false });
-      if (data?.success) {
+      console.log('[deactivate response]', data);
+      if (!data) { toast('Server error — not authorized or server offline', 'error'); }
+      else if (data?.success) {
         toast('⏸ Employee account deactivated');
         closeModal('emp-danger-modal');
         await loadEmployees();
         setStatusFilter('inactive', document.getElementById('status-pill-inactive'));
         loadSeparatedCount();
-      } else toast(data?.message || 'Failed to deactivate', 'error');
+      } else toast('Deactivate failed: ' + (data?.message || 'Unknown error'), 'error');
 
     } else if (_dangerAction === 'reactivate') {
       data = await api('PUT', `/employees/${_dangerEmpId}`, { is_active: true, separation_date: null, separation_type: null });
-      if (data?.success) {
+      console.log('[reactivate response]', data);
+      if (!data) { toast('Server error — not authorized or server offline', 'error'); }
+      else if (data?.success) {
         toast('✅ Employee account reactivated');
         closeModal('emp-danger-modal');
         await loadEmployees();
         setStatusFilter('active', document.getElementById('status-pill-active'));
         loadSeparatedCount();
-      } else toast(data?.message || 'Failed to reactivate', 'error');
+      } else toast('Reactivate failed: ' + (data?.message || 'Unknown error'), 'error');
 
     } else if (_dangerAction === 'delete') {
       data = await api('DELETE', `/employees/${_dangerEmpId}`);
-      if (data?.success) {
+      console.log('[delete response]', data);
+      if (!data) { toast('Server error — not authorized or server offline', 'error'); }
+      else if (data?.success) {
         toast('🗑️ Employee account deleted permanently');
         closeModal('emp-danger-modal');
         await loadEmployees();
         loadSeparatedCount();
-      } else toast(data?.message || 'Failed to delete', 'error');
+      } else toast('Delete failed: ' + (data?.message || 'Unknown error'), 'error');
     }
   } catch (err) {
-    toast('Network error. Please try again.', 'error');
+    console.error('[danger action error]', err);
+    toast('Error: ' + err.message, 'error');
   }
 
   btn.disabled = false;
