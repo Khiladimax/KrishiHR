@@ -354,7 +354,8 @@ exports.update = async (req, res) => {
       'bank_name','bank_account','bank_ifsc','bank_branch',
       'address_line1','city','state','pincode',
       'probation_end_date','exit_date','notes',
-      'is_active','is_wfh_permanent','level','saturday_policy'
+      'is_active','is_wfh_permanent','level','saturday_policy',
+      'separation_date','separation_type','separation_reason','employee_type'
     ];
 
     const sets = [], params = []; let idx = 1;
