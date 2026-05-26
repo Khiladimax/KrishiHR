@@ -1118,7 +1118,7 @@ buildSidebar('chat.html');
 if (typeof loadNotifBadge === "function") loadNotifBadge();
 
 if (window.CFG) {
-  document.getElementById('page-title').textContent = 'KrishiHR — Chat & Meetings';
+  document.getElementById('page-title').textContent = 'KrishiHR — Chat';
   const lt = document.getElementById('sidebar-logo-text');
   
   const cs = document.getElementById('sidebar-company-short');
@@ -2101,7 +2101,7 @@ async function chunkedUpload(file) {
 }
 
 function authHeaders() {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = localStorage.getItem('krishihr_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
   return token ? { Authorization: 'Bearer ' + token } : {};
 }
 function chatUrl(path) {
