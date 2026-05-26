@@ -1992,7 +1992,7 @@ async function uploadPendingFile() {
     const res = await chatApiFormWithProgress(`/chat/groups/${activeGid}/files`, fd,
       (pct) => showUploadProgress(file.name, pct, file.size));
     hideUploadProgress();
-    if (!res.success) alert('Upload failed: ' + (res.message || 'Unknown error'));
+    if (!res.success) { console.error('[upload] failed:', res); alert('Upload failed: ' + (res.message || res.error || JSON.stringify(res))); }
   } else {
     // Large file — chunked upload
     await chunkedUpload(file);
@@ -2032,9 +2032,13 @@ async function chatApiFormWithProgress(path, fd, onProgress) {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', chatUrl(path));
-    Object.entries(authHeaders()).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+    const hdrs = authHeaders();
+    Object.entries(hdrs).forEach(([k, v]) => xhr.setRequestHeader(k, v));
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
-    xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ success: false }); } };
+    xhr.onload = () => {
+      try { resolve(JSON.parse(xhr.responseText)); }
+      catch { resolve({ success: false, message: 'Server error (status ' + xhr.status + ')' }); }
+    };
     xhr.onerror = () => resolve({ success: false, message: 'Network error' });
     xhr.send(fd);
   });
@@ -2105,7 +2109,8 @@ function authHeaders() {
   return token ? { Authorization: 'Bearer ' + token } : {};
 }
 function chatUrl(path) {
-  const base = (window.API_BASE || window.location.origin + '/api').replace(/\/$/, '');
+  // BASE_URL is set at script top using typeof API_BASE (reads app.js const correctly)
+  const base = (typeof BASE_URL !== 'undefined' ? BASE_URL : (window.API_BASE || window.location.origin + '/api')).replace(/\/$/, '');
   return base + (path.startsWith('/') ? path : '/' + path);
 }
 
