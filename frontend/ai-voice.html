@@ -676,10 +676,6 @@ async function sendText(query) {
       const r = await handleHRContacts(lower); response = r.text; chips = r.chips;
     } else if (isEmployeeQuery(lower)) {
       const r = await handleEmployeeDir(query); response = r.text; chips = r.chips;
-    } else if (isScheduleMeetingQuery(lower)) {
-      const r = await handleScheduleMeeting(query); response = r.text; chips = r.chips;
-    } else if (isCallEmployeeQuery(lower)) {
-      const r = await handleCallEmployee(query); response = r.text; chips = r.chips;
     } else if (isSendMessageQuery(lower)) {
       const r = await handleSendMessage(query); response = r.text; chips = r.chips;
     } else {
@@ -1773,77 +1769,10 @@ function buildEmpCard(e, roleLabel) {
 }
 
 // ── SCHEDULE MEETING ────────────────────────────────────────────────────────
-function isScheduleMeetingQuery(lower) {
-  return /schedule|set up|arrange|book a meet|create a meet|plan.*meet/.test(lower) && /meeting|meet\b/.test(lower);
-}
 
-async function handleScheduleMeeting(query) {
-  if (!allEmployees) {
-    const res = await api('GET', '/employees');
-    if (res?.success) allEmployees = res.data;
-  }
-  const emp = findEmployeeInQuery(query, allEmployees);
-  const timeMatch = query.match(/(?:at|@)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
-  const dateMatch = query.match(/\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
-  let scheduledAt = new Date();
-  scheduledAt.setHours(scheduledAt.getHours() + 1, 0, 0, 0);
-  if (dateMatch) {
-    const d = dateMatch[1].toLowerCase();
-    if (d === 'tomorrow') scheduledAt.setDate(scheduledAt.getDate() + 1);
-    else {
-      const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-      const target = days.indexOf(d);
-      if (target >= 0) { const diff = (target - scheduledAt.getDay() + 7) % 7 || 7; scheduledAt.setDate(scheduledAt.getDate() + diff); }
-    }
-  }
-  if (timeMatch) {
-    const tStr = timeMatch[1].trim();
-    const isPM = /pm/i.test(tStr); const isAM = /am/i.test(tStr);
-    const parts = tStr.replace(/[apm\s]/gi,'').split(':');
-    let h = parseInt(parts[0]); const m = parts[1] ? parseInt(parts[1]) : 0;
-    if (isPM && h < 12) h += 12; if (isAM && h === 12) h = 0;
-    scheduledAt.setHours(h, m, 0, 0);
-  }
-  const title = emp ? `Meeting with ${emp.first_name} ${emp.last_name}` : 'Team Meeting';
-  let group_id = null;
-  if (emp) {
-    const grpsRes = await api('GET', '/chat/groups');
-    if (grpsRes?.success) {
-      const dm = grpsRes.data?.find(g => g.type === 'dm' && String(g.dm_peer_id) === String(emp.id));
-      if (dm) { group_id = dm.id; }
-      else { const dmRes = await api('POST', '/chat/groups', { type:'dm', member_ids:[emp.id] }); if (dmRes?.success) group_id = dmRes.data?.id; }
-    }
-  }
-  const res = await api('POST', '/chat/scheduled-meetings', { title, scheduled_at: scheduledAt.toISOString(), group_id, agenda: emp ? `Discussion with ${emp.first_name}` : '' });
-  if (!res?.success) return { text: `Sorry ${userName}, I couldn't schedule the meeting. Please try from Chat.`, chips:[{ label:'📅 Meetings', href:'chat.html' }] };
-  const timeStr = scheduledAt.toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
-  const withWho = emp ? ` with **${emp.first_name} ${emp.last_name}**` : '';
-  return { text: `Done! Scheduled "${title}"${withWho} for **${timeStr}**.`, chips:[{ label:'📅 View Meetings', href:'chat.html' }] };
-}
 
 // ── CALL EMPLOYEE ────────────────────────────────────────────────────────────
-function isCallEmployeeQuery(lower) {
-  return /(video call|audio call|voice call|start call|\bcall\b|\bring\b)/.test(lower) && !/schedule|meeting/.test(lower);
-}
 
-async function handleCallEmployee(query) {
-  if (!allEmployees) {
-    const res = await api('GET', '/employees');
-    if (res?.success) allEmployees = res.data;
-  }
-  const emp = findEmployeeInQuery(query, allEmployees);
-  if (!emp) return { text: `I couldn't find that employee. Try "Call Rahul" or "Video call Priya".`, chips:[] };
-  const isVideo = /video/.test(query.toLowerCase());
-  const callType = isVideo ? 'video' : 'audio';
-  const label = isVideo ? '📹 Video Call' : '📞 Audio Call';
-  return {
-    text: `Connecting you to **${label}** with **${emp.first_name} ${emp.last_name}**. Opening Chat now…`,
-    chips:[{ label:`${label} ${emp.first_name}`, action: () => {
-      sessionStorage.setItem('ai_call_intent', JSON.stringify({ userId: emp.id, callType }));
-      window.location.href = 'chat.html';
-    }}]
-  };
-}
 
 // ── SEND MESSAGE ─────────────────────────────────────────────────────────────
 function isSendMessageQuery(lower) {
