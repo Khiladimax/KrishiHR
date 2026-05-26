@@ -2809,28 +2809,8 @@ loadGroups().then(async () => {
   // Open the DM
   await openGroup(targetGroup.id);
 
-  // If it's a call (not dm_only), trigger once socket is fully connected
-  if (callType && callType !== 'dm_only') {
-    const doCall = () => {
-      setTimeout(() => { if (activeGroup) // initiateCall(callType); }, 500);
-    };
-    if (socket && socket.connected) {
-      // doCall();
-    } else {
-      let waited = 0;
-      const poll = setInterval(() => {
-        waited += 300;
-        if (socket && socket.connected) {
-          clearInterval(poll);
-          // doCall();
-        } else if (waited >= 10000) {
-          clearInterval(poll);
-          console.warn('[AI Call] socket never connected');
-        }
-      }, 300);
-    }
-  }
 });
+
 setInterval(loadGroups, 30000);
 </script>
 
