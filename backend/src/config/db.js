@@ -6,11 +6,12 @@ require('dotenv').config();
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      // Neon always requires SSL — rejectUnauthorized:false works on all hosting platforms
+      ssl: { rejectUnauthorized: false },
       max: 8,
       idleTimeoutMillis: 10000,        // release idle connections after 10s
-      connectionTimeoutMillis: 5000,   // ✅ fail fast (was 20s — caused request pile-up during DB hiccups)
-      allowExitOnIdle: true,           // ✅ free pool when server is idle (prevents zombie connections)
+      connectionTimeoutMillis: 5000,   // fail fast (was 20s — caused request pile-up during DB hiccups)
+      allowExitOnIdle: true,           // free pool when server is idle (prevents zombie connections)
     }
   : {
       host:     process.env.DB_HOST     || 'localhost',
