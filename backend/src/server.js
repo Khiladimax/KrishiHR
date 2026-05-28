@@ -379,7 +379,9 @@ cron.schedule('30 18 * * 1-6', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
-// ── Run auto-present on startup too (handles Render cold-start missing cron) ──
+// ── Run auto-present on startup DISABLED — was exhausting DB pool on cold start ──
+// Cron jobs handle this at scheduled times instead.
+/*
 (async () => {
   await new Promise(r => setTimeout(r, 15000)); // wait 15s for DB pool to warm up on cold start
   try {
@@ -429,6 +431,7 @@ cron.schedule('30 18 * * 1-6', async () => {
     if (wfhEmps.rows.length) console.log(`✅ Startup auto-present done for ${wfhEmps.rows.length} employees`);
   } catch (err) { console.error('Startup WFH error:', err.message); }
 })();
+*/
 
 // ── Cleanup: Delete expired notifications every day at 2 AM IST ─────────────
 cron.schedule('0 2 * * *', async () => {
