@@ -734,24 +734,21 @@ async function start() {
       console.log('');
     });
 
-    // ✅ Run background fixes AFTER server is live — these can be slow with large data
-    // Delay 5s so the pool is fully warm and Render has detected the port
+    // ✅ Run lightweight schema additions in background — non-blocking
     setTimeout(async () => {
       try {
-        // ── Safe column additions — moved here so they don't block port binding ──
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_type VARCHAR(20) DEFAULT 'onsite'`);
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_date DATE DEFAULT NULL`);
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
-        console.log('✅ DB schema ready');
         await offerCtrl.initTables();
         await itDeclCtrl.initTables();
-        await attCtrl.fixWrongAbsents();
-        await attCtrl.fixMissingPunchOuts();
-        await attCtrl.fixTimezoneShiftedLeaves(); // can be slow on large data — runs in background
-        // ── Project Budget Tracking tables ──
         const projCtrl = require('./controllers/projectController');
         await projCtrl.migrate();
+        console.log('✅ DB schema ready');
+        // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
+        // startup — they held DB connections and starved the pool causing login timeouts.
+        // Run these manually via pgAdmin when needed.
       } catch (err) {
         console.error('❌ Background startup fix failed:', err.message);
       }
