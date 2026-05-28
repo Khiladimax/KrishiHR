@@ -142,29 +142,38 @@ exports.delete = async (req, res) => {
 };
 
 // ── Toggle Like on Announcement ───────────────────────────────────────────────
+// Fix: replaced check-then-insert with atomic CTE to prevent race condition
+// that caused "duplicate key value violates unique constraint" on rapid clicks.
 exports.toggleLike = async (req, res) => {
   try {
     const annId = parseInt(req.params.id);
     const empId = req.user.id;
 
-    const existing = await db.query(
-      `SELECT id FROM announcement_likes WHERE announcement_id=$1 AND employee_id=$2`,
+    // Atomic toggle: try delete first; if nothing deleted, insert.
+    // This avoids the race condition between SELECT → INSERT.
+    const del = await db.query(
+      `DELETE FROM announcement_likes WHERE announcement_id=$1 AND employee_id=$2 RETURNING id`,
       [annId, empId]
     );
 
-    if (existing.rows.length) {
-      await db.query(`DELETE FROM announcement_likes WHERE id=$1`, [existing.rows[0].id]);
+    let liked;
+    if (del.rows.length > 0) {
+      // Was liked → now unliked
+      liked = false;
     } else {
+      // Not liked → insert (ON CONFLICT DO NOTHING handles any remaining edge case)
       await db.query(
-        `INSERT INTO announcement_likes(announcement_id, employee_id) VALUES($1,$2)`,
+        `INSERT INTO announcement_likes(announcement_id, employee_id)
+         VALUES($1, $2)
+         ON CONFLICT (announcement_id, employee_id) DO NOTHING`,
         [annId, empId]
       );
+      liked = true;
     }
 
     const count = await db.query(
       `SELECT COUNT(*) FROM announcement_likes WHERE announcement_id=$1`, [annId]
     );
-    const liked = existing.rows.length === 0; // if it didn't exist before, we just liked it
     res.json({ success: true, liked, like_count: parseInt(count.rows[0].count) });
   } catch (err) {
     console.error(err);
