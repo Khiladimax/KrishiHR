@@ -699,6 +699,7 @@ cron.schedule('5 8 * * *', async () => {
 async function start() {
   try {
     await db.query('SELECT 1');
+    await chatCtrl.migrate();
     console.log('✅ Database connected');
 
     await db.query(`CREATE TABLE IF NOT EXISTS birthday_likes (
@@ -720,8 +721,19 @@ async function start() {
     )`);
     console.log('✅ Birthday tables ready');
 
-    // ✅ Start listening IMMEDIATELY — don't block port binding on ALTER TABLE queries
-    // ALTER TABLE can lock tables and hang for seconds; Render times out waiting for port
+    // ── Safe column additions — idempotent, run every deploy ──────────────────
+    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_type VARCHAR(20) DEFAULT 'onsite'`);
+    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_date DATE DEFAULT NULL`);
+    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
+    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
+
+    // ── Indexes: already created in pgAdmin, skipped on every startup to avoid table locks ──
+    // ALTER TABLE attendance DROP/ADD CONSTRAINT removed — it locks the attendance table
+    // on every deploy causing all in-flight requests to timeout during redeployment.
+    // Constraint and indexes were applied once manually via pgAdmin. No-op now.
+    console.log('✅ DB schema ready');
+
+    // ✅ Start accepting requests FIRST — don't block login/API on background fixes
     server.listen(PORT, () => {
       console.log('');
       console.log('╔═══════════════════════════════════════╗');
@@ -734,21 +746,18 @@ async function start() {
       console.log('');
     });
 
-    // ✅ Run lightweight schema additions in background — non-blocking
+    // ✅ Run background fixes AFTER server is live — these can be slow with large data
+    // Delay 5s so the pool is fully warm and Render has detected the port
     setTimeout(async () => {
       try {
-        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_type VARCHAR(20) DEFAULT 'onsite'`);
-        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_date DATE DEFAULT NULL`);
-        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
-        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
         await offerCtrl.initTables();
         await itDeclCtrl.initTables();
+        await attCtrl.fixWrongAbsents();
+        await attCtrl.fixMissingPunchOuts();
+        await attCtrl.fixTimezoneShiftedLeaves(); // can be slow on large data — runs in background
+        // ── Project Budget Tracking tables ──
         const projCtrl = require('./controllers/projectController');
         await projCtrl.migrate();
-        console.log('✅ DB schema ready');
-        // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
-        // startup — they held DB connections and starved the pool causing login timeouts.
-        // Run these manually via pgAdmin when needed.
       } catch (err) {
         console.error('❌ Background startup fix failed:', err.message);
       }
@@ -910,14 +919,12 @@ setTimeout(() => {
   setInterval(pingServer, INTERVAL_MS);
 }, INITIAL_DELAY_MS);
 
-// ── DB Keep-Alive — keeps Neon DB pool warm every 5 minutes ──────────────────
-// NOTE: chatCtrl.migrate() was removed from here — it ran every minute causing
-// log spam ("✅ Chat tables migrated") and unnecessary DB load.
-// Migrations now run ONCE at startup only (see start() above).
-const DB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes (was 1 min — too aggressive)
+// ── DB Keep-Alive — keeps Neon DB pool warm every 1 minute ───────────────────
+const DB_PING_INTERVAL = 1 * 60 * 1000; // 1 minute
 setInterval(async () => {
   try {
     await db.query('SELECT 1');
+    await chatCtrl.migrate();
   } catch (err) {
     console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
   }
