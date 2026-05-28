@@ -2,14 +2,15 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Use DATABASE_URL if set (Neon), otherwise fall back to individual params
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-      max: 8,
-      idleTimeoutMillis: 10000,     // ✅ release idle connections after 10s (was 30s — caused pool pile-up)
-      connectionTimeoutMillis: 20000,
+      ssl: false,
+      max: 5,                        // hard cap — leaves room for pgAdmin + other tools
+      min: 1,                        // keep 1 connection warm
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
+      allowExitOnIdle: false,
     }
   : {
       host:     process.env.DB_HOST     || 'localhost',
@@ -17,15 +18,22 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME     || 'hrms_db',
       user:     process.env.DB_USER     || 'postgres',
       password: process.env.DB_PASSWORD || '',
-      max: 8,                       // ✅ 8 is enough — 15 caused all slots to fill with idle connections
-      idleTimeoutMillis: 10000,     // ✅ release idle connections after 10s (was 30s)
-      connectionTimeoutMillis: 20000,
+      max: 5,                        // hard cap — leaves room for pgAdmin + other tools
+      min: 1,                        // keep 1 connection warm
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
+      allowExitOnIdle: false,
       ssl: false,
     };
 
 const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => console.error('Unexpected DB error', err));
+
+// Log pool stats on connect for debugging
+pool.on('connect', () => {
+  console.log(`[DB Pool] New connection. Total: ${pool.totalCount} Idle: ${pool.idleCount} Waiting: ${pool.waitingCount}`);
+});
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
