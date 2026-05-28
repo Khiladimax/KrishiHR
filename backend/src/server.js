@@ -919,14 +919,12 @@ setTimeout(() => {
   setInterval(pingServer, INTERVAL_MS);
 }, INITIAL_DELAY_MS);
 
-// ── DB Keep-Alive — keeps Neon DB pool warm every 5 minutes ──────────────────
-// NOTE: chatCtrl.migrate() was removed from here — it ran every minute causing
-// log spam ("✅ Chat tables migrated") and unnecessary DB load.
-// Migrations now run ONCE at startup only (see start() above).
-const DB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes (was 1 min — too aggressive)
+// ── DB Keep-Alive — keeps Neon DB pool warm every 1 minute ───────────────────
+const DB_PING_INTERVAL = 1 * 60 * 1000; // 1 minute
 setInterval(async () => {
   try {
     await db.query('SELECT 1');
+    await chatCtrl.migrate();
   } catch (err) {
     console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
   }
