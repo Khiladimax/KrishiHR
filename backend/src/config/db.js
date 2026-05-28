@@ -2,16 +2,14 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Use DATABASE_URL if set (Neon), otherwise fall back to individual params
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      // Neon always requires SSL — rejectUnauthorized:false works on all hosting platforms
-      ssl: { rejectUnauthorized: false },
+      ssl: false,  // DB does not support SSL
       max: 8,
-      idleTimeoutMillis: 10000,        // release idle connections after 10s
-      connectionTimeoutMillis: 5000,   // fail fast (was 20s — caused request pile-up during DB hiccups)
-      allowExitOnIdle: true,           // free pool when server is idle (prevents zombie connections)
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
+      allowExitOnIdle: true,
     }
   : {
       host:     process.env.DB_HOST     || 'localhost',
@@ -20,9 +18,9 @@ const poolConfig = process.env.DATABASE_URL
       user:     process.env.DB_USER     || 'postgres',
       password: process.env.DB_PASSWORD || '',
       max: 8,
-      idleTimeoutMillis: 10000,        // release idle connections after 10s
-      connectionTimeoutMillis: 5000,   // ✅ fail fast (was 20s)
-      allowExitOnIdle: true,           // ✅ free pool when server is idle
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
+      allowExitOnIdle: true,
       ssl: false,
     };
 
