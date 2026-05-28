@@ -30,10 +30,6 @@ const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => console.error('Unexpected DB error', err));
 
-// Log pool stats on connect for debugging
-pool.on('connect', () => {
-  console.log(`[DB Pool] New connection. Total: ${pool.totalCount} Idle: ${pool.idleCount} Waiting: ${pool.waitingCount}`);
-});
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
