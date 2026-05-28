@@ -2,14 +2,14 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// Use DATABASE_URL if set (Neon), otherwise fall back to individual params
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: false,  // DB does not support SSL
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
       max: 8,
-      idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 5000,
-      allowExitOnIdle: true,
+      idleTimeoutMillis: 10000,     // ✅ release idle connections after 10s (was 30s — caused pool pile-up)
+      connectionTimeoutMillis: 20000,
     }
   : {
       host:     process.env.DB_HOST     || 'localhost',
@@ -17,10 +17,9 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME     || 'hrms_db',
       user:     process.env.DB_USER     || 'postgres',
       password: process.env.DB_PASSWORD || '',
-      max: 8,
-      idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 5000,
-      allowExitOnIdle: true,
+      max: 8,                       // ✅ 8 is enough — 15 caused all slots to fill with idle connections
+      idleTimeoutMillis: 10000,     // ✅ release idle connections after 10s (was 30s)
+      connectionTimeoutMillis: 20000,
       ssl: false,
     };
 
