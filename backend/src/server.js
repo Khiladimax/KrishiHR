@@ -720,19 +720,8 @@ async function start() {
     )`);
     console.log('✅ Birthday tables ready');
 
-    // ── Safe column additions — idempotent, run every deploy ──────────────────
-    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_type VARCHAR(20) DEFAULT 'onsite'`);
-    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_date DATE DEFAULT NULL`);
-    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
-    await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
-
-    // ── Indexes: already created in pgAdmin, skipped on every startup to avoid table locks ──
-    // ALTER TABLE attendance DROP/ADD CONSTRAINT removed — it locks the attendance table
-    // on every deploy causing all in-flight requests to timeout during redeployment.
-    // Constraint and indexes were applied once manually via pgAdmin. No-op now.
-    console.log('✅ DB schema ready');
-
-    // ✅ Start accepting requests FIRST — don't block login/API on background fixes
+    // ✅ Start listening IMMEDIATELY — don't block port binding on ALTER TABLE queries
+    // ALTER TABLE can lock tables and hang for seconds; Render times out waiting for port
     server.listen(PORT, () => {
       console.log('');
       console.log('╔═══════════════════════════════════════╗');
@@ -749,6 +738,12 @@ async function start() {
     // Delay 5s so the pool is fully warm and Render has detected the port
     setTimeout(async () => {
       try {
+        // ── Safe column additions — moved here so they don't block port binding ──
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_type VARCHAR(20) DEFAULT 'onsite'`);
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_date DATE DEFAULT NULL`);
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
+        console.log('✅ DB schema ready');
         await offerCtrl.initTables();
         await itDeclCtrl.initTables();
         await attCtrl.fixWrongAbsents();
