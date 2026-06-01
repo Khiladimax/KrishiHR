@@ -220,7 +220,7 @@ exports.uploadPayroll = async (req, res) => {
     const iPT         = col('prof');
     const iLWF        = col('lwf');
     const iTotalDed   = col('total');
-    const iLoanEMI    = col('loan') !== -1 ? col('loan') : col('salary deduction') !== -1 ? col('salary deduction') : col('emi');
+    const iLoanEMI    = col('loan') !== -1 ? col('loan') : col('salary deduction') !== -1 ? col('salary deduction') : col('emi') !== -1 ? col('emi') : col('loan/emi');
     const iNetPay     = col('net');
     const iStatus     = col('payment');
     const iRemarks    = col('remarks');
@@ -359,6 +359,46 @@ exports.uploadPayroll = async (req, res) => {
           await projCtrl.hookPayrollExpenditure(empId, netPay, monthNum, yearNum, payRow.rows[0].id);
         }
       } catch(hookErr) { console.error('[payroll.hook]', hookErr.message); }
+
+      // ── Auto-record EMI installment if employee has active loan ──────────
+      try {
+        const emiCheck = await client.query(
+          `SELECT id, monthly_emi, installments_paid, total_installments
+           FROM advance_salary
+           WHERE employee_id=$1 AND status='disbursed'
+             AND installments_paid < total_installments
+           ORDER BY payment_date ASC LIMIT 1`,
+          [empId]
+        );
+        if (emiCheck.rows.length) {
+          const loan = emiCheck.rows[0];
+          const newPaid   = parseInt(loan.installments_paid) + 1;
+          const isCleared = newPaid >= parseInt(loan.total_installments);
+          await client.query(
+            `INSERT INTO loan_recovery_log
+               (advance_id, employee_id, payroll_month, payroll_year, emi_amount, installment_no, notes)
+             VALUES($1,$2,$3,$4,$5,$6,$7)
+             ON CONFLICT(advance_id,payroll_month,payroll_year) DO NOTHING`,
+            [loan.id, empId, monthNum, yearNum, loan.monthly_emi, newPaid,
+             'Installment ' + newPaid + '/' + loan.total_installments]
+          );
+          await client.query(
+            `UPDATE advance_salary
+             SET installments_paid=$1,
+                 status=CASE WHEN $2 THEN 'cleared' ELSE status END,
+                 updated_at=NOW()
+             WHERE id=$3`,
+            [newPaid, isCleared, loan.id]
+          );
+          const notifMsg = isCleared
+            ? '🎉 Your loan is fully repaid! Final installment (' + newPaid + '/' + loan.total_installments + ') deducted from ' + monthName + ' ' + yearNum + ' salary.'
+            : '💳 EMI installment ' + newPaid + '/' + loan.total_installments + ' of ₹' + parseFloat(loan.monthly_emi).toLocaleString('en-IN') + ' deducted from ' + monthName + ' ' + yearNum + ' salary.';
+          await client.query(
+            `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance',$2,$3)`,
+            [empId, isCleared ? '✅ Loan Cleared!' : '💳 EMI Deducted', notifMsg]
+          ).catch(()=>{});
+        }
+      } catch(emiErr) { console.error('[EMI auto-record]', emiErr.message); }
 
       processed++;
     }
@@ -818,7 +858,7 @@ exports.downloadPayrollTemplate = async (req, res) => {
       'Working Days', 'Present Days', 'LOP Days', 'Paid Days',
       'Basic', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
       'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'LWF', 'TDS',
-      'Loan/EMI Deduction', 'Total Deductions',
+      'Loan/EMI Deduction (Active EMI)', 'EMI Progress', 'Total Deductions',
       'Net Pay', 'Payment Status', 'Remarks'
     ];
 
@@ -832,8 +872,15 @@ exports.downloadPayrollTemplate = async (req, res) => {
       // Row 3: Headers
       HEADERS,
       // Data rows
-      ...employees.map(e => {
+      ...await Promise.all(employees.map(async e => {
         const gross   = parseFloat(e.gross_salary)   || 0;
+        // Fetch active EMI for this employee
+        const emiRes  = await db.query(
+          `SELECT monthly_emi, installments_paid, total_installments
+           FROM advance_salary
+           WHERE employee_id=$1 AND status='disbursed' AND installments_paid < total_installments
+           ORDER BY payment_date ASC LIMIT 1`, [e.id]);
+        const activeEMI = emiRes.rows[0] || null;
         const pf      = parseFloat(e.pf_employee)    || 0;
         const esi     = parseFloat(e.esi_employee)   || 0;
         const pt      = parseFloat(e.professional_tax) || 0;
@@ -862,13 +909,16 @@ exports.downloadPayrollTemplate = async (req, res) => {
           pt,
           lwf,
           tds,
-          0,         // Loan/EMI — FILL IF APPLICABLE
+          parseFloat(activeEMI ? activeEMI.monthly_emi : 0),
+          activeEMI
+            ? (parseInt(activeEMI.installments_paid||0)+1) + '/' + activeEMI.total_installments
+            : '',
           totalDed,
           net,
           'Paid',    // Payment Status default
           '',        // Remarks
         ];
-      }),
+      })),
     ];
 
     const ws1 = XLSX.utils.aoa_to_sheet(rows);
@@ -879,7 +929,7 @@ exports.downloadPayrollTemplate = async (req, res) => {
       {wch:11},{wch:11},{wch:9},{wch:9},
       {wch:10},{wch:8},{wch:10},{wch:14},{wch:9},{wch:12},
       {wch:12},{wch:12},{wch:9},{wch:6},{wch:8},
-      {wch:16},{wch:14},
+      {wch:16},{wch:12},{wch:14},
       {wch:10},{wch:14},{wch:20}
     ];
 
