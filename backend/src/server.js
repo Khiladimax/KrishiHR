@@ -748,6 +748,11 @@ async function start() {
         await itDeclCtrl.initTables();
         const projCtrl = require('./controllers/projectController');
         await projCtrl.migrate();
+        // ── Add deactivation_remark column if it doesn't exist ─────────────
+        await db.query(`
+          ALTER TABLE employees
+          ADD COLUMN IF NOT EXISTS deactivation_remark TEXT DEFAULT NULL
+        `).catch(() => {});
         console.log('✅ DB schema ready');
         // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
         // startup — they held DB connections and starved the pool causing login timeouts.
