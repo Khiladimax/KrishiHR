@@ -286,9 +286,9 @@
 <!-- ══ Set EMI & Disburse Modal ════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="set-emi-modal" style="display:none;z-index:400">
   <div class="modal" style="width:460px;max-width:96vw">
-    <div class="modal-header" style="background:linear-gradient(135deg,#0d47a1,#1565c0)">
+    <div class="modal-header">
       <div class="modal-title" style="color:#fff">💳 Set EMI Schedule & Mark Disbursed</div>
-      <button class="modal-close" onclick="closeModal('set-emi-modal')" style="color:#fff">✕</button>
+      <button class="modal-close" onclick="closeModal('set-emi-modal')">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px;display:grid;gap:14px">
       <input type="hidden" id="set-emi-adv-id">
@@ -337,9 +337,9 @@
 <!-- ══ Mark EMI Paid Modal ══════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="mark-paid-modal" style="display:none;z-index:400">
   <div class="modal" style="width:420px;max-width:96vw">
-    <div class="modal-header" style="background:linear-gradient(135deg,#2e7d32,#1b5e20)">
-      <div class="modal-title" style="color:#fff">✅ Mark EMI Installment Paid</div>
-      <button class="modal-close" onclick="closeModal('mark-paid-modal')" style="color:#fff">✕</button>
+    <div class="modal-header">
+      <div class="modal-title">✅ Mark EMI Installment Paid</div>
+      <button class="modal-close" onclick="closeModal('mark-paid-modal')">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px;display:grid;gap:14px">
       <input type="hidden" id="mp-loan-id">
@@ -373,9 +373,9 @@
 <!-- ══ EMI Modal ══════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="emi-modal" style="display:none;z-index:300">
   <div class="modal" style="width:480px;max-width:96vw">
-    <div class="modal-header" style="background:linear-gradient(135deg,#1565c0,#0d47a1)">
-      <div class="modal-title" style="color:#fff">💳 <span id="emi-modal-title">Add New Loan / EMI</span></div>
-      <button class="modal-close" onclick="closeModal('emi-modal')" style="color:#fff">✕</button>
+    <div class="modal-header">
+      <div class="modal-title">💳 <span id="emi-modal-title">Add New Loan / EMI</span></div>
+      <button class="modal-close" onclick="closeModal('emi-modal')">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px;display:grid;gap:14px">
       <input type="hidden" id="emi-edit-id">
@@ -1053,7 +1053,7 @@ async function processPayment() {
 }
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { const el = document.getElementById(id); el.classList.remove('open'); el.style.display = 'none'; }
 
 // ════════════════════════════════════════════════════════════════════════════
 // EMI / LOAN TRACKER JS
@@ -1186,7 +1186,7 @@ function openEMIModal(existing) {
   ySel.innerHTML = [cy-1,cy,cy+1].map(y =>
     `<option value="${y}" ${existing?.emi_start_year==y?'selected':''}>${y}</option>`).join('');
 
-  document.getElementById('emi-modal').style.display = 'flex';
+  document.getElementById('emi-modal').style.display = 'flex'; document.getElementById('emi-modal').classList.add('open');
 }
 
 async function saveEMI() {
@@ -1267,7 +1267,7 @@ function openSetEMIModal(advId, empName, amount) {
   // Default start month = current month
   mSel.value = new Date().getMonth() + 1;
 
-  document.getElementById('set-emi-modal').style.display = 'flex';
+  document.getElementById('set-emi-modal').style.display = 'flex'; document.getElementById('set-emi-modal').classList.add('open');
 }
 
 async function saveSetEMI() {
@@ -1321,7 +1321,7 @@ function openMarkPaidModal(loanId, empName, emiAmt, paid, total) {
   const cy = now.getFullYear();
   ySel.innerHTML = [cy-1,cy,cy+1].map(y => `<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('');
 
-  document.getElementById('mark-paid-modal').style.display = 'flex';
+  document.getElementById('mark-paid-modal').style.display = 'flex'; document.getElementById('mark-paid-modal').classList.add('open');
 }
 
 async function confirmMarkPaid() {
