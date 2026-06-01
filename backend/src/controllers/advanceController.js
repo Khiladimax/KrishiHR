@@ -891,3 +891,154 @@ exports.getActiveEMI = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── Mark Approved Advance as Disbursed + Set EMI Schedule (Accounts) ─────────
+// POST /advance/:id/mark-disbursed
+exports.markDisbursedWithEMI = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const { id } = req.params;
+    const {
+      payment_date, monthly_emi, total_installments,
+      installments_paid = 0, emi_start_month, emi_start_year,
+      payment_mode = 'bank_transfer', remarks
+    } = req.body;
+
+    if (!monthly_emi || !total_installments || !emi_start_month || !emi_start_year)
+      return res.status(400).json({ success: false, message: 'monthly_emi, total_installments, emi_start_month, emi_start_year required' });
+
+    const adv = await client.query(
+      `SELECT * FROM advance_salary WHERE id=$1 FOR UPDATE`, [id]
+    );
+    if (!adv.rows.length)
+      return res.status(404).json({ success: false, message: 'Advance not found' });
+    if (!['approved','disbursed'].includes(adv.rows[0].status))
+      return res.status(400).json({ success: false, message: 'Only approved advances can be marked disbursed' });
+
+    // Calculate end month/year
+    let endMonth = parseInt(emi_start_month) + parseInt(total_installments) - 1;
+    let endYear  = parseInt(emi_start_year);
+    while (endMonth > 12) { endMonth -= 12; endYear++; }
+
+    // DDL safety
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS monthly_emi NUMERIC(12,2) DEFAULT 0`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS total_installments INT DEFAULT 1`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS installments_paid INT DEFAULT 0`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_start_month INT`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_start_year INT`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_end_month INT`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_end_year INT`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary DROP CONSTRAINT IF EXISTS advance_salary_status_check`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD CONSTRAINT advance_salary_status_check CHECK (status IN ('pending','approved','rejected','recovered','disbursed','cleared'))`).catch(()=>{});
+
+    await client.query(`
+      UPDATE advance_salary SET
+        status             = CASE WHEN $1::int >= $2::int THEN 'cleared' ELSE 'disbursed' END,
+        monthly_emi        = $3,
+        total_installments = $2,
+        installments_paid  = $1,
+        emi_start_month    = $4,
+        emi_start_year     = $5,
+        emi_end_month      = $6,
+        emi_end_year       = $7,
+        payment_date       = COALESCE($8, payment_date, NOW()),
+        payment_mode       = $9,
+        disbursed_by       = $10,
+        updated_at         = NOW()
+      WHERE id = $11`,
+      [installments_paid, total_installments, monthly_emi,
+       emi_start_month, emi_start_year, endMonth, endYear,
+       payment_date || null, payment_mode, req.user.id, id]
+    );
+
+    // Notify employee
+    const emp = adv.rows[0];
+    const paidN = parseInt(installments_paid);
+    const totalN = parseInt(total_installments);
+    await client.query(
+      `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance','💰 Loan Disbursed',$2)`,
+      [emp.employee_id,
+       `Your advance of ₹${parseFloat(emp.amount).toLocaleString('en-IN')} has been disbursed. EMI: ₹${parseFloat(monthly_emi).toLocaleString('en-IN')}/month × ${totalN} installments. ${paidN > 0 ? paidN + ' installment(s) already marked paid. Remaining: ' + (totalN - paidN) + '.' : 'Starting ' + emi_start_month + '/' + emi_start_year + '.'}`]
+    ).catch(()=>{});
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: `Advance marked as disbursed with ${totalN} EMI installments (${paidN} already paid)` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[markDisbursedWithEMI]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  } finally { client.release(); }
+};
+
+// ── Mark single EMI installment as paid (manual, by Accounts) ────────────────
+// POST /advance/emi/:id/mark-paid
+exports.markEMIPaid = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const { id } = req.params;
+    const { payroll_month, payroll_year, remarks } = req.body;
+
+    const adv = await client.query(
+      `SELECT * FROM advance_salary WHERE id=$1 FOR UPDATE`, [id]
+    );
+    if (!adv.rows.length)
+      return res.status(404).json({ success: false, message: 'Loan not found' });
+
+    const loan = adv.rows[0];
+    if (loan.status !== 'disbursed')
+      return res.status(400).json({ success: false, message: 'Loan is not active' });
+    if (loan.installments_paid >= loan.total_installments)
+      return res.status(400).json({ success: false, message: 'All installments already paid' });
+
+    const m = parseInt(payroll_month) || new Date().getMonth() + 1;
+    const y = parseInt(payroll_year)  || new Date().getFullYear();
+    const newPaid   = parseInt(loan.installments_paid) + 1;
+    const isCleared = newPaid >= parseInt(loan.total_installments);
+
+    // Insert recovery log
+    await client.query(
+      `INSERT INTO loan_recovery_log
+         (advance_id, employee_id, payroll_month, payroll_year, emi_amount, installment_no, notes)
+       VALUES($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT(advance_id,payroll_month,payroll_year) DO UPDATE
+         SET emi_amount=$5, installment_no=$6, notes=$7`,
+      [id, loan.employee_id, m, y, loan.monthly_emi, newPaid,
+       remarks || ('Installment ' + newPaid + '/' + loan.total_installments + ' — manual')]
+    );
+
+    // Update advance
+    await client.query(
+      `UPDATE advance_salary
+       SET installments_paid = $1,
+           status = CASE WHEN $2 THEN 'cleared' ELSE 'disbursed' END,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [newPaid, isCleared, id]
+    );
+
+    // Notify employee
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const msg = isCleared
+      ? `🎉 Your loan is fully repaid! Final installment (${newPaid}/${loan.total_installments}) recorded for ${MONTHS[m-1]} ${y}.`
+      : `💳 EMI installment ${newPaid}/${loan.total_installments} of ₹${parseFloat(loan.monthly_emi).toLocaleString('en-IN')} recorded for ${MONTHS[m-1]} ${y}.`;
+    await client.query(
+      `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance',$2,$3)`,
+      [loan.employee_id, isCleared ? '✅ Loan Cleared!' : '💳 EMI Recorded', msg]
+    ).catch(()=>{});
+
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      message: `Installment ${newPaid}/${loan.total_installments} marked paid${isCleared ? ' — LOAN CLEARED! 🎉' : ''}`,
+      installments_paid: newPaid,
+      total_installments: parseInt(loan.total_installments),
+      is_cleared: isCleared
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[markEMIPaid]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  } finally { client.release(); }
+};
