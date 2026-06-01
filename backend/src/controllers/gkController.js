@@ -914,9 +914,10 @@ exports.announceTop5 = async (req, res) => {
     const period   = req.body.period || 'month';   // 'month' or 'year'
     const postedBy = req.user.id;
 
-    const now   = new Date();
-    const month = now.getMonth() + 1;
-    const year  = now.getFullYear();
+    // Use IST date — server runs UTC, cron fires at 23:59 IST = next UTC day possibly
+    const nowIST  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const month   = nowIST.getMonth() + 1;
+    const year    = nowIST.getFullYear();
 
     // Determine date filter
     let dateFilter = '';
@@ -976,6 +977,24 @@ exports.announceTop5 = async (req, res) => {
       `INSERT INTO announcements (title, content, type, posted_by, expires_at) VALUES ($1, $2, 'achievement', $3, NOW() + INTERVAL '24 hours')`,
       [title, content, postedBy]
     );
+
+    // ── Notify ALL active employees via in-app notification ──────────────
+    try {
+      const allEmps = await db.query(`SELECT id FROM employees WHERE is_active = true`);
+      for (const emp of allEmps.rows) {
+        await db.query(
+          `INSERT INTO notifications(employee_id, type, title, message)
+           VALUES($1, 'announcement', $2, $3)`,
+          [emp.id, title, `🏆 ${r.rows[0]?.name || 'Top performer'} topped the leaderboard! Check the announcement for full results.`]
+        );
+      }
+      // ── Broadcast via Socket.IO so online users see it instantly ─────
+      if (global.io) {
+        global.io.emit('new_announcement', { title, content, type: 'achievement' });
+      }
+    } catch (notifErr) {
+      console.error('[announceTop5] Notification failed (non-blocking):', notifErr.message);
+    }
 
     res.json({ success: true, message: `Top 5 ${period} announcement posted!`, data: r.rows });
   } catch (err) {
