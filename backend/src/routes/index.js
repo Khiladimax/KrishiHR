@@ -196,6 +196,10 @@ router.delete('/advance/:id/dismiss',        authenticate, advCtrl.dismiss);
 router.post('/advance/:id/edit',             authenticate, advCtrl.edit);
 router.post('/advance/:id/process-payment',  authenticate, authorize('accounts'), advCtrl.processPayment);
 router.get ('/advance/:id/approvals',        authenticate, advCtrl.getApprovals);
+router.get ('/advance/emi/list',             authenticate, authorize('accounts','hr','super_admin'), advCtrl.getEMIList);
+router.post('/advance/emi',                  authenticate, authorize('accounts'), advCtrl.upsertEMI);
+router.put ('/advance/emi/:id',              authenticate, authorize('accounts'), advCtrl.upsertEMI);
+router.get ('/advance/emi/employee/:employee_id', authenticate, authorize('accounts','hr'), advCtrl.getActiveEMI);
 
 // ── Reimbursement ─────────────────────────────────────────────────────────────
 const reimbCtrl = require('../controllers/reimbursementController');
