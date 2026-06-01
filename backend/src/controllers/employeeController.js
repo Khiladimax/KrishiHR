@@ -1037,7 +1037,7 @@ exports.exportMasterExcel = async (req, res) => {
         const groupBg    = group === 'onsite'  ? 'FF1B5E20'
                          : group === 'offsite' ? 'FF0D47A1'
                          :                      'FF4A0000';
-        ws1.mergeCells(sepRow, 1, sepRow, totalCols);
+        try { ws1.mergeCells(sepRow, 1, sepRow, totalCols); } catch(_) {}
         const sc = ws1.getCell(sepRow, 1);
         sc.value = groupLabel;
         sc.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
@@ -1095,7 +1095,8 @@ exports.exportMasterExcel = async (req, res) => {
           }
         }
         if (lastAttDay2 < daysInMonth) {
-          try { ws1.mergeCells(row, 5 + lastAttDay2 + 1, row, 5 + daysInMonth); } catch(ex){}
+          try { ws1.unMergeCells(row, 5+lastAttDay2+1, row, 5+daysInMonth); } catch(_){}
+          try { ws1.mergeCells(row, 5 + lastAttDay2 + 1, row, 5 + daysInMonth); } catch(_) {}
           const rc = ws1.getCell(row, 5 + lastAttDay2 + 1);
           rc.value = e.deactivation_remark ? `❌ TERMINATED — ${e.deactivation_remark}` : `❌ Account deactivated${e.separation_date?' on '+e.separation_date:''}`;
           rc.font  = { bold: true, size: 8, color: { argb: 'FFB71C1C' }, italic: true };
@@ -1168,8 +1169,8 @@ exports.exportMasterExcel = async (req, res) => {
     for (let i = 1; i <= 9; i++) ws1.getColumn(5 + daysInMonth + i).width = 10;
 
     // ── Legend row ──────────────────────────────────────────────────────────
-    const legendRow = employees.length + 4;
-    ws1.mergeCells(legendRow, 1, legendRow, totalCols);
+    const legendRow = employees.length + 4 + masterGroupOffset;
+    try { ws1.mergeCells(legendRow, 1, legendRow, totalCols); } catch(_) {}
     const legendCell = ws1.getCell(legendRow, 1);
     legendCell.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Paid Leave (CL/SL/EL) — counts as Present for salary  LWP=Unpaid Leave  H=Half Day  H-EL=Half EL  H-CL=Half CL  H-SL=Half SL  H-LWP=Half LWP (Unpaid)  H-WFH=Half WFH  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off  HOL=Holiday';
     legendCell.font = { italic: true, size: 8, color: { argb: 'FF37474F' } };
@@ -1720,7 +1721,7 @@ exports.exportAttendanceRegister = async (req, res) => {
         const groupBg = group === 'onsite' ? 'FF1B5E20'
                       : group === 'offsite' ? 'FF0D47A1'
                       : 'FF4A0000';
-        ws1.mergeCells(sepRow, 1, sepRow, totalCols);
+        try { ws1.mergeCells(sepRow, 1, sepRow, totalCols); } catch(_) {}
         const sepCell = ws1.getCell(sepRow, 1);
         sepCell.value = groupLabel;
         sepCell.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
