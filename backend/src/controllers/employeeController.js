@@ -848,7 +848,11 @@ exports.exportMasterExcel = async (req, res) => {
              COALESCE(s.total_deductions,0)             AS total_deductions,
              COALESCE(s.net_salary,0)                   AS net_salary,
              COALESCE(s.ctc_monthly,0)                  AS ctc_monthly,
-             COALESCE(s.ctc_annual,e.ctc,0)             AS ctc_annual
+             COALESCE(s.ctc_annual,e.ctc,0)             AS ctc_annual,
+             e.is_active,
+             e.deactivation_remark,
+             e.separation_date,
+             e.is_wfh_permanent
       FROM employees e
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
@@ -857,9 +861,18 @@ exports.exportMasterExcel = async (req, res) => {
       WHERE (
         e.is_active = true
         OR (
-          -- Include employees who separated but were active during the export month
-          e.separation_date IS NOT NULL
-          AND e.separation_date >= MAKE_DATE($1::int, $2::int, 1)
+          -- Include employees deactivated this month or later
+          e.is_active = false
+          AND (
+            e.separation_date IS NULL
+            OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1)
+          )
+          AND EXISTS (
+            SELECT 1 FROM attendance a
+            WHERE a.employee_id = e.id
+              AND EXTRACT(MONTH FROM a.date) = $2
+              AND EXTRACT(YEAR  FROM a.date) = $1
+          )
         )
         OR (
           -- Include future-LWD completed separations
@@ -870,7 +883,13 @@ exports.exportMasterExcel = async (req, res) => {
           )
         )
       )
-      ORDER BY d.name, e.first_name`, [y, m]);
+      ORDER BY
+        CASE WHEN e.is_active = false THEN 2
+             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working'
+                  OR e.is_wfh_permanent = true
+                  OR LOWER(COALESCE(e.city,'')) LIKE '%work from home%' THEN 1
+             ELSE 0 END,
+        d.name, e.first_name`, [y, m]);
     const employees = empResult.rows;
 
     // ── 2. Attendance for the month ─────────────────────────────────────────
@@ -1460,15 +1479,20 @@ exports.exportMasterExcel = async (req, res) => {
       else if (h.region==='south_west') masterHolsByRegion.south_west.add(h.date_str);
     }
     // Build master employees list with is_active + saturday_policy fields
-    const masterEmpForPunch = empResult.rows.map(e => ({
-      id: e.id, employee_code: e.employee_code,
-      first_name: e.first_name, last_name: e.last_name,
-      department: e.department, city: e.city, state: e.state,
-      saturday_policy: e.saturday_policy || '2nd_4th_off',
-      is_active: e.is_active !== false,
-      deactivation_remark: e.deactivation_remark || null,
-      separation_date: e.separation_date || null,
-    }));
+    const masterEmpForPunch = empResult.rows.map(e => {
+      const isWFH = e.is_wfh_permanent === true
+                 || (e.saturday_policy === 'all_working')
+                 || (e.city || '').toLowerCase().includes('work from home');
+      return {
+        id: e.id, employee_code: e.employee_code,
+        first_name: e.first_name, last_name: e.last_name,
+        department: e.department, city: e.city, state: e.state,
+        saturday_policy: isWFH ? 'all_working' : (e.saturday_policy || '2nd_4th_off'),
+        is_active: e.is_active !== false,
+        deactivation_remark: e.deactivation_remark || null,
+        separation_date: e.separation_date || null,
+      };
+    });
     await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
 
     // ── Send response ────────────────────────────────────────────────────────
@@ -1503,6 +1527,7 @@ exports.exportAttendanceRegister = async (req, res) => {
              COALESCE(e.saturday_policy, '2nd_4th_off') AS saturday_policy,
              e.city, e.state,
              e.is_active,
+             e.is_wfh_permanent,
              e.deactivation_remark,
              e.separation_date,
              e.separation_type
@@ -1512,8 +1537,14 @@ exports.exportAttendanceRegister = async (req, res) => {
       WHERE (
         e.is_active = true
         OR (
-          e.separation_date IS NOT NULL
-          AND e.separation_date >= MAKE_DATE($1::int, $2::int, 1)
+          e.is_active = false
+          AND (e.separation_date IS NULL OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1))
+          AND EXISTS (
+            SELECT 1 FROM attendance a
+            WHERE a.employee_id = e.id
+              AND EXTRACT(MONTH FROM a.date) = $2
+              AND EXTRACT(YEAR  FROM a.date) = $1
+          )
         )
         OR (
           EXISTS (
@@ -1524,9 +1555,10 @@ exports.exportAttendanceRegister = async (req, res) => {
         )
       )
       ORDER BY
-        -- Sort: onsite first, then offsite, then deactivated
         CASE WHEN e.is_active = false THEN 2
-             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
+             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working'
+                  OR e.is_wfh_permanent = true
+                  OR LOWER(COALESCE(e.city,'')) LIKE '%work from home%' THEN 1
              ELSE 0 END,
         d.name, e.first_name`, [y, m]);
     const employees = empResult.rows;
@@ -1647,7 +1679,11 @@ exports.exportAttendanceRegister = async (req, res) => {
 
     employees.forEach((e, ri) => {
       const isDeactivated = e.is_active === false;
-      const isOffsite     = !isDeactivated && (e.saturday_policy === 'all_working');
+      const isOffsite     = !isDeactivated && (
+        e.saturday_policy === 'all_working' ||
+        e.is_wfh_permanent === true ||
+        (e.city || '').toLowerCase().includes('work from home')
+      );
       const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
 
       // Insert group separator row when group changes
