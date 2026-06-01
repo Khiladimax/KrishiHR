@@ -885,9 +885,7 @@ exports.exportMasterExcel = async (req, res) => {
       )
       ORDER BY
         CASE WHEN e.is_active = false THEN 2
-             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working'
-                  OR e.is_wfh_permanent = true
-                  OR LOWER(COALESCE(e.city,'')) LIKE '%work from home%' THEN 1
+             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
         d.name, e.first_name`, [y, m]);
     const employees = empResult.rows;
@@ -1479,20 +1477,15 @@ exports.exportMasterExcel = async (req, res) => {
       else if (h.region==='south_west') masterHolsByRegion.south_west.add(h.date_str);
     }
     // Build master employees list with is_active + saturday_policy fields
-    const masterEmpForPunch = empResult.rows.map(e => {
-      const isWFH = e.is_wfh_permanent === true
-                 || (e.saturday_policy === 'all_working')
-                 || (e.city || '').toLowerCase().includes('work from home');
-      return {
-        id: e.id, employee_code: e.employee_code,
-        first_name: e.first_name, last_name: e.last_name,
-        department: e.department, city: e.city, state: e.state,
-        saturday_policy: isWFH ? 'all_working' : (e.saturday_policy || '2nd_4th_off'),
-        is_active: e.is_active !== false,
-        deactivation_remark: e.deactivation_remark || null,
-        separation_date: e.separation_date || null,
-      };
-    });
+    const masterEmpForPunch = empResult.rows.map(e => ({
+      id: e.id, employee_code: e.employee_code,
+      first_name: e.first_name, last_name: e.last_name,
+      department: e.department, city: e.city, state: e.state,
+      saturday_policy: e.saturday_policy || '2nd_4th_off',
+      is_active: e.is_active !== false,
+      deactivation_remark: e.deactivation_remark || null,
+      separation_date: e.separation_date || null,
+    }));
     await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
 
     // ── Send response ────────────────────────────────────────────────────────
@@ -1556,9 +1549,7 @@ exports.exportAttendanceRegister = async (req, res) => {
       )
       ORDER BY
         CASE WHEN e.is_active = false THEN 2
-             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working'
-                  OR e.is_wfh_permanent = true
-                  OR LOWER(COALESCE(e.city,'')) LIKE '%work from home%' THEN 1
+             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
         d.name, e.first_name`, [y, m]);
     const employees = empResult.rows;
@@ -1679,11 +1670,7 @@ exports.exportAttendanceRegister = async (req, res) => {
 
     employees.forEach((e, ri) => {
       const isDeactivated = e.is_active === false;
-      const isOffsite     = !isDeactivated && (
-        e.saturday_policy === 'all_working' ||
-        e.is_wfh_permanent === true ||
-        (e.city || '').toLowerCase().includes('work from home')
-      );
+      const isOffsite     = !isDeactivated && e.saturday_policy === 'all_working';
       const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
 
       // Insert group separator row when group changes
