@@ -115,6 +115,7 @@
       <button class="tab-btn active" onclick="switchTab('my', event)">💸 My Requests</button>
       <button class="tab-btn" id="tab-pending-btn" style="display:none" onclick="switchTab('pending', event)">⏳ Pending Approval</button>
       <button class="tab-btn" id="tab-all-btn"     style="display:none" onclick="switchTab('all', event)">📋 All Requests</button>
+    <button class="tab-btn" id="tab-emi-btn" style="display:none" onclick="switchTab('emi', event)">💳 EMI / Loan Tracker</button>
     </div>
 
     <div id="tab-my">
@@ -249,6 +250,96 @@
 </div>
 
 <script src="app.js"></script>
+
+<!-- ══ EMI / LOAN TRACKER TAB ════════════════════════════════════════════════ -->
+<div id="tab-emi" style="display:none">
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div class="card-title"><span class="card-title-icon">💳</span>EMI / Loan Tracker</div>
+      <button class="btn btn-primary" onclick="openEMIModal(null)" style="padding:8px 18px;font-size:13px">➕ Add New Loan</button>
+    </div>
+
+    <!-- Summary cards -->
+    <div id="emi-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px"></div>
+
+    <!-- EMI table -->
+    <div style="overflow-x:auto">
+      <table class="table" id="emi-table">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Loan Amount</th>
+            <th>Monthly EMI</th>
+            <th>Progress</th>
+            <th>Outstanding</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="emi-tbody">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:30px">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EMI Modal ══════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="emi-modal" style="display:none;z-index:300">
+  <div class="modal" style="width:480px;max-width:96vw">
+    <div class="modal-header" style="background:linear-gradient(135deg,#1565c0,#0d47a1)">
+      <div class="modal-title" style="color:#fff">💳 <span id="emi-modal-title">Add New Loan / EMI</span></div>
+      <button class="modal-close" onclick="closeModal('emi-modal')" style="color:#fff">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;display:grid;gap:14px">
+      <input type="hidden" id="emi-edit-id">
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Employee</label>
+        <select id="emi-employee" class="form-control" style="margin-top:4px"></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Loan Amount (₹)</label>
+          <input type="number" id="emi-amount" class="form-control" placeholder="e.g. 300000" style="margin-top:4px">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Total Installments</label>
+          <input type="number" id="emi-installments" class="form-control" placeholder="e.g. 10" min="1" style="margin-top:4px" oninput="calcEMI()">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Monthly EMI (₹)</label>
+          <input type="number" id="emi-monthly" class="form-control" placeholder="Auto-calculated" style="margin-top:4px">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Installments Paid</label>
+          <input type="number" id="emi-paid" class="form-control" value="0" min="0" style="margin-top:4px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Start Month</label>
+          <select id="emi-start-month" class="form-control" style="margin-top:4px"></select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Start Year</label>
+          <select id="emi-start-year" class="form-control" style="margin-top:4px"></select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Reason / Purpose</label>
+        <input type="text" id="emi-reason" class="form-control" placeholder="e.g. Home loan advance, Medical, Vehicle" style="margin-top:4px">
+      </div>
+      <div id="emi-preview" style="background:#e3f2fd;border-radius:8px;padding:10px 14px;font-size:13px;color:#1565c0;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('emi-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEMI()" id="emi-save-btn">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 Auth.guard();
 buildSidebar('advance.html');
@@ -294,6 +385,7 @@ if (canSeePending) {
 const canSeeAll = isSuperAdmin || isAccounts;
 if (canSeeAll) {
   document.getElementById('tab-all-btn').style.display = '';
+      document.getElementById('tab-emi-btn').style.display = '';
 }
 
 // Show stats for admin/super_admin/accounts only
@@ -323,10 +415,11 @@ async function loadStats() {
 }
 
 function switchTab(name, e) {
-  ['my','pending','all'].forEach(t => {
+  ['my','pending','all','emi'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t === name ? '' : 'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (name === 'emi') loadEMIList();
   if (e) e.target.classList.add('active');
   if (name === 'pending') loadPending();
   if (name === 'all')     loadAll();
@@ -850,6 +943,181 @@ async function processPayment() {
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMI / LOAN TRACKER JS
+// ════════════════════════════════════════════════════════════════════════════
+const MONTHS_EMI = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+
+async function loadEMIList() {
+  const tbody = document.getElementById('emi-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading...</td></tr>';
+  try {
+    const data = await api('GET', '/advance/emi/list');
+    if (!data.success) { toast(data.message, 'error'); return; }
+    const rows = data.data;
+
+    // Summary
+    const active   = rows.filter(r => r.status === 'disbursed');
+    const cleared  = rows.filter(r => r.status === 'cleared');
+    const totalOut = active.reduce((s,r) => s + parseFloat(r.outstanding_balance||0), 0);
+    const totalEMI = active.reduce((s,r) => s + parseFloat(r.monthly_emi||0), 0);
+    document.getElementById('emi-summary').innerHTML = `
+      <div style="background:#e3f2fd;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#1565c0">${active.length}</div>
+        <div style="font-size:12px;color:#1976d2;font-weight:600">Active Loans</div>
+      </div>
+      <div style="background:#fff3e0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#e65100">₹${totalOut.toLocaleString('en-IN')}</div>
+        <div style="font-size:12px;color:#ef6c00;font-weight:600">Total Outstanding</div>
+      </div>
+      <div style="background:#e8f5e9;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#2e7d32">₹${totalEMI.toLocaleString('en-IN')}</div>
+        <div style="font-size:12px;color:#388e3c;font-weight:600">Monthly Recovery</div>
+      </div>
+      <div style="background:#f3e5f5;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#6a1b9a">${cleared.length}</div>
+        <div style="font-size:12px;color:#7b1fa2;font-weight:600">Loans Cleared</div>
+      </div>`;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No loans found. Click ➕ Add New Loan to create one.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => {
+      const paid  = parseInt(r.installments_paid || 0);
+      const total = parseInt(r.total_installments || 1);
+      const pct   = Math.round((paid / total) * 100);
+      const isActive  = r.status === 'disbursed';
+      const isCleared = r.status === 'cleared';
+      const progress = `
+        <div style="display:flex;align-items:center;gap:8px;min-width:140px">
+          <div style="flex:1;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${isCleared?'#2e7d32':pct>70?'#ef6c00':'#1565c0'};border-radius:4px;transition:width .3s"></div>
+          </div>
+          <span style="font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap">${paid}/${total}</span>
+        </div>`;
+      const badge = isCleared
+        ? '<span style="background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">✅ Cleared</span>'
+        : '<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">🔄 Active</span>';
+      return `<tr style="${isCleared?'opacity:.7':''}">
+        <td>
+          <div style="font-weight:600;font-size:13px">${r.employee_name}</div>
+          <div style="font-size:11px;color:var(--muted)">${r.employee_code} · ${r.department||''}</div>
+        </td>
+        <td style="font-weight:700">₹${parseFloat(r.loan_amount).toLocaleString('en-IN')}</td>
+        <td>₹${parseFloat(r.monthly_emi).toLocaleString('en-IN')}/mo</td>
+        <td>${progress}</td>
+        <td style="font-weight:700;color:${isCleared?'#2e7d32':'#e65100'}">₹${parseFloat(r.outstanding_balance||0).toLocaleString('en-IN')}</td>
+        <td>${badge}</td>
+        <td>
+          ${isActive ? `<button class="btn btn-sm btn-ghost" onclick='openEMIModal(${JSON.stringify(r)})' style="font-size:12px">✏️ Edit</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:red;padding:20px">${err.message}</td></tr>`;
+  }
+}
+
+function calcEMI() {
+  const amt   = parseFloat(document.getElementById('emi-amount').value) || 0;
+  const inst  = parseInt(document.getElementById('emi-installments').value) || 0;
+  if (amt && inst) {
+    const emi = Math.ceil(amt / inst);
+    document.getElementById('emi-monthly').value = emi;
+    const paid = parseInt(document.getElementById('emi-paid').value) || 0;
+    const preview = document.getElementById('emi-preview');
+    preview.style.display = '';
+    preview.innerHTML = `Monthly EMI: <b>₹${emi.toLocaleString('en-IN')}</b> × ${inst} installments = ₹${(emi*inst).toLocaleString('en-IN')} | Already paid: ${paid} | Remaining: ${inst-paid}`;
+  }
+}
+
+function openEMIModal(existing) {
+  document.getElementById('emi-edit-id').value    = existing?.id || '';
+  document.getElementById('emi-modal-title').textContent = existing ? 'Edit Loan / EMI' : 'Add New Loan / EMI';
+  document.getElementById('emi-amount').value      = existing?.loan_amount || '';
+  document.getElementById('emi-installments').value= existing?.total_installments || '';
+  document.getElementById('emi-monthly').value     = existing?.monthly_emi || '';
+  document.getElementById('emi-paid').value        = existing?.installments_paid || 0;
+  document.getElementById('emi-reason').value      = existing?.loan_reason || '';
+  document.getElementById('emi-preview').style.display = 'none';
+
+  // Populate employee dropdown
+  const sel = document.getElementById('emi-employee');
+  sel.innerHTML = '<option value="">Select Employee...</option>';
+  if (existing) {
+    sel.innerHTML = `<option value="${existing.employee_id}" selected>${existing.employee_name} (${existing.employee_code})</option>`;
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+    api('GET', '/employees').then(d => {
+      if (d.success) {
+        sel.innerHTML = '<option value="">Select Employee...</option>' +
+          d.data.filter(e => e.is_active !== false).map(e =>
+            `<option value="${e.id}">${e.first_name} ${e.last_name||''} (${e.employee_code})</option>`
+          ).join('');
+      }
+    });
+  }
+
+  // Populate month/year dropdowns
+  const mSel = document.getElementById('emi-start-month');
+  const ySel = document.getElementById('emi-start-year');
+  mSel.innerHTML = MONTHS_EMI.map((m,i) =>
+    `<option value="${i+1}" ${existing?.emi_start_month==i+1?'selected':''}>${m}</option>`).join('');
+  const cy = new Date().getFullYear();
+  ySel.innerHTML = [cy-1,cy,cy+1].map(y =>
+    `<option value="${y}" ${existing?.emi_start_year==y?'selected':''}>${y}</option>`).join('');
+
+  document.getElementById('emi-modal').style.display = 'flex';
+}
+
+async function saveEMI() {
+  const id       = document.getElementById('emi-edit-id').value;
+  const empId    = document.getElementById('emi-employee').value;
+  const amount   = document.getElementById('emi-amount').value;
+  const inst     = document.getElementById('emi-installments').value;
+  const emi      = document.getElementById('emi-monthly').value;
+  const paid     = document.getElementById('emi-paid').value;
+  const reason   = document.getElementById('emi-reason').value;
+  const startM   = document.getElementById('emi-start-month').value;
+  const startY   = document.getElementById('emi-start-year').value;
+
+  if (!empId || !amount || !inst || !emi || !startM || !startY) {
+    toast('Please fill all required fields', 'error'); return;
+  }
+
+  const btn = document.getElementById('emi-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+
+  try {
+    const body = {
+      employee_id: empId, loan_amount: amount, reason,
+      monthly_emi: emi, total_installments: inst,
+      installments_paid: paid,
+      emi_start_month: startM, emi_start_year: startY
+    };
+    const method = id ? 'PUT' : 'POST';
+    const url    = id ? `/advance/emi/${id}` : '/advance/emi';
+    const data   = await api(method, url, body);
+    if (data.success) {
+      toast(id ? '✅ EMI updated!' : '✅ Loan created!', 'success');
+      closeModal('emi-modal');
+      loadEMIList();
+    } else {
+      toast(data.message || 'Save failed', 'error');
+    }
+  } catch(err) {
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save';
+  }
+}
+
+document.getElementById('emi-amount').addEventListener('input', calcEMI);
 </script>
 </body>
 </html>
