@@ -1372,6 +1372,111 @@ exports.exportAttendanceRegister = async (req, res) => {
     legendCell.alignment = { horizontal: 'left', vertical: 'middle' };
     ws1.getRow(legendRow).height = 16;
 
+    // ── Sheet 2 — Punch Register (daily punch in / punch out per employee) ──
+    const attPunchResult = await db.query(`
+      SELECT employee_id,
+             EXTRACT(DAY FROM date)::int AS day,
+             TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
+             TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt
+      FROM attendance
+      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+        AND (punch_in IS NOT NULL OR punch_out IS NOT NULL)`,
+      [m, y]);
+    const punchMap = {};
+    for (const row of attPunchResult.rows) {
+      if (!punchMap[row.employee_id]) punchMap[row.employee_id] = {};
+      punchMap[row.employee_id][row.day] = { in: row.punch_in_fmt || '', out: row.punch_out_fmt || '' };
+    }
+
+    const ws2 = wb.addWorksheet(`Punch Register ${MONTH_NAMES[m-1]} ${y}`, {
+      views: [{ state: 'frozen', xSplit: 3, ySplit: 3 }]
+    });
+
+    // Title row
+    const totalPunchCols = 3 + daysInMonth * 2;
+    ws2.mergeCells(1, 1, 1, totalPunchCols);
+    const pTitle = ws2.getCell(1, 1);
+    pTitle.value = `KrishiHR — Daily Punch In / Punch Out Register | ${MONTH_NAMES[m-1]} ${y}`;
+    pTitle.font  = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+    pTitle.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
+    pTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws2.getRow(1).height = 26;
+
+    // Sub-header row: date groups
+    ['Emp Code', 'Name', 'Department'].forEach((h, i) => {
+      const c = ws2.getCell(2, i + 1);
+      c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+      c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF283593' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws2.mergeCells(2, i+1, 3, i+1);
+    });
+
+    const dayNms = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    let satCntP = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(y, m - 1, d).getDay();
+      if (dow === 6) satCntP++;
+      const isOff = dow === 0 || (dow === 6 && (satCntP === 2 || satCntP === 4));
+      const col   = 3 + (d - 1) * 2 + 1;
+      // Merge two cols for the date header
+      ws2.mergeCells(2, col, 2, col + 1);
+      const dc = ws2.getCell(2, col);
+      dc.value = `${d} ${dayNms[dow]}`;
+      dc.font  = { bold: true, size: 8, color: { argb: isOff ? 'FFFF1744' : 'FFFFFFFF' } };
+      dc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: isOff ? 'FF880E4F' : 'FF1565C0' } };
+      dc.alignment = { horizontal: 'center', vertical: 'middle' };
+      // IN / OUT sub-headers
+      ['IN','OUT'].forEach((lbl, li) => {
+        const sc = ws2.getCell(3, col + li);
+        sc.value = lbl;
+        sc.font  = { bold: true, size: 8, color: { argb: 'FFFFFFFF' } };
+        sc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: li === 0 ? 'FF2E7D32' : 'FFC62828' } };
+        sc.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+    }
+    ws2.getRow(2).height = 20;
+    ws2.getRow(3).height = 18;
+
+    // Fixed col widths
+    ws2.getColumn(1).width = 10;
+    ws2.getColumn(2).width = 22;
+    ws2.getColumn(3).width = 16;
+    for (let d = 1; d <= daysInMonth; d++) {
+      ws2.getColumn(3 + (d-1)*2 + 1).width = 10;
+      ws2.getColumn(3 + (d-1)*2 + 2).width = 10;
+    }
+
+    // Data rows
+    employees.forEach((e, ri) => {
+      const row   = ri + 4;
+      const isAlt = ri % 2 === 1;
+      const altBg = isAlt ? 'FFE8EAF6' : 'FFFFFFFF';
+      [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(), e.department||''].forEach((v, ci) => {
+        const c = ws2.getCell(row, ci + 1);
+        c.value = v; c.font = { size: 9 };
+        c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: altBg } };
+        c.alignment = { vertical: 'middle' };
+        c.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+      });
+      const empPunch = punchMap[e.id] || {};
+      for (let d = 1; d <= daysInMonth; d++) {
+        const col   = 3 + (d - 1) * 2 + 1;
+        const punch = empPunch[d] || { in: '', out: '' };
+        const inC   = ws2.getCell(row, col);
+        const outC  = ws2.getCell(row, col + 1);
+        inC.value   = punch.in;
+        outC.value  = punch.out;
+        inC.font    = { size: 8, color: { argb: punch.in  ? 'FF1B5E20' : 'FFBDBDBD' } };
+        outC.font   = { size: 8, color: { argb: punch.out ? 'FFB71C1C' : 'FFBDBDBD' } };
+        inC.fill    = { type: 'pattern', pattern: 'solid', fgColor: { argb: altBg } };
+        outC.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: altBg } };
+        inC.alignment  = { horizontal: 'center', vertical: 'middle' };
+        outC.alignment = { horizontal: 'center', vertical: 'middle' };
+        inC.border  = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+        outC.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+      }
+    });
+
     // ── Send ─────────────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_Attendance_${MONTH_NAMES[m-1]}${y}.xlsx"`);
