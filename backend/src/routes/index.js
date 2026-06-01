@@ -200,6 +200,8 @@ router.get ('/advance/emi/list',             authenticate, authorize('accounts',
 router.post('/advance/emi',                  authenticate, authorize('accounts'), advCtrl.upsertEMI);
 router.put ('/advance/emi/:id',              authenticate, authorize('accounts'), advCtrl.upsertEMI);
 router.get ('/advance/emi/employee/:employee_id', authenticate, authorize('accounts','hr'), advCtrl.getActiveEMI);
+router.post('/advance/:id/mark-disbursed',       authenticate, authorize('accounts'), advCtrl.markDisbursedWithEMI);
+router.post('/advance/emi/:id/mark-paid',         authenticate, authorize('accounts'), advCtrl.markEMIPaid);
 
 // ── Reimbursement ─────────────────────────────────────────────────────────────
 const reimbCtrl = require('../controllers/reimbursementController');
