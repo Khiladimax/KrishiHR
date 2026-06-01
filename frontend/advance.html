@@ -721,6 +721,28 @@ function myAdvanceCard(adv) {
           <div class="req-meta">Reason: ${adv.reason || '—'}</div>
           <div class="req-meta">Requested: ${fmt.date(adv.requested_at)}</div>
 
+          ${adv.status === 'disbursed' && adv.total_installments ? (() => {
+            const paid    = parseInt(adv.installments_paid || 0);
+            const total   = parseInt(adv.total_installments);
+            const balance = parseFloat(adv.balance_remaining || 0);
+            const emi     = parseFloat(adv.monthly_emi || 0);
+            const pct     = Math.round((paid / total) * 100);
+            return `
+              <div style="margin-top:8px;padding:8px 10px;background:#f0faf0;border-radius:8px;border:1px solid #c8e6c9">
+                <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#2e7d32;margin-bottom:6px">
+                  <span>💳 EMI Repayment</span>
+                  <span>${paid}/${total} paid</span>
+                </div>
+                <div style="background:#c8e6c9;border-radius:4px;height:6px;margin-bottom:6px">
+                  <div style="background:#2e7d32;height:6px;border-radius:4px;width:${pct}%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:#555">
+                  <span>₹${emi.toLocaleString('en-IN')}/month</span>
+                  <span>Balance: <b style="color:#c62828">₹${balance.toLocaleString('en-IN')}</b></span>
+                </div>
+              </div>`;
+          })() : ''}
+
           ${pipelineHTML(adv)}
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:16px">
