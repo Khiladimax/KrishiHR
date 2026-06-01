@@ -541,7 +541,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   // ── Row 2: Legend ────────────────────────────────────────────────────────
   ws.mergeCells(2, 1, 2, totalCols);
   const leg = ws.getCell(2,1);
-  leg.value = '🟢 IN ≤10:30 On Time   🟠 IN >10:30 Late   🔵 OUT ≥18:30 Full Day   🟣 OUT <18:30 Early   🔴 Missing Punch   ⬜ Weekend   🩶 Holiday';
+  leg.value = '🟢 IN ≤10:30 On Time  |  🟠 IN >10:30 Late  |  🔵 OUT ≥18:30 Full Day  |  🟣 OUT <18:30 Early  |  🟧 MPO=Missing PunchOut  |  🏠 WFH  |  🚗 OD  |  🏖 EL=Leave  |  💸 LWP  |  ½=Half Day  |  WO=Weekend  |  HOL=Holiday';
   leg.font  = { size:8, italic:true, color:{argb:'FF37474F'} };
   leg.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE3F2FD'} };
   leg.alignment = { horizontal:'left', vertical:'middle', indent:1 };
@@ -675,48 +675,119 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
       }
       if (isDeact && d > lastPunchDay) break;
 
-      const punch  = empPunch[d] || {in:'',out:'',inH:-1,outH:-1,inM:-1,outM:-1};
+      const punch  = empPunch[d] || {in:'',out:'',inH:-1,outH:-1,inM:-1,outM:-1,status:'',hours:0};
+      const status = punch.status;
       const inC    = ws.getCell(row, col);
       const outC   = ws.getCell(row, col+1);
 
       if (isWeekend) {
+        // ── Weekend ───────────────────────────────────────────────────────
         inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFECE0E8'}};
-        inC.value=''; outC.value='';
-      } else if (isHol) {
-        inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE0E5E8'}};
-        inC.value=''; outC.value='';
-      } else if (punch.in) {
-        // Parse punch-in time for color
-        const inH  = punch.inH;
-        const inM  = punch.inM;
-        const isOnTime = (inH < 10) || (inH===10 && inM<=30);
-        const inBg  = isOnTime ? 'FFE8F5E9' : 'FFFFF3E0'; // green tint : orange tint
-        const inFg  = isOnTime ? 'FF1B5E20' : 'FFE65100';
-        inC.value = punch.in;
-        inC.font  = {bold:true, size:8, color:{argb:inFg}};
-        inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:inBg}};
-        if (isOnTime) onTimeCnt++; else lateCnt++;
-        totalPunched++;
+        inC.value='WO'; outC.value='';
+        inC.font = {size:7,color:{argb:'FFB71C1C'},bold:true};
+        outC.font = {size:7,color:{argb:'FFBDBDBD'}};
 
-        // Parse punch-out for color
-        if (punch.out) {
-          const outH = punch.outH;
-          const outM = punch.outM;
-          const isFullDay = (outH > 18) || (outH===18 && outM>=30);
-          const outBg = isFullDay ? 'FFE3F2FD' : 'FFF3E5F5'; // blue tint : purple tint
-          const outFg = isFullDay ? 'FF0D47A1' : 'FF6A1B9A';
-          outC.value = punch.out;
-          outC.font  = {bold:true, size:8, color:{argb:outFg}};
-          outC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:outBg}};
+      } else if (isHol) {
+        // ── Holiday ───────────────────────────────────────────────────────
+        inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE0E5E8'}};
+        inC.value='HOL'; outC.value='';
+        inC.font={size:7,color:{argb:'FF546E7A'},bold:true};
+        outC.font={size:7,color:{argb:'FFBDBDBD'}};
+
+      } else if (status === 'wfh') {
+        // ── WFH — no physical punch, show WFH across both cols ────────────
+        try { ws.mergeCells(row, col, row, col+1); } catch(ex){}
+        inC.value = punch.in ? `🏠 IN:${punch.in}` : '🏠 WFH';
+        inC.font  = {bold:true,size:8,color:{argb:'FF006064'}};
+        inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE0F7FA'}};
+        inC.alignment = {horizontal:'center',vertical:'middle'};
+        inC.border = {right:{style:'hair'},bottom:{style:'hair'}};
+        if (punch.in) { totalPunched++; const inH=punch.inH,inM=punch.inM; if((inH<10)||(inH===10&&inM<=30)) onTimeCnt++; else lateCnt++; }
+        continue;
+
+      } else if (status === 'od') {
+        // ── OD — Outdoor Duty, may or may not have punch ──────────────────
+        try { ws.mergeCells(row, col, row, col+1); } catch(ex){}
+        inC.value = punch.in ? `🚗 IN:${punch.in}` : '🚗 OD';
+        inC.font  = {bold:true,size:8,color:{argb:'FF00695C'}};
+        inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE8F5E9'}};
+        inC.alignment = {horizontal:'center',vertical:'middle'};
+        inC.border = {right:{style:'hair'},bottom:{style:'hair'}};
+        if (punch.in) { totalPunched++; const inH=punch.inH,inM=punch.inM; if((inH<10)||(inH===10&&inM<=30)) onTimeCnt++; else lateCnt++; }
+        continue;
+
+      } else if (status === 'on-leave' || status === 'lwp') {
+        // ── On Leave / LWP — no punch expected ────────────────────────────
+        try { ws.mergeCells(row, col, row, col+1); } catch(ex){}
+        inC.value = status==='lwp' ? '💸 LWP' : '🏖 EL';
+        inC.font  = {bold:true,size:8,color:{argb:'FF1A237E'}};
+        inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EAF6'}};
+        inC.alignment = {horizontal:'center',vertical:'middle'};
+        inC.border = {right:{style:'hair'},bottom:{style:'hair'}};
+        continue;
+
+      } else if (status === 'half-day') {
+        // ── Half Day — has punch-in, punch-out is early ───────────────────
+        if (punch.in) {
+          const inH=punch.inH, inM=punch.inM;
+          const isOnTime=(inH<10)||(inH===10&&inM<=30);
+          inC.value=punch.in;
+          inC.font={bold:true,size:8,color:{argb:isOnTime?'FF1B5E20':'FFE65100'}};
+          inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOnTime?'FFE8F5E9':'FFFFF3E0'}};
+          totalPunched++; if(isOnTime) onTimeCnt++; else lateCnt++;
+          outC.value = punch.out || '½';
+          outC.font  = {bold:true,size:8,color:{argb:'FF6A1B9A'}};
+          outC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFF3E5F5'}};
         } else {
-          outC.value = '?';
-          outC.font  = {bold:true, size:8, color:{argb:'FFCC0000'}};
-          outC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFFDE8E8'}};
+          // Half day with no punch recorded
+          try { ws.mergeCells(row, col, row, col+1); } catch(ex){}
+          inC.value='½ DAY'; inC.font={bold:true,size:8,color:{argb:'FF6A1B9A'}};
+          inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3E5F5'}};
+          inC.alignment={horizontal:'center',vertical:'middle'};
+          inC.border={right:{style:'hair'},bottom:{style:'hair'}};
+          continue;
         }
+
+      } else if (status === 'missing_punch_out') {
+        // ── Missing Punch Out — has IN, no OUT ────────────────────────────
+        const inH=punch.inH, inM=punch.inM;
+        const isOnTime=(inH<10)||(inH===10&&inM<=30);
+        inC.value=punch.in||'?';
+        inC.font={bold:true,size:8,color:{argb:isOnTime?'FF1B5E20':'FFE65100'}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOnTime?'FFE8F5E9':'FFFFF3E0'}};
+        if(punch.in){totalPunched++; if(isOnTime) onTimeCnt++; else lateCnt++;}
+        outC.value='MPO';
+        outC.font={bold:true,size:8,color:{argb:'FFFFFFFF'}};
+        outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFF6F00'}};
+
+      } else if (punch.in) {
+        // ── Normal present / late — has punch in ─────────────────────────
+        const inH=punch.inH, inM=punch.inM;
+        const isOnTime=(inH<10)||(inH===10&&inM<=30);
+        const inBg=isOnTime?'FFE8F5E9':'FFFFF3E0';
+        const inFg=isOnTime?'FF1B5E20':'FFE65100';
+        inC.value=punch.in;
+        inC.font={bold:true,size:8,color:{argb:inFg}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:inBg}};
+        totalPunched++; if(isOnTime) onTimeCnt++; else lateCnt++;
+
+        if (punch.out) {
+          const outH=punch.outH,outM=punch.outM;
+          const isFullDay=(outH>18)||(outH===18&&outM>=30);
+          outC.value=punch.out;
+          outC.font={bold:true,size:8,color:{argb:isFullDay?'FF0D47A1':'FF6A1B9A'}};
+          outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isFullDay?'FFE3F2FD':'FFF3E5F5'}};
+        } else {
+          // Punched in but no punch out (shouldn't happen after MPO fix, but safety net)
+          outC.value='—';
+          outC.font={bold:true,size:8,color:{argb:'FFBDBDBD'}};
+          outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFDE8E8'}};
+        }
+
       } else {
-        // No punch — blank or show dash for working day
+        // ── No record for this working day ────────────────────────────────
         inC.value=''; outC.value='';
-        inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+        inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
       }
 
       [inC, outC].forEach(c => {
@@ -1353,15 +1424,16 @@ exports.exportMasterExcel = async (req, res) => {
     const masterPunchResult = await db.query(`
       SELECT employee_id,
              EXTRACT(DAY FROM date)::int AS day,
+             status,
              TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
              TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
              EXTRACT(HOUR   FROM punch_in)::int  AS punch_in_h,
              EXTRACT(MINUTE FROM punch_in)::int  AS punch_in_m,
              EXTRACT(HOUR   FROM punch_out)::int AS punch_out_h,
-             EXTRACT(MINUTE FROM punch_out)::int AS punch_out_m
+             EXTRACT(MINUTE FROM punch_out)::int AS punch_out_m,
+             working_hours
       FROM attendance
-      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
-        AND (punch_in IS NOT NULL OR punch_out IS NOT NULL)`,
+      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2`,
       [m, y]);
     const masterPunchMap = {};
     for (const row of masterPunchResult.rows) {
@@ -1373,6 +1445,8 @@ exports.exportMasterExcel = async (req, res) => {
         inM:  row.punch_in_m  ?? -1,
         outH: row.punch_out_h ?? -1,
         outM: row.punch_out_m ?? -1,
+        status: row.status || '',
+        hours: parseFloat(row.working_hours || 0),
       };
     }
     // Fetch master holidays for punch register
@@ -1763,15 +1837,16 @@ exports.exportAttendanceRegister = async (req, res) => {
     const attPunchResult = await db.query(`
       SELECT employee_id,
              EXTRACT(DAY FROM date)::int AS day,
+             status,
              TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
              TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
              EXTRACT(HOUR   FROM punch_in)::int  AS punch_in_h,
              EXTRACT(MINUTE FROM punch_in)::int  AS punch_in_m,
              EXTRACT(HOUR   FROM punch_out)::int AS punch_out_h,
-             EXTRACT(MINUTE FROM punch_out)::int AS punch_out_m
+             EXTRACT(MINUTE FROM punch_out)::int AS punch_out_m,
+             working_hours
       FROM attendance
-      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
-        AND (punch_in IS NOT NULL OR punch_out IS NOT NULL)`,
+      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2`,
       [m, y]);
     const punchMap = {};
     for (const row of attPunchResult.rows) {
@@ -1783,6 +1858,8 @@ exports.exportAttendanceRegister = async (req, res) => {
         inM:  row.punch_in_m  ?? -1,
         outH: row.punch_out_h ?? -1,
         outM: row.punch_out_m ?? -1,
+        status: row.status || '',
+        hours: parseFloat(row.working_hours || 0),
       };
     }
 
