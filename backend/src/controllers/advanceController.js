@@ -752,3 +752,142 @@ exports.processPayment = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   } finally { client.release(); }
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EMI MANAGEMENT (Accounts only)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── List all active EMI / advance loans ──────────────────────────────────────
+exports.getEMIList = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT
+        a.id, a.employee_id,
+        CONCAT(e.first_name,' ',e.last_name) AS employee_name,
+        e.employee_code, d.name AS department,
+        a.amount        AS loan_amount,
+        a.reason        AS loan_reason,
+        a.monthly_emi,
+        a.total_installments,
+        a.installments_paid,
+        a.total_installments - a.installments_paid AS installments_remaining,
+        a.emi_start_month, a.emi_start_year,
+        a.emi_end_month,   a.emi_end_year,
+        a.status,
+        a.payment_date  AS disbursed_date,
+        ROUND(a.amount - (a.installments_paid * a.monthly_emi), 2) AS outstanding_balance,
+        COALESCE(
+          (SELECT SUM(lr.emi_amount) FROM loan_recovery_log lr WHERE lr.advance_id = a.id),
+          0
+        ) AS total_recovered
+      FROM advance_salary a
+      JOIN employees   e ON e.id = a.employee_id
+      LEFT JOIN departments d ON d.id = e.department_id
+      WHERE a.status IN ('disbursed','cleared')
+        AND a.total_installments > 0
+      ORDER BY
+        CASE a.status WHEN 'disbursed' THEN 0 ELSE 1 END,
+        e.first_name
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('[getEMIList]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── Create or update a loan/EMI directly (Accounts) ─────────────────────────
+// POST /advance/emi  — create new loan for employee
+// PUT  /advance/emi/:id — edit existing
+exports.upsertEMI = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const { id } = req.params; // present on PUT, absent on POST
+    const {
+      employee_id, loan_amount, reason,
+      monthly_emi, total_installments,
+      emi_start_month, emi_start_year,
+      installments_paid = 0
+    } = req.body;
+
+    if (!employee_id || !loan_amount || !monthly_emi || !total_installments || !emi_start_month || !emi_start_year)
+      return res.status(400).json({ success: false, message: 'employee_id, loan_amount, monthly_emi, total_installments, emi_start_month, emi_start_year are required' });
+
+    // Calculate end month/year
+    let endMonth = parseInt(emi_start_month) + parseInt(total_installments) - 1;
+    let endYear  = parseInt(emi_start_year);
+    while (endMonth > 12) { endMonth -= 12; endYear++; }
+
+    if (id) {
+      // Update existing
+      await client.query(`
+        UPDATE advance_salary SET
+          amount = $1, reason = $2, monthly_emi = $3,
+          total_installments = $4, installments_paid = $5,
+          emi_start_month = $6, emi_start_year = $7,
+          emi_end_month = $8, emi_end_year = $9,
+          status = CASE WHEN $5::int >= $4::int THEN 'cleared' ELSE 'disbursed' END,
+          updated_at = NOW()
+        WHERE id = $10`,
+        [loan_amount, reason||'Salary Advance', monthly_emi, total_installments,
+         installments_paid, emi_start_month, emi_start_year,
+         endMonth, endYear, id]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, message: 'EMI updated successfully' });
+    } else {
+      // Create new — directly as disbursed (accounts is creating it directly)
+      const r = await client.query(`
+        INSERT INTO advance_salary
+          (employee_id, amount, reason, monthly_emi, total_installments, installments_paid,
+           emi_start_month, emi_start_year, emi_end_month, emi_end_year,
+           status, approval_chain, current_approver_code, current_level,
+           disbursed_by, payment_date, updated_at)
+        VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+           'disbursed','[]',NULL,1,
+           $11,NOW(),NOW())
+        RETURNING id`,
+        [employee_id, loan_amount, reason||'Salary Advance', monthly_emi, total_installments,
+         installments_paid, emi_start_month, emi_start_year, endMonth, endYear,
+         req.user.id]
+      );
+      // Notify employee
+      await client.query(
+        `INSERT INTO notifications(employee_id,type,title,message)
+         VALUES($1,'advance','💰 Loan/EMI Setup',
+           $2)`,
+        [employee_id,
+         `A loan of ₹${parseFloat(loan_amount).toLocaleString('en-IN')} has been set up for you. Monthly EMI: ₹${parseFloat(monthly_emi).toLocaleString('en-IN')} × ${total_installments} installments starting ${emi_start_month}/${emi_start_year}.`]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, message: 'EMI loan created successfully', id: r.rows[0].id });
+    }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[upsertEMI]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  } finally { client.release(); }
+};
+
+// ── Get active EMI for a specific employee (for payroll template) ─────────────
+exports.getActiveEMI = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    const result = await db.query(`
+      SELECT id, amount, monthly_emi, total_installments, installments_paid,
+             total_installments - installments_paid AS installments_remaining,
+             emi_start_month, emi_start_year
+      FROM advance_salary
+      WHERE employee_id=$1 AND status='disbursed' AND total_installments > 0
+        AND installments_paid < total_installments
+      ORDER BY payment_date ASC
+      LIMIT 1`,
+      [employee_id]
+    );
+    res.json({ success: true, data: result.rows[0] || null });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
