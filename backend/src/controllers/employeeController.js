@@ -355,7 +355,8 @@ exports.update = async (req, res) => {
       'address_line1','city','state','pincode',
       'probation_end_date','exit_date','notes',
       'is_active','is_wfh_permanent','level','saturday_policy',
-      'separation_date','separation_type','separation_reason','employee_type'
+      'separation_date','separation_type','separation_reason','employee_type',
+      'deactivation_remark'
     ];
 
     const sets = [], params = []; let idx = 1;
@@ -1147,7 +1148,11 @@ exports.exportAttendanceRegister = async (req, res) => {
              d.name AS department, des.title AS designation,
              e.employee_category,
              COALESCE(e.saturday_policy, '2nd_4th_off') AS saturday_policy,
-             e.city, e.state
+             e.city, e.state,
+             e.is_active,
+             e.deactivation_remark,
+             e.separation_date,
+             e.separation_type
       FROM employees e
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
@@ -1165,7 +1170,12 @@ exports.exportAttendanceRegister = async (req, res) => {
           )
         )
       )
-      ORDER BY d.name, e.first_name`, [y, m]);
+      ORDER BY
+        -- Sort: onsite first, then offsite, then deactivated
+        CASE WHEN e.is_active = false THEN 2
+             WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
+             ELSE 0 END,
+        d.name, e.first_name`, [y, m]);
     const employees = empResult.rows;
 
     // ── Attendance for the month ─────────────────────────────────────────────
@@ -1278,15 +1288,52 @@ exports.exportAttendanceRegister = async (req, res) => {
     });
     ws1.getRow(2).height = 30;
 
+    // Group employees: onsite → offsite → deactivated (already sorted by query)
+    let lastGroup = null;
+    let groupRowOffset = 0;
+
     employees.forEach((e, ri) => {
-      const row   = ri + 3;
+      const isDeactivated = e.is_active === false;
+      const isOffsite     = !isDeactivated && (e.saturday_policy === 'all_working');
+      const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
+
+      // Insert group separator row when group changes
+      if (group !== lastGroup) {
+        const sepRow = ri + 3 + groupRowOffset;
+        groupRowOffset++;
+        const groupLabel = group === 'onsite' ? '🏢 ONSITE EMPLOYEES'
+                         : group === 'offsite' ? '🌐 OFFSITE EMPLOYEES'
+                         : '❌ DEACTIVATED EMPLOYEES';
+        const groupBg = group === 'onsite' ? 'FF1B5E20'
+                      : group === 'offsite' ? 'FF0D47A1'
+                      : 'FF4A0000';
+        ws1.mergeCells(sepRow, 1, sepRow, totalCols);
+        const sepCell = ws1.getCell(sepRow, 1);
+        sepCell.value = groupLabel;
+        sepCell.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+        sepCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: groupBg } };
+        sepCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws1.getRow(sepRow).height = 18;
+        lastGroup = group;
+      }
+
+      const row   = ri + 3 + groupRowOffset;
       const isAlt = ri % 2 === 1;
+      const rowBg = isDeactivated
+        ? (isAlt ? 'FFFFF8F8' : 'FFFFFFEE')
+        : isOffsite
+          ? (isAlt ? 'FFE3F2FD' : 'FFFFFFFF')
+          : (isAlt ? 'FFE8F5E9' : 'FFFFFFFF');
+
+      // Build info values — append deactivation remark to category cell if deactivated
+      const remarkStr = e.deactivation_remark ? ` | NOTE: ${e.deactivation_remark}` : '';
+      const categoryVal = (e.employee_category || '') + (isDeactivated ? ` (INACTIVE${remarkStr})` : '');
 
       [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(),
-       e.department||'', e.designation||'', e.employee_category||''].forEach((v, ci) => {
+       e.department||'', e.designation||'', categoryVal].forEach((v, ci) => {
         const cell = ws1.getCell(row, ci + 1);
-        cell.value = v; cell.font = { size: 9 };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFE8F5E9' : 'FFFFFFFF' } };
+        cell.value = v; cell.font = { size: 9, color: { argb: isDeactivated ? 'FF9E0000' : 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
         cell.alignment = { vertical: 'middle' };
         cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
       });
