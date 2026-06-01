@@ -530,7 +530,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   });
 
   // ── Row 1: Title ─────────────────────────────────────────────────────────
-  ws.mergeCells(1, 1, 1, totalCols);
+  try { ws.mergeCells(1, 1, 1, totalCols); } catch(_) {}
   const t = ws.getCell(1,1);
   t.value = `KrishiHR — Daily Punch In / Punch Out Register | ${MONTH_NAMES[m-1]} ${y}`;
   t.font  = { bold:true, size:13, color:{argb:'FFFFFFFF'} };
@@ -539,7 +539,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   ws.getRow(1).height = 28;
 
   // ── Row 2: Legend ────────────────────────────────────────────────────────
-  ws.mergeCells(2, 1, 2, totalCols);
+  try { ws.mergeCells(2, 1, 2, totalCols); } catch(_) {}
   const leg = ws.getCell(2,1);
   leg.value = '🟢 IN ≤10:30 On Time  |  🟠 IN >10:30 Late  |  🔵 OUT ≥18:30 Full Day  |  🟣 OUT <18:30 Early  |  🟧 MPO=Missing PunchOut  |  🏠 WFH  |  🚗 OD  |  🏖 EL=Leave  |  💸 LWP  |  ½=Half Day  |  WO=Weekend  |  HOL=Holiday';
   leg.font  = { size:8, italic:true, color:{argb:'FF37474F'} };
@@ -958,7 +958,7 @@ exports.exportMasterExcel = async (req, res) => {
 
     // ── Header row 1: Title ─────────────────────────────────────────────────
     const totalCols = 5 + daysInMonth + 9; // info + days + totals (9 summary cols)
-    ws1.mergeCells(1, 1, 1, totalCols);
+    try { ws1.mergeCells(1, 1, 1, totalCols); } catch(_) {}
     const titleCell = ws1.getCell(1, 1);
     titleCell.value = `KrishiHR — Attendance Register | ${MONTH_NAMES[m-1]} ${y}`;
     titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
@@ -1186,8 +1186,8 @@ exports.exportMasterExcel = async (req, res) => {
     });
 
     // Title
-    const salCols = 32;
-    ws2.mergeCells(1, 1, 1, salCols);
+    const salCols = 34;
+    try { ws2.mergeCells(1, 1, 1, salCols); } catch(_) {}
     const salTitle = ws2.getCell(1, 1);
     salTitle.value = `KrishiHR — Salary Breakup | ${MONTH_NAMES[m-1]} ${y}`;
     salTitle.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
@@ -1205,7 +1205,7 @@ exports.exportMasterExcel = async (req, res) => {
     ];
     let colOffset = 1;
     groups.forEach(g => {
-      ws2.mergeCells(2, colOffset, 2, colOffset + g.cols - 1);
+      try { ws2.mergeCells(2, colOffset, 2, colOffset + g.cols - 1); } catch(_) {}
       const cell = ws2.getCell(2, colOffset);
       cell.value = g.label;
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
@@ -1426,7 +1426,7 @@ exports.exportMasterExcel = async (req, res) => {
       views: [{ state: 'frozen', xSplit: 3, ySplit: 2 }]
     });
 
-    ws3.mergeCells(1, 1, 1, 20);
+    try { ws3.mergeCells(1, 1, 1, 20); } catch(_) {}
     const dirTitle = ws3.getCell(1, 1);
     dirTitle.value = `KrishiHR — Employee Directory | Generated ${new Date().toLocaleDateString('en-IN')}`;
     dirTitle.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
@@ -1649,7 +1649,7 @@ exports.exportAttendanceRegister = async (req, res) => {
     });
 
     const totalCols = 5 + daysInMonth + 9;
-    ws1.mergeCells(1, 1, 1, totalCols);
+    try { ws1.mergeCells(1, 1, 1, totalCols); } catch(_) {}
     const titleCell = ws1.getCell(1, 1);
     titleCell.value = `KrishiHR — Attendance Register | ${MONTH_NAMES[m-1]} ${y}`;
     titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
@@ -1886,7 +1886,7 @@ exports.exportAttendanceRegister = async (req, res) => {
     for (let i = 1; i <= 9; i++) ws1.getColumn(5 + daysInMonth + i).width = 10;
 
     const legendRow = employees.length + 4;
-    ws1.mergeCells(legendRow, 1, legendRow, totalCols);
+    try { ws1.mergeCells(legendRow, 1, legendRow, totalCols); } catch(_) {}
     const legendCell = ws1.getCell(legendRow, 1);
     legendCell.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Paid Leave  LWP=Unpaid Leave  H=Half Day  H-EL=Half EL  H-CL=Half CL  H-SL=Half SL  H-LWP=Half LWP (Unpaid)  H-WFH=Half WFH  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off  HOL=Holiday';
     legendCell.font  = { italic: true, size: 8, color: { argb: 'FF37474F' } };
