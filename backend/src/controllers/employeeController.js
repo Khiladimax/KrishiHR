@@ -1018,87 +1018,123 @@ exports.exportMasterExcel = async (req, res) => {
     });
     ws1.getRow(2).height = 30;
 
-    // ── Data rows ───────────────────────────────────────────────────────────
+    // ── Data rows — with ONSITE / OFFSITE / DEACTIVATED group separators ────
+    let masterLastGroup = null;
+    let masterGroupOffset = 0;
+
     employees.forEach((e, ri) => {
-      const row = ri + 3;
-      const isAlt = ri % 2 === 1;
-      const rowBg = isAlt ? 'FFF1F8E9' : 'FFFFFFFF';
+      const isDeactivated = e.is_active === false;
+      const isOffsite     = !isDeactivated && e.saturday_policy === 'all_working';
+      const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
+
+      // ── Insert group separator row when group changes ─────────────────────
+      if (group !== masterLastGroup) {
+        const sepRow = ri + 3 + masterGroupOffset;
+        masterGroupOffset++;
+        const groupLabel = group === 'onsite'  ? '🏢 ONSITE EMPLOYEES'
+                         : group === 'offsite' ? '🌐 OFFSITE EMPLOYEES'
+                         :                       '❌ DEACTIVATED EMPLOYEES';
+        const groupBg    = group === 'onsite'  ? 'FF1B5E20'
+                         : group === 'offsite' ? 'FF0D47A1'
+                         :                      'FF4A0000';
+        ws1.mergeCells(sepRow, 1, sepRow, totalCols);
+        const sc = ws1.getCell(sepRow, 1);
+        sc.value = groupLabel;
+        sc.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+        sc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: groupBg } };
+        sc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws1.getRow(sepRow).height = 18;
+        masterLastGroup = group;
+      }
+
+      const row    = ri + 3 + masterGroupOffset;
+      const isAlt  = ri % 2 === 1;
+      const rowBg  = isDeactivated ? (isAlt ? 'FFFFF5F5' : 'FFFFFFEE')
+                   : isOffsite     ? (isAlt ? 'FFE3F2FD' : 'FFFFFFFF')
+                   :                 (isAlt ? 'FFF1F8E9' : 'FFFFFFFF');
 
       // Info cells
       [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(),
        e.department||'', e.designation||'', e.employee_category||''].forEach((v, ci) => {
         const cell = ws1.getCell(row, ci + 1);
         cell.value = v;
-        cell.font = { size: 9 };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFE8F5E9' : 'FFFFFFFF' } };
-        cell.alignment = { vertical: 'middle', wrapText: false };
+        cell.font = { size: 9, color: { argb: isDeactivated ? 'FF9E0000' : 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        cell.alignment = { vertical: 'middle' };
         cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
       });
 
-      // Attendance cells
       let attPaidLeave = 0, attUnpaidLeave = 0, attPaidHalfDay = 0, attUnpaidHalfDay = 0;
       let attLate = 0, attAbsent = 0, attPresent = 0;
       let satCountRow = 0;
-      const empIsOffsite = e.saturday_policy === 'all_working';
-      // Determine this employee's regional holiday set for correct HOL display
-      const empRegForSheet = getEmployeeRegion(e.city || '', e.state || '');
-      const empHolSetForSheet = empRegForSheet === 'north' ? holidaysByRegion.north : holidaysByRegion.south_west;
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const dow = new Date(y, m - 1, d).getDay();
-        const isSunday = dow === 0;
-        if (dow === 6) satCountRow++;
-        const is2nd4thSat = !empIsOffsite && dow === 6 && (satCountRow === 2 || satCountRow === 4);
-        const isWeekOff = isSunday || is2nd4thSat;
+      const empIsOffsite2 = e.saturday_policy === 'all_working';
+      const empReg2 = getEmployeeRegion(e.city || '', e.state || '');
+      const empHolSet2 = empReg2 === 'north' ? holidaysByRegion.north : holidaysByRegion.south_west;
 
-        // FIX: Show HOL for regional holidays if no attendance record overrides it
-        let status;
-        if (isWeekOff) {
-          status = 'weekend';
-        } else if (empHolSetForSheet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) {
-          status = 'holiday'; // Employee has a regional holiday — show HOL (was showing blank/black before)
-        } else {
-          status = (attMap[e.id] || {})[dateStr] || '';
+      if (isDeactivated) {
+        // ── Deactivated: show actual attendance then merge remaining with remark
+        const empAttDays2 = Object.keys(attMap[e.id] || {})
+          .map(ds => parseInt(ds.split('-')[2]))
+          .filter(d => d >= 1 && d <= daysInMonth);
+        const lastAttDay2 = empAttDays2.length ? Math.max(...empAttDays2) : 0;
+        let satDeact = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dow2 = new Date(y, m-1, d).getDay();
+          if (dow2 === 6) satDeact++;
+          const isWO2 = dow2 === 0 || (!empIsOffsite2 && dow2 === 6 && (satDeact===2||satDeact===4));
+          if (d <= lastAttDay2) {
+            let status2 = isWO2 ? 'weekend' : (empHolSet2.has(dateStr) && !((attMap[e.id]||{})[dateStr]) ? 'holiday' : ((attMap[e.id]||{})[dateStr]||''));
+            const style2 = STATUS_STYLE[status2] || { label: '', bg: 'FFF5F5', fg: '9E0000' };
+            const cell2  = ws1.getCell(row, 5 + d);
+            cell2.value = style2.label;
+            cell2.font  = { bold: true, size: 8, color: { argb: 'FF' + style2.fg } };
+            cell2.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style2.bg } };
+            cell2.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell2.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+          }
         }
-
-        const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'F1F8E9' : 'FFFFFF', fg: '000000' };
-
-        const cell = ws1.getCell(row, 5 + d);
-        cell.value = style.label;
-        cell.font = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
-
-        if (!isWeekOff) {
-          if (['present','regularized','od','wfh','holiday'].includes(status)) {
-            // Fully paid work / holiday
-            attPresent++;
-          } else if (status === 'late') {
-            // Late = present + mark late
-            attPresent++; attLate++;
-          } else if (status === 'on-leave') {
-            // Full paid leave (EL/CL/SL with balance)
-            attPaidLeave++; attPresent++;
-          } else if (['half-day','h-el','h-cl','h-sl','h-wfh'].includes(status)) {
-            // Paid half day — leave balance used for 0.5, worked 0.5
-            attPaidHalfDay++; attPresent++;
-          } else if (status === 'h-lwp') {
-            // Unpaid half day — worked 0.5, LWP 0.5
-            attUnpaidHalfDay++;
-          } else if (status === 'lwp') {
-            // Full unpaid leave / LWP
-            attUnpaidLeave++;
-          } else if (status === 'absent') {
-            attAbsent++;
+        if (lastAttDay2 < daysInMonth) {
+          try { ws1.mergeCells(row, 5 + lastAttDay2 + 1, row, 5 + daysInMonth); } catch(ex){}
+          const rc = ws1.getCell(row, 5 + lastAttDay2 + 1);
+          rc.value = e.deactivation_remark ? `❌ TERMINATED — ${e.deactivation_remark}` : `❌ Account deactivated${e.separation_date?' on '+e.separation_date:''}`;
+          rc.font  = { bold: true, size: 8, color: { argb: 'FFB71C1C' }, italic: true };
+          rc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3F3' } };
+          rc.alignment = { horizontal: 'left', vertical: 'middle' };
+          rc.border = { right: { style: 'medium', color: { argb: 'FFEF9A9A' } }, bottom: { style: 'hair' } };
+        }
+      } else {
+        // ── Active employee — normal attendance cells ──────────────────────
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dow = new Date(y, m - 1, d).getDay();
+          if (dow === 6) satCountRow++;
+          const is2nd4thSat = !empIsOffsite2 && dow === 6 && (satCountRow === 2 || satCountRow === 4);
+          const isWeekOff   = dow === 0 || is2nd4thSat;
+          let status = isWeekOff ? 'weekend'
+            : (empHolSet2.has(dateStr) && !((attMap[e.id]||{})[dateStr]) ? 'holiday'
+            : ((attMap[e.id]||{})[dateStr]||''));
+          const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'F1F8E9' : 'FFFFFF', fg: '000000' };
+          const cell  = ws1.getCell(row, 5 + d);
+          cell.value = style.label;
+          cell.font  = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
+          cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+          if (!isWeekOff) {
+            if (['present','regularized','od','wfh','holiday'].includes(status)) attPresent++;
+            else if (status === 'late')     { attPresent++; attLate++; }
+            else if (status === 'on-leave') { attPaidLeave++; attPresent++; }
+            else if (['half-day','h-el','h-cl','h-sl','h-wfh'].includes(status)) { attPaidHalfDay++; attPresent++; }
+            else if (status === 'h-lwp')   attUnpaidHalfDay++;
+            else if (status === 'lwp')     attUnpaidLeave++;
+            else if (status === 'absent')  attAbsent++;
           }
         }
       }
 
-      const attTotalPaid   = attPresent;   // present + paid leaves + paid half days already counted in attPresent
+      const attTotalPaid   = attPresent;
       const attTotalUnpaid = attUnpaidLeave + attUnpaidHalfDay;
-
-      // Totals — 9 summary columns
       [
         [attPaidLeave,     'FF2E7D32'],
         [attUnpaidLeave,   'FFC62828'],
@@ -1112,14 +1148,15 @@ exports.exportMasterExcel = async (req, res) => {
       ].forEach(([v, color], i) => {
         const cell = ws1.getCell(row, 5 + daysInMonth + 1 + i);
         cell.value = v;
-        cell.font = { bold: true, size: 9, color: { argb: color } };
+        cell.font  = { bold: true, size: 9, color: { argb: color } };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFE3F2FD' : 'FFFFFFFF' } };
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
         cell.border = { right: { style: 'thin' }, bottom: { style: 'hair' } };
       });
 
       ws1.getRow(row).height = 18;
     });
+
 
     // Column widths — attendance sheet
     ws1.getColumn(1).width = 10;
