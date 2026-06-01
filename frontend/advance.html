@@ -148,6 +148,37 @@
         <div id="all-list"><div class="loader"><div class="spinner"></div></div></div>
       </div>
     </div>
+    <div id="tab-emi" style="display:none">
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div class="card-title"><span class="card-title-icon">💳</span>EMI / Loan Tracker</div>
+          <button class="btn btn-primary" onclick="openEMIModal(null)" style="padding:8px 18px;font-size:13px">➕ Add New Loan</button>
+        </div>
+
+        <!-- Summary cards -->
+        <div id="emi-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px"></div>
+
+        <!-- EMI table -->
+        <div style="overflow-x:auto">
+          <table class="table" id="emi-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Loan Amount</th>
+                <th>Monthly EMI</th>
+                <th>Progress</th>
+                <th>Outstanding</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="emi-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:30px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -250,39 +281,6 @@
 </div>
 
 <script src="app.js"></script>
-
-<!-- ══ EMI / LOAN TRACKER TAB ════════════════════════════════════════════════ -->
-<div id="tab-emi" style="display:none">
-  <div class="card">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div class="card-title"><span class="card-title-icon">💳</span>EMI / Loan Tracker</div>
-      <button class="btn btn-primary" onclick="openEMIModal(null)" style="padding:8px 18px;font-size:13px">➕ Add New Loan</button>
-    </div>
-
-    <!-- Summary cards -->
-    <div id="emi-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px"></div>
-
-    <!-- EMI table -->
-    <div style="overflow-x:auto">
-      <table class="table" id="emi-table">
-        <thead>
-          <tr>
-            <th>Employee</th>
-            <th>Loan Amount</th>
-            <th>Monthly EMI</th>
-            <th>Progress</th>
-            <th>Outstanding</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="emi-tbody">
-          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:30px">Loading...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
 
 <!-- ══ Set EMI & Disburse Modal ════════════════════════════════════════════ -->
