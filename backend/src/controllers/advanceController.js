@@ -760,6 +760,9 @@ exports.processPayment = async (req, res) => {
 // ── List all active EMI / advance loans ──────────────────────────────────────
 exports.getEMIList = async (req, res) => {
   try {
+    // Ensure payment_date column exists (may not exist on older DBs)
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS payment_date TIMESTAMPTZ`).catch(()=>{});
+
     const result = await db.query(`
       SELECT
         a.id, a.employee_id,
@@ -774,7 +777,7 @@ exports.getEMIList = async (req, res) => {
         a.emi_start_month, a.emi_start_year,
         a.emi_end_month,   a.emi_end_year,
         a.status,
-        a.payment_date  AS disbursed_date,
+        COALESCE(a.payment_date, a.approved_at, a.updated_at) AS disbursed_date,
         ROUND(a.amount - (a.installments_paid * a.monthly_emi), 2) AS outstanding_balance,
         COALESCE(
           (SELECT SUM(lr.emi_amount) FROM loan_recovery_log lr WHERE lr.advance_id = a.id),
@@ -838,6 +841,9 @@ exports.upsertEMI = async (req, res) => {
       res.json({ success: true, message: 'EMI updated successfully' });
     } else {
       // Create new — directly as disbursed (accounts is creating it directly)
+      // Ensure payment_date column exists
+      await client.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS payment_date TIMESTAMPTZ`).catch(()=>{});
+
       const r = await client.query(`
         INSERT INTO advance_salary
           (employee_id, amount, reason, monthly_emi, total_installments, installments_paid,
@@ -882,7 +888,7 @@ exports.getActiveEMI = async (req, res) => {
       FROM advance_salary
       WHERE employee_id=$1 AND status='disbursed' AND total_installments > 0
         AND installments_paid < total_installments
-      ORDER BY payment_date ASC
+      ORDER BY COALESCE(payment_date, approved_at, updated_at) ASC
       LIMIT 1`,
       [employee_id]
     );
@@ -929,6 +935,7 @@ exports.markDisbursedWithEMI = async (req, res) => {
     await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_start_year INT`).catch(()=>{});
     await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_end_month INT`).catch(()=>{});
     await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS emi_end_year INT`).catch(()=>{});
+    await db.query(`ALTER TABLE advance_salary ADD COLUMN IF NOT EXISTS payment_date TIMESTAMPTZ`).catch(()=>{});
     await db.query(`ALTER TABLE advance_salary DROP CONSTRAINT IF EXISTS advance_salary_status_check`).catch(()=>{});
     await db.query(`ALTER TABLE advance_salary ADD CONSTRAINT advance_salary_status_check CHECK (status IN ('pending','approved','rejected','recovered','disbursed','cleared'))`).catch(()=>{});
 
