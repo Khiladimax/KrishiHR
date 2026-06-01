@@ -367,7 +367,7 @@ exports.uploadPayroll = async (req, res) => {
            FROM advance_salary
            WHERE employee_id=$1 AND status='disbursed'
              AND installments_paid < total_installments
-           ORDER BY payment_date ASC LIMIT 1`,
+           ORDER BY approved_at ASC LIMIT 1`,
           [empId]
         );
         if (emiCheck.rows.length) {
@@ -879,7 +879,7 @@ exports.downloadPayrollTemplate = async (req, res) => {
           `SELECT monthly_emi, installments_paid, total_installments
            FROM advance_salary
            WHERE employee_id=$1 AND status='disbursed' AND installments_paid < total_installments
-           ORDER BY payment_date ASC LIMIT 1`, [e.id]);
+           ORDER BY approved_at ASC LIMIT 1`, [e.id]);
         const activeEMI = emiRes.rows[0] || null;
         const pf      = parseFloat(e.pf_employee)    || 0;
         const esi     = parseFloat(e.esi_employee)   || 0;
