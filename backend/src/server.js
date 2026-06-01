@@ -768,6 +768,64 @@ async function start() {
   }
 }
 
+// ── EMI Installment Reminder Cron — runs daily 1st–7th of month at 9:05 AM IST ──
+// Notifies accounts team about active loans pending this month's installment
+cron.schedule('5 9 1-7 * *', async () => {
+  try {
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const m = nowIST.getMonth() + 1;
+    const y = nowIST.getFullYear();
+    const MONTHS = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+
+    // Find active loans where this month's installment not yet logged
+    const pending = await db.query(`
+      SELECT a.id, a.monthly_emi, a.installments_paid, a.total_installments,
+             CONCAT(e.first_name,' ',e.last_name) AS emp_name, e.employee_code
+      FROM advance_salary a
+      JOIN employees e ON e.id = a.employee_id
+      WHERE a.status = 'disbursed'
+        AND a.installments_paid < a.total_installments
+        AND NOT EXISTS (
+          SELECT 1 FROM loan_recovery_log lr
+          WHERE lr.advance_id = a.id
+            AND lr.payroll_month = $1
+            AND lr.payroll_year  = $2
+        )
+    `, [m, y]);
+
+    if (!pending.rows.length) {
+      console.log('[EMI Reminder] All installments recorded for', MONTHS[m-1], y);
+      return;
+    }
+
+    // Notify all accounts users
+    const accounts = await db.query(
+      `SELECT id FROM employees WHERE role='accounts' AND is_active=true`
+    );
+
+    const empList = pending.rows.map(r =>
+      `${r.emp_name} (${r.employee_code}) — ₹${parseFloat(r.monthly_emi).toLocaleString('en-IN')} — Inst. ${parseInt(r.installments_paid)+1}/${r.total_installments}`
+    ).join('
+');
+
+    for (const acc of accounts.rows) {
+      await db.query(
+        `INSERT INTO notifications(employee_id,type,title,message)
+         VALUES($1,'advance','💳 EMI Pending — ${MONTHS[m-1]} ${y}',$2)`,
+        [acc.id,
+         `${pending.rows.length} loan installment(s) not yet recorded for ${MONTHS[m-1]} ${y}:
+${empList}
+
+Go to Advance Salary → EMI Tracker to mark them paid.`]
+      ).catch(()=>{});
+    }
+    console.log(`[EMI Reminder] ✅ Notified accounts — ${pending.rows.length} pending installment(s) for ${MONTHS[m-1]} ${y}`);
+  } catch (err) {
+    console.error('❌ EMI reminder cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
 // ── GK End-of-Day Skip Cron — runs at 11:59 PM IST every day ─────────────────
 // Any assigned question with no response yet gets auto-marked as 'skip'
 cron.schedule('59 23 * * *', async () => {
