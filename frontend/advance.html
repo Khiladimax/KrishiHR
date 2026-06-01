@@ -284,6 +284,94 @@
   </div>
 </div>
 
+
+<!-- ══ Set EMI & Disburse Modal ════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="set-emi-modal" style="display:none;z-index:400">
+  <div class="modal" style="width:460px;max-width:96vw">
+    <div class="modal-header" style="background:linear-gradient(135deg,#0d47a1,#1565c0)">
+      <div class="modal-title" style="color:#fff">💳 Set EMI Schedule & Mark Disbursed</div>
+      <button class="modal-close" onclick="closeModal('set-emi-modal')" style="color:#fff">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;display:grid;gap:14px">
+      <input type="hidden" id="set-emi-adv-id">
+      <div style="background:#e3f2fd;border-radius:8px;padding:10px 14px;font-size:13px;color:#1565c0">
+        <b id="set-emi-emp-name"></b> — Loan: <b id="set-emi-amount"></b>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Total Installments</label>
+          <input type="number" id="set-emi-total" class="form-control" placeholder="e.g. 10" min="1" style="margin-top:4px" oninput="calcSetEMI()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Monthly EMI (₹)</label>
+          <input type="number" id="set-emi-monthly" class="form-control" placeholder="Auto" style="margin-top:4px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Already Paid</label>
+          <input type="number" id="set-emi-paid" class="form-control" value="0" min="0" style="margin-top:4px" oninput="calcSetEMI()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Disbursement Date</label>
+          <input type="date" id="set-emi-date" class="form-control" style="margin-top:4px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">EMI Start Month</label>
+          <select id="set-emi-start-month" class="form-control" style="margin-top:4px"></select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">EMI Start Year</label>
+          <select id="set-emi-start-year" class="form-control" style="margin-top:4px"></select>
+        </div>
+      </div>
+      <div id="set-emi-preview" style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:13px;color:#2e7d32;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('set-emi-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSetEMI()" id="set-emi-save-btn" style="background:#1565c0">✅ Mark Disbursed & Set EMI</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Mark EMI Paid Modal ══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="mark-paid-modal" style="display:none;z-index:400">
+  <div class="modal" style="width:420px;max-width:96vw">
+    <div class="modal-header" style="background:linear-gradient(135deg,#2e7d32,#1b5e20)">
+      <div class="modal-title" style="color:#fff">✅ Mark EMI Installment Paid</div>
+      <button class="modal-close" onclick="closeModal('mark-paid-modal')" style="color:#fff">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;display:grid;gap:14px">
+      <input type="hidden" id="mp-loan-id">
+      <div style="background:#e8f5e9;border-radius:8px;padding:12px 16px">
+        <div style="font-weight:700;font-size:14px" id="mp-emp-name"></div>
+        <div style="font-size:13px;color:#388e3c;margin-top:4px" id="mp-progress"></div>
+        <div style="font-size:13px;font-weight:700;color:#1b5e20;margin-top:4px" id="mp-amount"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Month</label>
+          <select id="mp-month" class="form-control" style="margin-top:4px"></select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Year</label>
+          <select id="mp-year" class="form-control" style="margin-top:4px"></select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Remarks (optional)</label>
+        <input type="text" id="mp-remarks" class="form-control" placeholder="e.g. Deducted from June salary" style="margin-top:4px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('mark-paid-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmMarkPaid()" id="mp-save-btn" style="background:#2e7d32">✅ Mark as Paid</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ EMI Modal ══════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="emi-modal" style="display:none;z-index:300">
   <div class="modal" style="width:480px;max-width:96vw">
@@ -560,6 +648,9 @@ function advanceCard(adv, showActions = false) {
           ${isPaymentStage ? `
             <button class="btn btn-primary btn-sm" onclick="openPayment(${adv.id},'${adv.employee_name}',${adv.amount},${adv.project_id||'null'})">
               💸 Process Payment
+            </button>
+            <button class="btn btn-sm" onclick="openSetEMIModal(${adv.id},'${adv.employee_name}',${adv.amount})" style="background:#e3f2fd;color:#1565c0;border:1.5px solid #90caf9;margin-top:4px;width:100%">
+              💳 Set EMI & Disburse
             </button>` : ''}
           ${!canAct && !isPaymentStage && showActions && adv.status === 'pending' && alreadyActed ? `
             <div style="font-size:11px;color:var(--muted)">✓ You acted</div>` : ''}
@@ -1013,7 +1104,10 @@ async function loadEMIList() {
         <td style="font-weight:700;color:${isCleared?'#2e7d32':'#e65100'}">₹${parseFloat(r.outstanding_balance||0).toLocaleString('en-IN')}</td>
         <td>${badge}</td>
         <td>
-          ${isActive ? `<button class="btn btn-sm btn-ghost" onclick='openEMIModal(${JSON.stringify(r)})' style="font-size:12px">✏️ Edit</button>` : ''}
+          ${isActive ? `
+          <button class="btn btn-sm" onclick="openMarkPaidModal(${r.id},'${r.employee_name}',${r.monthly_emi},${r.installments_paid},${r.total_installments})" style="background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;font-size:12px;margin-bottom:4px;display:block;width:100%">✅ Mark Paid</button>
+          <button class="btn btn-sm btn-ghost" onclick='openEMIModal(${JSON.stringify(r)})' style="font-size:12px;display:block;width:100%">✏️ Edit</button>
+        ` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -1118,6 +1212,124 @@ async function saveEMI() {
 }
 
 document.getElementById('emi-amount').addEventListener('input', calcEMI);
+
+// ════════════════════════════════════════════════════════════════════════════
+// SET EMI & DISBURSE + MARK PAID JS
+// ════════════════════════════════════════════════════════════════════════════
+
+function calcSetEMI() {
+  const amt   = parseFloat(document.getElementById('set-emi-amount')?.textContent?.replace(/[₹,]/g,'')) || 0;
+  const total = parseInt(document.getElementById('set-emi-total').value) || 0;
+  const paid  = parseInt(document.getElementById('set-emi-paid').value) || 0;
+  if (total > 0) {
+    document.getElementById('set-emi-monthly').value = Math.ceil(amt / total);
+    const preview = document.getElementById('set-emi-preview');
+    preview.style.display = '';
+    preview.innerHTML = `EMI: <b>₹${Math.ceil(amt/total).toLocaleString('en-IN')}</b>/month × ${total} = ₹${(Math.ceil(amt/total)*total).toLocaleString('en-IN')} | Already paid: <b>${paid}</b> | Remaining: <b>${total-paid}</b>`;
+  }
+}
+
+function openSetEMIModal(advId, empName, amount) {
+  document.getElementById('set-emi-adv-id').value = advId;
+  document.getElementById('set-emi-emp-name').textContent = empName;
+  document.getElementById('set-emi-amount').textContent = '₹' + parseFloat(amount).toLocaleString('en-IN');
+  document.getElementById('set-emi-total').value = '';
+  document.getElementById('set-emi-monthly').value = '';
+  document.getElementById('set-emi-paid').value = '0';
+  document.getElementById('set-emi-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('set-emi-preview').style.display = 'none';
+
+  const mSel = document.getElementById('set-emi-start-month');
+  const ySel = document.getElementById('set-emi-start-year');
+  mSel.innerHTML = MONTHS_EMI.map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
+  const cy = new Date().getFullYear();
+  ySel.innerHTML = [cy-1,cy,cy+1].map(y => `<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('');
+  // Default start month = current month
+  mSel.value = new Date().getMonth() + 1;
+
+  document.getElementById('set-emi-modal').style.display = 'flex';
+}
+
+async function saveSetEMI() {
+  const id    = document.getElementById('set-emi-adv-id').value;
+  const total = document.getElementById('set-emi-total').value;
+  const emi   = document.getElementById('set-emi-monthly').value;
+  const paid  = document.getElementById('set-emi-paid').value;
+  const date  = document.getElementById('set-emi-date').value;
+  const sm    = document.getElementById('set-emi-start-month').value;
+  const sy    = document.getElementById('set-emi-start-year').value;
+
+  if (!total || !emi || !sm || !sy) { toast('Please fill all fields', 'error'); return; }
+
+  const btn = document.getElementById('set-emi-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+
+  try {
+    const data = await api('POST', `/advance/${id}/mark-disbursed`, {
+      monthly_emi: emi, total_installments: total,
+      installments_paid: paid, payment_date: date,
+      emi_start_month: sm, emi_start_year: sy,
+      payment_mode: 'bank_transfer',
+      remarks: 'Disbursed and EMI schedule set by accounts'
+    });
+    if (data.success) {
+      toast('✅ ' + data.message, 'success');
+      closeModal('set-emi-modal');
+      loadAll();
+      if (document.getElementById('tab-emi').style.display !== 'none') loadEMIList();
+    } else {
+      toast(data.message || 'Failed', 'error');
+    }
+  } catch(err) {
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Mark Disbursed & Set EMI';
+  }
+}
+
+function openMarkPaidModal(loanId, empName, emiAmt, paid, total) {
+  document.getElementById('mp-loan-id').value = loanId;
+  document.getElementById('mp-emp-name').textContent = empName;
+  document.getElementById('mp-progress').textContent = 'Progress: ' + paid + '/' + total + ' paid → marking ' + (paid+1) + '/' + total;
+  document.getElementById('mp-amount').textContent = 'EMI Amount: ₹' + parseFloat(emiAmt).toLocaleString('en-IN');
+  document.getElementById('mp-remarks').value = '';
+
+  const now = new Date();
+  const mSel = document.getElementById('mp-month');
+  const ySel = document.getElementById('mp-year');
+  mSel.innerHTML = MONTHS_EMI.map((m,i) => `<option value="${i+1}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+  const cy = now.getFullYear();
+  ySel.innerHTML = [cy-1,cy,cy+1].map(y => `<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('');
+
+  document.getElementById('mark-paid-modal').style.display = 'flex';
+}
+
+async function confirmMarkPaid() {
+  const id      = document.getElementById('mp-loan-id').value;
+  const month   = document.getElementById('mp-month').value;
+  const year    = document.getElementById('mp-year').value;
+  const remarks = document.getElementById('mp-remarks').value.trim();
+
+  const btn = document.getElementById('mp-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ Recording...';
+
+  try {
+    const data = await api('POST', `/advance/emi/${id}/mark-paid`, {
+      payroll_month: month, payroll_year: year, remarks
+    });
+    if (data.success) {
+      toast('✅ ' + data.message, 'success');
+      closeModal('mark-paid-modal');
+      loadEMIList();
+    } else {
+      toast(data.message || 'Failed', 'error');
+    }
+  } catch(err) {
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Mark as Paid';
+  }
+}
 </script>
 </body>
 </html>
