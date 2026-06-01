@@ -369,7 +369,10 @@ exports.downloadAttendanceReport = async (req, res) => {
     let attQuery  = `SELECT employee_id,
                             TO_CHAR(date,'YYYY-MM-DD') AS date_str,
                             EXTRACT(DAY FROM date)::int AS day,
-                            status, working_hours, punch_in_location
+                            status, working_hours, punch_in_location,
+                            TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
+                            TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
+                            punch_in, punch_out
                      FROM attendance
                      WHERE EXTRACT(MONTH FROM date) = $1
                        AND EXTRACT(YEAR  FROM date) = $2`;
@@ -617,6 +620,51 @@ exports.downloadAttendanceReport = async (req, res) => {
     ];
 
     XLSX.utils.book_append_sheet(wb, wsDaily, `Daily ${mon}-${yr}`);
+
+    // ── Sheet 3: Punch Register (daily punch in / punch out per employee) ─
+    const punchHeaders = ['Emp Code', 'Name', 'Department'];
+    for (let d = 1; d <= numDays; d++) {
+      const dt  = new Date(yr, mon - 1, d);
+      const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
+      punchHeaders.push(`${d} ${dow}\nIN`);
+      punchHeaders.push(`${d} ${dow}\nOUT`);
+    }
+
+    const punchData = [
+      [`KrishiHR — Punch In / Punch Out Register | ${monthName} ${yr}`],
+      [`Each date shows two columns: IN (punch-in time) and OUT (punch-out time). Blank = no record.`],
+      [],
+      punchHeaders,
+    ];
+
+    for (const emp of employees.rows) {
+      const empAtt = attIndex[emp.id] || {};
+      const row = [emp.employee_code, emp.name, emp.department || '—'];
+      for (let d = 1; d <= numDays; d++) {
+        const rec = empAtt[d];
+        if (!rec) {
+          row.push('', '');
+        } else {
+          row.push(rec.punch_in_fmt  || '', rec.punch_out_fmt || '');
+        }
+      }
+      punchData.push(row);
+    }
+
+    const wsPunch = XLSX.utils.aoa_to_sheet(punchData);
+
+    // Column widths: fixed cols + 2 cols per day
+    const punchCols = [
+      {wch: 10}, {wch: 22}, {wch: 16},
+      ...Array(numDays * 2).fill({wch: 9}),
+    ];
+    wsPunch['!cols'] = punchCols;
+    wsPunch['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c: numDays*2+2} },
+      { s:{r:1,c:0}, e:{r:1,c: numDays*2+2} },
+    ];
+
+    XLSX.utils.book_append_sheet(wb, wsPunch, `Punch Register ${mon}-${yr}`);
 
     // ── 9. Stream response ────────────────────────────────────────────────
     const buf      = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
