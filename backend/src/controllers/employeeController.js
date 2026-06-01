@@ -1345,38 +1345,99 @@ exports.exportAttendanceRegister = async (req, res) => {
       const empReg = getEmployeeRegion(e.city || '', e.state || '');
       const empHolSet = empReg === 'north' ? holidaysByRegion.north : holidaysByRegion.south_west;
 
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const dow = new Date(y, m - 1, d).getDay();
-        if (dow === 6) satCountRow++;
-        const is2nd4thSat = !empIsOffsite && dow === 6 && (satCountRow === 2 || satCountRow === 4);
-        const isWeekOff   = dow === 0 || is2nd4thSat;
+      // ── DEACTIVATED EMPLOYEE: show actual attendance cells, then merge remaining days ──
+      if (isDeactivated) {
+        // Find last day with any attendance record for this employee this month
+        const empAttDays = Object.keys(attMap[e.id] || {})
+          .map(ds => parseInt(ds.split('-')[2]))
+          .filter(d => d >= 1 && d <= daysInMonth);
+        const lastAttDay = empAttDays.length ? Math.max(...empAttDays) : 0;
+        const mergeFromCol = 5 + lastAttDay + 1; // first col after last attendance day
+        const mergeToCol   = 5 + daysInMonth;    // last day col
 
-        let status;
-        if (isWeekOff) {
-          status = 'weekend';
-        } else if (empHolSet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) {
-          status = 'holiday';
-        } else {
-          status = (attMap[e.id] || {})[dateStr] || '';
+        // Render actual attendance for days they have records
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dow = new Date(y, m - 1, d).getDay();
+          if (dow === 6) satCountRow++;
+          const is2nd4thSat = !empIsOffsite && dow === 6 && (satCountRow === 2 || satCountRow === 4);
+          const isWeekOff   = dow === 0 || is2nd4thSat;
+
+          if (d <= lastAttDay) {
+            // Show actual status cell
+            let status;
+            if (isWeekOff) status = 'weekend';
+            else if (empHolSet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) status = 'holiday';
+            else status = (attMap[e.id] || {})[dateStr] || '';
+
+            const style = STATUS_STYLE[status] || { label: '', bg: 'FFF5F5', fg: '9E0000' };
+            const cell  = ws1.getCell(row, 5 + d);
+            cell.value = style.label;
+            cell.font  = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
+            cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+
+            if (!isWeekOff) {
+              if (['present','regularized','od','wfh','holiday'].includes(status)) attPresent++;
+              else if (status === 'late')     { attPresent++; attLate++; }
+              else if (status === 'on-leave') { attPaidLeave++; attPresent++; }
+              else if (['half-day','h-el','h-cl','h-sl','h-wfh'].includes(status)) { attPaidHalfDay++; attPresent++; }
+              else if (status === 'h-lwp')   attUnpaidHalfDay++;
+              else if (status === 'lwp')     attUnpaidLeave++;
+              else if (status === 'absent')  attAbsent++;
+            }
+          }
         }
 
-        const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'F1F8E9' : 'FFFFFF', fg: '000000' };
-        const cell  = ws1.getCell(row, 5 + d);
-        cell.value = style.label;
-        cell.font  = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
-        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+        // Merge remaining days into one cell with remark
+        if (mergeFromCol <= mergeToCol) {
+          try { ws1.mergeCells(row, mergeFromCol, row, mergeToCol); } catch(e) {}
+          const remarkCell = ws1.getCell(row, mergeFromCol);
+          const remarkText = e.deactivation_remark
+            ? `❌ TERMINATED — ${e.deactivation_remark}`
+            : `❌ Account deactivated${e.separation_date ? ' on ' + e.separation_date : ''}`;
+          remarkCell.value = remarkText;
+          remarkCell.font  = { bold: true, size: 8, color: { argb: 'FFB71C1C' }, italic: true };
+          remarkCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3F3' } };
+          remarkCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
+          remarkCell.border = { right: { style: 'medium', color: { argb: 'FFEF9A9A' } }, bottom: { style: 'hair' } };
+        }
 
-        if (!isWeekOff) {
-          if (['present','regularized','od','wfh','holiday'].includes(status)) attPresent++;
-          else if (status === 'late')     { attPresent++; attLate++; }
-          else if (status === 'on-leave') { attPaidLeave++;  attPresent++; }
-          else if (['half-day','h-el','h-cl','h-sl','h-wfh'].includes(status)) { attPaidHalfDay++;   attPresent++; }
-          else if (status === 'h-lwp')   attUnpaidHalfDay++;
-          else if (status === 'lwp')     attUnpaidLeave++;
-          else if (status === 'absent')  attAbsent++;
+      } else {
+        // ── NORMAL (active) employee — render all days as before ─────────────
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dow = new Date(y, m - 1, d).getDay();
+          if (dow === 6) satCountRow++;
+          const is2nd4thSat = !empIsOffsite && dow === 6 && (satCountRow === 2 || satCountRow === 4);
+          const isWeekOff   = dow === 0 || is2nd4thSat;
+
+          let status;
+          if (isWeekOff) {
+            status = 'weekend';
+          } else if (empHolSet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) {
+            status = 'holiday';
+          } else {
+            status = (attMap[e.id] || {})[dateStr] || '';
+          }
+
+          const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'F1F8E9' : 'FFFFFF', fg: '000000' };
+          const cell  = ws1.getCell(row, 5 + d);
+          cell.value = style.label;
+          cell.font  = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
+          cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+
+          if (!isWeekOff) {
+            if (['present','regularized','od','wfh','holiday'].includes(status)) attPresent++;
+            else if (status === 'late')     { attPresent++; attLate++; }
+            else if (status === 'on-leave') { attPaidLeave++;  attPresent++; }
+            else if (['half-day','h-el','h-cl','h-sl','h-wfh'].includes(status)) { attPaidHalfDay++;   attPresent++; }            else if (status === 'h-lwp')   attUnpaidHalfDay++;
+            else if (status === 'lwp')     attUnpaidLeave++;
+            else if (status === 'absent')  attAbsent++;
+          }
         }
       }
 
