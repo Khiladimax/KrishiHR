@@ -767,3 +767,173 @@ exports.getForm16Years = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ── Download Payroll Template Excel ──────────────────────────────────────────
+// GET /api/payroll/template?month=5&year=2026
+// Pre-fills all active employees with their salary structure so accounts just
+// fills in Working Days, Present Days, LOP and any adjustments
+exports.downloadPayrollTemplate = async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    const { month, year } = req.query;
+    const m = parseInt(month) || new Date().getMonth() + 1;
+    const y = parseInt(year)  || new Date().getFullYear();
+    const monthName = MONTH_NAMES[m - 1];
+    const daysInMonth = new Date(y, m, 0).getDate();
+
+    // ── Fetch all active employees with salary structure ──────────────────
+    const empResult = await db.query(`
+      SELECT e.id, e.employee_code,
+             CONCAT(e.first_name,' ',e.last_name) AS full_name,
+             d.name AS department, des.title AS designation,
+             e.employee_category, e.employment_type,
+             COALESCE(s.basic,           e.basic_salary,       0) AS basic,
+             COALESCE(s.hra,             e.hra,                0) AS hra,
+             COALESCE(s.conveyance,      e.conveyance,         0) AS conveyance,
+             COALESCE(s.special_allowance,e.special_allowance, 0) AS special_allowance,
+             COALESCE(s.gratuity,                              0) AS gratuity,
+             COALESCE(s.gross_salary,                          0) AS gross_salary,
+             COALESCE(s.pf_employee,                           0) AS pf_employee,
+             COALESCE(s.esi_employee,                          0) AS esi_employee,
+             COALESCE(s.professional_tax,                      0) AS professional_tax,
+             COALESCE(s.lwf,                                   0) AS lwf,
+             COALESCE(s.tds,                                   0) AS tds,
+             COALESCE(s.total_deductions,                      0) AS total_deductions,
+             COALESCE(s.net_salary,                            0) AS net_salary
+      FROM employees e
+      LEFT JOIN departments  d   ON e.department_id  = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
+      WHERE e.is_active = true
+      ORDER BY d.name, e.first_name`);
+
+    const employees = empResult.rows;
+
+    // ── Build Excel ───────────────────────────────────────────────────────
+    const wb = XLSX.utils.book_new();
+
+    // ── Sheet 1: Payroll Input Template ───────────────────────────────────
+    const HEADERS = [
+      'Emp Code', 'Full Name', 'Department', 'Designation', 'Category',
+      'Working Days', 'Present Days', 'LOP Days', 'Paid Days',
+      'Basic', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
+      'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'LWF', 'TDS',
+      'Loan/EMI Deduction', 'Total Deductions',
+      'Net Pay', 'Payment Status', 'Remarks'
+    ];
+
+    const rows = [
+      // Row 0: Title
+      [`KrishiHR — Payroll Input Template | ${monthName} ${y} | Total Working Days: ${daysInMonth}`],
+      // Row 1: Instructions
+      [`⚠️  FILL ONLY: Working Days, Present Days, LOP Days, Loan/EMI Deduction, Remarks. Salary figures are pre-filled from salary structures. Net Pay = auto-calculated. Payment Status: Paid / Hold / Pending`],
+      // Row 2: Empty spacer
+      [],
+      // Row 3: Headers
+      HEADERS,
+      // Data rows
+      ...employees.map(e => {
+        const gross   = parseFloat(e.gross_salary)   || 0;
+        const pf      = parseFloat(e.pf_employee)    || 0;
+        const esi     = parseFloat(e.esi_employee)   || 0;
+        const pt      = parseFloat(e.professional_tax) || 0;
+        const lwf     = parseFloat(e.lwf)            || 0;
+        const tds     = parseFloat(e.tds)            || 0;
+        const totalDed= parseFloat(e.total_deductions) || (pf + esi + pt + lwf + tds);
+        const net     = parseFloat(e.net_salary)     || Math.max(0, gross - totalDed);
+        return [
+          e.employee_code,
+          e.full_name,
+          e.department  || '',
+          e.designation || '',
+          e.employee_category || '',
+          daysInMonth,       // Working Days — pre-filled, accounts can adjust
+          '',                // Present Days — FILL THIS
+          '',                // LOP Days — FILL THIS
+          '',                // Paid Days — calculated by system on upload
+          parseFloat(e.basic)             || 0,
+          parseFloat(e.hra)               || 0,
+          parseFloat(e.conveyance)        || 0,
+          parseFloat(e.special_allowance) || 0,
+          parseFloat(e.gratuity)          || 0,
+          gross,
+          pf,
+          esi,
+          pt,
+          lwf,
+          tds,
+          0,         // Loan/EMI — FILL IF APPLICABLE
+          totalDed,
+          net,
+          'Paid',    // Payment Status default
+          '',        // Remarks
+        ];
+      }),
+    ];
+
+    const ws1 = XLSX.utils.aoa_to_sheet(rows);
+
+    // Column widths
+    ws1['!cols'] = [
+      {wch:10},{wch:24},{wch:16},{wch:22},{wch:12},
+      {wch:11},{wch:11},{wch:9},{wch:9},
+      {wch:10},{wch:8},{wch:10},{wch:14},{wch:9},{wch:12},
+      {wch:12},{wch:12},{wch:9},{wch:6},{wch:8},
+      {wch:16},{wch:14},
+      {wch:10},{wch:14},{wch:20}
+    ];
+
+    // Freeze top 4 rows and first 2 cols
+    ws1['!freeze'] = { xSplit: 2, ySplit: 4 };
+
+    // Merge title row across all cols
+    ws1['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c:HEADERS.length-1} },
+      { s:{r:1,c:0}, e:{r:1,c:HEADERS.length-1} },
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws1, `Payroll ${monthName} ${y}`);
+
+    // ── Sheet 2: Instructions ─────────────────────────────────────────────
+    const instrRows = [
+      ['KrishiHR Payroll Template — How to Fill'],
+      [''],
+      ['COLUMNS TO FILL (highlighted in template):'],
+      ['Column', 'What to Enter'],
+      ['Working Days',      `Total working days in ${monthName} ${y} (pre-filled as ${daysInMonth})`],
+      ['Present Days',      'Actual days employee was present (from attendance register)'],
+      ['LOP Days',          'Loss of Pay days (absent without approved leave)'],
+      ['Loan/EMI Deduction','Monthly loan EMI deduction if any (else leave 0)'],
+      ['Payment Status',    'Paid / Hold / Pending'],
+      ['Remarks',           'Any note e.g. "Full & Final", "Bonus included", etc.'],
+      [''],
+      ['COLUMNS PRE-FILLED (do not change unless needed):'],
+      ['Column', 'Source'],
+      ['Basic, HRA, Conveyance, etc.', 'From employee salary structure in system'],
+      ['Gross Salary',      'Sum of all earnings'],
+      ['PF, ESI, PT, TDS',  'From salary structure'],
+      ['Total Deductions',  'Sum of all deductions'],
+      ['Net Pay',           'Gross - Total Deductions (system recalculates on upload)'],
+      [''],
+      ['UPLOAD RULES:'],
+      ['• Emp Code must match exactly (e.g. KC7708)'],
+      ['• Do not add/remove columns'],
+      ['• Do not change sheet name'],
+      ['• Save as .xlsx before uploading'],
+      ['• Upload via Payroll → Upload Payroll Excel tab'],
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(instrRows);
+    ws2['!cols'] = [{wch:28},{wch:60}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Instructions');
+
+    // ── Send ──────────────────────────────────────────────────────────────
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_Payroll_Template_${monthName}_${y}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+
+  } catch (err) {
+    console.error('[downloadPayrollTemplate]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
