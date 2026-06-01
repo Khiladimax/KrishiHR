@@ -511,6 +511,236 @@ exports.exportExcel = async (req, res) => {
 };
 
 // Master Excel Export — All employees + their attendance for selected month
+
+// ── Shared Punch Register Sheet Builder ──────────────────────────────────────
+// Color logic mirrors attendance register:
+//   Punch-IN  ≤ 10:30 → Green (on time)  | > 10:30 → Orange (late)  | missing → light red bg
+//   Punch-OUT ≥ 18:30 → Blue (full day)  | < 18:30 → Purple (early) | missing → light red bg
+//   Weekend col → dark pink header (matches attendance sheet)
+//   Holiday col → grey header
+//   Deactivated employee → rows in pale red, merged remark after last punch day
+async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMapIn, holidaysByRegion, getEmployeeRegion) {
+  const ExcelJS = require('exceljs');
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const dayNms = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const totalCols = 3 + daysInMonth * 2 + 3; // 3 info + 2*days + 3 summary cols
+
+  const ws = wb.addWorksheet(`Punch Register ${MONTH_NAMES[m-1]} ${y}`, {
+    views: [{ state: 'frozen', xSplit: 3, ySplit: 3 }]
+  });
+
+  // ── Row 1: Title ─────────────────────────────────────────────────────────
+  ws.mergeCells(1, 1, 1, totalCols);
+  const t = ws.getCell(1,1);
+  t.value = `KrishiHR — Daily Punch In / Punch Out Register | ${MONTH_NAMES[m-1]} ${y}`;
+  t.font  = { bold:true, size:13, color:{argb:'FFFFFFFF'} };
+  t.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0D47A1'} };
+  t.alignment = { horizontal:'center', vertical:'middle' };
+  ws.getRow(1).height = 28;
+
+  // ── Row 2: Legend ────────────────────────────────────────────────────────
+  ws.mergeCells(2, 1, 2, totalCols);
+  const leg = ws.getCell(2,1);
+  leg.value = '🟢 IN ≤10:30 On Time   🟠 IN >10:30 Late   🔵 OUT ≥18:30 Full Day   🟣 OUT <18:30 Early   🔴 Missing Punch   ⬜ Weekend   🩶 Holiday';
+  leg.font  = { size:8, italic:true, color:{argb:'FF37474F'} };
+  leg.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE3F2FD'} };
+  leg.alignment = { horizontal:'left', vertical:'middle', indent:1 };
+  ws.getRow(2).height = 16;
+
+  // ── Row 3: Fixed col headers ─────────────────────────────────────────────
+  const hdrFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1565C0'} };
+  const hdrFont = { bold:true, size:9, color:{argb:'FFFFFFFF'} };
+  ['Emp Code','Name','Department'].forEach((h,i) => {
+    const c = ws.getCell(3, i+1);
+    c.value=h; c.font=hdrFont; c.fill=hdrFill;
+    c.alignment={horizontal:'center',vertical:'middle'};
+    c.border={bottom:{style:'medium',color:{argb:'FFFFFFFF'}}};
+  });
+
+  // ── Row 3: Day date headers (merged IN+OUT per day) ──────────────────────
+  let satCnt = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow    = new Date(y, m-1, d).getDay();
+    if (dow === 6) satCnt++;
+    const isWeekend = dow === 0 || (dow === 6 && (satCnt === 2 || satCnt === 4));
+    const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isHoliday = (holidaysByRegion.all || new Set()).has(dateStr);
+    const col = 3 + (d-1)*2 + 1;
+
+    // Merged date header
+    try { ws.mergeCells(3, col, 3, col+1); } catch(e){}
+    const dc = ws.getCell(3, col);
+    dc.value = `${d}\n${dayNms[dow]}`;
+    const hBg = isWeekend ? 'FF880E4F' : isHoliday ? 'FF607D8B' : 'FF1565C0';
+    const hFg = 'FFFFFFFF';
+    dc.font  = { bold:true, size:8, color:{argb:hFg} };
+    dc.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:hBg} };
+    dc.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+    dc.border = { bottom:{style:'thin',color:{argb:'FFFFFFFF'}} };
+  }
+
+  // Summary headers
+  ['Total\nDays', 'On\nTime', 'Late\nIN'].forEach((h,i) => {
+    const c = ws.getCell(3, 3+daysInMonth*2+1+i);
+    c.value=h; c.font={bold:true,size:8,color:{argb:'FFFFFFFF'}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF00695C'}};
+    c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+  });
+  ws.getRow(3).height = 24;
+
+  // ── Fixed col widths ──────────────────────────────────────────────────────
+  ws.getColumn(1).width = 10;
+  ws.getColumn(2).width = 22;
+  ws.getColumn(3).width = 16;
+  for (let d = 1; d <= daysInMonth; d++) {
+    ws.getColumn(3+(d-1)*2+1).width = 9;
+    ws.getColumn(3+(d-1)*2+2).width = 9;
+  }
+  ws.getColumn(3+daysInMonth*2+1).width = 7;
+  ws.getColumn(3+daysInMonth*2+2).width = 7;
+  ws.getColumn(3+daysInMonth*2+3).width = 7;
+
+  // ── Group separator tracker (onsite → offsite → deactivated) ─────────────
+  let lastGrp = null;
+  let grpOffset = 0;
+
+  employees.forEach((e, ri) => {
+    const isDeact   = e.is_active === false;
+    const isOffsite = !isDeact && e.saturday_policy === 'all_working';
+    const grp = isDeact ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
+
+    if (grp !== lastGrp) {
+      const sepRow = ri + 4 + grpOffset;
+      grpOffset++;
+      const grpLabel = grp==='onsite' ? '🏢 ONSITE EMPLOYEES'
+                     : grp==='offsite' ? '🌐 OFFSITE EMPLOYEES'
+                     : '❌ DEACTIVATED EMPLOYEES';
+      const grpBg = grp==='onsite' ? 'FF1B5E20' : grp==='offsite' ? 'FF0D47A1' : 'FF4A0000';
+      try { ws.mergeCells(sepRow, 1, sepRow, totalCols); } catch(ex){}
+      const sc = ws.getCell(sepRow,1);
+      sc.value=grpLabel;
+      sc.font={bold:true,size:10,color:{argb:'FFFFFFFF'}};
+      sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:grpBg}};
+      sc.alignment={horizontal:'left',vertical:'middle',indent:1};
+      ws.getRow(sepRow).height=18;
+      lastGrp=grp;
+    }
+
+    const row   = ri + 4 + grpOffset;
+    const isAlt = ri % 2 === 1;
+    const rowBg = isDeact ? (isAlt?'FFFFF5F5':'FFFFFFEE')
+                : isOffsite ? (isAlt?'FFE3F2FD':'FFFFFFFF')
+                : (isAlt?'FFE8F5E9':'FFFFFFFF');
+
+    // Info cells
+    [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(), e.department||''].forEach((v,ci) => {
+      const c = ws.getCell(row, ci+1);
+      c.value=v;
+      c.font={size:9, bold: ci===1, color:{argb: isDeact?'FF9E0000':'FF000000'}};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+      c.alignment={vertical:'middle'};
+      c.border={right:{style:'hair'},bottom:{style:'hair'}};
+    });
+
+    const empPunch = punchMapIn[e.id] || {};
+    const empReg   = getEmployeeRegion(e.city||'', e.state||'');
+    const empHols  = empReg==='north' ? holidaysByRegion.north : holidaysByRegion.south_west;
+    let punchSatCnt = 0;
+    let totalPunched=0, onTimeCnt=0, lateCnt=0;
+
+    // For deactivated: find last punch day, merge rest
+    const punchDays = Object.keys(empPunch).map(Number);
+    const lastPunchDay = punchDays.length ? Math.max(...punchDays) : 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(y,m-1,d).getDay();
+      if (dow===6) punchSatCnt++;
+      const isWeekend = dow===0 || (dow===6 && (punchSatCnt===2||punchSatCnt===4));
+      const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const isHol   = empHols.has(dateStr);
+      const col     = 3+(d-1)*2+1;
+
+      // Deactivated: merge remaining days after last punch day
+      if (isDeact && d === lastPunchDay + 1 && d <= daysInMonth) {
+        try { ws.mergeCells(row, col, row, 3+daysInMonth*2); } catch(ex){}
+        const mc = ws.getCell(row, col);
+        mc.value = e.deactivation_remark
+          ? `❌ ${e.deactivation_remark}`
+          : `❌ Account deactivated${e.separation_date?' on '+e.separation_date:''}`;
+        mc.font  = {bold:true,size:8,color:{argb:'FFB71C1C'},italic:true};
+        mc.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF3F3'}};
+        mc.alignment = {horizontal:'left',vertical:'middle',wrapText:false};
+        mc.border = {right:{style:'medium',color:{argb:'FFEF9A9A'}},bottom:{style:'hair'}};
+        break;
+      }
+      if (isDeact && d > lastPunchDay) break;
+
+      const punch  = empPunch[d] || {in:'',out:'',inH:-1,outH:-1,inM:-1,outM:-1};
+      const inC    = ws.getCell(row, col);
+      const outC   = ws.getCell(row, col+1);
+
+      if (isWeekend) {
+        inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFECE0E8'}};
+        inC.value=''; outC.value='';
+      } else if (isHol) {
+        inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE0E5E8'}};
+        inC.value=''; outC.value='';
+      } else if (punch.in) {
+        // Parse punch-in time for color
+        const inH  = punch.inH;
+        const inM  = punch.inM;
+        const isOnTime = (inH < 10) || (inH===10 && inM<=30);
+        const inBg  = isOnTime ? 'FFE8F5E9' : 'FFFFF3E0'; // green tint : orange tint
+        const inFg  = isOnTime ? 'FF1B5E20' : 'FFE65100';
+        inC.value = punch.in;
+        inC.font  = {bold:true, size:8, color:{argb:inFg}};
+        inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:inBg}};
+        if (isOnTime) onTimeCnt++; else lateCnt++;
+        totalPunched++;
+
+        // Parse punch-out for color
+        if (punch.out) {
+          const outH = punch.outH;
+          const outM = punch.outM;
+          const isFullDay = (outH > 18) || (outH===18 && outM>=30);
+          const outBg = isFullDay ? 'FFE3F2FD' : 'FFF3E5F5'; // blue tint : purple tint
+          const outFg = isFullDay ? 'FF0D47A1' : 'FF6A1B9A';
+          outC.value = punch.out;
+          outC.font  = {bold:true, size:8, color:{argb:outFg}};
+          outC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:outBg}};
+        } else {
+          outC.value = '?';
+          outC.font  = {bold:true, size:8, color:{argb:'FFCC0000'}};
+          outC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFFDE8E8'}};
+        }
+      } else {
+        // No punch — blank or show dash for working day
+        inC.value=''; outC.value='';
+        inC.fill = outC.fill = {type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+      }
+
+      [inC, outC].forEach(c => {
+        c.alignment={horizontal:'center',vertical:'middle'};
+        c.border={right:{style:'hair'},bottom:{style:'hair'}};
+      });
+    }
+
+    // Summary cells
+    [[totalPunched,'FF00695C'],[onTimeCnt,'FF2E7D32'],[lateCnt,'FFE65100']].forEach(([v,fg],i) => {
+      const c = ws.getCell(row, 3+daysInMonth*2+1+i);
+      c.value=v||'';
+      c.font={bold:true,size:9,color:{argb:v>0?fg:'FFBDBDBD'}};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+      c.alignment={horizontal:'center',vertical:'middle'};
+      c.border={right:{style:'thin'},bottom:{style:'hair'}};
+    });
+
+    ws.getRow(row).height=18;
+  });
+
+  return ws;
+}
+
 exports.exportMasterExcel = async (req, res) => {
   try {
     const ExcelJS = require('exceljs');
@@ -1118,6 +1348,55 @@ exports.exportMasterExcel = async (req, res) => {
       ws3.getColumn(i + 1).width = w;
     });
 
+    // ── Sheet 4: Punch Register ───────────────────────────────────────────────
+    // Fetch punch data for master sheet
+    const masterPunchResult = await db.query(`
+      SELECT employee_id,
+             EXTRACT(DAY FROM date)::int AS day,
+             TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
+             TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
+             EXTRACT(HOUR   FROM punch_in)::int  AS punch_in_h,
+             EXTRACT(MINUTE FROM punch_in)::int  AS punch_in_m,
+             EXTRACT(HOUR   FROM punch_out)::int AS punch_out_h,
+             EXTRACT(MINUTE FROM punch_out)::int AS punch_out_m
+      FROM attendance
+      WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+        AND (punch_in IS NOT NULL OR punch_out IS NOT NULL)`,
+      [m, y]);
+    const masterPunchMap = {};
+    for (const row of masterPunchResult.rows) {
+      if (!masterPunchMap[row.employee_id]) masterPunchMap[row.employee_id] = {};
+      masterPunchMap[row.employee_id][row.day] = {
+        in:   row.punch_in_fmt  || '',
+        out:  row.punch_out_fmt || '',
+        inH:  row.punch_in_h  ?? -1,
+        inM:  row.punch_in_m  ?? -1,
+        outH: row.punch_out_h ?? -1,
+        outM: row.punch_out_m ?? -1,
+      };
+    }
+    // Fetch master holidays for punch register
+    const masterHolResult = await db.query(
+      `SELECT TO_CHAR(date,'YYYY-MM-DD') AS date_str, region FROM holidays
+       WHERE EXTRACT(MONTH FROM date)=$1 AND EXTRACT(YEAR FROM date)=$2`, [m, y]);
+    const masterHolsByRegion = { all: new Set(), north: new Set(), south_west: new Set() };
+    for (const h of masterHolResult.rows) {
+      if (h.region==='all') { masterHolsByRegion.all.add(h.date_str); masterHolsByRegion.north.add(h.date_str); masterHolsByRegion.south_west.add(h.date_str); }
+      else if (h.region==='north') masterHolsByRegion.north.add(h.date_str);
+      else if (h.region==='south_west') masterHolsByRegion.south_west.add(h.date_str);
+    }
+    // Build master employees list with is_active + saturday_policy fields
+    const masterEmpForPunch = empResult.rows.map(e => ({
+      id: e.id, employee_code: e.employee_code,
+      first_name: e.first_name, last_name: e.last_name,
+      department: e.department, city: e.city, state: e.state,
+      saturday_policy: e.saturday_policy || '2nd_4th_off',
+      is_active: e.is_active !== false,
+      deactivation_remark: e.deactivation_remark || null,
+      separation_date: e.separation_date || null,
+    }));
+    await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
+
     // ── Send response ────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_Master_${MONTH_NAMES[m-1]}${y}.xlsx"`);
@@ -1485,7 +1764,11 @@ exports.exportAttendanceRegister = async (req, res) => {
       SELECT employee_id,
              EXTRACT(DAY FROM date)::int AS day,
              TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
-             TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt
+             TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
+             EXTRACT(HOUR   FROM punch_in)::int  AS punch_in_h,
+             EXTRACT(MINUTE FROM punch_in)::int  AS punch_in_m,
+             EXTRACT(HOUR   FROM punch_out)::int AS punch_out_h,
+             EXTRACT(MINUTE FROM punch_out)::int AS punch_out_m
       FROM attendance
       WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
         AND (punch_in IS NOT NULL OR punch_out IS NOT NULL)`,
@@ -1493,97 +1776,17 @@ exports.exportAttendanceRegister = async (req, res) => {
     const punchMap = {};
     for (const row of attPunchResult.rows) {
       if (!punchMap[row.employee_id]) punchMap[row.employee_id] = {};
-      punchMap[row.employee_id][row.day] = { in: row.punch_in_fmt || '', out: row.punch_out_fmt || '' };
+      punchMap[row.employee_id][row.day] = {
+        in:   row.punch_in_fmt  || '',
+        out:  row.punch_out_fmt || '',
+        inH:  row.punch_in_h  ?? -1,
+        inM:  row.punch_in_m  ?? -1,
+        outH: row.punch_out_h ?? -1,
+        outM: row.punch_out_m ?? -1,
+      };
     }
 
-    const ws2 = wb.addWorksheet(`Punch Register ${MONTH_NAMES[m-1]} ${y}`, {
-      views: [{ state: 'frozen', xSplit: 3, ySplit: 3 }]
-    });
-
-    // Title row
-    const totalPunchCols = 3 + daysInMonth * 2;
-    ws2.mergeCells(1, 1, 1, totalPunchCols);
-    const pTitle = ws2.getCell(1, 1);
-    pTitle.value = `KrishiHR — Daily Punch In / Punch Out Register | ${MONTH_NAMES[m-1]} ${y}`;
-    pTitle.font  = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
-    pTitle.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
-    pTitle.alignment = { horizontal: 'center', vertical: 'middle' };
-    ws2.getRow(1).height = 26;
-
-    // Sub-header row: date groups
-    ['Emp Code', 'Name', 'Department'].forEach((h, i) => {
-      const c = ws2.getCell(2, i + 1);
-      c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
-      c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF283593' } };
-      c.alignment = { horizontal: 'center', vertical: 'middle' };
-      ws2.mergeCells(2, i+1, 3, i+1);
-    });
-
-    const dayNms = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    let satCntP = 0;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dow = new Date(y, m - 1, d).getDay();
-      if (dow === 6) satCntP++;
-      const isOff = dow === 0 || (dow === 6 && (satCntP === 2 || satCntP === 4));
-      const col   = 3 + (d - 1) * 2 + 1;
-      // Merge two cols for the date header
-      ws2.mergeCells(2, col, 2, col + 1);
-      const dc = ws2.getCell(2, col);
-      dc.value = `${d} ${dayNms[dow]}`;
-      dc.font  = { bold: true, size: 8, color: { argb: isOff ? 'FFFF1744' : 'FFFFFFFF' } };
-      dc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: isOff ? 'FF880E4F' : 'FF1565C0' } };
-      dc.alignment = { horizontal: 'center', vertical: 'middle' };
-      // IN / OUT sub-headers
-      ['IN','OUT'].forEach((lbl, li) => {
-        const sc = ws2.getCell(3, col + li);
-        sc.value = lbl;
-        sc.font  = { bold: true, size: 8, color: { argb: 'FFFFFFFF' } };
-        sc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: li === 0 ? 'FF2E7D32' : 'FFC62828' } };
-        sc.alignment = { horizontal: 'center', vertical: 'middle' };
-      });
-    }
-    ws2.getRow(2).height = 20;
-    ws2.getRow(3).height = 18;
-
-    // Fixed col widths
-    ws2.getColumn(1).width = 10;
-    ws2.getColumn(2).width = 22;
-    ws2.getColumn(3).width = 16;
-    for (let d = 1; d <= daysInMonth; d++) {
-      ws2.getColumn(3 + (d-1)*2 + 1).width = 10;
-      ws2.getColumn(3 + (d-1)*2 + 2).width = 10;
-    }
-
-    // Data rows
-    employees.forEach((e, ri) => {
-      const row   = ri + 4;
-      const isAlt = ri % 2 === 1;
-      const altBg = isAlt ? 'FFE8EAF6' : 'FFFFFFFF';
-      [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(), e.department||''].forEach((v, ci) => {
-        const c = ws2.getCell(row, ci + 1);
-        c.value = v; c.font = { size: 9 };
-        c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: altBg } };
-        c.alignment = { vertical: 'middle' };
-        c.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
-      });
-      const empPunch = punchMap[e.id] || {};
-      for (let d = 1; d <= daysInMonth; d++) {
-        const col   = 3 + (d - 1) * 2 + 1;
-        const punch = empPunch[d] || { in: '', out: '' };
-        const inC   = ws2.getCell(row, col);
-        const outC  = ws2.getCell(row, col + 1);
-        inC.value   = punch.in;
-        outC.value  = punch.out;
-        inC.font    = { size: 8, color: { argb: punch.in  ? 'FF1B5E20' : 'FFBDBDBD' } };
-        outC.font   = { size: 8, color: { argb: punch.out ? 'FFB71C1C' : 'FFBDBDBD' } };
-        inC.fill    = { type: 'pattern', pattern: 'solid', fgColor: { argb: altBg } };
-        outC.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: altBg } };
-        inC.alignment  = { horizontal: 'center', vertical: 'middle' };
-        outC.alignment = { horizontal: 'center', vertical: 'middle' };
-        inC.border  = { right: { style: 'hair' }, bottom: { style: 'hair' } };
-        outC.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
-      }
-    });
+    await buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMap, holidaysByRegion, getEmployeeRegion);
 
     // ── Send ─────────────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
