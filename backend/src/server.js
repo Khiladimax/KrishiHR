@@ -806,8 +806,7 @@ cron.schedule('5 9 1-7 * *', async () => {
 
     const empList = pending.rows.map(r =>
       `${r.emp_name} (${r.employee_code}) — ₹${parseFloat(r.monthly_emi).toLocaleString('en-IN')} — Inst. ${parseInt(r.installments_paid)+1}/${r.total_installments}`
-    ).join('
-');
+    ).join('\n');
 
     for (const acc of accounts.rows) {
       await db.query(
