@@ -1071,6 +1071,17 @@
           <div id="emp-danger-modal-code" style="font-size:12px;color:var(--muted)"></div>
         </div>
       </div>
+      <!-- Deactivation remark field — shown only when action=deactivate -->
+      <div id="deactivation-remark-wrap" style="display:none;margin-top:14px">
+        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">
+          📝 Salary / Termination Remark <span style="color:#dc2626">*</span>
+        </label>
+        <textarea id="deactivation-remark-input"
+          placeholder="e.g. Process salary only till 15th May 2026. Full &amp; Final pending. Terminated due to..."
+          style="width:100%;min-height:80px;border:1.5px solid #fca5a5;border-radius:8px;padding:10px 12px;font-size:13px;resize:vertical;background:var(--surface);color:var(--text);box-sizing:border-box"
+          maxlength="500"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">This note will appear in the attendance Excel download for payroll processing.</div>
+      </div>
     </div>
     <div class="modal-footer" style="gap:10px">
       <button class="btn btn-outline" onclick="closeModal('emp-danger-modal');closeModal('emp-detail-modal')">Cancel</button>
@@ -2892,12 +2903,18 @@ function openDangerModal(id, name, code, action) {
   document.getElementById('emp-danger-modal-name').textContent = name;
   document.getElementById('emp-danger-modal-code').textContent = code;
 
+  // Show/hide remark field
+  const remarkWrap = document.getElementById('deactivation-remark-wrap');
+  const remarkInput = document.getElementById('deactivation-remark-input');
+  remarkWrap.style.display = action === 'deactivate' ? 'block' : 'none';
+  if (remarkInput) remarkInput.value = '';
+
   if (action === 'deactivate') {
     header.style.background = 'linear-gradient(135deg,#d97706,#b45309)';
     icon.textContent        = '⏸';
     titleTxt.textContent    = 'Deactivate Account';
     warn.style.cssText      = 'background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:16px';
-    warn.textContent        = '⚠️ This employee will no longer be able to log in to the app.';
+    warn.textContent        = '⚠️ This employee will no longer be able to log in. Add a salary/termination note below.';
     msg.textContent         = 'Are you sure you want to deactivate this employee account?';
     btn.style.cssText       = 'background:#d97706;color:#fff;border:none;min-width:160px';
     btn.textContent         = 'Yes, Deactivate';
@@ -2934,8 +2951,9 @@ async function executeDangerAction() {
 
     // DEBUG: raw fetch to see exact server response
     const debugMethod = _dangerAction === 'delete' ? 'DELETE' : 'PUT';
-    const debugBody   = _dangerAction === 'deactivate' ? { is_active: false }
-                      : _dangerAction === 'reactivate' ? { is_active: true }
+    const remarkVal   = (document.getElementById('deactivation-remark-input')?.value || '').trim();
+    const debugBody   = _dangerAction === 'deactivate' ? { is_active: false, deactivation_remark: remarkVal || null }
+                      : _dangerAction === 'reactivate' ? { is_active: true,  deactivation_remark: null }
                       : null;
     const debugRes = await fetch(`${API_BASE}/employees/${_dangerEmpId}`, {
       method: debugMethod,
