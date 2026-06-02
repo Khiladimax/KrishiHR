@@ -324,11 +324,68 @@ async function loadMovementDetail(employeeId, date, empName) {
   // Show map type buttons
   document.getElementById('mv-map-type-btns').style.display = 'flex';
 
-  // ── Draw route polyline ───────────────────────────────────────────────────
-  // ✅ FIX: Filter points with accuracy > 100m before drawing line to reduce jumps.
-  // Also use ALL points for the path (not thinned gPts) for accurate route.
-  const pathPts = pts.filter(p => !p.accuracy || p.accuracy <= 100);
-  const path = (pathPts.length >= 2 ? pathPts : pts).map(p => ({ lat: p.lat, lng: p.lng }));
+  // ── Draw route polyline ─────────────────────────────────────────────────
+  // Step 1: Client-side jump filter — remove points that imply speed > 80 km/h
+  // This catches any bad GPS points that slipped through the backend filter.
+  function filterJumps(points) {
+    if (points.length < 2) return points;
+    const clean = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      const prev = clean[clean.length - 1];
+      const cur  = points[i];
+      const distKm = hav(prev, cur);
+      // Estimate time gap from logged_at if available, else assume 30s
+      const prevTs = prev.logged_at ? new Date(prev.logged_at).getTime() : 0;
+      const curTs  = cur.logged_at  ? new Date(cur.logged_at).getTime()  : 0;
+      const timeDiffHrs = (prevTs && curTs && curTs > prevTs)
+        ? (curTs - prevTs) / 3600000
+        : 30 / 3600;
+      const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
+      if (speedKmh > 80) {
+        console.warn(`[Movement] Jump filtered: ${speedKmh.toFixed(0)} km/h between point ${i-1} and ${i}`);
+        continue; // skip this point — it's a GPS teleport
+      }
+      clean.push(cur);
+    }
+    return clean;
+  }
+
+  // Step 2: Also filter accuracy > 50m (matches backend threshold)
+  const accPts  = pts.filter(p => !p.accuracy || parseFloat(p.accuracy) <= 50);
+  const safePts = filterJumps(accPts.length >= 2 ? accPts : pts);
+  const path    = safePts.map(p => ({ lat: p.lat, lng: p.lng }));
+
+  // Step 3: Draw polyline with road-snapping via Google Roads API
+  // Roads API accepts max 100 points per call — chunk if needed
+  async function drawSnappedRoute(rawPath) {
+    const MAX_PER_CALL = 100;
+    const snappedPath  = [];
+
+    for (let start = 0; start < rawPath.length; start += MAX_PER_CALL) {
+      const chunk = rawPath.slice(start, start + MAX_PER_CALL);
+      const pathStr = chunk.map(p => `${p.lat},${p.lng}`).join('|');
+      try {
+        const resp = await fetch(
+          `https://roads.googleapis.com/v1/snapToRoads?path=${pathStr}&interpolate=true&key=AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA`
+        );
+        const data = await resp.json();
+        if (data.snappedPoints?.length) {
+          data.snappedPoints.forEach(sp => {
+            snappedPath.push({ lat: sp.location.latitude, lng: sp.location.longitude });
+          });
+        } else {
+          // Roads API failed for this chunk — fall back to raw points
+          chunk.forEach(p => snappedPath.push(p));
+        }
+      } catch (_) {
+        // Network error — use raw points
+        chunk.forEach(p => snappedPath.push(p));
+      }
+    }
+    return snappedPath;
+  }
+
+  // Draw raw path first (instant), then replace with snapped route
   _mvPolyline = new google.maps.Polyline({
     path,
     geodesic: true,
@@ -337,6 +394,16 @@ async function loadMovementDetail(employeeId, date, empName) {
     strokeWeight: 4,
     map: _mvGoogleMap
   });
+
+  // Road-snap in background and update polyline when ready
+  if (path.length >= 2) {
+    drawSnappedRoute(path).then(snapped => {
+      if (snapped.length >= 2 && _mvPolyline) {
+        _mvPolyline.setPath(snapped);
+        console.log(`[Movement] Road-snapped: ${path.length} GPS points → ${snapped.length} road points`);
+      }
+    });
+  }
 
   // ── Shared InfoWindow ─────────────────────────────────────────────────────
   _mvInfoWindow = new google.maps.InfoWindow();
