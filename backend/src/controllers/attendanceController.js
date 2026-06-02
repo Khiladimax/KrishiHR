@@ -1800,9 +1800,9 @@ exports.logMovement = async (req, res) => {
     if (!lat || !lng)
       return res.status(400).json({ success: false, message: 'lat and lng are required' });
 
-    // ── Accuracy filter: reject only truly unusable GPS (>200m) ──────────
+    // ── Accuracy filter: reject readings worse than 50m (tight = no jumps) ──
     const acc = parseFloat(accuracy) || 9999;
-    if (acc > 200)
+    if (acc > 50)
       return res.json({ success: true, skipped: true, reason: 'poor_accuracy' });
 
     const today = getISTDate();
@@ -1855,7 +1855,8 @@ exports.logMovement = async (req, res) => {
       const distKm = haversineKm(parseFloat(prev.lat), parseFloat(prev.lng), parseFloat(lat), parseFloat(lng));
       const timeDiffHrs = timeDiffMs / 3600000;
       const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
-      if (speedKmh > 150)
+      // 80 km/h = realistic bike max speed — anything faster is a GPS jump
+      if (speedKmh > 80)
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
     }
 
@@ -1883,6 +1884,66 @@ exports.logMovement = async (req, res) => {
 };
 
 // ── Get movement history for HR/admin (employee + date filter) ────────────
+
+// ── Batch log GPS points buffered offline (SW sends these on reconnect) ───────
+exports.logMovementBatch = async (req, res) => {
+  try {
+    const empId = req.user.id;
+    const { points } = req.body;
+    if (!Array.isArray(points) || !points.length)
+      return res.status(400).json({ success: false, message: 'points array required' });
+
+    const today = getISTDate();
+    const stateQ = await db.query(
+      `SELECT
+         (SELECT COUNT(1) FROM od_requests WHERE employee_id=$1 AND date=$2 AND status='approved') AS has_od,
+         (SELECT punch_in  FROM attendance WHERE employee_id=$1 AND date=$2) AS punch_in,
+         (SELECT punch_out FROM attendance WHERE employee_id=$1 AND date=$2) AS punch_out`,
+      [empId, today]
+    );
+    const { has_od, punch_in, punch_out } = stateQ.rows[0];
+    if (!parseInt(has_od) && (!punch_in || punch_out))
+      return res.json({ success: true, skipped: true, reason: 'not_active' });
+
+    const lastPtQ = await db.query(
+      `SELECT lat::float AS lat, lng::float AS lng, logged_at
+       FROM employee_movement_log WHERE employee_id=$1 ORDER BY logged_at DESC LIMIT 1`,
+      [empId]
+    );
+    let lastLat = lastPtQ.rows[0]?.lat ?? null;
+    let lastLng = lastPtQ.rows[0]?.lng ?? null;
+    let lastTs  = lastPtQ.rows[0]?.logged_at ? new Date(lastPtQ.rows[0].logged_at).getTime() : 0;
+
+    let inserted = 0, skipped = 0;
+    const sorted = [...points].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+    for (const pt of sorted) {
+      const { lat, lng, acc = 0, ts } = pt;
+      if (!lat || !lng) { skipped++; continue; }
+      const accuracy = parseFloat(acc) || 0;
+      if (accuracy > 50) { skipped++; continue; }
+      if (lastLat !== null) {
+        const distKm = haversineKm(lastLat, lastLng, parseFloat(lat), parseFloat(lng));
+        if (distKm * 1000 < 500) { skipped++; continue; }
+        const timeDiffHrs = ts ? (ts - lastTs) / 3600000 : 30 / 3600;
+        if (timeDiffHrs > 0 && distKm / timeDiffHrs > 80) { skipped++; continue; }
+      }
+      const loggedAt = ts ? new Date(ts).toISOString() : new Date().toISOString();
+      await db.query(
+        `INSERT INTO employee_movement_log(employee_id, lat, lng, accuracy, logged_at)
+         VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+        [empId, lat, lng, accuracy, loggedAt]
+      );
+      lastLat = parseFloat(lat); lastLng = parseFloat(lng); lastTs = ts || Date.now();
+      inserted++;
+    }
+    res.json({ success: true, inserted, skipped });
+  } catch (err) {
+    console.error('[logMovementBatch Error]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.getMovementHistory = async (req, res) => {
   try {
     const { employee_id, date } = req.query;

@@ -1,26 +1,29 @@
 /**
  * KrishiHR Movement Tracking Service Worker
- * Keeps GPS pinging every 10 minutes across ALL pages — survives navigation,
- * tab switching, and page reloads.
- *
- * Android keep-alive fixes:
- *  - keepalive:true on fetch so Android doesn't kill in-flight requests
- *  - Watchdog: main page pings SW every 25s; if loop died it restarts
- *  - clients.claim() on activate so SW takes control immediately
- *  - maximumAge:15000 so GPS doesn't hang waiting for fresh fix every time
- *  - Saves apiBase to IndexedDB so it survives SW restart
+ * ─────────────────────────────────────────────────────────────────────────────
+ * FIXES in this version:
+ *  1. 500m distance gate  — only logs a point if employee moved ≥500m from
+ *                           the last saved point (or it's the very first point)
+ *  2. Accuracy tightened  — skips points with GPS accuracy > 50m (was 200m)
+ *  3. Offline buffer      — when no internet, stores points in IndexedDB queue
+ *  4. Batch flush         — on reconnect, flushes queued points in order via
+ *                           POST /attendance/movement/log-batch
+ *  5. Watchdog preserved  — main page PING still restarts dead loop
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
-const API_BASE    = 'https://krishihr-zuui.onrender.com/api';
-const INTERVAL    = 30 * 1000; // 30 seconds
-const MAX_GPS_WAIT = 10000;          // 10 second GPS timeout per tick
+const API_BASE     = 'https://krishihr-zuui.onrender.com/api';
+const INTERVAL     = 30 * 1000;   // 30 seconds between GPS checks
+const MAX_GPS_WAIT = 10000;        // 10 sec GPS timeout
+const MAX_ACCURACY = 50;           // metres — reject readings worse than this
+const MIN_DIST_M   = 500;          // metres — skip if employee hasn't moved this far
 
 let _token    = null;
 let _timerId  = null;
 let _inFlight = false;
-let _lastTick = 0;   // timestamp of last successful ping — used by watchdog
+let _lastTick = 0;
 
-// ── Message handler (from main thread) ───────────────────────────────────────
+// ── Message handler ───────────────────────────────────────────────────────────
 self.addEventListener('message', async (event) => {
   const { type, token, apiBase } = event.data || {};
 
@@ -41,7 +44,6 @@ self.addEventListener('message', async (event) => {
   }
 
   if (type === 'PING') {
-    // Watchdog: if we have a token but loop died (no tick in >650s), restart it
     if (_token && _lastTick > 0 && (Date.now() - _lastTick) > 650000 && !_timerId) {
       console.warn('[SW] Watchdog restarting dead loop');
       startLoop();
@@ -54,10 +56,8 @@ self.addEventListener('message', async (event) => {
   }
 });
 
-// ── Install: skip waiting so new SW activates immediately ────────────────────
 self.addEventListener('install', () => self.skipWaiting());
 
-// ── Activate: claim all clients + restore tracking if it was running ─────────
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     await self.clients.claim();
@@ -73,7 +73,6 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// ── Periodic Sync (Android Chrome — keeps SW alive in background) ────────────
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'krishi-tracking') {
     event.waitUntil((async () => {
@@ -82,11 +81,8 @@ self.addEventListener('periodicsync', (event) => {
   }
 });
 
-// ── Loop ─────────────────────────────────────────────────────────────────────
-function startLoop() {
-  stopLoop();
-  scheduleTick();
-}
+// ── Loop ──────────────────────────────────────────────────────────────────────
+function startLoop() { stopLoop(); scheduleTick(); }
 
 function stopLoop() {
   if (_timerId !== null) { clearTimeout(_timerId); _timerId = null; }
@@ -102,20 +98,72 @@ function scheduleTick() {
   }, INTERVAL);
 }
 
+// ── Haversine distance in metres ──────────────────────────────────────────────
+function haversineMetres(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2
+          + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ── Main tick ─────────────────────────────────────────────────────────────────
 async function doTick() {
   if (_inFlight) return;
   _inFlight = true;
   try {
+    // 1. Flush any buffered offline points first (in order)
+    await flushOfflineBuffer();
+
+    // 2. Get current GPS position
     const pos = await getLocationWithTimeout(MAX_GPS_WAIT);
     if (!pos) { console.log('[SW] No GPS fix — skipping'); return; }
-    // ✅ FIX: Raised threshold from 50m → 200m. Log poor accuracy but never skip the ping.
-    if (pos.coords.accuracy > 200) {
-      console.warn(`[SW] Poor accuracy ${pos.coords.accuracy.toFixed(0)}m — logging anyway`);
+
+    // 3. Accuracy gate — skip poor readings
+    if (pos.coords.accuracy > MAX_ACCURACY) {
+      console.warn(`[SW] Poor accuracy ${pos.coords.accuracy.toFixed(0)}m > ${MAX_ACCURACY}m — skipping`);
+      return;
     }
 
-    const base = self._apiBase || API_BASE;
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const acc = pos.coords.accuracy;
 
-    // keepalive:true = browser keeps this fetch alive even if SW is suspended by Android
+    // 4. Distance gate — only log if moved ≥500m from last saved point
+    const lastPt = await dbGet('last_logged_point');
+    if (lastPt) {
+      const distM = haversineMetres(lastPt.lat, lastPt.lng, lat, lng);
+      if (distM < MIN_DIST_M) {
+        console.log(`[SW] Moved only ${distM.toFixed(0)}m — below 500m gate, skipping`);
+        _lastTick = Date.now();
+        return;
+      }
+      console.log(`[SW] Moved ${distM.toFixed(0)}m — logging point`);
+    }
+
+    // 5. Try to upload; if offline, buffer for later
+    const uploaded = await uploadPoint(lat, lng, acc);
+    if (uploaded) {
+      await dbSet('last_logged_point', { lat, lng, ts: Date.now() });
+    } else {
+      // Offline — push to buffer queue
+      await pushOfflineBuffer({ lat, lng, acc, ts: Date.now() });
+      console.log('[SW] Offline — point buffered for later upload');
+    }
+
+    _lastTick = Date.now();
+  } catch (err) {
+    console.warn('[SW] Tick error (will retry):', err.message);
+  } finally {
+    _inFlight = false;
+  }
+}
+
+// ── Upload single point ───────────────────────────────────────────────────────
+async function uploadPoint(lat, lng, acc) {
+  try {
+    const base = self._apiBase || API_BASE;
     const resp = await fetch(`${base}/attendance/movement/log`, {
       method:    'POST',
       keepalive: true,
@@ -123,25 +171,60 @@ async function doTick() {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${_token}`
       },
-      body: JSON.stringify({
-        lat:      pos.coords.latitude,
-        lng:      pos.coords.longitude,
-        accuracy: pos.coords.accuracy
-      })
+      body: JSON.stringify({ lat, lng, accuracy: acc })
     });
-
     if (resp.status === 401) {
       console.warn('[SW] 401 — token expired, stopping');
       stopLoop();
       await clearStorage();
-    } else {
-      _lastTick = Date.now();
-      console.log(`[SW] ✅ ${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)} ±${pos.coords.accuracy.toFixed(0)}m`);
+      return false;
     }
-  } catch (err) {
-    console.warn('[SW] Tick error (will retry):', err.message);
-  } finally {
-    _inFlight = false;
+    console.log(`[SW] ✅ Uploaded ${lat.toFixed(5)},${lng.toFixed(5)} ±${acc.toFixed(0)}m`);
+    return true;
+  } catch (_) {
+    return false; // offline or network error
+  }
+}
+
+// ── Offline buffer: queue of points waiting to be uploaded ────────────────────
+async function pushOfflineBuffer(point) {
+  const buf = (await dbGet('offline_buffer')) || [];
+  buf.push(point);
+  // Cap buffer at 500 points (~250km at 500m spacing) to avoid bloat
+  if (buf.length > 500) buf.splice(0, buf.length - 500);
+  await dbSet('offline_buffer', buf);
+}
+
+async function flushOfflineBuffer() {
+  const buf = (await dbGet('offline_buffer')) || [];
+  if (!buf.length) return;
+
+  console.log(`[SW] Flushing ${buf.length} buffered points`);
+  const base = self._apiBase || API_BASE;
+
+  try {
+    const resp = await fetch(`${base}/attendance/movement/log-batch`, {
+      method:    'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${_token}`
+      },
+      body: JSON.stringify({ points: buf })
+    });
+
+    if (resp.ok) {
+      const lastPt = buf[buf.length - 1];
+      await dbSet('last_logged_point', { lat: lastPt.lat, lng: lastPt.lng, ts: lastPt.ts });
+      await dbDel('offline_buffer');
+      console.log(`[SW] ✅ Batch flushed ${buf.length} points`);
+    } else if (resp.status === 401) {
+      stopLoop();
+      await clearStorage();
+    }
+    // If still offline, buffer stays intact for next attempt
+  } catch (_) {
+    console.log('[SW] Batch flush failed — still offline, will retry');
   }
 }
 
@@ -152,7 +235,6 @@ function getLocationWithTimeout(ms) {
     navigator.geolocation.getCurrentPosition(
       (pos) => { clearTimeout(timer); resolve(pos); },
       ()    => { clearTimeout(timer); resolve(null); },
-      // ✅ FIX: maximumAge 0 → 20000ms — avoids fresh-fix timeout on every tick
       { enableHighAccuracy: true, timeout: ms, maximumAge: 20000 }
     );
   });
@@ -161,7 +243,7 @@ function getLocationWithTimeout(ms) {
 // ── IndexedDB ─────────────────────────────────────────────────────────────────
 function openDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('KrishiHR_SW', 2);
+    const req = indexedDB.open('KrishiHR_SW', 3);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
@@ -186,7 +268,7 @@ async function dbGet(key) {
     const tx = db.transaction('kv', 'readonly');
     return new Promise((resolve) => {
       const req = tx.objectStore('kv').get(key);
-      req.onsuccess = () => resolve(req.result || null);
+      req.onsuccess = () => resolve(req.result ?? null);
       req.onerror   = () => resolve(null);
     });
   } catch { return null; }
@@ -208,4 +290,6 @@ const loadApiBase = ()  => dbGet('api_base');
 async function clearStorage() {
   await dbDel('tracking_token');
   await dbDel('api_base');
+  await dbDel('last_logged_point');
+  // Keep offline_buffer — don't lose queued points on token refresh
 }
