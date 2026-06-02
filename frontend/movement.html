@@ -325,44 +325,132 @@ async function loadMovementDetail(employeeId, date, empName) {
   document.getElementById('mv-map-type-btns').style.display = 'flex';
 
   // ── Draw route polyline ─────────────────────────────────────────────────
-  // Step 1: Client-side jump filter — remove points that imply speed > 80 km/h
-  // This catches any bad GPS points that slipped through the backend filter.
-  function filterJumps(points) {
-    if (points.length < 2) return points;
-    const clean = [points[0]];
+  // GAP DETECTION THRESHOLD:
+  // If time between two consecutive points > 10 minutes → treat as a GPS-off gap.
+  // That gap gets a dashed grey line + a "📍 off" marker, NOT a solid route line.
+  const GAP_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+  const MAX_SPEED_KMH    = 80;              // anything faster = GPS jump, skip point
+
+  // Step 1: Split points into SEGMENTS separated by gaps or GPS jumps
+  // Each segment = array of consecutive points with no big time/speed break
+  function buildSegments(points) {
+    if (!points.length) return [];
+    const segments = [];  // [{points, isGap}] — isGap segments are just [prev, next] for dashed line
+    let current = [points[0]];
+
     for (let i = 1; i < points.length; i++) {
-      const prev = clean[clean.length - 1];
+      const prev = current[current.length - 1];
       const cur  = points[i];
-      const distKm = hav(prev, cur);
-      // Estimate time gap from logged_at if available, else assume 30s
+
       const prevTs = prev.logged_at ? new Date(prev.logged_at).getTime() : 0;
       const curTs  = cur.logged_at  ? new Date(cur.logged_at).getTime()  : 0;
-      const timeDiffHrs = (prevTs && curTs && curTs > prevTs)
-        ? (curTs - prevTs) / 3600000
-        : 30 / 3600;
-      const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
-      if (speedKmh > 80) {
-        console.warn(`[Movement] Jump filtered: ${speedKmh.toFixed(0)} km/h between point ${i-1} and ${i}`);
-        continue; // skip this point — it's a GPS teleport
+      const timeDiffMs  = (prevTs && curTs) ? curTs - prevTs : 30000;
+      const timeDiffHrs = timeDiffMs / 3600000;
+      const distKm      = hav(prev, cur);
+      const speedKmh    = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
+
+      // GPS jump — skip this point entirely (don't even show gap, just remove it)
+      if (speedKmh > MAX_SPEED_KMH && timeDiffMs < GAP_THRESHOLD_MS) {
+        console.warn(`[Movement] Jump removed: ${speedKmh.toFixed(0)} km/h at point ${i}`);
+        continue;
       }
-      clean.push(cur);
+
+      // Time gap — location was off. End current segment, mark a gap, start new one.
+      if (timeDiffMs > GAP_THRESHOLD_MS) {
+        if (current.length >= 1) segments.push({ points: current, isGap: false });
+        // Store gap info: from last point of prev segment to first of next
+        const gapMins = Math.round(timeDiffMs / 60000);
+        segments.push({ points: [prev, cur], isGap: true, gapMins, distKm });
+        current = [cur];
+        continue;
+      }
+
+      current.push(cur);
     }
-    return clean;
+    if (current.length >= 1) segments.push({ points: current, isGap: false });
+    return segments;
   }
 
-  // Step 2: Also filter accuracy > 50m (matches backend threshold)
-  const accPts  = pts.filter(p => !p.accuracy || parseFloat(p.accuracy) <= 50);
-  const safePts = filterJumps(accPts.length >= 2 ? accPts : pts);
-  const path    = safePts.map(p => ({ lat: p.lat, lng: p.lng }));
+  // Step 2: Filter accuracy, then split into segments
+  const accPts   = pts.filter(p => !p.accuracy || parseFloat(p.accuracy) <= 50);
+  const cleanPts = accPts.length >= 2 ? accPts : pts;
+  const segments = buildSegments(cleanPts);
 
-  // Step 3: Draw polyline with road-snapping via Google Roads API
-  // Roads API accepts max 100 points per call — chunk if needed
-  async function drawSnappedRoute(rawPath) {
+  // Keep track of all polylines/markers so we can clear them
+  const _segPolylines = [];
+  const _gapMarkers   = [];
+
+  // Step 3: Draw each segment
+  segments.forEach(seg => {
+    const segPath = seg.points.map(p => ({ lat: p.lat, lng: p.lng }));
+
+    if (seg.isGap) {
+      // ── Dashed grey line for GPS-off gap ──────────────────────────────
+      const gapLine = new google.maps.Polyline({
+        path: segPath,
+        geodesic: true,
+        strokeColor:   '#9ca3af',
+        strokeOpacity: 0,
+        strokeWeight:  2,
+        icons: [{
+          icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.7, scale: 3 },
+          offset: '0',
+          repeat: '12px'
+        }],
+        map: _mvGoogleMap
+      });
+      _segPolylines.push(gapLine);
+
+      // Gap label marker at midpoint
+      const mid = {
+        lat: (seg.points[0].lat + seg.points[1].lat) / 2,
+        lng: (seg.points[0].lng + seg.points[1].lng) / 2
+      };
+      const gapMarker = new google.maps.Marker({
+        position: mid,
+        map: _mvGoogleMap,
+        icon: {
+          url: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="90" height="22">
+              <rect rx="11" ry="11" width="90" height="22" fill="#6b7280" opacity="0.92"/>
+              <text x="45" y="15" font-family="DM Sans,sans-serif" font-size="10" fill="white" text-anchor="middle">
+                📵 ${seg.gapMins}min gap · ${seg.distKm.toFixed(1)}km
+              </text>
+            </svg>`),
+          anchor: new google.maps.Point(45, 11)
+        },
+        title: `Location off for ${seg.gapMins} minutes`
+      });
+      _gapMarkers.push(gapMarker);
+
+    } else if (segPath.length >= 2) {
+      // ── Solid blue line for actual tracked movement ────────────────────
+      const poly = new google.maps.Polyline({
+        path: segPath,
+        geodesic: true,
+        strokeColor:   '#2563eb',
+        strokeOpacity: 0.9,
+        strokeWeight:  4,
+        map: _mvGoogleMap
+      });
+      _segPolylines.push(poly);
+
+      // Road-snap this segment in background
+      drawSnappedSegment(segPath).then(snapped => {
+        if (snapped.length >= 2) poly.setPath(snapped);
+      });
+    }
+  });
+
+  // Keep reference to clear on next load
+  _mvPolyline = { setMap: (m) => { _segPolylines.forEach(p => p.setMap(m)); _gapMarkers.forEach(mk => mk.setMap(m)); } };
+
+  // Step 4: Road-snap a single segment via Google Roads API
+  async function drawSnappedSegment(rawPath) {
     const MAX_PER_CALL = 100;
     const snappedPath  = [];
-
     for (let start = 0; start < rawPath.length; start += MAX_PER_CALL) {
-      const chunk = rawPath.slice(start, start + MAX_PER_CALL);
+      const chunk   = rawPath.slice(start, start + MAX_PER_CALL);
       const pathStr = chunk.map(p => `${p.lat},${p.lng}`).join('|');
       try {
         const resp = await fetch(
@@ -370,39 +458,17 @@ async function loadMovementDetail(employeeId, date, empName) {
         );
         const data = await resp.json();
         if (data.snappedPoints?.length) {
-          data.snappedPoints.forEach(sp => {
-            snappedPath.push({ lat: sp.location.latitude, lng: sp.location.longitude });
-          });
+          data.snappedPoints.forEach(sp =>
+            snappedPath.push({ lat: sp.location.latitude, lng: sp.location.longitude })
+          );
         } else {
-          // Roads API failed for this chunk — fall back to raw points
           chunk.forEach(p => snappedPath.push(p));
         }
       } catch (_) {
-        // Network error — use raw points
         chunk.forEach(p => snappedPath.push(p));
       }
     }
     return snappedPath;
-  }
-
-  // Draw raw path first (instant), then replace with snapped route
-  _mvPolyline = new google.maps.Polyline({
-    path,
-    geodesic: true,
-    strokeColor: '#2563eb',
-    strokeOpacity: 0.9,
-    strokeWeight: 4,
-    map: _mvGoogleMap
-  });
-
-  // Road-snap in background and update polyline when ready
-  if (path.length >= 2) {
-    drawSnappedRoute(path).then(snapped => {
-      if (snapped.length >= 2 && _mvPolyline) {
-        _mvPolyline.setPath(snapped);
-        console.log(`[Movement] Road-snapped: ${path.length} GPS points → ${snapped.length} road points`);
-      }
-    });
   }
 
   // ── Shared InfoWindow ─────────────────────────────────────────────────────
