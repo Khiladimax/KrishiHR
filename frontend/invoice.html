@@ -31,74 +31,51 @@
 
 /* ── Invoice Template Preview ───────────────────────────── */
 .invoice-preview-wrap {
-  background:#f0f0f0; border-radius:var(--radius); padding:24px;
+  background:#e8e8e8; border-radius:var(--radius); padding:20px;
   display:flex; justify-content:center;
 }
 .invoice-sheet {
   background:#fff; width:740px; min-height:960px;
-  padding:40px 44px; box-shadow:0 4px 24px rgba(0,0,0,.18);
+  padding:40px 44px; box-shadow:0 2px 12px rgba(0,0,0,.12);
   font-family:'DM Sans',sans-serif; font-size:13px; line-height:1.5;
   color:#1a1a1a; position:relative;
 }
-.inv-header-bar {
-  background:linear-gradient(135deg,#1B5E20,#2E7D32);
-  color:#fff; text-align:center; padding:18px 24px;
-  border-radius:8px 8px 0 0; margin:-40px -44px 28px -44px;
-}
-.inv-header-bar h1 { font-size:26px; font-weight:800; letter-spacing:2px; margin:0 0 2px; }
-.inv-header-bar p  { font-size:11px; opacity:.85; margin:0; letter-spacing:.5px; }
 
-.inv-company-block { margin-bottom:24px; }
-.inv-company-block .company-name { font-size:13px; font-weight:700; color:#1B5E20; margin-bottom:2px; }
-.inv-company-block .company-detail { font-size:11px; color:#555; line-height:1.6; }
-.inv-company-block .gst-row { font-size:11px; color:#333; margin-top:4px; }
+/* ── Paper invoice styles (no color) ───────────────────── */
+.pi-header { text-align:center; border-bottom:2px solid #222; padding-bottom:12px; margin-bottom:18px; }
+.pi-header h1 { font-size:22px; font-weight:800; letter-spacing:3px; margin:0 0 3px; color:#111; }
+.pi-header p  { font-size:11px; color:#555; margin:0; }
 
-.inv-meta-row {
-  display:flex; justify-content:space-between; align-items:flex-start;
-  border:1.5px solid #c8e6c9; border-radius:8px; padding:14px 18px;
-  background:#f1f8e9; margin-bottom:22px;
-}
-.inv-meta-col { min-width:0; }
-.inv-meta-col h4 { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:#558b2f; font-weight:700; margin-bottom:6px; }
-.inv-meta-col p  { font-size:12.5px; color:#1a1a1a; margin:1px 0; line-height:1.5; }
-.inv-meta-col .inv-no { font-size:15px; font-weight:700; color:#1B5E20; }
+.pi-meta-row { display:flex; justify-content:space-between; margin-bottom:16px; gap:20px; }
+.pi-meta-left { flex:1; }
+.pi-meta-right { min-width:160px; border:1px solid #bbb; padding:10px 12px; }
+.pi-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#666; font-weight:700; margin-bottom:2px; }
+.pi-value { font-size:13px; font-weight:700; color:#111; }
+.pi-name  { font-size:14px; font-weight:700; color:#111; margin-bottom:4px; }
+.pi-info  { font-size:11.5px; color:#555; line-height:1.7; }
 
-.inv-to-block { margin-bottom:20px; }
-.inv-to-block h4 { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:#558b2f; font-weight:700; margin-bottom:6px; border-bottom:1.5px solid #c8e6c9; padding-bottom:4px; }
-.inv-to-block .to-name { font-weight:700; font-size:13px; color:#1a1a1a; }
-.inv-to-block p { font-size:12px; color:#444; margin:1px 0; }
+.pi-divider { border:none; border-top:1px solid #ccc; margin:14px 0; }
+.pi-section-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#555; font-weight:700; margin-bottom:6px; border-bottom:1px solid #ccc; padding-bottom:3px; }
 
-.inv-table { width:100%; border-collapse:collapse; margin-bottom:16px; }
-.inv-table thead tr { background:#1B5E20; color:#fff; }
-.inv-table thead th { padding:10px 14px; font-size:11.5px; font-weight:700; text-align:left; }
-.inv-table thead th:last-child { text-align:right; }
-.inv-table tbody tr:nth-child(even) { background:#f9fbe7; }
-.inv-table tbody td { padding:11px 14px; font-size:12.5px; border-bottom:1px solid #e0e0e0; vertical-align:top; }
-.inv-table tbody td:last-child { text-align:right; font-weight:600; white-space:nowrap; }
-.inv-table tfoot tr { background:#e8f5e9; }
-.inv-table tfoot td { padding:11px 14px; font-size:13.5px; font-weight:700; }
-.inv-table tfoot td:last-child { text-align:right; color:#1B5E20; font-size:15px; }
+.pi-table { width:100%; border-collapse:collapse; margin-bottom:0; }
+.pi-table thead tr { border-top:1.5px solid #333; border-bottom:1.5px solid #333; }
+.pi-table thead th { padding:8px 10px; font-size:10px; font-weight:700; text-align:left; color:#222; text-transform:uppercase; letter-spacing:.5px; }
+.pi-table thead th:last-child { text-align:right; }
+.pi-table tbody td { padding:10px 10px; font-size:12.5px; border-bottom:1px solid #e0e0e0; vertical-align:top; color:#222; }
+.pi-table tbody td:last-child { text-align:right; font-weight:600; }
+.pi-total-row { border-top:1.5px solid #333; border-bottom:1.5px solid #333; }
+.pi-total-row td { padding:9px 10px; font-size:13px; font-weight:700; color:#111; }
+.pi-total-row td:last-child { text-align:right; }
 
-.inv-words-box {
-  border:1.5px solid #c8e6c9; border-radius:6px; padding:10px 14px;
-  background:#f1f8e9; font-size:12px; color:#2d5a0e; margin-bottom:24px;
-}
-.inv-words-box strong { font-weight:700; }
+.pi-words-box { border:1px solid #bbb; padding:9px 12px; font-size:12px; color:#333; margin:14px 0; background:#fafafa; }
+.pi-words-box b { font-weight:700; }
 
-.inv-bank-section { margin-top:auto; }
-.inv-bank-section h4 { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:#558b2f; font-weight:700; margin-bottom:10px; border-bottom:1.5px solid #c8e6c9; padding-bottom:4px; }
-.inv-bank-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 32px; }
-.inv-bank-row { display:flex; gap:8px; font-size:12px; }
-.inv-bank-row .label { color:#777; min-width:90px; flex-shrink:0; }
-.inv-bank-row .value { font-weight:600; color:#1a1a1a; }
+.pi-bank-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; margin-top:8px; }
+.pi-bank-row { display:flex; gap:8px; font-size:12px; }
+.pi-bank-row .lbl { color:#888; min-width:88px; flex-shrink:0; font-size:11px; }
+.pi-bank-row .val { font-weight:700; color:#111; }
 
-.inv-footer-bar {
-  background:linear-gradient(135deg,#1B5E20,#2E7D32);
-  color:#fff; text-align:center; padding:10px 24px;
-  border-radius:0 0 8px 8px; margin:28px -44px -40px -44px;
-  font-size:11px; opacity:.85;
-}
-
+.pi-footer { text-align:center; border-top:1px solid #ccc; padding-top:10px; margin-top:20px; font-size:10px; color:#888; }
 /* ── Manual Form ────────────────────────────────────────── */
 .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px 20px; }
 .form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px 20px; }
@@ -442,90 +419,81 @@ const COMPANY = {
 function renderInvoiceHTML(d) {
   const amtWords = numToWords(Number(d.amount) || 0);
   const dateStr  = d.date || '—';
+  const amt      = Number(d.amount||0).toLocaleString('en-IN');
   return `
-    <div class="inv-header-bar">
+    <div class="pi-header">
       <h1>INVOICE</h1>
-      <p>Krishi Care & Management Services Pvt. Ltd.</p>
+      <p>${COMPANY.name}</p>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px">
-      <!-- Payee -->
-      <div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#558b2f;font-weight:700;margin-bottom:8px">Bill From</div>
-        <div style="font-weight:700;font-size:14px;margin-bottom:3px">${d.name || '—'}</div>
-        <div style="font-size:11.5px;color:#555;line-height:1.7">
-          ${d.mob ? '📞 ' + d.mob + '<br>' : ''}
+    <div class="pi-meta-row">
+      <div class="pi-meta-left">
+        <div class="pi-section-label">Bill From</div>
+        <div class="pi-name">${d.name || '—'}</div>
+        <div class="pi-info">
+          ${d.mob    ? 'Mob: ' + d.mob + '<br>' : ''}
           ${d.aadhar ? 'Aadhar: ' + d.aadhar + '<br>' : ''}
-          ${d.pan ? 'PAN: ' + d.pan + '<br>' : ''}
+          ${d.pan    ? 'PAN: ' + d.pan + '<br>' : ''}
           ${(d.address||'').replace(/\n/g,'<br>')}
         </div>
       </div>
-      <!-- Invoice meta -->
-      <div>
-        <div class="inv-meta-row" style="flex-direction:column;gap:6px">
-          <div>
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#558b2f;font-weight:700">Invoice No</div>
-            <div style="font-size:16px;font-weight:800;color:#1B5E20">${d.invoiceNo || '—'}</div>
-          </div>
-          <div>
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#558b2f;font-weight:700">Date</div>
-            <div style="font-size:13px;font-weight:600">${dateStr}</div>
-          </div>
-        </div>
+      <div class="pi-meta-right">
+        <div class="pi-label">Invoice No</div>
+        <div class="pi-value" style="font-size:15px;margin-bottom:10px">${d.invoiceNo || '—'}</div>
+        <div class="pi-label">Date</div>
+        <div class="pi-value" style="font-size:12px">${dateStr}</div>
       </div>
     </div>
 
-    <!-- Bill To -->
-    <div class="inv-to-block">
-      <h4>Bill To</h4>
-      <div class="to-name">${COMPANY.name}</div>
-      <p style="white-space:pre-line;font-size:11.5px;color:#555">${COMPANY.addr}</p>
-      <p style="font-size:11.5px;margin-top:3px"><b>GSTIN:</b> ${COMPANY.gst} &nbsp;&nbsp; <b>PAN:</b> ${COMPANY.pan}</p>
+    <hr class="pi-divider">
+
+    <div style="margin-bottom:16px">
+      <div class="pi-section-label">Bill To</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:3px">${COMPANY.name}</div>
+      <div class="pi-info">${COMPANY.addr.replace(/\n/g,'<br>')}</div>
+      <div class="pi-info" style="margin-top:3px"><b>GSTIN:</b> ${COMPANY.gst} &nbsp; <b>PAN:</b> ${COMPANY.pan}</div>
     </div>
 
-    <!-- Table -->
-    <table class="inv-table">
+    <hr class="pi-divider">
+
+    <table class="pi-table">
       <thead>
         <tr>
-          <th style="width:40px">#</th>
+          <th style="width:36px">#</th>
           <th>Particulars</th>
-          <th style="width:120px;text-align:right">Amount (₹)</th>
+          <th style="width:110px">Amount (Rs.)</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td>1</td>
           <td>${d.description || '—'}</td>
-          <td>${Number(d.amount||0).toLocaleString('en-IN')}</td>
+          <td>${amt}</td>
         </tr>
       </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="2" style="text-align:right;font-size:13px;color:#333;font-weight:700">Total (Rs.)</td>
-          <td>₹ ${Number(d.amount||0).toLocaleString('en-IN')}</td>
-        </tr>
-      </tfoot>
+      <tr class="pi-total-row">
+        <td colspan="2" style="text-align:right;font-size:12px">Total (Rs.)</td>
+        <td>Rs. ${amt}</td>
+      </tr>
     </table>
 
-    <!-- Amount in words -->
-    <div class="inv-words-box">
-      <strong>Amount in Words:</strong> Rupees ${amtWords} Only
+    <div class="pi-words-box">
+      <b>Amount in Words:</b> Rupees ${amtWords} Only
     </div>
 
-    <!-- Bank details -->
-    <div class="inv-bank-section">
-      <h4>Payment / Bank Details</h4>
-      <div class="inv-bank-grid">
-        <div class="inv-bank-row"><span class="label">Account Name</span><span class="value">${d.name || '—'}</span></div>
-        <div class="inv-bank-row"><span class="label">Bank Name</span><span class="value">${d.bankName || '—'}</span></div>
-        ${d.branch ? `<div class="inv-bank-row"><span class="label">Branch</span><span class="value">${d.branch}</span></div>` : ''}
-        <div class="inv-bank-row"><span class="label">Account No</span><span class="value">${d.accountNo || '—'}</span></div>
-        <div class="inv-bank-row"><span class="label">IFSC Code</span><span class="value">${d.ifsc || '—'}</span></div>
-      </div>
+    <hr class="pi-divider">
+
+    <div class="pi-section-label">Payment / Bank Details</div>
+    <div class="pi-bank-grid">
+      <div class="pi-bank-row"><span class="lbl">Account Name</span><span class="val">${d.name || '—'}</span></div>
+      <div class="pi-bank-row"><span class="lbl">Bank Name</span><span class="val">${d.bankName || '—'}</span></div>
+      ${d.branch ? '<div class="pi-bank-row"><span class="lbl">Branch</span><span class="val">'+d.branch+'</span></div>' : ''}
+      <div class="pi-bank-row"><span class="lbl">Account No</span><span class="val">${d.accountNo || '—'}</span></div>
+      <div class="pi-bank-row"><span class="lbl">IFSC Code</span><span class="val">${d.ifsc || '—'}</span></div>
     </div>
 
-    <div class="inv-footer-bar">
-      This is a computer generated invoice. &nbsp;|&nbsp; Krishi Care & Management Services Pvt. Ltd.
+    <div class="pi-footer">
+      This is a computer generated invoice. &nbsp;|&nbsp; ${COMPANY.name}
     </div>
   `;
 }
