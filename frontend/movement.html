@@ -227,23 +227,6 @@ async function loadMovementSummary() {
   window._mvSummaryData = rows;
 }
 
-// ── Detail (Google Maps) ───────────────────────────────────────────────────────
-let _mvGoogleMap    = null;
-let _mvPolyline     = null;
-let _mvMarkers      = [];
-let _mvInfoWindow   = null;
-let _mvCurrentType  = 'hybrid';
-
-function setMapType(type) {
-  _mvCurrentType = type;
-  if (_mvGoogleMap) _mvGoogleMap.setMapTypeId(type);
-  document.querySelectorAll('.map-type-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.toLowerCase().includes(
-      type === 'roadmap' ? 'road' : type === 'hybrid' ? 'hybrid' : type === 'satellite' ? 'sat' : 'terr'
-    ));
-  });
-}
-
 function closeMvDetail() {
   document.getElementById('mv-detail-card').style.display = 'none';
   document.getElementById('mv-map-type-btns').style.display = 'none';
