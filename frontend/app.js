@@ -153,6 +153,7 @@ const NAV_GROUPS = [
       { href:'reimbursement.html',  icon: ICONS.reimbursement,  label:'Reimbursement',    always:true },
       { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
       { href:'projects.html',       icon: ICONS.projects,     label:'Projects',         roles:['admin','super_admin','accounts'] },
+      { href:'invoice.html',        icon: '🧾',                label:'Invoice Generator', roles:['admin','super_admin','hr','accounts'] },
     ]
   },
   {
