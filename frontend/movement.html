@@ -291,17 +291,11 @@ async function loadMovementDetail(employeeId, date, empName) {
   document.getElementById('mv-detail-card').style.display = 'block';
 
   try {
-    const token = Auth.getToken();
-    const base  = window.API_BASE || 'https://krishihr-zuui.onrender.com/api';
+    // Use the shared api() helper from app.js — handles auth, base URL, retries
+    const json = await api('GET', `/attendance/movement/segmented?employee_id=${employeeId}&date=${date}`);
 
-    // Call new segmented endpoint
-    const resp = await fetch(`${base}/attendance/movement/segmented?employee_id=${employeeId}&date=${date}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const json = await resp.json();
-
-    if (!json.success || !json.data)
-      return (document.getElementById('mv-stats-bar').innerHTML = `<span style="color:#ef4444">Failed to load</span>`);
+    if (!json || !json.success || !json.data)
+      return (document.getElementById('mv-stats-bar').innerHTML = `<span style="color:#ef4444">Failed to load data</span>`);
 
     const { segments, events, analytics, alerts } = json.data;
 
