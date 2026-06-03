@@ -1796,13 +1796,17 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 exports.logMovement = async (req, res) => {
   try {
     const empId = req.user.id;
-    const { lat, lng, accuracy } = req.body;
+    const { lat, lng, accuracy, gps_status, internet_status, battery } = req.body;
     if (!lat || !lng)
       return res.status(400).json({ success: false, message: 'lat and lng are required' });
 
-    // ── Accuracy filter: reject readings worse than 50m (tight = no jumps) ──
+    const gpsOn  = gps_status      !== false; // default true if not sent
+    const netOn  = internet_status !== false;
+    const batt   = battery != null ? parseInt(battery) : null;
+
+    // ── Accuracy filter: reject readings worse than 80m ──────────────────
     const acc = parseFloat(accuracy) || 9999;
-    if (acc > 50)
+    if (acc > 80)
       return res.json({ success: true, skipped: true, reason: 'poor_accuracy' });
 
     const today = getISTDate();
@@ -1862,9 +1866,9 @@ exports.logMovement = async (req, res) => {
 
     // ── Save the point ────────────────────────────────────────────────────
     await db.query(
-      `INSERT INTO employee_movement_log(employee_id, lat, lng, accuracy, logged_at)
-       VALUES($1,$2,$3,$4,NOW())`,
-      [empId, lat, lng, acc]
+      `INSERT INTO employee_movement_log(employee_id, lat, lng, accuracy, gps_status, internet_status, battery, logged_at)
+       VALUES($1,$2,$3,$4,$5,$6,$7,NOW())`,
+      [empId, lat, lng, acc, gpsOn, netOn, batt]
     );
 
     // ── Cleanup old logs: fire-and-forget, NOT in the request path ────────
@@ -1940,6 +1944,223 @@ exports.logMovementBatch = async (req, res) => {
     res.json({ success: true, inserted, skipped });
   } catch (err) {
     console.error('[logMovementBatch Error]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+
+// ── Segmented movement: builds S1→E1 (blue) + E1→S2 (orange gap) segments ──
+exports.getMovementSegmented = async (req, res) => {
+  try {
+    const { employee_id, date } = req.query;
+    if (!employee_id || !date)
+      return res.status(400).json({ success: false, message: 'employee_id and date required' });
+
+    // Fetch all points for the day ordered by time
+    const result = await db.query(
+      `SELECT
+         lat::float, lng::float, accuracy,
+         gps_status, internet_status, battery,
+         logged_at,
+         TO_CHAR(logged_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM') AS time_label,
+         EXTRACT(EPOCH FROM logged_at)*1000 AS ts
+       FROM employee_movement_log
+       WHERE employee_id = $1
+         AND DATE(logged_at AT TIME ZONE 'Asia/Kolkata') = $2
+       ORDER BY logged_at ASC`,
+      [employee_id, date]
+    );
+    const pts = result.rows;
+
+    if (!pts.length)
+      return res.json({ success: true, data: { segments: [], events: [], analytics: null, alerts: [] } });
+
+    // ── Constants ────────────────────────────────────────────────────────────
+    const GAP_THRESHOLD_MS  = 60 * 1000;      // 1 min gap → new segment
+    const RESUME_WAIT_MS    = 5 * 60 * 1000;  // 5 min confirmed tracking before S{n}
+    const MAX_SPEED_KMH     = 120;
+    const GPS_FLAG_MINS     = 15;
+    const NET_FLAG_MINS     = 30;
+    const MAX_INTERRUPTIONS = 5;
+
+    // ── Haversine ────────────────────────────────────────────────────────────
+    function havKm(p1, p2) {
+      const R = 6371, toRad = d => d * Math.PI / 180;
+      const dLat = toRad(p2.lat - p1.lat), dLng = toRad(p2.lng - p1.lng);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(p1.lat))*Math.cos(toRad(p2.lat))*Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // ── Step 1: Remove GPS teleport jumps ───────────────────────────────────
+    const clean = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      const prev = clean[clean.length - 1];
+      const cur  = pts[i];
+      const diffMs  = cur.ts - prev.ts;
+      const distKm  = havKm(prev, cur);
+      const speed   = diffMs > 0 ? distKm / (diffMs / 3600000) : 0;
+      if (speed > MAX_SPEED_KMH && diffMs < GAP_THRESHOLD_MS) continue; // teleport — skip
+      clean.push(cur);
+    }
+
+    // ── Step 2: Split into raw segments by time gap ──────────────────────────
+    const rawSegs = []; // [{pts:[...]}]
+    let cur = [clean[0]];
+    for (let i = 1; i < clean.length; i++) {
+      const diffMs = clean[i].ts - clean[i-1].ts;
+      if (diffMs >= GAP_THRESHOLD_MS) {
+        rawSegs.push(cur);
+        cur = [clean[i]];
+      } else {
+        cur.push(clean[i]);
+      }
+    }
+    rawSegs.push(cur);
+
+    // ── Step 3: Apply 5-min resume confirmation window ───────────────────────
+    // A segment is only confirmed (gets S{n} label) if its duration >= RESUME_WAIT_MS
+    // Short spurious pings within 5 min of gap are merged into the gap.
+    const confirmedSegs = [];
+    for (let i = 0; i < rawSegs.length; i++) {
+      const seg = rawSegs[i];
+      const durMs = seg[seg.length-1].ts - seg[0].ts;
+      if (i === 0 || durMs >= RESUME_WAIT_MS) {
+        confirmedSegs.push(seg);
+      } else {
+        // Short segment — treat as noise, merge its first point into previous gap
+        // (just don't add a new confirmed segment)
+        console.log(`[Segmented] Skipping short segment ${durMs/1000}s < ${RESUME_WAIT_MS/1000}s (resume confirmation)`);
+      }
+    }
+    if (!confirmedSegs.length) confirmedSegs.push(rawSegs[0]);
+
+    // ── Step 4: Build output segments + events + analytics ───────────────────
+    const segments  = [];
+    const events    = [];
+    let   segIdx    = 0;
+    let   verifiedKm = 0, estimatedKm = 0, downtimeMs = 0, longestGapMs = 0;
+    let   interruptions = 0;
+    let   gpsOffMs = 0, netOffMs = 0;
+
+    for (let i = 0; i < confirmedSegs.length; i++) {
+      segIdx++;
+      const seg    = confirmedSegs[i];
+      const startP = seg[0];
+      const endP   = seg[seg.length - 1];
+
+      // Calc verified km for this segment
+      let segKm = 0;
+      for (let j = 1; j < seg.length; j++) segKm += havKm(seg[j-1], seg[j]);
+      verifiedKm += segKm;
+
+      // Tracked segment (BLUE)
+      segments.push({
+        type:        'verified',
+        index:       segIdx,
+        startLabel:  `S${segIdx}`,
+        endLabel:    `E${segIdx}`,
+        points:      seg.map(p => ({ lat: p.lat, lng: p.lng, time_label: p.time_label, ts: p.ts, accuracy: p.accuracy, battery: p.battery })),
+        km:          Math.round(segKm * 100) / 100,
+        start_time:  startP.time_label,
+        end_time:    endP.time_label
+      });
+
+      // S{n} event
+      events.push({ type: 'start', label: `S${segIdx}`, point: { lat: startP.lat, lng: startP.lng, time_label: startP.time_label, ts: startP.ts } });
+      // E{n} event
+      events.push({ type: 'loss', label: `E${segIdx}`, point: { lat: endP.lat, lng: endP.lng, time_label: endP.time_label, ts: endP.ts } });
+
+      // Check gps/internet off within segment
+      seg.forEach(p => {
+        if (!p.gps_status)      gpsOffMs += 60000;
+        if (!p.internet_status) netOffMs += 60000;
+      });
+
+      // GAP segment between this E{n} and next S{n+1} (ORANGE)
+      if (i < confirmedSegs.length - 1) {
+        const nextSeg   = confirmedSegs[i + 1];
+        const gapFromPt = endP;
+        const gapToPt   = nextSeg[0];
+        const gapMs     = gapToPt.ts - gapFromPt.ts;
+        const gapKm     = havKm(gapFromPt, gapToPt);
+
+        downtimeMs   += gapMs;
+        longestGapMs  = Math.max(longestGapMs, gapMs);
+        estimatedKm  += gapKm;
+        interruptions++;
+
+        const gapMins = Math.round(gapMs / 60000);
+        const durLabel = gapMs < 3600000
+          ? `${gapMins}m`
+          : `${Math.floor(gapMins/60)}h ${gapMins%60}m`;
+
+        segments.push({
+          type:       'gap',
+          from_index: segIdx,
+          to_index:   segIdx + 1,
+          startLabel: `E${segIdx}`,
+          endLabel:   `S${segIdx + 1}`,
+          from:       { lat: gapFromPt.lat, lng: gapFromPt.lng, time_label: gapFromPt.time_label, ts: gapFromPt.ts },
+          to:         { lat: gapToPt.lat,   lng: gapToPt.lng,   time_label: gapToPt.time_label,   ts: gapToPt.ts   },
+          gap_ms:     gapMs,
+          gap_mins:   gapMins,
+          dur_label:  durLabel,
+          straight_km: Math.round(gapKm * 100) / 100
+        });
+
+        events.push({
+          type:     'resume',
+          label:    `S${segIdx + 1}`,
+          gap_min:  gapMins,
+          point:    { lat: gapToPt.lat, lng: gapToPt.lng, time_label: gapToPt.time_label, ts: gapToPt.ts }
+        });
+      }
+    }
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+    const totalMs       = clean[clean.length-1].ts - clean[0].ts;
+    const trackingPct   = totalMs > 0 ? Math.round(((totalMs - downtimeMs) / totalMs) * 100) : 100;
+    const firstPoint    = clean[0].time_label;
+    const lastPoint     = clean[clean.length-1].time_label;
+
+    const analytics = {
+      verified_km:    Math.round(verifiedKm  * 100) / 100,
+      estimated_km:   Math.round(estimatedKm * 100) / 100,
+      total_km:       Math.round((verifiedKm + estimatedKm) * 100) / 100,
+      tracking_pct:   trackingPct,
+      downtime_min:   Math.round(downtimeMs / 60000),
+      interruptions,
+      longest_gap_min: Math.round(longestGapMs / 60000),
+      gps_off_min:    Math.round(gpsOffMs / 60000),
+      net_off_min:    Math.round(netOffMs / 60000),
+      first_point:    firstPoint,
+      last_point:     lastPoint,
+      total_points:   clean.length
+    };
+
+    // ── Security alerts ───────────────────────────────────────────────────────
+    const alerts = [];
+    if (analytics.gps_off_min > GPS_FLAG_MINS)
+      alerts.push({ type: 'gps_off',       value: analytics.gps_off_min,    msg: `GPS off for ${analytics.gps_off_min}min (>${GPS_FLAG_MINS}min threshold)` });
+    if (analytics.net_off_min > NET_FLAG_MINS)
+      alerts.push({ type: 'net_off',       value: analytics.net_off_min,    msg: `Internet off for ${analytics.net_off_min}min (>${NET_FLAG_MINS}min threshold)` });
+    if (interruptions > MAX_INTERRUPTIONS)
+      alerts.push({ type: 'interruptions', value: interruptions,            msg: `${interruptions} tracking interruptions today (>${MAX_INTERRUPTIONS} threshold)` });
+
+    // Check for unrealistic speed across any two consecutive clean points
+    for (let i = 1; i < clean.length; i++) {
+      const diffMs = clean[i].ts - clean[i-1].ts;
+      const distKm = havKm(clean[i-1], clean[i]);
+      const speed  = diffMs > 0 ? distKm / (diffMs / 3600000) : 0;
+      if (speed > MAX_SPEED_KMH) {
+        alerts.push({ type: 'speed', value: Math.round(speed), time: clean[i].time_label, msg: `Unrealistic speed ${Math.round(speed)} km/h at ${clean[i].time_label}` });
+        break; // only flag once
+      }
+    }
+
+    res.json({ success: true, data: { segments, events, analytics, alerts } });
+  } catch (err) {
+    console.error('[getMovementSegmented Error]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

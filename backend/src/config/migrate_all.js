@@ -607,15 +607,24 @@ async function runAllMigrations() {
 
     // ── Employee Movement Log ──────────────────────────────────────────────
     await client.query(`CREATE TABLE IF NOT EXISTS employee_movement_log (
-      id          SERIAL PRIMARY KEY,
-      employee_id INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-      lat         NUMERIC(11,8) NOT NULL,
-      lng         NUMERIC(11,8) NOT NULL,
-      accuracy    FLOAT,
-      logged_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id              SERIAL PRIMARY KEY,
+      employee_id     INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      lat             NUMERIC(11,8) NOT NULL,
+      lng             NUMERIC(11,8) NOT NULL,
+      accuracy        FLOAT,
+      gps_status      BOOLEAN NOT NULL DEFAULT TRUE,
+      internet_status BOOLEAN NOT NULL DEFAULT TRUE,
+      battery         SMALLINT,
+      logged_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    // Safe column additions for existing deployments
+    await client.query(`ALTER TABLE employee_movement_log ADD COLUMN IF NOT EXISTS gps_status BOOLEAN NOT NULL DEFAULT TRUE`);
+    await client.query(`ALTER TABLE employee_movement_log ADD COLUMN IF NOT EXISTS internet_status BOOLEAN NOT NULL DEFAULT TRUE`);
+    await client.query(`ALTER TABLE employee_movement_log ADD COLUMN IF NOT EXISTS battery SMALLINT`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_movement_emp_date
       ON employee_movement_log(employee_id, DATE(logged_at AT TIME ZONE 'Asia/Kolkata'))`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_movement_emp_logged
+      ON employee_movement_log(employee_id, logged_at)`);
 
     // ═══════════════════════════════════════════════════════════════
     // INDEXES

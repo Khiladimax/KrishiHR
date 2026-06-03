@@ -104,6 +104,17 @@
       </div>
       <div id="mv-stats-bar" style="display:flex;gap:24px;padding:12px 0;flex-wrap:wrap"></div>
 
+      <!-- Analytics + Alerts panel -->
+      <div id="mv-analytics-panel" style="display:none;margin-bottom:12px"></div>
+
+      <!-- Legend -->
+      <div id="mv-legend" style="display:none;gap:20px;align-items:center;padding:8px 0;flex-wrap:wrap;font-size:12px;color:#374151">
+        <span><span style="display:inline-block;width:24px;height:4px;background:#2563eb;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Verified Movement</span>
+        <span><span style="display:inline-block;width:24px;height:0;border-top:3px dashed #f97316;vertical-align:middle;margin-right:4px"></span>Estimated Route (Tracking Off)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:50%;vertical-align:middle;margin-right:4px"></span>S = Tracking Start</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:50%;vertical-align:middle;margin-right:4px"></span>E = Tracking Lost</span>
+      </div>
+
       <!-- Map type toggle -->
       <div class="map-type-btns" id="mv-map-type-btns" style="display:none">
         <button class="map-type-btn" onclick="setMapType('roadmap')">🗺 Road</button>
@@ -236,476 +247,397 @@ function setMapType(type) {
 function closeMvDetail() {
   document.getElementById('mv-detail-card').style.display = 'none';
   document.getElementById('mv-map-type-btns').style.display = 'none';
+  document.getElementById('mv-analytics-panel').style.display = 'none';
+  document.getElementById('mv-legend').style.display = 'none';
   if (_mvInfoWindow) { _mvInfoWindow.close(); _mvInfoWindow = null; }
   if (_mvMarkers.length) { _mvMarkers.forEach(m => m.setMap(null)); _mvMarkers = []; }
   if (_mvPolyline) { _mvPolyline.setMap(null); _mvPolyline = null; }
   if (_mvGoogleMap) { _mvGoogleMap = null; }
 }
 
+// ── State ─────────────────────────────────────────────────────────────────────
+let _mvGoogleMap    = null;
+let _mvInfoWindow   = null;
+let _mvMarkers      = [];
+let _mvPolyline     = null;
+let _mvCurrentType  = 'hybrid';
+const MAPS_KEY      = 'AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA';
+
+function setMapType(type) {
+  _mvCurrentType = type;
+  if (_mvGoogleMap) _mvGoogleMap.setMapTypeId(type);
+  document.querySelectorAll('.map-type-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(
+      type === 'roadmap' ? 'road' : type === 'hybrid' ? 'hybrid' : type === 'satellite' ? 'sat' : 'terr'
+    ));
+  });
+}
+
+// ── Main load ─────────────────────────────────────────────────────────────────
 async function loadMovementDetail(employeeId, date, empName) {
   date = String(date).split('T')[0];
 
-  // Reset
+  document.getElementById('mv-detail-card').style.display = 'block';
+  document.getElementById('mv-detail-title').textContent  = `🗺 ${empName} — ${date}`;
+  document.getElementById('mv-stats-bar').innerHTML        = '<span style="color:#6b7280;font-size:13px">Loading…</span>';
+  document.getElementById('mv-analytics-panel').style.display = 'none';
+  document.getElementById('mv-legend').style.display       = 'none';
+  document.getElementById('mv-route-map').innerHTML        = '';
+  document.getElementById('mv-timeline').innerHTML         = '';
+  document.getElementById('mv-pt-count').textContent       = '';
+  document.getElementById('mv-map-type-btns').style.display = 'none';
+
   closeMvDetail();
+  document.getElementById('mv-detail-card').style.display = 'block';
 
-  const card = document.getElementById('mv-detail-card');
-  card.style.display = '';
-  document.getElementById('mv-detail-title').innerHTML = `🗺 ${empName} — ${date}`;
-  document.getElementById('mv-stats-bar').innerHTML = '<span style="color:#6b7280;font-size:13px">Loading…</span>';
-  document.getElementById('mv-timeline').innerHTML = '';
-  document.getElementById('mv-route-map').innerHTML = '';
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const token = Auth.getToken();
+    const base  = window.API_BASE || 'https://krishihr-zuui.onrender.com/api';
 
-  const res = await api('GET', `/attendance/movement/history?employee_id=${employeeId}&date=${date}`);
-  if (!res?.success || !res.data?.length) {
-    document.getElementById('mv-stats-bar').innerHTML = '';
-    document.getElementById('mv-timeline').innerHTML =
-      '<div style="padding:30px;color:#9ca3af;text-align:center;font-size:14px">⚠️ No GPS points recorded for this day</div>';
-    document.getElementById('mv-gmaps-link').href = '#';
-    return;
-  }
-
-  const pts = res.data.map(p => ({ ...p, lat: parseFloat(p.lat), lng: parseFloat(p.lng) }));
-
-  // ── Haversine ────────────────────────────────────────────────────────────
-  function hav(p1, p2) {
-    const R = 6371,
-      dLat = (p2.lat - p1.lat) * Math.PI / 180,
-      dLon = (p2.lng - p1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 +
-      Math.cos(p1.lat * Math.PI/180) * Math.cos(p2.lat * Math.PI/180) * Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  let totalKm = 0;
-  for (let i = 1; i < pts.length; i++) totalKm += hav(pts[i-1], pts[i]);
-  totalKm = Math.round(totalKm * 100) / 100;
-
-  // Stats bar
-  document.getElementById('mv-stats-bar').innerHTML = `
-    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#2563eb">${totalKm.toFixed(2)}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">Total KM</div></div>
-    <div style="width:1px;background:#e5e7eb;align-self:stretch"></div>
-    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#7c3aed">${pts.length}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">GPS Points</div></div>
-    <div style="width:1px;background:#e5e7eb;align-self:stretch"></div>
-    <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#059669">${pts[0].time_label}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">First Point</div></div>
-    <div style="width:1px;background:#e5e7eb;align-self:stretch"></div>
-    <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#dc2626">${pts[pts.length-1].time_label}</div><div style="font-size:11px;color:#6b7280;margin-top:2px">Last Point</div></div>`;
-
-  document.getElementById('mv-pt-count').textContent = `${pts.length} point${pts.length !== 1 ? 's' : ''}`;
-
-  // Google Maps navigation link (max 25 waypoints)
-  const gPts = pts.length > 25
-    ? [pts[0], ...pts.filter((_,i) => i > 0 && i < pts.length-1 && i % (Math.ceil(pts.length/23)) === 0).slice(0,23), pts[pts.length-1]]
-    : pts;
-  document.getElementById('mv-gmaps-link').href =
-    `https://www.google.com/maps/dir/${gPts.map(p => `${p.lat},${p.lng}`).join('/')}`;
-
-  // ── Init Google Map ───────────────────────────────────────────────────────
-  const mapDiv = document.getElementById('mv-route-map');
-
-  // FIX: small timeout so the container is fully visible/reflowed before init
-  await new Promise(r => setTimeout(r, 80));
-
-  _mvGoogleMap = new google.maps.Map(mapDiv, {
-    zoom: 15,
-    center: { lat: pts[0].lat, lng: pts[0].lng },
-    mapTypeId: _mvCurrentType,
-    mapTypeControl: false,   // we have our own buttons
-    streetViewControl: false,
-    fullscreenControl: true,
-    zoomControl: true,
-    gestureHandling: 'greedy',
-    styles: [
-      // Slightly cleaner style for field tracking
-      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
-    ]
-  });
-
-  // Show map type buttons
-  document.getElementById('mv-map-type-btns').style.display = 'flex';
-
-  // ── Draw route polyline ─────────────────────────────────────────────────
-  // LOGIC:
-  //  - Points split into tracked SEGMENTS (S1→E1, S2→E2 ...) by time gaps > 1 min
-  //  - Each segment drawn as solid BLUE road-snapped route
-  //  - Gap between E1→S2: Google Directions API finds best bike route → ORANGE line
-  //  - Gap label: "📵 Location off  HH:MM → HH:MM  (Xh Ym)"
-  //  - GPS teleport jumps (>80km/h, <1min gap) silently removed
-
-  const GAP_THRESHOLD_MS = 1 * 60 * 1000;  // 1 minute gap = new segment
-  const MAX_SPEED_KMH    = 80;
-  const MAPS_KEY         = 'AIzaSyBlfD24fvfHS4agCYkrxg4v_SQWgnYuNxA';
-
-  // ── Format gap duration ───────────────────────────────────────────────
-  function fmtDuration(ms) {
-    const totalMins = Math.round(ms / 60000);
-    if (totalMins < 60) return `${totalMins}m`;
-    const h = Math.floor(totalMins / 60), m = totalMins % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }
-
-  function fmtTime(logged_at) {
-    if (!logged_at) return '--:--';
-    return new Date(logged_at).toLocaleTimeString('en-IN', {
-      hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata'
+    // Call new segmented endpoint
+    const resp = await fetch(`${base}/attendance/movement/segmented?employee_id=${employeeId}&date=${date}`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
-  }
+    const json = await resp.json();
 
-  // ── Step 1: Split into tracked segments ───────────────────────────────
-  function buildSegments(points) {
-    if (!points.length) return [];
-    const segments = [];
-    let current = [points[0]];
+    if (!json.success || !json.data)
+      return (document.getElementById('mv-stats-bar').innerHTML = `<span style="color:#ef4444">Failed to load</span>`);
 
-    for (let i = 1; i < points.length; i++) {
-      const prev   = current[current.length - 1];
-      const cur    = points[i];
-      const prevTs = prev.logged_at ? new Date(prev.logged_at).getTime() : 0;
-      const curTs  = cur.logged_at  ? new Date(cur.logged_at).getTime()  : 0;
-      const diffMs = (prevTs && curTs) ? curTs - prevTs : 30000;
-      const distKm = hav(prev, cur);
-      const speed  = diffMs > 0 ? distKm / (diffMs / 3600000) : 0;
+    const { segments, events, analytics, alerts } = json.data;
 
-      // GPS teleport — remove silently
-      if (speed > MAX_SPEED_KMH && diffMs < GAP_THRESHOLD_MS) {
-        console.warn(`[Movement] Teleport removed: ${speed.toFixed(0)} km/h`);
-        continue;
-      }
+    // Collect all tracked points for stats/timeline
+    const allTrackedPts = segments
+      .filter(s => s.type === 'verified')
+      .flatMap(s => s.points);
 
-      // Time gap → end this segment, record gap, start next
-      if (diffMs >= GAP_THRESHOLD_MS) {
-        if (current.length) segments.push({ type: 'tracked', points: current });
-        segments.push({
-          type:    'gap',
-          from:    prev,
-          to:      cur,
-          diffMs,
-          distKm
+    if (!allTrackedPts.length)
+      return (document.getElementById('mv-stats-bar').innerHTML = '<span style="color:#6b7280;font-size:13px">No GPS data for this day</span>');
+
+    // ── Stats bar ─────────────────────────────────────────────────────────
+    const a = analytics || {};
+    document.getElementById('mv-stats-bar').innerHTML = `
+      <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#2563eb">${a.verified_km ?? '–'}</div><div style="font-size:11px;color:#6b7280">Verified KM</div></div>
+      <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#f97316">${a.estimated_km ?? '–'}</div><div style="font-size:11px;color:#6b7280">Estimated KM</div></div>
+      <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#374151">${allTrackedPts.length}</div><div style="font-size:11px;color:#6b7280">GPS Points</div></div>
+      <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#059669">${a.first_point ?? '–'}</div><div style="font-size:11px;color:#6b7280">First Point</div></div>
+      <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#dc2626">${a.last_point ?? '–'}</div><div style="font-size:11px;color:#6b7280">Last Point</div></div>
+      <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#7c3aed">${a.tracking_pct ?? 100}%</div><div style="font-size:11px;color:#6b7280">Tracked</div></div>`;
+
+    // ── Analytics panel ───────────────────────────────────────────────────
+    const interruptionColor = (a.interruptions || 0) > 5 ? '#dc2626' : '#374151';
+    const downtimeLabel = a.downtime_min > 60
+      ? `${Math.floor(a.downtime_min/60)}h ${a.downtime_min%60}m`
+      : `${a.downtime_min ?? 0}m`;
+
+    let alertsHtml = '';
+    if (alerts && alerts.length) {
+      alertsHtml = `<div style="margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px">
+        <div style="font-weight:700;font-size:12px;color:#ea580c;margin-bottom:6px">⚠️ Security Alerts</div>
+        ${alerts.map(al => `<div style="font-size:12px;color:#9a3412;margin-bottom:3px">• ${al.msg}</div>`).join('')}
+      </div>`;
+    }
+
+    document.getElementById('mv-analytics-panel').style.display = 'block';
+    document.getElementById('mv-analytics-panel').innerHTML = `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px">
+        <div style="font-weight:700;font-size:12px;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📊 Tracking Analytics</div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px">
+          <div style="min-width:130px"><div style="font-size:11px;color:#6b7280">Tracking Availability</div><div style="font-weight:700;color:#059669">${a.tracking_pct ?? 100}%</div></div>
+          <div style="min-width:130px"><div style="font-size:11px;color:#6b7280">Total Downtime</div><div style="font-weight:700;color:#f97316">${downtimeLabel}</div></div>
+          <div style="min-width:130px"><div style="font-size:11px;color:#6b7280">Interruptions</div><div style="font-weight:700;color:${interruptionColor}">${a.interruptions ?? 0}</div></div>
+          <div style="min-width:130px"><div style="font-size:11px;color:#6b7280">Longest Gap</div><div style="font-weight:700;color:#374151">${a.longest_gap_min ?? 0}m</div></div>
+          <div style="min-width:130px"><div style="font-size:11px;color:#6b7280">GPS Off Duration</div><div style="font-weight:700;color:#374151">${a.gps_off_min ?? 0}m</div></div>
+          <div style="min-width:130px"><div style="font-size:11px;color:#6b7280">Internet Off Duration</div><div style="font-weight:700;color:#374151">${a.net_off_min ?? 0}m</div></div>
+        </div>
+        ${alertsHtml}
+      </div>`;
+
+    // ── Show legend ───────────────────────────────────────────────────────
+    document.getElementById('mv-legend').style.display = 'flex';
+
+    // ── Build map ─────────────────────────────────────────────────────────
+    const mapDiv = document.getElementById('mv-route-map');
+    document.getElementById('mv-map-type-btns').style.display = 'flex';
+
+    _mvGoogleMap = new google.maps.Map(mapDiv, {
+      center:    { lat: allTrackedPts[0].lat, lng: allTrackedPts[0].lng },
+      zoom:      14,
+      mapTypeId: _mvCurrentType,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: true,
+    });
+    _mvInfoWindow = new google.maps.InfoWindow();
+
+    const allPolylines = [];
+    const allMarkers   = [];
+    const allBounds    = new google.maps.LatLngBounds();
+
+    // ── Draw each segment ─────────────────────────────────────────────────
+    for (const seg of segments) {
+      if (seg.type === 'verified') {
+        // ── BLUE solid polyline ──
+        const path = seg.points.map(p => ({ lat: p.lat, lng: p.lng }));
+        path.forEach(p => allBounds.extend(p));
+
+        const poly = new google.maps.Polyline({
+          path, geodesic: true,
+          strokeColor: '#2563eb', strokeOpacity: 0.9, strokeWeight: 5,
+          map: _mvGoogleMap
         });
-        current = [cur];
-        continue;
-      }
-      current.push(cur);
-    }
-    if (current.length) segments.push({ type: 'tracked', points: current });
-    return segments;
-  }
+        allPolylines.push(poly);
 
-  // ── Step 2: Prepare clean points & build segments ─────────────────────
-  const accPts   = pts.filter(p => !p.accuracy || parseFloat(p.accuracy) <= 50);
-  const cleanPts = accPts.length >= 2 ? accPts : pts;
-  const segments = buildSegments(cleanPts);
+        // Road-snap in background
+        roadSnapSegment(path).then(snapped => {
+          if (snapped && snapped.length >= 2) poly.setPath(snapped);
+        });
 
-  const _segPolylines = [];
-  const _segMarkers   = [];
-
-  // Count only tracked segments for S1/E1 numbering
-  let segIdx = 0;
-
-  // ── Step 3: Draw segments ──────────────────────────────────────────────
-  for (let si = 0; si < segments.length; si++) {
-    const seg = segments[si];
-
-    if (seg.type === 'tracked') {
-      segIdx++;
-      const idx      = segIdx;
-      const segPts   = seg.points;
-      const segPath  = segPts.map(p => ({ lat: p.lat, lng: p.lng }));
-      const startPt  = segPts[0];
-      const endPt    = segPts[segPts.length - 1];
-
-      // ── Blue solid line ──────────────────────────────────────────────
-      const poly = new google.maps.Polyline({
-        path: segPath, geodesic: true,
-        strokeColor: '#2563eb', strokeOpacity: 0.9, strokeWeight: 4,
-        map: _mvGoogleMap
-      });
-      _segPolylines.push(poly);
-
-      // Road-snap in background
-      drawSnappedSegment(segPath).then(snapped => {
-        if (snapped.length >= 2) poly.setPath(snapped);
-      });
-
-      // ── S{n} marker ─────────────────────────────────────────────────
-      _segMarkers.push(makeSegEndMarker(startPt, `S${idx}`, '#16a34a'));
-      // ── E{n} marker ─────────────────────────────────────────────────
-      _segMarkers.push(makeSegEndMarker(endPt,   `E${idx}`, '#dc2626'));
-
-    } else if (seg.type === 'gap') {
-      // ── Orange Directions route for gap ───────────────────────────────
-      const fromPt = { lat: seg.from.lat, lng: seg.from.lng };
-      const toPt   = { lat: seg.to.lat,   lng: seg.to.lng   };
-      const label  = buildGapLabel(seg);
-
-      // Draw placeholder straight orange dashed line immediately
-      const placeholder = new google.maps.Polyline({
-        path: [fromPt, toPt], geodesic: true,
-        strokeColor: '#f97316', strokeOpacity: 0,
-        strokeWeight: 3,
-        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3 }, offset: '0', repeat: '10px' }],
-        map: _mvGoogleMap
-      });
-      _segPolylines.push(placeholder);
-
-      // Gap label at midpoint
-      const mid = { lat: (fromPt.lat + toPt.lat) / 2, lng: (fromPt.lng + toPt.lng) / 2 };
-      _segMarkers.push(makeGapLabelMarker(mid, label, seg.diffMs));
-
-      // Fetch real bike route from Directions API and replace placeholder
-      fetchBikeRoute(fromPt, toPt).then(routePath => {
-        if (routePath && routePath.length >= 2) {
-          placeholder.setPath(routePath);
-          placeholder.setOptions({ strokeOpacity: 0, icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.85, scale: 3 }, offset: '0', repeat: '10px' }] });
-          // Update label to midpoint of actual route
-          const mid2 = routePath[Math.floor(routePath.length / 2)];
-          // reposition existing label marker
-        }
-      });
-    }
-  }
-
-  // Keep reference to clear on next load
-  _mvPolyline = {
-    setMap: (m) => {
-      _segPolylines.forEach(p => p.setMap(m));
-      _segMarkers.forEach(mk => mk.setMap(m));
-    }
-  };
-
-  // ── Build gap label string ─────────────────────────────────────────────
-  function buildGapLabel(seg) {
-    const t1 = fmtTime(seg.from.logged_at);
-    const t2 = fmtTime(seg.to.logged_at);
-    const dur = fmtDuration(seg.diffMs);
-    return `📵 Location off  ${t1} – ${t2}  (${dur})`;
-  }
-
-  // ── S1/E1 style endpoint marker ───────────────────────────────────────
-  function makeSegEndMarker(pt, label, color) {
-    const isStart = label.startsWith('S');
-    const m = new google.maps.Marker({
-      position: { lat: pt.lat, lng: pt.lng },
-      map: _mvGoogleMap,
-      zIndex: 20,
-      title: `${label} — ${fmtTime(pt.logged_at)}`,
-      icon: {
-        url: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44">
-            <path d="M18 0 C8 0 0 8 0 18 C0 30 18 44 18 44 C18 44 36 30 36 18 C36 8 28 0 18 0Z"
-                  fill="${color}" stroke="white" stroke-width="2"/>
-            <text x="18" y="22" text-anchor="middle" font-family="DM Sans,Arial,sans-serif"
-                  font-size="12" font-weight="700" fill="white">${label}</text>
-          </svg>`),
-        scaledSize: new google.maps.Size(36, 44),
-        anchor: new google.maps.Point(18, 44)
-      }
-    });
-    m.addListener('click', () => {
-      _mvInfoWindow.setContent(`
-        <div style="font-family:'DM Sans',sans-serif;padding:4px 2px">
-          <div style="font-weight:700;font-size:13px;color:${color}">${label}</div>
-          <div style="font-size:12px;color:#374151;margin-top:2px">${fmtTime(pt.logged_at)}</div>
-          <div style="font-size:11px;color:#6b7280;margin-top:2px">${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}</div>
-        </div>`);
-      _mvInfoWindow.open(_mvGoogleMap, m);
-    });
-    _segMarkers.push(m);
-    return m;
-  }
-
-  // ── Orange gap label pill marker ──────────────────────────────────────
-  function makeGapLabelMarker(pos, label, diffMs) {
-    const w = Math.min(Math.max(label.length * 6.5, 160), 340);
-    const m = new google.maps.Marker({
-      position: pos,
-      map: _mvGoogleMap,
-      zIndex: 15,
-      title: label,
-      icon: {
-        url: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="24">
-            <rect rx="12" ry="12" width="${w}" height="24" fill="#f97316" opacity="0.95"/>
-            <text x="${w/2}" y="16" font-family="DM Sans,Arial,sans-serif" font-size="10.5"
-                  font-weight="600" fill="white" text-anchor="middle">${label}</text>
-          </svg>`),
-        anchor: new google.maps.Point(w / 2, 12)
-      }
-    });
-    return m;
-  }
-
-  // ── Road-snap tracked segment via Roads API ───────────────────────────
-  async function drawSnappedSegment(rawPath) {
-    const MAX_PER_CALL = 100;
-    const snappedPath  = [];
-    for (let start = 0; start < rawPath.length; start += MAX_PER_CALL) {
-      const chunk   = rawPath.slice(start, start + MAX_PER_CALL);
-      const pathStr = chunk.map(p => `${p.lat},${p.lng}`).join('|');
-      try {
-        const resp = await fetch(
-          `https://roads.googleapis.com/v1/snapToRoads?path=${pathStr}&interpolate=true&key=${MAPS_KEY}`
-        );
-        const data = await resp.json();
-        if (data.snappedPoints?.length) {
-          data.snappedPoints.forEach(sp =>
-            snappedPath.push({ lat: sp.location.latitude, lng: sp.location.longitude })
-          );
-        } else {
-          chunk.forEach(p => snappedPath.push(p));
-        }
-      } catch (_) { chunk.forEach(p => snappedPath.push(p)); }
-    }
-    return snappedPath;
-  }
-
-  // ── Bike route for gap via Directions API ─────────────────────────────
-  function fetchBikeRoute(from, to) {
-    return new Promise(resolve => {
-      const svc = new google.maps.DirectionsService();
-      svc.route({
-        origin:      new google.maps.LatLng(from.lat, from.lng),
-        destination: new google.maps.LatLng(to.lat, to.lng),
-        travelMode:  google.maps.TravelMode.TWO_WHEELER,
-        provideRouteAlternatives: false
-      }, (result, status) => {
-        if (status === 'OK' && result.routes[0]) {
-          // Decode the overview polyline into LatLng array
-          const path = result.routes[0].overview_path.map(ll => ({
-            lat: ll.lat(), lng: ll.lng()
-          }));
-          resolve(path);
-        } else {
-          // TWO_WHEELER not available in this region — try DRIVING
-          svc.route({
-            origin: new google.maps.LatLng(from.lat, from.lng),
-            destination: new google.maps.LatLng(to.lat, to.lng),
-            travelMode: google.maps.TravelMode.DRIVING
-          }, (r2, s2) => {
-            if (s2 === 'OK' && r2.routes[0]) {
-              resolve(r2.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
-            } else {
-              resolve(null); // fallback: keep straight dashed line
-            }
+        // Blue dot markers for intermediate points
+        seg.points.forEach((pt, idx) => {
+          if (idx === 0 || idx === seg.points.length - 1) return; // S/E markers handle endpoints
+          const dot = new google.maps.Marker({
+            position: { lat: pt.lat, lng: pt.lng }, map: _mvGoogleMap,
+            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 4,
+                    fillColor: '#3b82f6', fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1.5 },
+            zIndex: 5
           });
-        }
-      });
-    });
-  }
+          dot.addListener('click', () => {
+            _mvInfoWindow.setContent(buildPointTooltip(pt, 'verified'));
+            _mvInfoWindow.open(_mvGoogleMap, dot);
+          });
+          allMarkers.push(dot);
+        });
 
-  // ── Shared InfoWindow ─────────────────────────────────────────────────────
-  _mvInfoWindow = new google.maps.InfoWindow();
+        // S{n} green pin
+        allMarkers.push(makePinMarker(seg.points[0], seg.startLabel, '#16a34a', 'Tracking Started'));
+        // E{n} red pin
+        allMarkers.push(makePinMarker(seg.points[seg.points.length-1], seg.endLabel, '#dc2626', 'Tracking Lost'));
 
-  // ── Helper: create SVG dot marker ────────────────────────────────────────
-  function makeMarker(pt, label, color, size = 10, isEndpoint = false) {
-    let icon;
-    if (isEndpoint) {
-      icon = {
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
-            <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5"/>
-            <text x="14" y="19" text-anchor="middle" font-size="13" font-weight="bold"
-                  fill="white" font-family="Arial,sans-serif">${label}</text>
-          </svg>`)}`,
-        scaledSize: new google.maps.Size(28, 28),
-        anchor: new google.maps.Point(14, 14)
-      };
-    } else {
-      icon = {
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-            <circle cx="${size/2}" cy="${size/2}" r="${size/2-1.5}" fill="${color}"
-                    stroke="white" stroke-width="1.5"/>
-          </svg>`)}`,
-        scaledSize: new google.maps.Size(size, size),
-        anchor: new google.maps.Point(size/2, size/2)
-      };
+      } else if (seg.type === 'gap') {
+        // ── ORANGE dashed polyline — Directions API ──
+        const fromPt = { lat: seg.from.lat, lng: seg.from.lng };
+        const toPt   = { lat: seg.to.lat,   lng: seg.to.lng   };
+        allBounds.extend(fromPt);
+        allBounds.extend(toPt);
+
+        // Dashed placeholder immediately
+        const orangePoly = new google.maps.Polyline({
+          path: [fromPt, toPt], geodesic: true,
+          strokeColor: '#f97316', strokeOpacity: 0, strokeWeight: 5,
+          icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.85, scale: 3.5,
+                            strokeColor: '#f97316' }, offset: '0', repeat: '12px' }],
+          map: _mvGoogleMap
+        });
+        allPolylines.push(orangePoly);
+
+        // Gap label
+        const mid = { lat: (seg.from.lat+seg.to.lat)/2, lng: (seg.from.lng+seg.to.lng)/2 };
+        const labelText = `📵 Location off  ${seg.from.time_label} – ${seg.to.time_label}  (${seg.dur_label})`;
+        allMarkers.push(makeGapLabel(mid, labelText));
+
+        // Fetch Directions API bike route
+        fetchBikeRoute(fromPt, toPt, seg).then(routePath => {
+          if (routePath && routePath.length >= 2) {
+            orangePoly.setPath(routePath);
+            // Update label to midpoint of actual route
+            const midIdx = Math.floor(routePath.length / 2);
+            // label is already placed — position is approximate, that's fine
+          }
+        });
+      }
     }
 
-    const m = new google.maps.Marker({
-      position: { lat: pt.lat, lng: pt.lng },
-      map: _mvGoogleMap,
-      icon,
-      title: pt.time_label,
-      zIndex: isEndpoint ? 10 : 1
-    });
+    // Set polyline wrapper for cleanup
+    _mvPolyline = { setMap: (m) => { allPolylines.forEach(p => p.setMap(m)); allMarkers.forEach(mk => mk.setMap(m)); _mvMarkers.forEach(mk => mk.setMap(m)); } };
+    _mvMarkers = allMarkers;
 
-    m.addListener('click', () => {
-      const acc = pt.accuracy ? `±${Math.round(pt.accuracy)}m` : '';
-      _mvInfoWindow.setContent(`
-        <div style="font-family:'DM Sans',sans-serif;padding:4px 2px;min-width:160px">
-          <div style="font-weight:700;font-size:13px;color:#1f2937">${pt.time_label}</div>
-          <div style="font-size:11px;color:#6b7280;margin-top:3px">
-            ${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}
-            ${acc ? `<br>Accuracy: ${acc}` : ''}
-          </div>
-          ${isEndpoint ? `<div style="margin-top:4px;font-size:11px;font-weight:600;color:${color}">${label === 'S' ? '🟢 Start' : '🔴 End'}</div>` : ''}
-        </div>`);
-      _mvInfoWindow.open(_mvGoogleMap, m);
-    });
+    // Fit bounds
+    if (!allBounds.isEmpty()) _mvGoogleMap.fitBounds(allBounds);
 
-    return m;
+    // Google Maps link
+    const firstPt = allTrackedPts[0], lastPt = allTrackedPts[allTrackedPts.length-1];
+    document.getElementById('mv-gmaps-link').href =
+      `https://www.google.com/maps/dir/${firstPt.lat},${firstPt.lng}/${lastPt.lat},${lastPt.lng}`;
+
+    // ── Point count ───────────────────────────────────────────────────────
+    const verifiedSegs = segments.filter(s => s.type === 'verified');
+    const gapSegs      = segments.filter(s => s.type === 'gap');
+    document.getElementById('mv-pt-count').textContent =
+      `${allTrackedPts.length} tracked pts · ${verifiedSegs.length} segment${verifiedSegs.length!==1?'s':''} · ${gapSegs.length} gap${gapSegs.length!==1?'s':''}`;
+
+    // ── Timeline ──────────────────────────────────────────────────────────
+    buildTimeline(segments);
+
+  } catch(e) {
+    console.error('[loadMovementDetail]', e);
+    document.getElementById('mv-stats-bar').innerHTML = `<span style="color:#ef4444">Error: ${e.message}</span>`;
   }
-
-  // S1/E1/S2/E2 markers are already drawn per segment above.
-  // Only draw intermediate blue dots for tracked points (skip gap endpoints).
-  const trackedPts = cleanPts; // same filtered set used for segments
-  for (let i = 1; i < trackedPts.length - 1; i++) {
-    _mvMarkers.push(makeMarker(trackedPts[i], '', '#3b82f6', 10, false));
-  }
-
-  // ── FIT map to route bounds ───────────────────────────────────────────────
-  const bounds = new google.maps.LatLngBounds();
-  pts.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
-  _mvGoogleMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-
-  // FIX: after fitBounds, trigger resize in case container size changed
-  google.maps.event.addListenerOnce(_mvGoogleMap, 'idle', () => {
-    google.maps.event.trigger(_mvGoogleMap, 'resize');
-    _mvGoogleMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-  });
-
-  // ── Timeline ──────────────────────────────────────────────────────────────
-  let tlHtml = '', cumKm = 0;
-  pts.forEach((pt, i) => {
-    const segKm = i > 0 ? hav(pts[i-1], pt) : 0;
-    cumKm += segKm;
-    const isFirst = i === 0, isLast = i === pts.length - 1;
-    const dotCol = isFirst ? '#16a34a' : isLast ? '#dc2626' : '#3b82f6';
-    const badge = isFirst
-      ? '<span style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">START</span>'
-      : isLast
-      ? '<span style="background:#fee2e2;color:#dc2626;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">END</span>'
-      : `<span style="color:#9ca3af;font-size:11px">+${segKm < 1 ? (segKm*1000).toFixed(0)+'m' : segKm.toFixed(2)+'km'}</span>`;
-    tlHtml += `<div style="display:flex;align-items:flex-start;padding:8px 0;gap:12px;cursor:pointer;border-bottom:1px solid #f9fafb"
-       onclick="panMapTo(${pt.lat},${pt.lng})">
-      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:3px">
-        <div style="width:11px;height:11px;border-radius:50%;background:${dotCol};border:2px solid #fff;box-shadow:0 0 0 1px ${dotCol}"></div>
-        ${!isLast ? '<div style="width:2px;flex:1;min-height:18px;background:#e5e7eb;margin:2px auto"></div>' : ''}
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-weight:600;font-size:13px">${pt.time_label}</span>${badge}
-        </div>
-        <div style="font-size:11px;color:#6b7280">
-          ${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}
-          ${pt.accuracy ? `&nbsp;·&nbsp; ±${Math.round(pt.accuracy)}m` : ''}
-          &nbsp;·&nbsp; <span style="color:#2563eb">${cumKm.toFixed(2)} km total</span>
-        </div>
-      </div>
-    </div>`;
-  });
-  document.getElementById('mv-timeline').innerHTML = tlHtml;
 }
 
-// Pan map to a point and open its info window
+// ── Build point tooltip HTML ──────────────────────────────────────────────────
+function buildPointTooltip(pt, type) {
+  const typeLabel = type === 'verified'
+    ? '<span style="color:#2563eb;font-weight:700">✅ Verified</span>'
+    : '<span style="color:#f97316;font-weight:700">📵 Estimated</span>';
+  return `<div style="font-family:'DM Sans',sans-serif;padding:4px;min-width:160px">
+    <div style="font-weight:700;font-size:13px">${pt.time_label}</div>
+    ${typeLabel}
+    <div style="font-size:11px;color:#6b7280;margin-top:4px">${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}</div>
+    ${pt.accuracy ? `<div style="font-size:11px;color:#6b7280">GPS ±${Math.round(pt.accuracy)}m</div>` : ''}
+    ${pt.battery  ? `<div style="font-size:11px;color:#6b7280">🔋 ${pt.battery}%</div>` : ''}
+  </div>`;
+}
+
+// ── S/E pin marker ────────────────────────────────────────────────────────────
+function makePinMarker(pt, label, color, tooltip) {
+  const m = new google.maps.Marker({
+    position: { lat: pt.lat, lng: pt.lng }, map: _mvGoogleMap, zIndex: 30,
+    title: `${label} — ${pt.time_label}`,
+    icon: {
+      url: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="48">
+          <path d="M19 0C8.5 0 0 8.5 0 19C0 32 19 48 19 48C19 48 38 32 38 19C38 8.5 29.5 0 19 0Z"
+                fill="${color}" stroke="white" stroke-width="2.5"/>
+          <text x="19" y="23" text-anchor="middle" font-family="DM Sans,Arial,sans-serif"
+                font-size="13" font-weight="800" fill="white">${label}</text>
+        </svg>`),
+      scaledSize: new google.maps.Size(38, 48),
+      anchor: new google.maps.Point(19, 48)
+    }
+  });
+  m.addListener('click', () => {
+    _mvInfoWindow.setContent(`
+      <div style="font-family:'DM Sans',sans-serif;padding:4px 2px">
+        <div style="font-weight:800;font-size:14px;color:${color}">${label}</div>
+        <div style="font-size:12px;color:#374151;margin-top:3px">${tooltip}</div>
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-top:3px">${pt.time_label}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px">${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}</div>
+      </div>`);
+    _mvInfoWindow.open(_mvGoogleMap, m);
+  });
+  return m;
+}
+
+// ── Orange gap label pill ─────────────────────────────────────────────────────
+function makeGapLabel(pos, label) {
+  const w = Math.min(Math.max(label.length * 6.8, 180), 380);
+  return new google.maps.Marker({
+    position: pos, map: _mvGoogleMap, zIndex: 20, title: label,
+    icon: {
+      url: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="26">
+          <rect rx="13" ry="13" width="${w}" height="26" fill="#f97316" opacity="0.95"/>
+          <text x="${w/2}" y="17" font-family="DM Sans,Arial,sans-serif" font-size="11"
+                font-weight="600" fill="white" text-anchor="middle">${label}</text>
+        </svg>`),
+      anchor: new google.maps.Point(w/2, 13)
+    }
+  });
+}
+
+// ── Road-snap a blue segment (Roads API) ──────────────────────────────────────
+async function roadSnapSegment(rawPath) {
+  if (rawPath.length < 2) return rawPath;
+  const MAX = 100, snapped = [];
+  for (let s = 0; s < rawPath.length; s += MAX) {
+    const chunk   = rawPath.slice(s, s + MAX);
+    const pathStr = chunk.map(p => `${p.lat},${p.lng}`).join('|');
+    try {
+      const r = await fetch(
+        `https://roads.googleapis.com/v1/snapToRoads?path=${pathStr}&interpolate=true&key=${MAPS_KEY}`
+      );
+      const d = await r.json();
+      if (d.snappedPoints?.length) {
+        d.snappedPoints.forEach(sp => snapped.push({ lat: sp.location.latitude, lng: sp.location.longitude }));
+      } else chunk.forEach(p => snapped.push(p));
+    } catch { chunk.forEach(p => snapped.push(p)); }
+  }
+  return snapped;
+}
+
+// ── Directions API for gap (bike route) ──────────────────────────────────────
+function fetchBikeRoute(from, to, seg) {
+  return new Promise(resolve => {
+    if (!google.maps.DirectionsService) { resolve(null); return; }
+    const svc = new google.maps.DirectionsService();
+    svc.route({
+      origin: new google.maps.LatLng(from.lat, from.lng),
+      destination: new google.maps.LatLng(to.lat, to.lng),
+      travelMode: google.maps.TravelMode.TWO_WHEELER,
+      provideRouteAlternatives: false
+    }, (result, status) => {
+      if (status === 'OK' && result.routes[0]) {
+        resolve(result.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
+      } else {
+        // Fallback: DRIVING
+        svc.route({
+          origin: new google.maps.LatLng(from.lat, from.lng),
+          destination: new google.maps.LatLng(to.lat, to.lng),
+          travelMode: google.maps.TravelMode.DRIVING
+        }, (r2, s2) => {
+          if (s2 === 'OK' && r2.routes[0]) {
+            resolve(r2.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
+          } else resolve(null);
+        });
+      }
+    });
+  });
+}
+
+// ── Timeline builder ──────────────────────────────────────────────────────────
+function buildTimeline(segments) {
+  let html = '';
+  for (const seg of segments) {
+    if (seg.type === 'verified') {
+      // Section header
+      html += `<div style="padding:8px 0 4px;font-weight:700;font-size:12px;color:#2563eb;border-bottom:2px solid #dbeafe;margin-top:8px">
+        🔵 ${seg.startLabel}→${seg.endLabel}  |  ${seg.start_time} – ${seg.end_time}  |  ${seg.km} km
+      </div>`;
+      // Points
+      seg.points.forEach((pt, idx) => {
+        const isFirst = idx === 0, isLast = idx === seg.points.length - 1;
+        const dotColor = isFirst ? '#16a34a' : isLast ? '#dc2626' : '#3b82f6';
+        const badge = isFirst
+          ? `<span style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">${seg.startLabel}</span>`
+          : isLast
+          ? `<span style="background:#fee2e2;color:#dc2626;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">${seg.endLabel}</span>`
+          : '';
+        html += `<div style="display:flex;align-items:flex-start;padding:7px 0;gap:12px;cursor:pointer;border-bottom:1px solid #f9fafb"
+          onclick="panMapTo(${pt.lat},${pt.lng})">
+          <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:3px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};border:2px solid #fff;box-shadow:0 0 0 1.5px ${dotColor}"></div>
+            ${!isLast?'<div style="width:2px;flex:1;min-height:16px;background:#e5e7eb;margin:2px auto"></div>':''}
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+              <span style="font-weight:600;font-size:13px">${pt.time_label}</span>${badge}
+            </div>
+            <div style="font-size:11px;color:#6b7280">${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}
+              ${pt.accuracy ? ` · ±${Math.round(pt.accuracy)}m` : ''}
+              ${pt.battery  ? ` · 🔋${pt.battery}%` : ''}
+            </div>
+          </div>
+        </div>`;
+      });
+    } else if (seg.type === 'gap') {
+      html += `<div style="padding:8px 12px;margin:6px 0;background:#fff7ed;border-left:3px solid #f97316;border-radius:4px;font-size:12px;color:#c2410c">
+        📵 <strong>Location Off</strong> &nbsp;${seg.from.time_label} → ${seg.to.time_label}&nbsp;
+        <span style="background:#fed7aa;padding:1px 8px;border-radius:10px;font-weight:700">${seg.dur_label}</span>
+        <span style="color:#6b7280;margin-left:6px">~${seg.straight_km} km straight-line</span>
+      </div>`;
+    }
+  }
+  document.getElementById('mv-timeline').innerHTML = html || '<p style="color:#6b7280;font-size:13px;padding:8px">No data</p>';
+}
+
+// ── Pan map to point ──────────────────────────────────────────────────────────
 function panMapTo(lat, lng) {
   if (!_mvGoogleMap) return;
   _mvGoogleMap.panTo({ lat, lng });
   _mvGoogleMap.setZoom(17);
 }
 
-// ── Export CSV ─────────────────────────────────────────────────────────────────
+// ── Export CSV ────────────────────────────────────────────────────────────────
 function exportMovementCSV() {
   const data = window._mvSummaryData;
   if (!data || !data.length) { toast('No data to export', 'error'); return; }

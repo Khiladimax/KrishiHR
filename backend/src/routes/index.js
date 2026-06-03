@@ -115,9 +115,10 @@ router.get ('/attendance/report/download',  authenticate, authorize('hr','accoun
 router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
 
 // ── Movement Tracking ──────────────────────────────────────────────────────
-router.post('/attendance/movement/log',       authenticate, attCtrl.logMovement);
-router.post('/attendance/movement/log-batch', authenticate, attCtrl.logMovementBatch);
-router.get ('/attendance/movement/history',   authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementHistory);
+router.post('/attendance/movement/log',           authenticate, attCtrl.logMovement);
+router.post('/attendance/movement/log-batch',     authenticate, attCtrl.logMovementBatch);
+router.get ('/attendance/movement/segmented',     authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSegmented);
+router.get ('/attendance/movement/history',       authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementHistory);
 router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSummary);
 
 // ── WFH (Work From Home) ──────────────────────────────────────────────────────
