@@ -1872,6 +1872,8 @@ exports.logMovement = async (req, res) => {
       const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
       const isJitter = (distKm * 1000) < 50;
       console.log(`[PING] emp=${empId} distM=${Math.round(distKm*1000)} speedKmh=${Math.round(speedKmh)} isJitter=${isJitter}`);
+      // Only skip GPS teleport jumps (>150 km/h) — NOT stationary points
+      // Stationary employees must be tracked every 30s regardless of movement
       if (!isJitter && speedKmh > 150) {
         console.log(`[PING] SKIP emp=${empId} reason=gps_jump speedKmh=${Math.round(speedKmh)}`);
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
@@ -1942,7 +1944,7 @@ exports.logMovementBatch = async (req, res) => {
       if (accuracy > 50) { skipped++; continue; }
       if (lastLat !== null) {
         const distKm = haversineKm(lastLat, lastLng, parseFloat(lat), parseFloat(lng));
-        if (distKm * 1000 < 100) { skipped++; continue; } // 100m gate (matches app LocationRepository)
+        // Distance gate removed — save every point regardless of movement
         const timeDiffHrs = ts ? (ts - lastTs) / 3600000 : 30 / 3600;
         if (timeDiffHrs > 0 && distKm / timeDiffHrs > 80) { skipped++; continue; }
       }
