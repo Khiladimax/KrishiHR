@@ -1863,7 +1863,8 @@ exports.logMovement = async (req, res) => {
       const prev = lastPt.rows[0];
       const timeDiffMs = Date.now() - new Date(prev.logged_at).getTime();
       console.log(`[PING] emp=${empId} timeSinceLast=${Math.round(timeDiffMs/1000)}s`);
-      if (timeDiffMs < 25000) {
+      if (timeDiffMs < 20000) {
+        // 20s gate — allows 30s pings even if slightly early
         console.log(`[PING] SKIP emp=${empId} reason=too_soon timeDiffMs=${timeDiffMs}`);
         return res.json({ success: true, skipped: true, reason: 'too_soon' });
       }
