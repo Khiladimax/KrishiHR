@@ -355,8 +355,29 @@ async function loadMovementDetail(employeeId, date, empName) {
     // ── Draw each segment ─────────────────────────────────────────────────
     for (const seg of segments) {
       if (seg.type === 'verified') {
+        // ── Smooth GPS jitter before rendering ──
+        // Stationary employees produce dots scattered 10-50m in random directions.
+        // Filter: only keep points that moved >= 15m from the last kept point.
+        // This removes the "spider web" pattern for office/home workers.
+        function smoothPoints(points, minDistM = 15) {
+          if (points.length <= 2) return points;
+          const R = 6371000;
+          const toRad = d => d * Math.PI / 180;
+          function distM(a, b) {
+            const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+            const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+          }
+          const out = [points[0]];
+          for (let i = 1; i < points.length - 1; i++) {
+            if (distM(out[out.length-1], points[i]) >= minDistM) out.push(points[i]);
+          }
+          out.push(points[points.length-1]); // always keep last point
+          return out;
+        }
+        const smoothedPts = smoothPoints(seg.points);
         // ── BLUE solid polyline ──
-        const path = seg.points.map(p => ({ lat: p.lat, lng: p.lng }));
+        const path = smoothedPts.map(p => ({ lat: p.lat, lng: p.lng }));
         path.forEach(p => allBounds.extend(p));
 
         const poly = new google.maps.Polyline({
@@ -371,9 +392,9 @@ async function loadMovementDetail(employeeId, date, empName) {
           if (snapped && snapped.length >= 2) poly.setPath(snapped);
         });
 
-        // Blue dot markers for intermediate points
-        seg.points.forEach((pt, idx) => {
-          if (idx === 0 || idx === seg.points.length - 1) return; // S/E markers handle endpoints
+        // Blue dot markers for intermediate points (use smoothed points — no jitter web)
+        smoothedPts.forEach((pt, idx) => {
+          if (idx === 0 || idx === smoothedPts.length - 1) return; // S/E markers handle endpoints
           const dotEl = document.createElement('div');
           dotEl.style.cssText = 'width:10px;height:10px;border-radius:50%;background:#3b82f6;border:2px solid #fff;box-shadow:0 0 0 1.5px #3b82f6;cursor:pointer';
           const dot = new google.maps.marker.AdvancedMarkerElement({
