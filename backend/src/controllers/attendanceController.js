@@ -1808,8 +1808,13 @@ exports.logMovement = async (req, res) => {
     const netOn  = internet_status !== false;
     const batt   = battery != null ? parseInt(battery) : null;
 
-    const acc = parseFloat(accuracy) || 9999;
-    if (acc > 500) {
+    // is_punch_in=true bypasses ALL time/distance/accuracy gates.
+    // The app sends this for the anchor point logged at punch-in — must always save.
+    const isPunchIn = req.body.is_punch_in === true || req.body.is_punch_in === 'true';
+
+    // accuracy=0 means "unknown" (punch-in point) — allow it; only reject clearly bad readings
+    const acc = parseFloat(accuracy) || 0;
+    if (!isPunchIn && acc > 0 && acc > 500) {
       console.log(`[PING] SKIP emp=${empId} reason=poor_accuracy acc=${acc}`);
       return res.json({ success: true, skipped: true, reason: 'poor_accuracy' });
     }
@@ -1854,7 +1859,7 @@ exports.logMovement = async (req, res) => {
        WHERE employee_id=$1 ORDER BY logged_at DESC LIMIT 1`,
       [empId]
     );
-    if (lastPt.rows.length) {
+    if (lastPt.rows.length && !isPunchIn) {
       const prev = lastPt.rows[0];
       const timeDiffMs = Date.now() - new Date(prev.logged_at).getTime();
       console.log(`[PING] emp=${empId} timeSinceLast=${Math.round(timeDiffMs/1000)}s`);
@@ -1871,8 +1876,10 @@ exports.logMovement = async (req, res) => {
         console.log(`[PING] SKIP emp=${empId} reason=gps_jump speedKmh=${Math.round(speedKmh)}`);
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
       }
+    } else if (!lastPt.rows.length) {
+      console.log(`[PING] emp=${empId} ${isPunchIn ? 'punch-in anchor point (bypass)' : 'first point of the day'}`);
     } else {
-      console.log(`[PING] emp=${empId} first point of the day`);
+      console.log(`[PING] emp=${empId} punch-in anchor — bypassing time/distance gates`);
     }
 
     await db.query(
@@ -1935,7 +1942,7 @@ exports.logMovementBatch = async (req, res) => {
       if (accuracy > 50) { skipped++; continue; }
       if (lastLat !== null) {
         const distKm = haversineKm(lastLat, lastLng, parseFloat(lat), parseFloat(lng));
-        if (distKm * 1000 < 500) { skipped++; continue; }
+        if (distKm * 1000 < 100) { skipped++; continue; } // 100m gate (matches app LocationRepository)
         const timeDiffHrs = ts ? (ts - lastTs) / 3600000 : 30 / 3600;
         if (timeDiffHrs > 0 && distKm / timeDiffHrs > 80) { skipped++; continue; }
       }
@@ -2181,16 +2188,25 @@ exports.getMovementHistory = async (req, res) => {
     if (!employee_id || !date)
       return res.status(400).json({ success: false, message: 'employee_id and date are required' });
 
-    // Scope check: non-super_admin/KC718/hr can only view their own direct reports
+    // Scope check:
+    //  - super_admin / hr / KC718 → see all
+    //  - employee → can only see their OWN movement history (self-query for multi-live map)
+    //  - manager/tl/admin → direct reports only
     const caller = req.user;
     const seeAll = caller.role === 'super_admin' || caller.role === 'hr' || caller.employee_code === 'KC718';
     if (!seeAll) {
-      const check = await db.query(
-        `SELECT id FROM employees WHERE id=$1 AND reporting_manager_id=$2`,
-        [employee_id, caller.id]
-      );
-      if (!check.rows.length) {
-        return res.status(403).json({ success: false, message: 'Access denied: not your direct report' });
+      const isSelf = parseInt(employee_id) === caller.id;
+      if (isSelf) {
+        // Employee viewing own history — allowed (used by multi-live map for self-dot)
+      } else {
+        // Manager/admin viewing a report — must be direct report
+        const check = await db.query(
+          `SELECT id FROM employees WHERE id=$1 AND reporting_manager_id=$2`,
+          [employee_id, caller.id]
+        );
+        if (!check.rows.length) {
+          return res.status(403).json({ success: false, message: 'Access denied: not your direct report' });
+        }
       }
     }
 
@@ -2385,3 +2401,4 @@ exports.getMovementSummary = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
