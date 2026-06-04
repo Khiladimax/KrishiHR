@@ -2002,7 +2002,7 @@ exports.getMovementSegmented = async (req, res) => {
 
     // ── Constants ────────────────────────────────────────────────────────────
     const GAP_THRESHOLD_MS  = 90 * 1000;      // 90s gap → new segment (handles delayed 30s pings)
-    const RESUME_WAIT_MS    = 60 * 1000;       // 1 min — short sessions still show all points
+    const RESUME_WAIT_MS    = 0;               // 0 — always show ALL points regardless of session length
     const MAX_SPEED_KMH     = 150;  // raised from 120 — bikes/cars rarely exceed this; lower = false alerts
     const GPS_FLAG_MINS     = 15;
     const NET_FLAG_MINS     = 30;
