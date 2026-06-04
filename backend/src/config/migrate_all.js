@@ -631,6 +631,64 @@ async function runAllMigrations() {
     // ═══════════════════════════════════════════════════════════════
     console.log('📦 Creating indexes...');
 
+
+    // ── Feature #10: movement_alerts table ───────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS movement_alerts (
+        id                SERIAL PRIMARY KEY,
+        employee_id       INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        alert_date        DATE NOT NULL,
+        alert_type        VARCHAR(20) NOT NULL
+                            CHECK (alert_type IN ('silence','low_battery','gps_off','net_off')),
+        message           TEXT NOT NULL,
+        details           JSONB DEFAULT '{}',
+        status            VARCHAR(20) DEFAULT 'open'
+                            CHECK (status IN ('open','resolved','auto_resolved')),
+        notified_at       TIMESTAMPTZ DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ DEFAULT NOW(),
+        resolved_at       TIMESTAMPTZ,
+        resolved_by       INT REFERENCES employees(id),
+        resolution_note   TEXT,
+        manager_notified  BOOLEAN DEFAULT FALSE,
+        UNIQUE(employee_id, alert_date, alert_type)
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_alerts_emp_date ON movement_alerts(employee_id, alert_date)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_alerts_status ON movement_alerts(status)`);
+
+    // ── Feature #7: beat_plans + beat_plan_stops tables ──────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS beat_plans (
+        id           SERIAL PRIMARY KEY,
+        employee_id  INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        plan_date    DATE NOT NULL,
+        title        VARCHAR(200) DEFAULT 'Beat Plan',
+        notes        TEXT,
+        created_by   INT REFERENCES employees(id),
+        created_at   TIMESTAMPTZ DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id, plan_date)
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS beat_plan_stops (
+        id               SERIAL PRIMARY KEY,
+        plan_id          INT NOT NULL REFERENCES beat_plans(id) ON DELETE CASCADE,
+        sequence         INT NOT NULL DEFAULT 1,
+        location_name    VARCHAR(200) NOT NULL,
+        address          TEXT,
+        lat              NUMERIC(10,6),
+        lng              NUMERIC(10,6),
+        notes            TEXT,
+        expected_arrival TIME,
+        visit_status     VARCHAR(20) DEFAULT 'pending'
+                           CHECK (visit_status IN ('pending','visited','missed')),
+        created_at       TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_beat_plans_emp_date ON beat_plans(employee_id, plan_date)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_beat_stops_plan ON beat_plan_stops(plan_id, sequence)`);
+
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_attendance_emp_date    ON attendance(employee_id, date)',
       'CREATE INDEX IF NOT EXISTS idx_leave_req_emp          ON leave_requests(employee_id)',
