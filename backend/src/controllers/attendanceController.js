@@ -1804,9 +1804,9 @@ exports.logMovement = async (req, res) => {
     const netOn  = internet_status !== false;
     const batt   = battery != null ? parseInt(battery) : null;
 
-    // ── Accuracy filter: reject readings worse than 80m ──────────────────
+    // Accuracy: accept up to 500m (matches Android app filter — indoor GPS is often 100-400m)
     const acc = parseFloat(accuracy) || 9999;
-    if (acc > 80)
+    if (acc > 500)
       return res.json({ success: true, skipped: true, reason: 'poor_accuracy' });
 
     const today = getISTDate();
@@ -1859,8 +1859,10 @@ exports.logMovement = async (req, res) => {
       const distKm = haversineKm(parseFloat(prev.lat), parseFloat(prev.lng), parseFloat(lat), parseFloat(lng));
       const timeDiffHrs = timeDiffMs / 3600000;
       const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
-      // 80 km/h = realistic bike max speed — anything faster is a GPS jump
-      if (speedKmh > 80)
+      // Only flag as GPS jump if: speed > 150 km/h AND distance > 50m (avoids jitter false-positives)
+      // Points < 50m apart are just GPS noise — speed calculation is meaningless at that scale
+      const isJitter = (distKm * 1000) < 50;
+      if (!isJitter && speedKmh > 150)
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
     }
 
@@ -1978,7 +1980,7 @@ exports.getMovementSegmented = async (req, res) => {
     // ── Constants ────────────────────────────────────────────────────────────
     const GAP_THRESHOLD_MS  = 60 * 1000;      // 1 min gap → new segment
     const RESUME_WAIT_MS    = 5 * 60 * 1000;  // 5 min confirmed tracking before S{n}
-    const MAX_SPEED_KMH     = 120;
+    const MAX_SPEED_KMH     = 150;  // raised from 120 — bikes/cars rarely exceed this; lower = false alerts
     const GPS_FLAG_MINS     = 15;
     const NET_FLAG_MINS     = 30;
     const MAX_INTERRUPTIONS = 5;
@@ -1998,7 +2000,8 @@ exports.getMovementSegmented = async (req, res) => {
       const cur  = pts[i];
       const diffMs  = cur.ts - prev.ts;
       const distKm  = havKm(prev, cur);
-      const speed   = diffMs > 0 ? distKm / (diffMs / 3600000) : 0;
+      const isJitter = (distKm * 1000) < 50; // < 50m = GPS noise, not real movement
+      const speed   = (!isJitter && diffMs > 0) ? distKm / (diffMs / 3600000) : 0;
       if (speed > MAX_SPEED_KMH && diffMs < GAP_THRESHOLD_MS) continue; // teleport — skip
       clean.push(cur);
     }
@@ -2148,10 +2151,12 @@ exports.getMovementSegmented = async (req, res) => {
       alerts.push({ type: 'interruptions', value: interruptions,            msg: `${interruptions} tracking interruptions today (>${MAX_INTERRUPTIONS} threshold)` });
 
     // Check for unrealistic speed across any two consecutive clean points
+    // Only flag if distance > 50m — smaller gaps are GPS jitter, speed calc is meaningless
     for (let i = 1; i < clean.length; i++) {
       const diffMs = clean[i].ts - clean[i-1].ts;
       const distKm = havKm(clean[i-1], clean[i]);
-      const speed  = diffMs > 0 ? distKm / (diffMs / 3600000) : 0;
+      const isJitter = (distKm * 1000) < 50;
+      const speed  = (!isJitter && diffMs > 0) ? distKm / (diffMs / 3600000) : 0;
       if (speed > MAX_SPEED_KMH) {
         alerts.push({ type: 'speed', value: Math.round(speed), time: clean[i].time_label, msg: `Unrealistic speed ${Math.round(speed)} km/h at ${clean[i].time_label}` });
         break; // only flag once
