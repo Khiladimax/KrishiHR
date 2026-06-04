@@ -1797,26 +1797,27 @@ exports.logMovement = async (req, res) => {
   try {
     const empId = req.user.id;
     const { lat, lng, accuracy, gps_status, internet_status, battery } = req.body;
-    if (!lat || !lng)
-      return res.status(400).json({ success: false, message: 'lat and lng are required' });
+    console.log(`[PING] emp=${empId} lat=${lat} lng=${lng} acc=${accuracy} gps=${gps_status} net=${internet_status} batt=${battery}`);
 
-    const gpsOn  = gps_status      !== false; // default true if not sent
+    if (!lat || !lng) {
+      console.log(`[PING] SKIP emp=${empId} reason=no_lat_lng`);
+      return res.status(400).json({ success: false, message: 'lat and lng are required' });
+    }
+
+    const gpsOn  = gps_status      !== false;
     const netOn  = internet_status !== false;
     const batt   = battery != null ? parseInt(battery) : null;
 
-    // Accuracy: accept up to 500m (matches Android app filter — indoor GPS is often 100-400m)
     const acc = parseFloat(accuracy) || 9999;
-    if (acc > 500)
+    if (acc > 500) {
+      console.log(`[PING] SKIP emp=${empId} reason=poor_accuracy acc=${acc}`);
       return res.json({ success: true, skipped: true, reason: 'poor_accuracy' });
+    }
 
     const today = getISTDate();
-
-    // ── Get current IST time as HHMM number e.g. 930 = 09:30, 1830 = 18:30 ─
     const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const currentHHMM = istNow.getHours() * 100 + istNow.getMinutes();
 
-    // ── Merge OD + attendance check into ONE query instead of two ────────
-    // ✅ FIX: was 2 separate queries per ping — now 1
     const stateQ = await db.query(
       `SELECT
          (SELECT COUNT(1) FROM od_requests
@@ -1829,21 +1830,24 @@ exports.logMovement = async (req, res) => {
     const hasOD     = parseInt(has_od) > 0;
     const punchedIn  = !!punch_in;
     const punchedOut = !!punch_out;
+    console.log(`[PING] emp=${empId} today=${today} hhmm=${currentHHMM} hasOD=${hasOD} punchedIn=${punchedIn} punchedOut=${punchedOut}`);
 
-    // ── RULE 1 & 3: OD approved today → track 09:30 to 18:30 only ────────
     if (hasOD) {
-      if (currentHHMM < 930 || currentHHMM > 1830)
+      if (currentHHMM < 930 || currentHHMM > 1830) {
+        console.log(`[PING] SKIP emp=${empId} reason=od_outside_window hhmm=${currentHHMM}`);
         return res.json({ success: true, skipped: true, reason: 'od_outside_window' });
-    }
-    // ── RULE 2: No OD → must be punched in and not yet punched out ────────
-    else {
-      if (!punchedIn)
+      }
+    } else {
+      if (!punchedIn) {
+        console.log(`[PING] SKIP emp=${empId} reason=not_punched_in today=${today}`);
         return res.status(400).json({ success: false, message: 'Not punched in today' });
-      if (punchedOut)
+      }
+      if (punchedOut) {
+        console.log(`[PING] SKIP emp=${empId} reason=punched_out`);
         return res.json({ success: true, skipped: true, reason: 'punched_out' });
+      }
     }
 
-    // ── Throttle + GPS jump check ────────────────────────────────────────────
     const lastPt = await db.query(
       `SELECT lat::float AS lat, lng::float AS lng, logged_at
        FROM employee_movement_log
@@ -1853,30 +1857,31 @@ exports.logMovement = async (req, res) => {
     if (lastPt.rows.length) {
       const prev = lastPt.rows[0];
       const timeDiffMs = Date.now() - new Date(prev.logged_at).getTime();
-      // Reject if pinged less than 25s ago — deduplicates multi-layer simultaneous pings
-      if (timeDiffMs < 25000)
+      console.log(`[PING] emp=${empId} timeSinceLast=${Math.round(timeDiffMs/1000)}s`);
+      if (timeDiffMs < 25000) {
+        console.log(`[PING] SKIP emp=${empId} reason=too_soon timeDiffMs=${timeDiffMs}`);
         return res.json({ success: true, skipped: true, reason: 'too_soon' });
+      }
       const distKm = haversineKm(parseFloat(prev.lat), parseFloat(prev.lng), parseFloat(lat), parseFloat(lng));
       const timeDiffHrs = timeDiffMs / 3600000;
       const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
-      // Only flag as GPS jump if: speed > 150 km/h AND distance > 50m (avoids jitter false-positives)
-      // Points < 50m apart are just GPS noise — speed calculation is meaningless at that scale
       const isJitter = (distKm * 1000) < 50;
-      if (!isJitter && speedKmh > 150)
+      console.log(`[PING] emp=${empId} distM=${Math.round(distKm*1000)} speedKmh=${Math.round(speedKmh)} isJitter=${isJitter}`);
+      if (!isJitter && speedKmh > 150) {
+        console.log(`[PING] SKIP emp=${empId} reason=gps_jump speedKmh=${Math.round(speedKmh)}`);
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
+      }
+    } else {
+      console.log(`[PING] emp=${empId} first point of the day`);
     }
 
-    // ── Save the point ────────────────────────────────────────────────────
     await db.query(
       `INSERT INTO employee_movement_log(employee_id, lat, lng, accuracy, gps_status, internet_status, battery, logged_at)
        VALUES($1,$2,$3,$4,$5,$6,$7,NOW())`,
       [empId, lat, lng, acc, gpsOn, netOn, batt]
     );
+    console.log(`[PING] SAVED emp=${empId} lat=${lat} lng=${lng} acc=${acc}`);
 
-    // ── Cleanup old logs: fire-and-forget, NOT in the request path ────────
-    // ✅ FIX: was running a full-table DELETE on EVERY ping from EVERY employee.
-    // With 30 days of data this was locking the table ~100x/minute and causing pool exhaustion.
-    // Now runs only 1-in-50 pings (randomly) and does NOT block the response.
     if (Math.random() < 0.02) {
       db.query(`DELETE FROM employee_movement_log WHERE logged_at < NOW() - INTERVAL '3 days'`)
         .catch(err => console.warn('[logMovement] cleanup error:', err.message));
