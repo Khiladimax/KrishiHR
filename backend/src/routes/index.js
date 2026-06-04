@@ -121,6 +121,20 @@ router.get ('/attendance/movement/segmented',     authenticate, authorize('hr','
 router.get ('/attendance/movement/history',       authenticate, authorize('hr','super_admin','admin','manager','tl','employee'), attCtrl.getMovementHistory); // employee allowed for multi-live map self-query
 router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSummary);
 
+// ── Feature #10: Tracking Alerts ──────────────────────────────────────────────
+router.get ('/attendance/movement/alerts',              authenticate, authorize('hr','super_admin','admin','manager','tl'), alertsCtrl.getActiveAlerts);
+router.post('/attendance/movement/alerts/:id/resolve',  authenticate, authorize('hr','super_admin','admin','manager','tl'), alertsCtrl.resolveAlert);
+router.get ('/attendance/movement/alerts/employee/:employee_id', authenticate, authorize('hr','super_admin','admin','manager','tl'), alertsCtrl.getEmployeeAlertHistory);
+
+// ── Feature #7: Beat Plan / PJP ───────────────────────────────────────────────
+router.post('/attendance/beat-plan',                    authenticate, authorize('hr','super_admin','admin','manager','tl'), beatPlanCtrl.createPlan);
+router.get ('/attendance/beat-plan',                    authenticate, beatPlanCtrl.listPlans);
+router.get ('/attendance/beat-plan/compare',            authenticate, beatPlanCtrl.comparePlanVsActual);
+router.get ('/attendance/beat-plan/:id',                authenticate, beatPlanCtrl.getPlan);
+router.delete('/attendance/beat-plan/:id',              authenticate, authorize('hr','super_admin','admin','manager','tl'), beatPlanCtrl.deletePlan);
+router.post('/attendance/beat-plan/:id/stop',           authenticate, authorize('hr','super_admin','admin','manager','tl'), beatPlanCtrl.addStop);
+router.delete('/attendance/beat-plan/stop/:stopId',     authenticate, authorize('hr','super_admin','admin','manager','tl'), beatPlanCtrl.removeStop);
+
 // ── WFH (Work From Home) ──────────────────────────────────────────────────────
 router.post('/wfh/apply',       authenticate, attImportCtrl.applyWFH);
 router.get ('/wfh',             authenticate, attImportCtrl.getWFH);
