@@ -1972,6 +1972,14 @@ exports.getMovementSegmented = async (req, res) => {
     if (!employee_id || !date)
       return res.status(400).json({ success: false, message: 'employee_id and date required' });
 
+    // Check if employee is currently punched in (to label last segment correctly)
+    const attState = await db.query(
+      `SELECT punch_in, punch_out FROM attendance WHERE employee_id=$1 AND date=$2`,
+      [employee_id, date]
+    );
+    const punchedIn  = !!attState.rows[0]?.punch_in;
+    const punchedOut = !!attState.rows[0]?.punch_out;
+
     // Fetch all points for the day ordered by time
     const result = await db.query(
       `SELECT
