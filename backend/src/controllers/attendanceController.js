@@ -2069,11 +2069,19 @@ exports.getMovementSegmented = async (req, res) => {
       verifiedKm += segKm;
 
       // Tracked segment (BLUE)
+      // If this is the last segment and employee is still active (no punch-out),
+      // label end as "NOW" not E{n} — avoids showing E1 for a single live point
+      const isLastSeg   = i === confirmedSegs.length - 1;
+      const isLiveSeg   = isLastSeg && !!punchedIn && !punchedOut;
+      const endLabel    = isLiveSeg ? 'NOW' : `E${segIdx}`;
+      const endType     = isLiveSeg ? 'current' : 'loss';
+
       segments.push({
         type:        'verified',
         index:       segIdx,
         startLabel:  `S${segIdx}`,
-        endLabel:    `E${segIdx}`,
+        endLabel,
+        is_live:     isLiveSeg,
         points:      seg.map(p => ({ lat: p.lat, lng: p.lng, time_label: p.time_label, ts: p.ts, accuracy: p.accuracy, battery: p.battery })),
         km:          Math.round(segKm * 100) / 100,
         start_time:  startP.time_label,
@@ -2082,8 +2090,8 @@ exports.getMovementSegmented = async (req, res) => {
 
       // S{n} event
       events.push({ type: 'start', label: `S${segIdx}`, point: { lat: startP.lat, lng: startP.lng, time_label: startP.time_label, ts: startP.ts } });
-      // E{n} event
-      events.push({ type: 'loss', label: `E${segIdx}`, point: { lat: endP.lat, lng: endP.lng, time_label: endP.time_label, ts: endP.ts } });
+      // E{n} / NOW event
+      events.push({ type: endType, label: endLabel, point: { lat: endP.lat, lng: endP.lng, time_label: endP.time_label, ts: endP.ts } });
 
       // Check gps/internet off within segment
       seg.forEach(p => {
