@@ -1987,7 +1987,7 @@ exports.getMovementSegmented = async (req, res) => {
          lat::float, lng::float, accuracy,
          gps_status, internet_status, battery,
          logged_at,
-         TO_CHAR(logged_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM') AS time_label,
+         TO_CHAR(logged_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI:SS AM') AS time_label,
          EXTRACT(EPOCH FROM logged_at)*1000 AS ts
        FROM employee_movement_log
        WHERE employee_id = $1
@@ -2234,7 +2234,7 @@ exports.getMovementHistory = async (req, res) => {
               lat::float  AS lat,
               lng::float  AS lng,
               accuracy,
-              TO_CHAR(logged_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM') AS time_label,
+              TO_CHAR(logged_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI:SS AM') AS time_label,
               logged_at
        FROM employee_movement_log
        WHERE employee_id=$1 AND TO_CHAR(logged_at AT TIME ZONE 'Asia/Kolkata','YYYY-MM-DD')=$2
