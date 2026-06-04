@@ -355,27 +355,9 @@ async function loadMovementDetail(employeeId, date, empName) {
     // ── Draw each segment ─────────────────────────────────────────────────
     for (const seg of segments) {
       if (seg.type === 'verified') {
-        // ── Smooth GPS jitter before rendering ──
-        // Stationary employees produce dots scattered 10-50m in random directions.
-        // Filter: only keep points that moved >= 15m from the last kept point.
-        // This removes the "spider web" pattern for office/home workers.
-        function smoothPoints(points, minDistM = 15) {
-          if (points.length <= 2) return points;
-          const R = 6371000;
-          const toRad = d => d * Math.PI / 180;
-          function distM(a, b) {
-            const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
-            const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
-          }
-          const out = [points[0]];
-          for (let i = 1; i < points.length - 1; i++) {
-            if (distM(out[out.length-1], points[i]) >= minDistM) out.push(points[i]);
-          }
-          out.push(points[points.length-1]); // always keep last point
-          return out;
-        }
-        const smoothedPts = smoothPoints(seg.points);
+        // Show ALL points — no distance filtering
+        // Every 30-second ping is shown in timeline even if employee is stationary
+        const smoothedPts = seg.points;
         // ── BLUE solid polyline ──
         const path = smoothedPts.map(p => ({ lat: p.lat, lng: p.lng }));
         path.forEach(p => allBounds.extend(p));
