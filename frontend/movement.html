@@ -261,6 +261,12 @@ function setMapType(type) {
 async function loadMovementDetail(employeeId, date, empName) {
   date = String(date).split('T')[0];
 
+  // Reset map state cleanly before loading new data
+  if (_mvInfoWindow) { _mvInfoWindow.close(); _mvInfoWindow = null; }
+  if (_mvMarkers.length) { _mvMarkers.forEach(m => m.setMap(null)); _mvMarkers = []; }
+  if (_mvPolyline) { _mvPolyline.setMap(null); _mvPolyline = null; }
+  _mvGoogleMap = null;
+
   document.getElementById('mv-detail-card').style.display = 'block';
   document.getElementById('mv-detail-title').textContent  = `🗺 ${empName} — ${date}`;
   document.getElementById('mv-stats-bar').innerHTML        = '<span style="color:#6b7280;font-size:13px">Loading…</span>';
@@ -271,8 +277,8 @@ async function loadMovementDetail(employeeId, date, empName) {
   document.getElementById('mv-pt-count').textContent       = '';
   document.getElementById('mv-map-type-btns').style.display = 'none';
 
-  closeMvDetail();
-  document.getElementById('mv-detail-card').style.display = 'block';
+  // Scroll to detail card
+  document.getElementById('mv-detail-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
     // Use the shared api() helper from app.js — handles auth, base URL, retries
