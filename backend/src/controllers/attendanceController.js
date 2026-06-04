@@ -2001,8 +2001,8 @@ exports.getMovementSegmented = async (req, res) => {
       return res.json({ success: true, data: { segments: [], events: [], analytics: null, alerts: [] } });
 
     // ── Constants ────────────────────────────────────────────────────────────
-    const GAP_THRESHOLD_MS  = 60 * 1000;      // 1 min gap → new segment
-    const RESUME_WAIT_MS    = 5 * 60 * 1000;  // 5 min confirmed tracking before S{n}
+    const GAP_THRESHOLD_MS  = 90 * 1000;      // 90s gap → new segment (handles delayed 30s pings)
+    const RESUME_WAIT_MS    = 60 * 1000;       // 1 min — short sessions still show all points
     const MAX_SPEED_KMH     = 150;  // raised from 120 — bikes/cars rarely exceed this; lower = false alerts
     const GPS_FLAG_MINS     = 15;
     const NET_FLAG_MINS     = 30;
