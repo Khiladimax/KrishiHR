@@ -111,7 +111,7 @@
       <!-- Legend -->
       <div id="mv-legend" style="display:none;gap:20px;align-items:center;padding:8px 0;flex-wrap:wrap;font-size:12px;color:#374151">
         <span><span style="display:inline-block;width:24px;height:4px;background:#2563eb;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Verified Movement</span>
-        <span><span style="display:inline-block;width:24px;height:0;border-top:3px dashed #f97316;vertical-align:middle;margin-right:4px"></span>Estimated Route (Tracking Off)</span>
+        <span><span style="display:inline-block;width:24px;height:0;border-top:3px dashed #f97316;vertical-align:middle;margin-right:4px"></span>Estimated Route (Tracking Gap)</span>
         <span><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:50%;vertical-align:middle;margin-right:4px"></span>S = Tracking Start</span>
         <span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:50%;vertical-align:middle;margin-right:4px"></span>E = Tracking Lost</span>
       </div>
@@ -425,7 +425,7 @@ async function loadMovementDetail(employeeId, date, empName) {
 
         // Gap label
         const mid = { lat: (seg.from.lat+seg.to.lat)/2, lng: (seg.from.lng+seg.to.lng)/2 };
-        const labelText = `📵 Location off  ${seg.from.time_label} – ${seg.to.time_label}  (${seg.dur_label})`;
+        const labelText = `⏸ Tracking Gap  ${seg.from.time_label} – ${seg.to.time_label}  (${seg.dur_label})`;
         allMarkers.push(makeGapLabel(mid, labelText));
 
         // Fetch Directions API bike route
@@ -471,7 +471,7 @@ async function loadMovementDetail(employeeId, date, empName) {
 function buildPointTooltip(pt, type) {
   const typeLabel = type === 'verified'
     ? '<span style="color:#2563eb;font-weight:700">✅ Verified</span>'
-    : '<span style="color:#f97316;font-weight:700">📵 Estimated</span>';
+    : '<span style="color:#f97316;font-weight:700">⏸ Gap</span>';
   return `<div style="font-family:'DM Sans',sans-serif;padding:4px;min-width:160px">
     <div style="font-weight:700;font-size:13px">${pt.time_label}</div>
     ${typeLabel}
@@ -641,7 +641,7 @@ function buildTimeline(segments) {
       });
     } else if (seg.type === 'gap') {
       html += `<div style="padding:8px 12px;margin:6px 0;background:#fff7ed;border-left:3px solid #f97316;border-radius:4px;font-size:12px;color:#c2410c">
-        📵 <strong>Location Off</strong> &nbsp;${seg.from.time_label} → ${seg.to.time_label}&nbsp;
+        ⏸ <strong>Tracking Gap</strong> <span style="font-size:11px;color:#92400e">(app closed / signal lost)</span> &nbsp;${seg.from.time_label} → ${seg.to.time_label}&nbsp;
         <span style="background:#fed7aa;padding:1px 8px;border-radius:10px;font-weight:700">${seg.dur_label}</span>
         <span style="color:#6b7280;margin-left:6px">~${seg.straight_km} km straight-line</span>
       </div>`;
