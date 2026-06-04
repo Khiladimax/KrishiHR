@@ -9,7 +9,8 @@ const { Server: SocketIO } = require('socket.io');
 const jwt_sock = require('jsonwebtoken');
 const routes  = require('./routes/index');
 const chatCtrl   = require('./controllers/chatController');
-const attCtrl = require('./controllers/attendanceController');
+const attCtrl    = require('./controllers/attendanceController');
+const alertsCtrl = require('./controllers/movementAlertsController');
 const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
 const itDeclCtrl = require('./controllers/itDeclarationController');
@@ -696,6 +697,20 @@ cron.schedule('5 8 * * *', async () => {
     console.log('✅ Anniversary emails done');
   } catch(err) {
     console.error('❌ Anniversary cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Feature #10: Tracking silence / low-battery alerts every 30 min ──────────
+// Runs during work hours 9:00–21:00 IST — checks punched-in field employees
+// for silence (no GPS ping >30 min), low battery, GPS off, internet off
+cron.schedule('*/30 9-20 * * 1-6', async () => {
+  try {
+    const result = await alertsCtrl.checkTrackingSilence();
+    if (result.alerts > 0) {
+      console.log(`[TrackingAlerts] ✅ ${result.alerts} alerts created/updated for ${result.checked} employees`);
+    }
+  } catch (err) {
+    console.error('❌ TrackingAlerts cron failed:', err.message);
   }
 }, { timezone: 'Asia/Kolkata' });
 
