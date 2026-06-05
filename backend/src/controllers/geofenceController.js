@@ -767,6 +767,32 @@ exports.toggleUniversal = async (req, res) => {
   }
 };
 
+// ── Fix: Reset wrongly-universal employees under office locations ─────────────
+exports.fixOfficeUniversal = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query("BEGIN");
+    const wrongRes = await client.query(
+      `SELECT eg.employee_id, eg.office_location_id
+       FROM employee_geofence eg
+       JOIN office_locations ol ON ol.id = eg.office_location_id
+       WHERE ol.radius_meters < 10000 AND eg.is_universal = TRUE`
+    );
+    let fixed = 0;
+    for (const row of wrongRes.rows) {
+      await client.query(`UPDATE employee_geofence SET is_universal = FALSE WHERE employee_id = $1 AND office_location_id = $2`, [row.employee_id, row.office_location_id]);
+      await client.query(`INSERT INTO employee_buffer_rules (employee_id, rule_type, state, district, assigned_by, updated_at) VALUES ($1, 'office', NULL, NULL, $2, NOW()) ON CONFLICT (employee_id) DO UPDATE SET rule_type = 'office', state = NULL, district = NULL, assigned_by = $2, updated_at = NOW()`, [row.employee_id, req.user.id]);
+      await client.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [row.employee_id]);
+      fixed++;
+    }
+    await client.query("COMMIT");
+    res.json({ success: true, message: `Fixed ${fixed} employee(s)`, fixed });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).json({ success: false, message: "Server error" });
+  } finally { client.release(); }
+};
+
 // ── Get Employees for Location (used by frontend assign panel) ────────────────
 // Returns TWO groups:
 //   assigned: employees already assigned to this location (with is_universal flag)

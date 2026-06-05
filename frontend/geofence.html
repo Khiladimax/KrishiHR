@@ -896,6 +896,8 @@ window.addEventListener('load', () => {
   });
   _geoInfoWin = new google.maps.InfoWindow();
   loadAll();
+  // Auto-fix: silently correct any office employees wrongly saved as Universal
+  api("POST", "/geofence/fix-office-universal").catch(() => {});
 });
 
 // North zone employee codes (hardcoded for KC346 access)
@@ -1578,7 +1580,9 @@ async function openAssignModal(locId) {
 
   document.getElementById('assign-emp-list').innerHTML = _allEmployees.map(e => {
     const isChecked   = assignedIds.has(e.id);
-    const isUniversal = assigned.find(a => a.id === e.id)?.is_universal ?? isGlobalLoc;
+    // For already-assigned employees use saved flag; for new ones default to Office for office locations, Universal for global zones
+    const existingAssign = assigned.find(a => a.id === e.id);
+    const isUniversal = existingAssign ? existingAssign.is_universal : isGlobalLoc;
     return `<div class="asgn-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
       <div style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="acheck-${e.id}" ${isChecked?'checked':''} onchange="updateAssignCount()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
@@ -1909,7 +1913,9 @@ async function openAssignModal(locId) {
   const isGlobalLoc = (loc?.radius_meters || 0) >= 10000;
   document.getElementById('assign-emp-list').innerHTML = _allEmployees.map(e => {
     const isChecked   = assignedIds.has(e.id);
-    const isUniversal = assigned.find(a => a.id === e.id)?.is_universal ?? isGlobalLoc;
+    // For already-assigned employees use saved flag; for new ones default to Office for office locations, Universal for global zones
+    const existingAssign = assigned.find(a => a.id === e.id);
+    const isUniversal = existingAssign ? existingAssign.is_universal : isGlobalLoc;
     return `<div class="g-asgn-row" id="arow-${e.id}" data-name="${(e.first_name+' '+e.last_name+' '+e.employee_code).toLowerCase()}">
       <div style="display:flex;align-items:center;gap:10px">
         <input type="checkbox" id="acheck-${e.id}" ${isChecked?'checked':''} onchange="updateAssignCount()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--g-green)">
