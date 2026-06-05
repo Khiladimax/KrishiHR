@@ -30,6 +30,11 @@ const ADMIN      = ['admin','super_admin'];
 const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
+// KC346 geofence access — hardcoded north zone manager
+const authorizeGeofence = (req, res, next) => {
+  if (['admin','super_admin'].includes(req.user.role) || req.user.employee_code === 'KC346') return next();
+  return res.status(403).json({ success: false, message: 'Access denied. Required: admin or super_admin' });
+};
 const EMP_MGMT   = ['hr','accounts','admin','super_admin'];
 const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
 
@@ -461,29 +466,29 @@ router.post('/gk/thoughts/import',
 
 // ── Geofence ──────────────────────────────────────────────────────────────────
 router.get   ('/geofence/locations',                          authenticate,                           geoCtrl.getLocations);
-router.post  ('/geofence/locations',                          authenticate, authorize(...ADMIN_ONLY), geoCtrl.createLocation);
-router.put   ('/geofence/locations/:id',                      authenticate, authorize(...ADMIN_ONLY), geoCtrl.updateLocation);
-router.delete('/geofence/locations/:id',                      authenticate, authorize(...ADMIN_ONLY), geoCtrl.deleteLocation);
-router.get   ('/geofence/locations/:id/employees',            authenticate, authorize(...ADMIN_ONLY), geoCtrl.getLocationEmployees);
-router.get   ('/geofence/locations/:id/unassigned',           authenticate, authorize(...ADMIN_ONLY), geoCtrl.getUnassignedEmployees);
-router.get   ('/geofence/employees',                          authenticate, authorize(...ADMIN_ONLY), geoCtrl.getEmployeesForLocation);
+router.post  ('/geofence/locations',                          authenticate, authorizeGeofence, geoCtrl.createLocation);
+router.put   ('/geofence/locations/:id',                      authenticate, authorizeGeofence, geoCtrl.updateLocation);
+router.delete('/geofence/locations/:id',                      authenticate, authorizeGeofence, geoCtrl.deleteLocation);
+router.get   ('/geofence/locations/:id/employees',            authenticate, authorizeGeofence, geoCtrl.getLocationEmployees);
+router.get   ('/geofence/locations/:id/unassigned',           authenticate, authorizeGeofence, geoCtrl.getUnassignedEmployees);
+router.get   ('/geofence/employees',                          authenticate, authorizeGeofence, geoCtrl.getEmployeesForLocation);
 router.post  ('/geofence/validate',                           authenticate,                           geoCtrl.validatePunch);
 router.get   ('/geofence/my-locations',                       authenticate,                           geoCtrl.getMyLocations);
 router.get   ('/geofence/logs',                               authenticate,                           geoCtrl.getLogs);
 router.get   ('/geofence/employee/:employee_id',              authenticate,                           geoCtrl.getEmployeeGeofence);
-router.post  ('/geofence/assign',                             authenticate, authorize(...ADMIN_ONLY), geoCtrl.assignBuffer);
-router.post  ('/geofence/bulk-assign',                        authenticate, authorize(...ADMIN_ONLY), geoCtrl.bulkAssignBuffer);
-router.patch ('/geofence/:employee_id/:location_id/toggle',   authenticate, authorize(...ADMIN_ONLY), geoCtrl.toggleUniversal);
-router.delete('/geofence/:employee_id/:location_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.removeBuffer);
+router.post  ('/geofence/assign',                             authenticate, authorizeGeofence, geoCtrl.assignBuffer);
+router.post  ('/geofence/bulk-assign',                        authenticate, authorizeGeofence, geoCtrl.bulkAssignBuffer);
+router.patch ('/geofence/:employee_id/:location_id/toggle',   authenticate, authorizeGeofence, geoCtrl.toggleUniversal);
+router.delete('/geofence/:employee_id/:location_id',          authenticate, authorizeGeofence, geoCtrl.removeBuffer);
 
 // ── Buffer Rules ──────────────────────────────────────────────────────────────
 router.post  ('/geofence/validate-buffer',                    authenticate,                           geoCtrl.validateBuffer);
 router.get   ('/geofence/boundary',                           authenticate,                           geoCtrl.getBoundary);
-router.get   ('/geofence/buffer-rules',                       authenticate, authorize(...ADMIN_ONLY), geoCtrl.getAllBufferRules);
-router.get   ('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.getBufferRule);
-router.post  ('/geofence/buffer-rules',                       authenticate, authorize(...ADMIN_ONLY), geoCtrl.upsertBufferRule);
-router.put   ('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.upsertBufferRule);
-router.delete('/geofence/buffer-rules/:employee_id',          authenticate, authorize(...ADMIN_ONLY), geoCtrl.deleteBufferRule);
+router.get   ('/geofence/buffer-rules',                       authenticate, authorizeGeofence, geoCtrl.getAllBufferRules);
+router.get   ('/geofence/buffer-rules/:employee_id',          authenticate, authorizeGeofence, geoCtrl.getBufferRule);
+router.post  ('/geofence/buffer-rules',                       authenticate, authorizeGeofence, geoCtrl.upsertBufferRule);
+router.put   ('/geofence/buffer-rules/:employee_id',          authenticate, authorizeGeofence, geoCtrl.upsertBufferRule);
+router.delete('/geofence/buffer-rules/:employee_id',          authenticate, authorizeGeofence, geoCtrl.deleteBufferRule);
 
 // ── Separation ────────────────────────────────────────────────────────────────
 // NOTE: Specific/static routes MUST come before generic routes (POST /separations,
