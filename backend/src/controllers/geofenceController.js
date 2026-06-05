@@ -27,7 +27,7 @@ exports.getLocations = async (req, res) => {
                   -- PLUS employees from employee_buffer_rules whose district/state matches
                   -- the location name (district/state zone assignments).
                   (
-                    COUNT(DISTINCT eg.employee_id)
+                    COUNT(DISTINCT eg_emp.id)
                     +
                     -- District match: location is a district zone AND district name matches
                     (SELECT COUNT(DISTINCT ebr.employee_id)
@@ -58,6 +58,7 @@ exports.getLocations = async (req, res) => {
                   CONCAT(e.first_name,' ',e.last_name) AS created_by_name
            FROM office_locations ol
            LEFT JOIN employee_geofence eg ON ol.id = eg.office_location_id
+           LEFT JOIN employees eg_emp ON eg_emp.id = eg.employee_id AND eg_emp.is_active = TRUE
            LEFT JOIN employees e ON ol.created_by = e.id
            GROUP BY ol.id, e.first_name, e.last_name
            ORDER BY ol.name`;
@@ -657,10 +658,12 @@ exports.bulkAssignBuffer = async (req, res) => {
     for (const eid of employee_ids) {
       // Delete ALL old geofence rows so employee moves cleanly to the new office
       await client.query(`DELETE FROM employee_geofence WHERE employee_id = $1`, [eid]);
-      // Insert the new geofence row
+      // Insert the new geofence row (ON CONFLICT safety net in case of race condition)
       await client.query(
         `INSERT INTO employee_geofence(employee_id, office_location_id, is_universal, assigned_by)
-         VALUES($1,$2,$3,$4)`,
+         VALUES($1,$2,$3,$4)
+         ON CONFLICT (employee_id, office_location_id)
+         DO UPDATE SET is_universal = $3, assigned_by = $4`,
         [eid, office_location_id, is_universal, req.user.id]
       );
 
@@ -1235,6 +1238,7 @@ exports.getAllBufferRules = async (req, res) => {
          FROM employee_geofence eg
          JOIN office_locations loc ON loc.id = eg.office_location_id AND loc.radius_meters < 10000
          WHERE eg.employee_id = e.id
+         ORDER BY eg.office_location_id DESC
          LIMIT 1
        ) latest_eg ON TRUE
        LEFT JOIN office_locations ol ON ol.id = latest_eg.office_location_id
