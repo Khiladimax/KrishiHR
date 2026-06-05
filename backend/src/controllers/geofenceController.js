@@ -78,18 +78,41 @@ exports.getLocations = async (req, res) => {
 
     const r = await db.query(q, params);
 
-    // True global distinct count — summing per-location counts double-counts
-    // employees who appear under multiple location cards.
+    // True global distinct count — only employees actually visible under a location card.
+    // Universal buffer-rule employees without a geofence row are NOT counted here
+    // because they don't appear under any specific location card.
     const globalRes = await db.query(
       `SELECT COUNT(DISTINCT emp_id) AS cnt FROM (
+         -- Employees assigned via employee_geofence (office locations + any universal assigned to a specific card)
          SELECT eg.employee_id AS emp_id
          FROM employee_geofence eg
          JOIN employees e ON e.id = eg.employee_id AND e.is_active = TRUE
          UNION
+         -- District-rule employees counted under a matching district zone card
          SELECT ebr.employee_id AS emp_id
          FROM employee_buffer_rules ebr
          JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE
-         WHERE ebr.rule_type IN ('district','state','universal')
+         WHERE ebr.rule_type = 'district'
+           AND EXISTS (
+             SELECT 1 FROM office_locations ol
+             WHERE LOWER(ol.name) LIKE 'district%'
+               AND LOWER(ol.name) LIKE '%' || LOWER(COALESCE(ebr.district,'')) || '%'
+               AND ol.is_active = TRUE
+           )
+           AND NOT EXISTS (SELECT 1 FROM employee_geofence eg2 WHERE eg2.employee_id = ebr.employee_id)
+         UNION
+         -- State-rule employees counted under a matching state zone card
+         SELECT ebr.employee_id AS emp_id
+         FROM employee_buffer_rules ebr
+         JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE
+         WHERE ebr.rule_type = 'state'
+           AND EXISTS (
+             SELECT 1 FROM office_locations ol
+             WHERE LOWER(ol.name) LIKE 'state%'
+               AND LOWER(ol.name) LIKE '%' || LOWER(COALESCE(ebr.state,'')) || '%'
+               AND ol.is_active = TRUE
+           )
+           AND NOT EXISTS (SELECT 1 FROM employee_geofence eg2 WHERE eg2.employee_id = ebr.employee_id)
        ) sub`
     );
     const globalAssignedCount = parseInt(globalRes.rows[0]?.cnt || 0);
