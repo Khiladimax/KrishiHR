@@ -941,9 +941,11 @@ window.addEventListener('load', () => {
   loadUnassignedBanner();
 });
 
-// North zone employee codes (hardcoded for KC346 access)
+// KC346 north zone scope — employees who report to Delhi office or are in north-zone states/districts
+// This is broader than just city matching — includes employees moved to districts like Palwal (Haryana)
 const NORTH_ZONE_CODES = ['KC718','KC1041','KC346','KC4426','KC6446','KC6447','KC8977','KC9082'];
-const NORTH_ZONE_CITIES = ['delhi','new delhi','up','uttar pradesh','uttarakhand','haryana','punjab','rajasthan','bihar','madhya pradesh','mp'];
+const NORTH_ZONE_STATES = ['delhi','haryana','punjab','uttar pradesh','up','uttarakhand','rajasthan','himachal pradesh','jammu','chandigarh','bihar','madhya pradesh','mp'];
+const NORTH_ZONE_CITIES = [...NORTH_ZONE_STATES, 'new delhi','gurgaon','gurugram','noida','faridabad','meerut','agra','lucknow','jaipur','chandigarh','palwal','ambala','panipat','rohtak','bhiwani','hisar','sirsa','karnal'];
 
 
 // ── UNASSIGNED EMPLOYEES BANNER + MODAL ──────────────────────
@@ -1021,22 +1023,46 @@ async function loadAll() {
   let allLocs = locData?.data || [];
   let allRules = ruleData?.data || [];
 
-  // KC346 sees only north zone employees and locations
+  // KC346 sees Delhi office employees + any employee currently in a north-zone state/district
   if (isKC346) {
+    // Step 1: find employees whose home office is Delhi (via buffer rules or geofence)
+    const delhiOfficeId = (locData?.data||[]).find(l => l.name.toLowerCase().includes('delhi') && l.radius_meters < 10000)?.id;
+    const delhiRuleEmpIds = new Set(
+      allRules
+        .filter(r =>
+          (r.office_location_id && r.office_location_id == delhiOfficeId) ||
+          (r.office_location_name && r.office_location_name.toLowerCase().includes('delhi')) ||
+          NORTH_ZONE_CODES.includes(r.employee_code)
+        )
+        .map(r => r.id)
+    );
+
+    // Step 2: filter employees — Delhi-office assigned OR in a north-zone city/state
     allEmps = allEmps.filter(e =>
+      delhiRuleEmpIds.has(e.id) ||
       NORTH_ZONE_CODES.includes(e.employee_code) ||
       NORTH_ZONE_CITIES.some(c => (e.city||'').toLowerCase().includes(c)) ||
-      NORTH_ZONE_CITIES.some(c => (e.state||'').toLowerCase().includes(c))
+      NORTH_ZONE_STATES.some(s => (e.state||'').toLowerCase().includes(s))
     );
+
     const northEmpIds = new Set(allEmps.map(e => e.id));
     allRules = allRules.filter(r => northEmpIds.has(r.id));
-    // Show only north zone relevant locations
-    allLocs = allLocs.filter(l =>
-      ['Corporate Office - Delhi', 'State - Delhi', 'North Zone'].some(n => l.name.includes(n)) ||
-      ['delhi','north'].some(k => (l.name||'').toLowerCase().includes(k))
+
+    // Step 3: show Delhi office + any district/state zone that has a north-zone employee
+    const northZoneLocIds = new Set(
+      allRules.filter(r => r.office_location_id).map(r => r.office_location_id)
     );
-    // If no matching locations, still show Corporate Office - Delhi
-    if (!allLocs.length) allLocs = (locData?.data||[]).filter(l => l.name.includes('Delhi') || l.name.includes('North'));
+    allLocs = (locData?.data||[]).filter(l =>
+      l.name.toLowerCase().includes('delhi') ||
+      northZoneLocIds.has(l.id) ||
+      // Include district zones where the district is in a north-zone state
+      (l.name.toLowerCase().startsWith('district') &&
+        NORTH_ZONE_STATES.some(s => l.name.toLowerCase().includes(s))) ||
+      // Include state zones for north-zone states
+      (l.name.toLowerCase().startsWith('state') &&
+        NORTH_ZONE_STATES.some(s => l.name.toLowerCase().includes(s)))
+    );
+    if (!allLocs.length) allLocs = (locData?.data||[]).filter(l => l.name.toLowerCase().includes('delhi'));
   }
 
   _allLocations = allLocs;
@@ -1514,6 +1540,9 @@ async function saveEmpRule(empId, locId) {
     const selectedOfficeId = officeSel ? parseInt(officeSel.value) : null;
     if (!selectedOfficeId) { toast('Please select an office location', 'error'); return; }
     body.office_location_id = selectedOfficeId;
+    // Universal checkbox — allow office employee to punch from anywhere
+    const univCb = document.getElementById(`office-univ-${empId}`);
+    body.is_universal = univCb ? univCb.checked : false;
   } else if (ruleType === 'universal') {
     body.state = null; body.district = null;
   } else if (ruleType === 'state') {
@@ -1953,6 +1982,10 @@ function empSubRow(locId) {
             <option value="">— select office location —</option>
             ${_allLocations.filter(l => l.radius_meters < 10000 && l.is_active).map(l => `<option value="${l.id}" ${(rule?.rule_type==='office' && l.id==rule?.office_location_id)?'selected':''}>${l.name}</option>`).join('')}
           </select>
+          <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11.5px;color:var(--g-muted);cursor:pointer">
+            <input type="checkbox" id="office-univ-${e.id}" ${(rule?.rule_type==='office' && e.is_universal)?'checked':''} style="accent-color:var(--g-green);width:13px;height:13px">
+            Universal access <span style="font-size:10.5px;opacity:.7">(can punch from anywhere, not just office)</span>
+          </label>
         </div>
         <!-- State / District pickers -->
         <div id="state-wrap-${e.id}" style="display:${(rt==='state'||rt==='district')?'flex':'none'};flex-direction:column;gap:3px">
