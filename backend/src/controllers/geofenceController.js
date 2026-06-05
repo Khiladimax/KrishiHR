@@ -767,6 +767,29 @@ exports.toggleUniversal = async (req, res) => {
   }
 };
 
+// ── Get employees with NO geofence assignment (unassigned to any location) ────
+exports.getUnassignedToAnyLocation = async (req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.city, e.state,
+              d.name AS department_name, e.employee_type,
+              ebr.rule_type
+       FROM employees e
+       LEFT JOIN departments d ON d.id = e.department_id
+       LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
+       WHERE e.is_active = TRUE
+         AND NOT EXISTS (
+           SELECT 1 FROM employee_geofence eg WHERE eg.employee_id = e.id
+         )
+       ORDER BY e.first_name`
+    );
+    res.json({ success: true, data: r.rows, count: r.rows.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // ── Fix: Reset wrongly-universal employees under office locations ─────────────
 exports.fixOfficeUniversal = async (req, res) => {
   const client = await db.getClient();

@@ -478,6 +478,7 @@ router.get   ('/geofence/logs',                               authenticate,     
 router.get   ('/geofence/employee/:employee_id',              authenticate,                           geoCtrl.getEmployeeGeofence);
 router.post  ('/geofence/assign',                             authenticate, authorizeGeofence, geoCtrl.assignBuffer);
 router.post  ('/geofence/bulk-assign',                        authenticate, authorizeGeofence, geoCtrl.bulkAssignBuffer);
+router.get   ('/geofence/unassigned-employees',                 authenticate, authorizeGeofence, geoCtrl.getUnassignedToAnyLocation);
 router.post  ('/geofence/fix-office-universal',               authenticate, authorizeGeofence, geoCtrl.fixOfficeUniversal);
 router.patch ('/geofence/:employee_id/:location_id/toggle',   authenticate, authorizeGeofence, geoCtrl.toggleUniversal);
 router.delete('/geofence/:employee_id/:location_id',          authenticate, authorizeGeofence, geoCtrl.removeBuffer);

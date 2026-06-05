@@ -625,6 +625,25 @@
       </div>
     </div>
 
+
+    <!-- ── UNASSIGNED EMPLOYEES ALERT BANNER ─────────────────── -->
+    <div id="unassigned-banner" style="display:none;background:#fff7ed;border:1.5px solid #f97316;border-radius:10px;padding:14px 18px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">⚠️</span>
+          <div>
+            <div style="font-weight:700;font-size:13.5px;color:#c2410c" id="unassigned-banner-title">Employees not assigned to any office</div>
+            <div style="font-size:12px;color:#9a3412;margin-top:2px" id="unassigned-banner-sub">These employees have no geofence location — assign them to Delhi or Mumbai.</div>
+          </div>
+        </div>
+        <button onclick="openUnassignedModal()" style="background:#f97316;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">
+          👥 View &amp; Assign →
+        </button>
+      </div>
+      <!-- Employee chips -->
+      <div id="unassigned-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+    </div>
+
     <!-- ── MAP CARD ────────────────────────────────────────── -->
     <div class="g-map-card">
       <div class="g-map-header">
@@ -792,6 +811,26 @@
   </div>
 </div>
 
+<!-- ═══ UNASSIGNED EMPLOYEES MODAL ══════════════════════════ -->
+<div class="modal-backdrop" id="unassigned-modal">
+  <div class="modal modal-lg g-modal-inner">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ Unassigned Employees — Assign an Office</div>
+      <button class="modal-close" onclick="closeModal('unassigned-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <p style="font-size:12.5px;color:var(--g-muted);margin-bottom:14px">
+        These employees have no geofence office. Select an office for each one and click Save.
+      </p>
+      <div id="unassigned-modal-list"></div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 16px;border-top:1px solid var(--g-border)">
+      <button onclick="closeModal('unassigned-modal')" style="background:var(--g-surface);border:1.5px solid var(--g-border);border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer">Cancel</button>
+      <button onclick="saveUnassignedAssignments()" style="background:var(--g-green);color:#fff;border:none;border-radius:7px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">✓ Save Assignments</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ ASSIGN EMPLOYEES MODAL ════════════════════════════ -->
 <div class="modal-backdrop" id="assign-modal">
   <div class="modal modal-lg g-modal-inner">
@@ -898,11 +937,76 @@ window.addEventListener('load', () => {
   loadAll();
   // Auto-fix: silently correct any office employees wrongly saved as Universal
   api("POST", "/geofence/fix-office-universal").catch(() => {});
+  // Load unassigned banner
+  loadUnassignedBanner();
 });
 
 // North zone employee codes (hardcoded for KC346 access)
 const NORTH_ZONE_CODES = ['KC718','KC1041','KC346','KC4426','KC6446','KC6447','KC8977','KC9082'];
 const NORTH_ZONE_CITIES = ['delhi','new delhi','up','uttar pradesh','uttarakhand','haryana','punjab','rajasthan','bihar','madhya pradesh','mp'];
+
+
+// ── UNASSIGNED EMPLOYEES BANNER + MODAL ──────────────────────
+let _unassignedEmps = [];
+
+async function loadUnassignedBanner() {
+  const data = await api('GET', '/geofence/unassigned-employees');
+  _unassignedEmps = data?.data || [];
+  const banner = document.getElementById('unassigned-banner');
+  const chips  = document.getElementById('unassigned-chips');
+  const title  = document.getElementById('unassigned-banner-title');
+  const sub    = document.getElementById('unassigned-banner-sub');
+  if (!_unassignedEmps.length) { banner.style.display = 'none'; return; }
+  banner.style.display = '';
+  title.textContent = _unassignedEmps.length + ' employee' + (_unassignedEmps.length > 1 ? 's' : '') + ' not assigned to any office';
+  sub.textContent = 'These employees have no geofence location. Click to assign them to Delhi or Mumbai.';
+  chips.innerHTML = _unassignedEmps.map(e =>
+    '<span style="background:#fff;border:1px solid #f97316;border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600;color:#c2410c">' +
+    e.first_name + ' ' + e.last_name + ' <span style="opacity:.6">' + e.employee_code + '</span></span>'
+  ).join('');
+}
+
+async function openUnassignedModal() {
+  const officeLocs = _allLocations.filter(l => l.radius_meters < 10000 && l.is_active);
+  const optHtml = officeLocs.map(l => '<option value="' + l.id + '">' + l.name + '</option>').join('');
+  document.getElementById('unassigned-modal-list').innerHTML = _unassignedEmps.map(e => {
+    const city = (e.city || '—');
+    // Pre-select based on city
+    const muMatch = ['mumbai','thane','navi mumbai','pune','western'].some(k => city.toLowerCase().includes(k));
+    const delMatch = ['delhi','gurgaon','noida','gurugram','faridabad'].some(k => city.toLowerCase().includes(k));
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--g-border)">' +
+      '<div style="width:32px;height:32px;border-radius:50%;background:#f97316;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">' + (e.first_name[0]||'?') + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-weight:600;font-size:13px">' + e.first_name + ' ' + e.last_name + '</div>' +
+        '<div style="font-size:11px;color:var(--g-muted)">' + e.employee_code + ' · ' + city + '</div>' +
+      '</div>' +
+      '<select id="unasgn-loc-' + e.id + '" style="border:1.5px solid var(--g-border);border-radius:7px;padding:6px 10px;font-size:12px;min-width:200px">' +
+        '<option value="">— Select office —</option>' +
+        officeLocs.map(l => '<option value="' + l.id + '"' + ((muMatch && l.name.toLowerCase().includes('mumbai')) || (delMatch && l.name.toLowerCase().includes('delhi')) ? ' selected' : '') + '>' + l.name + '</option>').join('') +
+      '</select>' +
+    '</div>';
+  }).join('');
+  openModal('unassigned-modal');
+}
+
+async function saveUnassignedAssignments() {
+  let saved = 0, failed = 0;
+  for (const e of _unassignedEmps) {
+    const sel = document.getElementById('unasgn-loc-' + e.id);
+    if (!sel?.value) continue;
+    const r = await api('POST', '/geofence/bulk-assign', {
+      employee_ids: [e.id],
+      office_location_id: parseInt(sel.value),
+      is_universal: false
+    });
+    if (r?.success) saved++; else failed++;
+  }
+  closeModal('unassigned-modal');
+  if (saved) toast(saved + ' employee(s) assigned successfully!');
+  if (failed) toast(failed + ' assignment(s) failed', 'error');
+  await loadAll();
+  await loadUnassignedBanner();
+}
 
 async function loadAll() {
   const [locData, empData, ruleData] = await Promise.all([
