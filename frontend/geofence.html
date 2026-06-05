@@ -585,7 +585,7 @@
       </div>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-primary btn-sm" onclick="openAddLocation()">+ Add Location</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddLocation()" id="add-loc-btn">+ Add Location</button>
       <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
       <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
@@ -857,6 +857,20 @@
 
 Auth.guard();
 buildSidebar('geofence.html');
+// KC346: hide add/delete location controls — read+assign only
+(function() {
+  const u = Auth.getUser();
+  if (u?.employee_code === 'KC346') {
+    document.addEventListener('DOMContentLoaded', () => {
+      const addBtn = document.getElementById('add-loc-btn');
+      if (addBtn) addBtn.style.display = 'none';
+    });
+    // Patch openDeleteLocation to block
+    window._origOpenDeleteLocation = window.openDeleteLocation;
+    window.openDeleteLocation = () => { toast('Only admins can delete locations', 'error'); };
+    window.openAddLocation = () => { toast('Only admins can add locations', 'error'); };
+  }
+})();
 loadNotifBadge();
 
 // ── State ────────────────────────────────────────────────────
@@ -884,16 +898,45 @@ window.addEventListener('load', () => {
   loadAll();
 });
 
+// North zone employee codes (hardcoded for KC346 access)
+const NORTH_ZONE_CODES = ['KC718','KC1041','KC346','KC4426','KC6446','KC6447','KC8977','KC9082'];
+const NORTH_ZONE_CITIES = ['delhi','new delhi','up','uttar pradesh','uttarakhand','haryana','punjab','rajasthan','bihar','madhya pradesh','mp'];
+
 async function loadAll() {
   const [locData, empData, ruleData] = await Promise.all([
     api('GET', '/geofence/locations'),
     api('GET', '/employees'),
     api('GET', '/geofence/buffer-rules')
   ]);
-  _allLocations = locData?.data  || [];
-  _allEmployees = empData?.data  || [];
-  _allRules     = ruleData?.data || [];
-  _globalAssignedCount = locData?.global_assigned_count ?? null;
+  const user = Auth.getUser();
+  const isKC346 = user?.employee_code === 'KC346';
+
+  let allEmps = empData?.data || [];
+  let allLocs = locData?.data || [];
+  let allRules = ruleData?.data || [];
+
+  // KC346 sees only north zone employees and locations
+  if (isKC346) {
+    allEmps = allEmps.filter(e =>
+      NORTH_ZONE_CODES.includes(e.employee_code) ||
+      NORTH_ZONE_CITIES.some(c => (e.city||'').toLowerCase().includes(c)) ||
+      NORTH_ZONE_CITIES.some(c => (e.state||'').toLowerCase().includes(c))
+    );
+    const northEmpIds = new Set(allEmps.map(e => e.id));
+    allRules = allRules.filter(r => northEmpIds.has(r.id));
+    // Show only north zone relevant locations
+    allLocs = allLocs.filter(l =>
+      ['Corporate Office - Delhi', 'State - Delhi', 'North Zone'].some(n => l.name.includes(n)) ||
+      ['delhi','north'].some(k => (l.name||'').toLowerCase().includes(k))
+    );
+    // If no matching locations, still show Corporate Office - Delhi
+    if (!allLocs.length) allLocs = (locData?.data||[]).filter(l => l.name.includes('Delhi') || l.name.includes('North'));
+  }
+
+  _allLocations = allLocs;
+  _allEmployees = allEmps;
+  _allRules     = allRules;
+  _globalAssignedCount = isKC346 ? allEmps.length : (locData?.global_assigned_count ?? null);
   _locEmployees = {}; // clear cache
   renderMapMarkers();
   updateStats();
