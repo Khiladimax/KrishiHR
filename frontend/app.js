@@ -1,3 +1,4 @@
+
 // app.js — Shared utilities for all KrishiHR pages
 const API_BASE = 'https://krishihr-zuui.onrender.com/api';
 
@@ -159,7 +160,7 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin'] },
+      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin'], allowCodes:['KC346'] },
       { href:'ai-voice.html',       icon: ICONS.aivoice,      label:'Voice Assistant',  always:true },
     ]
   },
@@ -188,7 +189,7 @@ function buildSidebar(activePage) {
   for (const group of NAV_GROUPS) {
     const visibleItems = group.items.filter(l => {
       if (l.hideRoles && l.hideRoles.includes(user.role)) return false;
-      return l.always || (l.roles && l.roles.includes(user.role));
+      return l.always || (l.roles && l.roles.includes(user.role)) || (l.allowCodes && l.allowCodes.includes(user.employee_code));
     });
     if (visibleItems.length === 0) continue;
 
@@ -485,3 +486,5 @@ function closeSidebar() {
   bubble.addEventListener('click', () => { window.location.href = 'ai-voice.html'; });
   document.body.appendChild(bubble);
 })();
+
+
