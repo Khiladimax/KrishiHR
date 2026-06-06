@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Tractor/Wagon wheel with spokes — agricultural theme for KrishiHR.
+    Animated via rotate in anim/rotate_wheel.xml or ObjectAnimator in code.
+    Size: 48x48dp recommended.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Outer rim -->
+    <path
+        android:strokeColor="#2E7D32"
+        android:strokeWidth="2.8"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M24,24 m-19,0 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0"/>
+
+    <!-- Inner hub ring -->
+    <path
+        android:strokeColor="#2E7D32"
+        android:strokeWidth="2.2"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M24,24 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"/>
+
+    <!-- Hub fill dot -->
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M24,24 m-1.8,0 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0"/>
+
+    <!-- 8 spokes: each from hub edge (r=4) to rim inner edge (r=18.5) -->
+    <!-- Spoke 0° (right) -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M28,24 L42.5,24"/>
+    <!-- Spoke 45° -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M26.83,26.83 L37.09,37.09"/>
+    <!-- Spoke 90° (down) -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M24,28 L24,42.5"/>
+    <!-- Spoke 135° -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M21.17,26.83 L10.91,37.09"/>
+    <!-- Spoke 180° (left) -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M20,24 L5.5,24"/>
+    <!-- Spoke 225° -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M21.17,21.17 L10.91,10.91"/>
+    <!-- Spoke 270° (up) -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M24,20 L24,5.5"/>
+    <!-- Spoke 315° -->
+    <path android:strokeColor="#2E7D32" android:strokeWidth="1.8"
+        android:pathData="M26.83,21.17 L37.09,10.91"/>
+
+</vector>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App cache (used by openFileInApp for temp image preview) -->
+    <cache-path name="cache" path="." />
+    <cache-path name="chat_files" path="chat_files/" />
+    <!-- Public Downloads root -->
+    <external-path name="downloads" path="Download/" />
+    <!-- KrishiHR/Attachments folder inside Downloads -->
+    <external-path name="krishihr_attachments" path="Download/KrishiHR/Attachments/" />
+</paths>

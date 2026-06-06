@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:background="@drawable/bg_header_dashboard" android:orientation="horizontal"
+            android:gravity="center_vertical" android:paddingHorizontal="16dp"
+            android:paddingTop="44dp" android:paddingBottom="16dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="🧠  GK Quiz"
+                android:textColor="@color/white" android:textSize="20sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_margin="16dp"
+            app:cardCornerRadius="18dp" app:cardElevation="5dp"
+            app:cardBackgroundColor="@color/white">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="20dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="TODAY'S QUESTION" android:textColor="@color/primary"
+                    android:textSize="11sp" android:textAllCaps="true" android:letterSpacing="0.1"
+                    android:layout_marginBottom="12dp"/>
+
+                <TextView android:id="@+id/tvQuestion"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Loading question..."
+                    android:textColor="@color/text_primary" android:textSize="16sp"
+                    android:textStyle="bold" android:lineSpacingMultiplier="1.4"
+                    android:layout_marginBottom="20dp"/>
+
+                <TextView android:id="@+id/tvAlreadyAnswered"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="✅ Already answered!"
+                    android:textColor="@color/status_present" android:textSize="13sp"
+                    android:background="@color/primary_ultra_light" android:padding="12dp"
+                    android:visibility="gone" android:layout_marginBottom="14dp"/>
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnOptA"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:text="A) Option A" android:textColor="@color/white"
+                    android:textSize="14sp" android:layout_marginBottom="8dp"
+                    app:cornerRadius="10dp" app:backgroundTint="#1565C0"/>
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnOptB"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:text="B) Option B" android:textColor="@color/white"
+                    android:textSize="14sp" android:layout_marginBottom="8dp"
+                    app:cornerRadius="10dp" app:backgroundTint="#E65100"/>
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnOptC"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:text="C) Option C" android:textColor="@color/white"
+                    android:textSize="14sp" android:layout_marginBottom="8dp"
+                    app:cornerRadius="10dp" app:backgroundTint="#00695C"/>
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnOptD"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:text="D) Option D" android:textColor="@color/white"
+                    android:textSize="14sp"
+                    app:cornerRadius="10dp" app:backgroundTint="#6A1B9A"/>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnViewLeaderboard"
+            android:layout_width="match_parent" android:layout_height="52dp"
+            android:layout_marginHorizontal="16dp" android:layout_marginBottom="12dp"
+            android:text="🏆  View Leaderboard" android:textColor="@color/white" android:textSize="15sp"
+            app:cornerRadius="12dp" app:backgroundTint="#E65100"/>
+
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp" android:layout_marginBottom="80dp"
+            app:cardCornerRadius="16dp" app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/white">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="🏆  LEADERBOARD" android:textColor="@color/primary"
+                    android:textSize="12sp" android:textStyle="bold" android:letterSpacing="0.08"
+                    android:layout_marginBottom="8dp"/>
+                <TextView android:id="@+id/tvLeaderboard"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary" android:textSize="14sp"
+                    android:lineSpacingMultiplier="2.0" android:visibility="gone"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

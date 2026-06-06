@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="180dp"
+            android:background="@drawable/bg_toolbar_purple" android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:layout_width="80dp" android:layout_height="80dp"
+                android:text="👤" android:textSize="44sp" android:gravity="center"
+                android:background="#40FFFFFF"/>
+            <TextView android:id="@+id/tvProfileName" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="Name"
+                android:textColor="@color/white" android:textSize="20sp"
+                android:textStyle="bold" android:layout_marginTop="10dp"/>
+        </LinearLayout>
+
+        <!-- Info card -->
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_margin="16dp"
+            app:cardCornerRadius="16dp" app:cardElevation="4dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowEmail" />
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowCode" />
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowDept" />
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowDesig" />
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowManager" />
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowRole" />
+                <include layout="@layout/item_profile_detail" android:id="@+id/rowDOJ" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Hidden TextViews to hold values for the Fragment -->
+        <TextView android:id="@+id/tvProfileEmail" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvProfileCode" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvProfileDept" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvProfileDesig" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvProfileManager" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvProfileRole" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvProfileDOJ" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

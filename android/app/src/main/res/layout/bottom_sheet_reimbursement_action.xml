@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/white"
+    android:padding="16dp">
+
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:background="#CBD5E1"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Review Reimbursement"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"/>
+
+    <TextView
+        android:id="@+id/tvActionEmployee"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        android:paddingTop="2dp"/>
+
+    <TextView
+        android:id="@+id/tvActionTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+        android:paddingTop="6dp"
+        android:paddingBottom="12dp"/>
+
+    <!-- Optional: Revise Amount -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Revised Amount (optional)"
+        android:textSize="12sp"
+        android:textColor="#64748b"
+        android:paddingBottom="4dp"/>
+
+    <EditText
+        android:id="@+id/etRevisedAmount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Leave empty to approve full amount"
+        android:inputType="numberDecimal"
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:background="@drawable/bg_spinner_field"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Remarks -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Remarks (optional)"
+        android:textSize="12sp"
+        android:textColor="#64748b"
+        android:paddingBottom="4dp"/>
+
+    <EditText
+        android:id="@+id/etActionRemarks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Add a remark..."
+        android:minLines="2"
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:background="@drawable/bg_spinner_field"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReimbReject"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Reject"
+            android:textSize="14sp"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="#ef4444"
+            style="@style/Widget.MaterialComponents.Button"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReimbApprove"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Approve"
+            android:textSize="14sp"
+            android:backgroundTint="#10b981"
+            style="@style/Widget.MaterialComponents.Button"/>
+    </LinearLayout>
+
+</LinearLayout>

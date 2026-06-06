@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <!-- Profile Header -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/primary" android:padding="16dp" android:paddingTop="20dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/tvMoreName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Employee" android:textColor="@color/white" android:textSize="18sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/tvMoreDesig" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Designation" android:textColor="@color/primary_ultra_light" android:textSize="12sp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Menu Rows -->
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingBottom="80dp">
+
+            <!-- SECTION: My Info -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="MY INFO" android:textSize="11sp" android:textStyle="bold" android:textColor="@color/text_hint" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="4dp"/>
+
+            <include layout="@layout/item_more_row" android:id="@+id/rowProfile"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowNotifications"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowPayslip"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowForm16"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowITDeclaration"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowAdvance"/>
+            <!-- ✅ NEW: Reimbursement row added after Advance -->
+            <include layout="@layout/item_more_row" android:id="@+id/rowReimbursement"/>
+
+            <!-- SECTION: Tools -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="TOOLS" android:textSize="11sp" android:textStyle="bold" android:textColor="@color/text_hint" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="4dp"/>
+
+            <include layout="@layout/item_more_row" android:id="@+id/rowBirthdays"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowAnniversaries"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowHolidays"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowAnnouncements"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowGkQuiz"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowEmployees"/>
+
+            <!-- SECTION: Management (role-gated, shown programmatically) -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="MANAGEMENT" android:textSize="11sp" android:textStyle="bold" android:textColor="@color/text_hint" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="4dp"/>
+
+            <include layout="@layout/item_more_row" android:id="@+id/rowTeamToday"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowPendingLeaves"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowRegularizations"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowAdvanceApprovals"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowSeparation"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowPayrollMgmt"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowProvision"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowProjectMgmt"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowBeatPlan"/>
+
+            <!-- SECTION: Account -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ACCOUNT" android:textSize="11sp" android:textStyle="bold" android:textColor="@color/text_hint" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="4dp"/>
+
+            <include layout="@layout/item_more_row" android:id="@+id/rowChangePassword"/>
+            <include layout="@layout/item_more_row" android:id="@+id/rowLogout"/>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

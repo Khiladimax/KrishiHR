@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingBottom="80dp">
+
+        <!-- HEADER -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/primary" android:padding="16dp" android:paddingTop="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:id="@+id/tvGreeting" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Good Morning" android:textColor="@color/primary_ultra_light" android:textSize="12sp"/>
+                    <TextView android:id="@+id/tvName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Employee" android:textColor="@color/white" android:textSize="20sp" android:textStyle="bold"/>
+                    <TextView android:id="@+id/tvDesignation" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/primary_ultra_light" android:textSize="12sp"/>
+                </LinearLayout>
+                <!-- Profile avatar -->
+                <androidx.cardview.widget.CardView android:id="@+id/headerAvatar" android:layout_width="40dp" android:layout_height="40dp" app:cardCornerRadius="20dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/primary_dark" android:clickable="true" android:focusable="true" android:layout_marginEnd="8dp">
+                    <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                        <ImageView android:id="@+id/headerAvatarImg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop"/>
+                        <TextView android:id="@+id/headerAvatarInitials" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:textColor="@color/white" android:textSize="14sp" android:textStyle="bold"/>
+                    </FrameLayout>
+                </androidx.cardview.widget.CardView>
+                <!-- Notification bell -->
+                <RelativeLayout android:layout_width="wrap_content" android:layout_height="wrap_content">
+                    <ImageView android:id="@+id/notifBtn" android:layout_width="40dp" android:layout_height="40dp" android:src="@drawable/ic_notification" android:padding="9dp" android:tint="@color/primary" android:background="@drawable/bg_notif_bell" android:clickable="true" android:focusable="true"/>
+                    <TextView android:id="@+id/tvPendingBadge" android:layout_width="18dp" android:layout_height="18dp" android:layout_alignTop="@id/notifBtn" android:layout_alignEnd="@id/notifBtn" android:gravity="center" android:textColor="@color/white" android:textSize="9sp" android:textStyle="bold" android:background="@drawable/bg_badge" android:visibility="gone"/>
+                </RelativeLayout>
+            </LinearLayout>
+            <TextView android:id="@+id/tvTodayDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/primary_ultra_light" android:textSize="11sp"/>
+        </LinearLayout>
+
+        <!-- ATTENDANCE CARD — Style B: Split Dark Panel -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardPunch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="0dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/surface">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- TOP ROW: clock left | dark mark-attendance panel right -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <!-- LEFT: status tag + big clock -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:padding="18dp"
+                        android:gravity="center_vertical">
+
+                        <!-- Active pill -->
+                        <LinearLayout
+                            android:id="@+id/llActivePill"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:background="@drawable/bg_active_pill"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
+                            android:layout_marginBottom="10dp">
+
+                            <View
+                                android:id="@+id/vActiveDot"
+                                android:layout_width="6dp"
+                                android:layout_height="6dp"
+                                android:background="@drawable/bg_green_dot"
+                                android:layout_marginEnd="5dp"/>
+
+                            <TextView
+                                android:id="@+id/tvActivePillText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Active"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/primary_dark"/>
+                        </LinearLayout>
+
+                        <!-- Big live clock -->
+                        <TextView
+                            android:id="@+id/tvTimer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="00:00:00"
+                            android:textColor="@color/text_primary"
+                            android:textSize="32sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="-0.03"/>
+
+                        <!-- Status subtitle -->
+                        <TextView
+                            android:id="@+id/tvAttendanceStatusLine2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Marked in · punch not received"
+                            android:textSize="11sp"
+                            android:textColor="@color/text_hint"
+                            android:layout_marginTop="4dp"/>
+
+                    </LinearLayout>
+
+                    <!-- Vertical divider -->
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:background="@color/divider"/>
+
+                    <!-- RIGHT: white Mark Attendance panel -->
+                    <LinearLayout
+                        android:id="@+id/btnMarkAttendance"
+                        android:layout_width="110dp"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="@color/surface"
+                        android:padding="16dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:src="@drawable/ic_location"
+                            android:tint="@color/primary"
+                            android:layout_marginBottom="8dp"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Mark"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary"
+                            android:gravity="center"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Attendance"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary"
+                            android:gravity="center"/>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- DIVIDER -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"/>
+
+                <!-- BOTTOM ROW: Punch In | Punch Out | Total Hrs -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:paddingVertical="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="PUNCH IN"
+                            android:textSize="9sp"
+                            android:letterSpacing="0.08"
+                            android:textColor="@color/text_hint"/>
+                        <TextView
+                            android:id="@+id/tvPunchInTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--:--"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary"
+                            android:layout_marginTop="3dp"/>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center_vertical"
+                        android:background="@color/divider"/>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:paddingVertical="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="PUNCH OUT"
+                            android:textSize="9sp"
+                            android:letterSpacing="0.08"
+                            android:textColor="@color/text_hint"/>
+                        <TextView
+                            android:id="@+id/tvPunchOutTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--:--"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/accent_red"
+                            android:layout_marginTop="3dp"/>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center_vertical"
+                        android:background="@color/divider"/>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:paddingVertical="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="TOTAL HRS"
+                            android:textSize="9sp"
+                            android:letterSpacing="0.08"
+                            android:textColor="@color/text_hint"/>
+                        <TextView
+                            android:id="@+id/tvTotalHours"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/accent_blue"
+                            android:layout_marginTop="3dp"/>
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- MONTHLY SUMMARY -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingTop="0dp"
+            android:layout_marginTop="10dp">
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginEnd="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/primary_ultra_light">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/tvPresent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Present"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/text_secondary"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="2dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/accent_red_light">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/tvAbsent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/accent_red"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Absent"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/text_secondary"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/accent_blue_light">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/tvMonthHours"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0h"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/accent_blue"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Avg/Day"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/text_secondary"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+
+        <!-- QUICK ACCESS TITLE -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Quick Access" android:textSize="14sp" android:textStyle="bold" android:textColor="@color/text_primary" android:paddingHorizontal="16dp" android:paddingTop="16dp" android:paddingBottom="6dp"/>
+
+        <!-- QUICK ACCESS GRID (4 columns, auto-wraps rows) -->
+        <GridLayout
+            android:id="@+id/quickAccessGrid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="4"
+            android:paddingHorizontal="4dp"
+            android:useDefaultMargins="false">
+
+            <!-- Attendance -->
+            <LinearLayout android:id="@+id/menuAttendance" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/primary_ultra_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_attendance" android:tint="@color/primary"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Attendance" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Leave -->
+            <LinearLayout android:id="@+id/menuLeave" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_orange_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_leave" android:tint="@color/accent_orange"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Leave" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Payslip -->
+            <LinearLayout android:id="@+id/menuPayslip" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_blue_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_payroll" android:tint="@color/accent_blue"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Payslip" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Advance -->
+            <LinearLayout android:id="@+id/menuAdvance" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_purple_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_advance" android:tint="@color/accent_purple"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Advance" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Quiz -->
+            <LinearLayout android:id="@+id/menuQuiz" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_pink_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_quiz" android:tint="@color/accent_pink"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quiz" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Team Today / Announcements -->
+            <LinearLayout android:id="@+id/menuAnnouncements" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_indigo_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_announcement" android:tint="@color/accent_indigo"/></androidx.cardview.widget.CardView>
+                <TextView android:id="@+id/tvMenuAnnouncementsLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Team Today" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Profile -->
+            <LinearLayout android:id="@+id/menuProfile" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_teal_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_profile" android:tint="@color/accent_teal"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Profile" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Birthdays -->
+            <LinearLayout android:id="@+id/menuBirthdays" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_pink_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_notification" android:tint="@color/accent_pink"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Birthdays" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Chat -->
+            <LinearLayout android:id="@+id/menuChat" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="#E0F2F1"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_announcement" android:tint="#00695C"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Chat" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Employees (admin) -->
+            <LinearLayout android:id="@+id/menuEmployees" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:visibility="gone">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_teal_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_employees" android:tint="@color/accent_teal"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Employees" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Approvals (admin) -->
+            <LinearLayout android:id="@+id/menuApprovals" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:visibility="gone">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_amber_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_leave" android:tint="@color/accent_amber"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Approvals" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Movement (admin, optional) -->
+            <LinearLayout android:id="@+id/menuMovement" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:visibility="gone">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_blue_light"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_location" android:tint="@color/accent_blue"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Movement" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+            <!-- Geofence (admin, optional) -->
+            <LinearLayout android:id="@+id/menuGeofence" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="6dp" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:visibility="gone">
+                <androidx.cardview.widget.CardView android:layout_width="52dp" android:layout_height="52dp" app:cardCornerRadius="14dp" app:cardElevation="2dp" app:cardBackgroundColor="#F3E5F5"><ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:src="@drawable/ic_geofence" android:tint="#6a1b9a"/></androidx.cardview.widget.CardView>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Geofence" android:textSize="9sp" android:gravity="center" android:layout_marginTop="4dp" android:textColor="@color/text_primary"/>
+            </LinearLayout>
+
+        </GridLayout>
+
+        <!-- BIRTHDAY CARD -->
+        <androidx.cardview.widget.CardView android:id="@+id/cardBirthday" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginHorizontal="12dp" android:layout_marginTop="12dp" android:visibility="gone" app:cardCornerRadius="12dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_pink_light">
+            <TextView android:id="@+id/tvBirthdayToday" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:textSize="13sp" android:textColor="@color/accent_pink"/>
+        </androidx.cardview.widget.CardView>
+
+        <!-- HOLIDAY CARD -->
+        <androidx.cardview.widget.CardView android:id="@+id/cardHoliday" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginHorizontal="12dp" android:layout_marginTop="8dp" android:visibility="gone" app:cardCornerRadius="12dp" app:cardElevation="2dp" app:cardBackgroundColor="@color/accent_blue_light">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="12dp" android:gravity="center_vertical">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🏖️ Upcoming Holiday" android:textSize="12sp" android:textColor="@color/accent_blue"/>
+                <TextView android:id="@+id/tvNextHoliday" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/accent_blue"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ANNOUNCEMENTS -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="6dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Announcements" android:textSize="14sp" android:textStyle="bold" android:textColor="@color/text_primary"/>
+            <TextView android:id="@+id/tvViewAllAnnouncements" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="View All ›" android:textSize="12sp" android:textColor="@color/primary" android:clickable="true" android:focusable="true"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/llAnnouncementsContainer" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="16dp"/>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

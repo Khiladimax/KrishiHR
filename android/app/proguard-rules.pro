@@ -1,0 +1,5 @@
+-keep class com.krishihr.app.data.models.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
