@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Request logger (dev only)
 app.use((req, _res, next) => {
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    // request logging disabled (too noisy)
   }
   next();
 });
@@ -58,7 +58,7 @@ global.userSockets    = new Map();  // userId -> Set of socketIds (legacy, kept 
 global.userSocketsMeta = new Map(); // userId -> Map<socketId, device>
 io.on('connection', (socket) => {
   const user = socket.user;
-  console.log(`[Socket] ${user.first_name || user.id} connected`);
+  // socket connected
 
   // Track socket for this user
   if (!global.userSockets.has(String(user.id))) global.userSockets.set(String(user.id), new Set());
@@ -108,7 +108,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`[Socket] ${user.first_name || user.id} disconnected`);
+    // socket disconnected
     // Remove socket from tracking
     const sockets = global.userSockets.get(String(user.id));
     if (sockets) {
@@ -1002,4 +1002,5 @@ setInterval(async () => {
     console.warn('[DB Keep-Alive] ⚠️ DB ping failed:', err.message);
   }
 }, DB_PING_INTERVAL);
+
 
