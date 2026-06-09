@@ -464,8 +464,7 @@ async function loadMovementDetail(employeeId, date, empName) {
       `https://www.google.com/maps/dir/${firstPt.lat},${firstPt.lng}/${lastPt.lat},${lastPt.lng}`;
 
     // ── Point count ───────────────────────────────────────────────────────
-    const verifiedSegs = segments.filter(s => s.type === 'verified');
-    const gapSegs      = segments.filter(s => s.type === 'gap');
+    const gapSegs = segments.filter(s => s.type === 'gap');
     document.getElementById('mv-pt-count').textContent =
       `${allTrackedPts.length} tracked pts · ${verifiedSegs.length} segment${verifiedSegs.length!==1?'s':''} · ${gapSegs.length} gap${gapSegs.length!==1?'s':''}`;
 
