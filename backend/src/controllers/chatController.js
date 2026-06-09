@@ -560,9 +560,10 @@ exports.sendMessage = async (req, res) => {
     const groupTypeRes = await db.query(`SELECT type FROM chat_groups WHERE id=$1`, [gid]);
     if (groupTypeRes.rows[0]?.type === 'dm') {
       await db.query(
-        `UPDATE chat_group_members 
-         SET left_at = NULL 
-         WHERE group_id=$1 AND employee_id != $2 AND left_at IS NOT NULL`,
+        `UPDATE chat_group_members
+         SET left_at = NULL, deleted_at = NULL
+         WHERE group_id=$1 AND employee_id != $2
+           AND (left_at IS NOT NULL OR deleted_at IS NOT NULL)`,
         [gid, empId]
       );
     }
@@ -624,6 +625,19 @@ exports.sendFile = async (req, res) => {
       `SELECT CONCAT(first_name,' ',last_name) AS name, employee_code FROM employees WHERE id=$1`, [empId]
     );
     const full = { ...msg, sender_name: emp.rows[0]?.name, sender_code: emp.rows[0]?.employee_code, reactions: [], seen_count: 0, delivered_count: 0 };
+
+    // Restore DM visibility for recipient (same fix as sendMessage — clear left_at + deleted_at)
+    const fileGroupType = await db.query(`SELECT type FROM chat_groups WHERE id=$1`, [gid]);
+    if (fileGroupType.rows[0]?.type === 'dm') {
+      await db.query(
+        `UPDATE chat_group_members
+         SET left_at = NULL, deleted_at = NULL
+         WHERE group_id=$1 AND employee_id != $2
+           AND (left_at IS NOT NULL OR deleted_at IS NOT NULL)`,
+        [gid, empId]
+      );
+    }
+
     emitToGroup(gid, 'message', full);
     res.json({ success: true, data: full });
   } catch (e) {
@@ -1195,6 +1209,7 @@ exports.migrate = async () => {
 
   console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
 };
+
 
 
 
