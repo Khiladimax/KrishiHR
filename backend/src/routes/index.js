@@ -930,6 +930,35 @@ router.get   ('/chat/groups/:id/search',                  authenticate, chatCtrl
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 router.get   ('/chat/groups/:id/messages',                authenticate, chatCtrl.getMessages);
+
+// Typing indicator (REST fallback for clients without Socket.IO)
+const typingStore = new Map(); // groupId_userId -> { name, expires }
+router.post('/chat/groups/:id/typing', authenticate, (req, res) => {
+  const key = `${req.params.id}_${req.user.id}`;
+  const { typing } = req.body;
+  if (typing) {
+    typingStore.set(key, { userId: req.user.id, name: req.user.name || 'Someone', expires: Date.now() + 5000 });
+    // Also emit via socket for web clients
+    if (global.io) global.io.to(`group:${req.params.id}`).emit('userTyping', { userId: req.user.id, name: req.user.name });
+  } else {
+    typingStore.delete(key);
+    if (global.io) global.io.to(`group:${req.params.id}`).emit('userStoppedTyping', { userId: req.user.id });
+  }
+  res.json({ success: true });
+});
+router.get('/chat/groups/:id/typing', authenticate, (req, res) => {
+  const gid = req.params.id;
+  const now = Date.now();
+  const typers = [];
+  for (const [key, val] of typingStore.entries()) {
+    if (key.startsWith(gid + '_') && val.expires > now && val.userId !== req.user.id) {
+      typers.push({ userId: val.userId, name: val.name });
+    } else if (val.expires <= now) {
+      typingStore.delete(key);
+    }
+  }
+  res.json({ success: true, data: typers });
+});
 router.post  ('/chat/groups/:id/messages',                authenticate, chatCtrl.sendMessage);
 // ── File upload: direct (<=50 MB) + chunked (up to 1 GB) ─────────────────────
 const fileCtrl = require('../controllers/chatFileController');
@@ -975,3 +1004,4 @@ router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 
 
 module.exports = router;
+
