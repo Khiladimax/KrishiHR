@@ -426,7 +426,8 @@ async function loadMovementDetail(employeeId, date, empName) {
         // Gap label
         const mid = { lat: (seg.from.lat+seg.to.lat)/2, lng: (seg.from.lng+seg.to.lng)/2 };
         const labelText = `⏸ Tracking Gap  ${seg.from.time_label} – ${seg.to.time_label}  (${seg.dur_label})`;
-        allMarkers.push(makeGapLabel(mid, labelText));
+        // Gap label removed — dashed orange line already indicates tracking gap clearly
+        // allMarkers.push(makeGapLabel(mid, labelText));
 
         // Fetch Directions API bike route
         fetchBikeRoute(fromPt, toPt, seg).then(routePath => {
