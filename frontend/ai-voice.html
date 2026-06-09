@@ -1679,18 +1679,31 @@ async function handleHRContacts(lower='') {
 
 // ── EMPLOYEE DIRECTORY ─────────────────────────────────────
 function isEmployeeQuery(lower) {
-  if (anyOf(lower, ['find employee','find colleague','contact of','phone of','email of','number of',
-    'who is ','reach ','contact details','directory','employee details','find ','search employee',
-    'details of','detail of','want to find','looking for','info of','information of',
-    'get details','show details','employee contact','colleague contact'])) return true;
-  // Super admin: "get <name>" / "show <name>" natural lookups
-  if (userRole === 'super_admin' && anyOf(lower, ['get ','show ','search '])) {
-    const skipKws = ['get hr','get leave','get salary','get payslip','get attendance',
-      'get advance','get reimburs','get holiday','get announce','get notice','get team',
-      'show leave','show salary','show payslip','show attendance','show team',
-      'search leave','search salary'];
-    if (!skipKws.some(kw => lower.startsWith(kw) || lower.includes(kw))) return true;
-  }
+  // Hard skip — these are other modules
+  const skipKws = ['get hr','get leave','get salary','get payslip','get attendance',
+    'get advance','get reimburs','get holiday','get announce','get notice','get team',
+    'show leave','show salary','show payslip','show attendance','show team',
+    'search leave','search salary','plan leave','apply leave','leave balance',
+    'punch in','punch out','my payslip','my salary','my attendance'];
+  if (skipKws.some(kw => lower.includes(kw))) return false;
+
+  // Explicit employee-search phrases
+  if (anyOf(lower, ['find employee','find colleague','contact of','phone of','email of',
+    'number of','contact details','directory','employee details','find colleague',
+    'search employee','details of','detail of','want to find','looking for',
+    'info of','information of','get details','show details','employee contact',
+    'colleague contact','who is ','reach '])) return true;
+
+  // Natural "get me X contact/number/details" — works for ALL roles
+  if (/(get me|get|find|show|tell me|give me|what is|whats)/.test(lower) &&
+      /(contact|number|phone|email|details|info|profile)/.test(lower)) return true;
+
+  // "X ka number do", "X contact chahiye" — Hinglish
+  if (/(ka number|ka contact|ka phone|ka email|chahiye|do mujhe)/.test(lower)) return true;
+
+  // Admin/super_admin: bare "get X" / "show X" / "search X"
+  if (isPrivAdmin && anyOf(lower, ['get ','show ','search '])) return true;
+
   return false;
 }
 
@@ -1699,9 +1712,17 @@ async function handleEmployeeDir(query) {
   const stopWords = new Set(['find','employee','employees','colleague','contact','of','the','phone',
     'email','number','details','detail','who','is','reach','search','me','please','can','you',
     'get','show','i','want','to','a','an','my','your','their','his','her','for','with',
-    'about','looking','info','information','tell','give','need','check','see']);
-  const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length > 1 && !stopWords.has(t));
-  const searchTerm = tokens.join(' ').trim();
+    'about','looking','info','information','tell','give','need','check','see',
+    'ka','do','mujhe','chahiye','bata','send']);
+  // Keep tokens that are proper names (capitalised in original query) or not stopwords
+  const rawTokens = query.split(/\s+/);
+  const tokens = rawTokens.filter(t => {
+    const tl = t.toLowerCase().replace(/[^a-z]/g,'');
+    if (tl.length < 2) return false;
+    if (stopWords.has(tl)) return false;
+    return true;
+  });
+  const searchTerm = tokens.join(' ').trim().toLowerCase();
 
   if (!searchTerm) {
     return { text: `Sure! Tell me the name of the colleague you're looking for. For example: "Find John Smith" or "Contact of Sarah".`, chips:[] };
@@ -1898,21 +1919,50 @@ async function handleSendMessage(query) {
   }}] };
 }
 
-// ── HELPER: find employee name in query (full name > first name > last name) ──
+// ── HELPER: find employee name in query (full name > first > last > fuzzy) ──
 function findEmployeeInQuery(query, employees) {
   if (!employees) return null;
-  const q = query.toLowerCase();
-  let best = null, bestLen = 0;
+  const q = query.toLowerCase().replace(/[^a-z0-9 ]/g, ' ');
+  let best = null, bestScore = 0;
+
   for (const e of employees) {
     if (!e.is_active) continue;
     const full  = (e.first_name + ' ' + e.last_name).toLowerCase();
     const first = e.first_name.toLowerCase();
     const last  = e.last_name.toLowerCase();
-    if (q.includes(full) && full.length > bestLen) { best = e; bestLen = full.length; }
-    else if (first.length >= 3 && q.includes(first) && first.length > bestLen) { best = e; bestLen = first.length; }
-    else if (!best && last.length >= 4 && q.includes(last) && last.length > bestLen) { best = e; bestLen = last.length; }
+    let score = 0;
+
+    // Exact full name match — highest priority
+    if (q.includes(full)) score = 100 + full.length;
+    // Both first + last appear anywhere in query (handles "get me Moumita Mahata contact")
+    else if (first.length >= 3 && last.length >= 3 && q.includes(first) && q.includes(last)) score = 90;
+    // First name alone (min 3 chars)
+    else if (first.length >= 3 && q.includes(first)) score = 50 + first.length;
+    // Last name alone (min 4 chars)
+    else if (last.length >= 4 && q.includes(last)) score = 40 + last.length;
+    // Fuzzy: first name starts with query token
+    else {
+      const tokens = q.split(/\s+/).filter(t => t.length >= 3);
+      for (const tok of tokens) {
+        if (first.startsWith(tok) && tok.length >= 4) { score = Math.max(score, 30); }
+        if (last.startsWith(tok) && tok.length >= 4)  { score = Math.max(score, 25); }
+        // Levenshtein distance 1 (one typo)
+        if (tok.length >= 5 && (levDist(tok, first) <= 1 || levDist(tok, last) <= 1)) score = Math.max(score, 20);
+      }
+    }
+
+    if (score > bestScore) { best = e; bestScore = score; }
   }
-  return best;
+  return bestScore > 0 ? best : null;
+}
+
+// Levenshtein distance (for fuzzy match)
+function levDist(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_, i) => Array.from({length: n+1}, (_, j) => i===0?j:j===0?i:0));
+  for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
 }
 
 async function handleWithClaude(query) {
@@ -2166,3 +2216,4 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+
