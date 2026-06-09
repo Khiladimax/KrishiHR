@@ -577,6 +577,21 @@ exports.sendFile = async (req, res) => {
     if (mimetype.startsWith('audio/')) type = 'audio';
     if (mimetype.startsWith('video/')) type = 'video';
 
+    // Voice note metadata (duration + waveform) — passed as form fields, stored in content as JSON
+    const isVoiceNote = req.body.voice_note === 'true' || req.body.voice_note === true;
+    let contentMeta = originalname;
+    if (isVoiceNote && type === 'audio') {
+      const durationMs = parseInt(req.body.duration_ms) || 0;
+      let waveform = [];
+      try { waveform = JSON.parse(req.body.waveform || '[]'); } catch (_) {}
+      // Cap waveform to 60 samples to keep it small
+      if (waveform.length > 60) {
+        const step = waveform.length / 60;
+        waveform = Array.from({ length: 60 }, (_, i) => waveform[Math.floor(i * step)]);
+      }
+      contentMeta = JSON.stringify({ voice: true, duration_ms: durationMs, waveform });
+    }
+
     // Store file in DB (persistent — survives Render restarts, no external storage needed)
     const fileRow = await db.query(
       `INSERT INTO chat_file_data (original_name, mime_type, file_size, file_data)
@@ -589,7 +604,7 @@ exports.sendFile = async (req, res) => {
     const r = await db.query(`
       INSERT INTO chat_messages(group_id, sender_id, content, message_type, file_name, file_size, file_mime, file_url)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
-    `, [gid, empId, originalname, type, originalname, size, mimetype, fileUrl]);
+    `, [gid, empId, contentMeta, type, originalname, size, mimetype, fileUrl]);
 
     const msg = r.rows[0];
     const emp = await db.query(
@@ -1167,3 +1182,4 @@ exports.migrate = async () => {
 
   console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
 };
+
