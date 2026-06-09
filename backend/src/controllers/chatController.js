@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // chatController.js — WhatsApp + Google Meet grade chat system
 // Features: reactions, pinned messages, delivery receipts, presence,
 //           delete for everyone, scheduled meetings, message search,
@@ -49,6 +50,45 @@ function emitToUser(userId, event, data) {
     const socketIds = global.userSockets.get(String(userId)) || [];
     socketIds.forEach(sid => global.io.to(sid).emit(event, data));
   }
+}
+
+
+// ── Chat push helper: notify offline, non-muted members ──────────────────────
+async function pushChatMessage(gid, empId, senderName, pushBody) {
+  try {
+    const groupInfo = await db.query(`SELECT name, type FROM chat_groups WHERE id=$1`, [gid]);
+    const grpName   = groupInfo.rows[0]?.name;
+    const isDM      = groupInfo.rows[0]?.type === 'dm';
+
+    const members = await db.query(
+      `SELECT cgm.employee_id
+       FROM chat_group_members cgm
+       WHERE cgm.group_id=$1
+         AND cgm.employee_id != $2
+         AND cgm.left_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM chat_group_mutes mu
+           WHERE mu.group_id=$1 AND mu.employee_id=cgm.employee_id
+         )`,
+      [gid, empId]
+    );
+
+    const onlineUsers = global.userSockets
+      ? new Set([...global.userSockets.keys()].filter(k => (global.userSockets.get(k) || []).length > 0))
+      : new Set();
+
+    const pushTitle = isDM ? senderName : `${senderName} @ ${grpName}`;
+
+    for (const m of members.rows) {
+      if (!onlineUsers.has(String(m.employee_id))) {
+        fcm.sendToEmployee(db, m.employee_id, pushTitle, pushBody, {
+          channel: 'krishihr_chat',
+          screen: 'chat',
+          group_id: String(gid),
+        }).catch(() => {});
+      }
+    }
+  } catch (_) {}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -569,6 +609,11 @@ exports.sendMessage = async (req, res) => {
     }
 
     emitToGroup(gid, 'message', full);
+
+    // Push to offline members
+    const msgBody = content.length > 100 ? content.substring(0, 97) + '\u2026' : content;
+    pushChatMessage(gid, empId, emp.rows[0]?.name || 'Someone', msgBody);
+
     res.json({ success: true, data: full });
   } catch (e) {
     console.error('[chat sendMessage]', e.message);
@@ -639,6 +684,11 @@ exports.sendFile = async (req, res) => {
     }
 
     emitToGroup(gid, 'message', full);
+
+    // Push to offline members
+    const fileLabel = isVoiceNote ? '🎤 Voice message' : type === 'image' ? '📷 Image' : type === 'video' ? '🎥 Video' : `📎 ${originalname}`;
+    pushChatMessage(gid, empId, emp.rows[0]?.name || 'Someone', fileLabel);
+
     res.json({ success: true, data: full });
   } catch (e) {
     console.error('[chat sendFile]', e.message);

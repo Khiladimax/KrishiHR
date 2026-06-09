@@ -14,6 +14,7 @@ const alertsCtrl = require('./controllers/movementAlertsController');
 const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
 const itDeclCtrl = require('./controllers/itDeclarationController');
+const fcm        = require('./services/fcmService');
 
 const app    = express();
 const server = http.createServer(app);
@@ -1004,3 +1005,90 @@ setInterval(async () => {
 }, DB_PING_INTERVAL);
 
 
+
+// ── Cron: Punch-IN reminder at 10:20 AM IST (Mon–Sat) ────────────────────────
+// Notifies active employees who have NOT punched in yet today
+cron.schedule('20 10 * * 1-6', async () => {
+  console.log('⏰ [Punch-IN reminder] Checking unpunched employees...');
+  try {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+
+    // Skip non-working days (holidays / Sundays already excluded by cron pattern)
+    const { isNonWorkingDay } = require('./controllers/attendanceController');
+    if (typeof isNonWorkingDay === 'function' && await isNonWorkingDay(today)) {
+      console.log('[Punch-IN reminder] Non-working day — skipped');
+      return;
+    }
+
+    // Employees who are active, not WFH-permanent, not on approved leave, and have no punch-in today
+    const result = await db.query(`
+      SELECT e.id, e.first_name
+      FROM employees e
+      WHERE e.is_active = true
+        AND (e.is_wfh_permanent IS NULL OR e.is_wfh_permanent = false)
+        AND e.role != 'super_admin'
+        AND NOT EXISTS (
+          SELECT 1 FROM attendance a
+          WHERE a.employee_id = e.id AND a.date = $1
+            AND (a.punch_in IS NOT NULL OR a.status IN ('on_leave','holiday','weekend'))
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM leave_requests lr
+          WHERE lr.employee_id = e.id
+            AND $1 BETWEEN lr.from_date AND lr.to_date
+            AND lr.status = 'approved'
+        )
+    `, [today]);
+
+    let sent = 0;
+    for (const emp of result.rows) {
+      await fcm.sendToEmployee(
+        db, emp.id,
+        '⏰ Punch-In Reminder',
+        `Hi ${emp.first_name}, you haven't punched in yet today. Please mark your attendance.`,
+        { screen: 'attendance', channel: 'krishihr_alerts' }
+      );
+      sent++;
+    }
+    console.log(`✅ [Punch-IN reminder] Sent to ${sent} employee(s)`);
+  } catch (err) {
+    console.error('❌ [Punch-IN reminder] Failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// ── Cron: Punch-OUT reminder at 7:00 PM IST (Mon–Sat) ────────────────────────
+// Notifies employees who punched in today but have NOT punched out yet
+cron.schedule('0 19 * * 1-6', async () => {
+  console.log('⏰ [Punch-OUT reminder] Checking missing punch-outs...');
+  try {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+
+    const result = await db.query(`
+      SELECT e.id, e.first_name
+      FROM employees e
+      JOIN attendance a ON a.employee_id = e.id AND a.date = $1
+      WHERE e.is_active = true
+        AND a.punch_in IS NOT NULL
+        AND a.punch_out IS NULL
+        AND a.status NOT IN ('on_leave','holiday','weekend')
+    `, [today]);
+
+    let sent = 0;
+    for (const emp of result.rows) {
+      await fcm.sendToEmployee(
+        db, emp.id,
+        '🔔 Punch-Out Reminder',
+        `Hi ${emp.first_name}, don't forget to punch out before you leave!`,
+        { screen: 'attendance', channel: 'krishihr_alerts' }
+      );
+      sent++;
+    }
+    console.log(`✅ [Punch-OUT reminder] Sent to ${sent} employee(s)`);
+  } catch (err) {
+    console.error('❌ [Punch-OUT reminder] Failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
