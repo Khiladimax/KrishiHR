@@ -689,6 +689,11 @@ async function runAllMigrations() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_beat_plans_emp_date ON beat_plans(employee_id, plan_date)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_beat_stops_plan ON beat_plan_stops(plan_id, sequence)`);
 
+    // ── FCM push token column ────────────────────────────────────────────────
+    await client.query(`
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS fcm_token TEXT
+    `);
+
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_attendance_emp_date    ON attendance(employee_id, date)',
       'CREATE INDEX IF NOT EXISTS idx_leave_req_emp          ON leave_requests(employee_id)',
@@ -730,6 +735,7 @@ async function runAllMigrations() {
     await client.query('COMMIT');
     console.log('\n✅ All migrations completed successfully!');
     console.log('   ✓ Core schema (all tables)');
+    console.log('   ✓ FCM token column (employees.fcm_token)');
     console.log('   ✓ Additional columns');
     console.log('   ✓ GK Daily tables');
     console.log('   ✓ Indexes');

@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/provisionController.js
 // Handles the 6-month provision → permanent employee workflow
 // Approval chain: Manager approves → HR approves → account auto-converts
@@ -133,15 +134,14 @@ exports.initiateConfirmation = async (req, res) => {
     );
 
     // Create notification for manager
+    const provMgrMsg = `Please review and approve the permanent confirmation for ${emp.first_name} ${emp.last_name} (${emp.employee_code}).`;
     await client.query(
       `INSERT INTO notifications (employee_id, type, title, message, is_read)
        VALUES ($1, 'provision_confirm', 'Provision Confirmation Request',
                $2, FALSE)`,
-      [
-        emp.reporting_manager_id,
-        `Please review and approve the permanent confirmation for ${emp.first_name} ${emp.last_name} (${emp.employee_code}).`
-      ]
+      [emp.reporting_manager_id, provMgrMsg]
     );
+    fcm.sendToEmployee(db, emp.reporting_manager_id, 'Provision Confirmation Request', provMgrMsg, { screen: 'more', channel: 'krishihr_alerts' }).catch(() => {});
 
     await client.query('COMMIT');
 
@@ -232,15 +232,14 @@ exports.approveConfirmation = async (req, res) => {
         `SELECT id FROM employees WHERE role='hr' AND is_active=TRUE`
       );
       for (const hr of hrList.rows) {
+        const hrProvMsg = `Manager has approved permanent confirmation for ${pc.first_name} ${pc.last_name} (${pc.employee_code}). Awaiting your approval.`;
         await client.query(
           `INSERT INTO notifications (employee_id, type, title, message, is_read)
            VALUES ($1, 'provision_confirm', 'Manager Approved — Your HR Approval Needed',
                    $2, FALSE)`,
-          [
-            hr.id,
-            `Manager has approved permanent confirmation for ${pc.first_name} ${pc.last_name} (${pc.employee_code}). Awaiting your approval.`
-          ]
+          [hr.id, hrProvMsg]
         );
+        fcm.sendToEmployee(db, hr.id, 'Manager Approved — Your HR Approval Needed', hrProvMsg, { screen: 'more' }).catch(() => {});
       }
 
       await client.query('COMMIT');
@@ -338,15 +337,14 @@ exports.approveConfirmation = async (req, res) => {
       );
 
       // Notify the employee
+      const permConfMsg = `Your provision period is complete. You have been confirmed as a permanent employee from ${confirmDate.toLocaleDateString('en-IN')}. EL: ${prorata.el}, SL: ${prorata.sl}, CL: ${prorata.cl} credited for this month.`;
       await client.query(
         `INSERT INTO notifications (employee_id, type, title, message, is_read)
          VALUES ($1, 'provision_confirm', '🎉 Congratulations! You are now a Permanent Employee',
                  $2, FALSE)`,
-        [
-          empId,
-          `Your provision period is complete. You have been confirmed as a permanent employee from ${confirmDate.toLocaleDateString('en-IN')}. EL: ${prorata.el}, SL: ${prorata.sl}, CL: ${prorata.cl} credited for this month.`
-        ]
+        [empId, permConfMsg]
       );
+      fcm.sendToEmployee(db, empId, '🎉 You are now a Permanent Employee!', permConfMsg, { screen: 'more', channel: 'krishihr_alerts' }).catch(() => {});
 
       await client.query('COMMIT');
       return res.json({

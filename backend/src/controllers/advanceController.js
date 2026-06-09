@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/advanceController.js — COMPLETE with approval chain
 // Advance chain: Employee → Manager → COO (KC718) → MD (KC01) → HR notified
 // For direct-reports-of-COO: COO → MD → HR notified
@@ -116,6 +117,7 @@ exports.apply = async (req, res) => {
             `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'💰 Advance Request',$2,'advance')`,
             [r.id, notifMsg]
           );
+          fcm.sendToEmployee(db, r.id, '💰 Advance Request', notifMsg, { screen: 'advance' }).catch(() => {});
         }
       } catch (notifErr) {
         console.error('Advance notification error:', notifErr.message);
@@ -215,11 +217,12 @@ exports.action = async (req, res) => {
         const approverName = (req.user.first_name + ' ' + req.user.last_name).trim();
         const lvlLabel = currentLevel === 1 ? 'Manager' : currentLevel === 2 ? 'COO' : currentLevel === 3 ? 'MD' : 'Approver';
         try {
+          const reviseMsg = `Your advance request of Rs.${originalAmount.toLocaleString('en-IN')} was revised to Rs.${overrideAmt.toLocaleString('en-IN')} by ${approverName} (${lvlLabel}).${remarks ? ' Remarks: ' + remarks : ''}`;
           await client.query(
             `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'⚠️ Advance Amount Revised',$2,'advance')`,
-            [advance.employee_id,
-             `Your advance request of Rs.${originalAmount.toLocaleString('en-IN')} was revised to Rs.${overrideAmt.toLocaleString('en-IN')} by ${approverName} (${lvlLabel}).${remarks ? ' Remarks: ' + remarks : ''}`]
+            [advance.employee_id, reviseMsg]
           );
+          fcm.sendToEmployee(db, advance.employee_id, '⚠️ Advance Amount Revised', reviseMsg, { screen: 'advance', channel: 'krishihr_alerts' }).catch(() => {});
         } catch (_) {}
       }
     }
@@ -237,6 +240,7 @@ exports.action = async (req, res) => {
           `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'❌ Advance Rejected',$2,'advance')`,
           [advance.employee_id, rejMsg]
         );
+        fcm.sendToEmployee(db, advance.employee_id, '❌ Advance Rejected', rejMsg, { screen: 'advance', channel: 'krishihr_alerts' }).catch(() => {});
       } catch (_) {}
       return res.json({ success: true, message: 'Advance rejected' });
     }
@@ -271,10 +275,12 @@ exports.action = async (req, res) => {
             `SELECT id FROM employees WHERE employee_code=$1 AND is_active=true`, [nextCode]
           );
           for (const r of nextApproverRow.rows) {
+            const fwdMsg = `${info.full_name}'s advance request of ₹${advance.amount} is awaiting your approval.`;
             await db.query(
               `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'💰 Advance Request',$2,'advance')`,
-              [r.id, `${info.full_name}'s advance request of ₹${advance.amount} is awaiting your approval.`]
+              [r.id, fwdMsg]
             );
+            fcm.sendToEmployee(db, r.id, '💰 Advance Request', fwdMsg, { screen: 'advance' }).catch(() => {});
           }
         }
       } catch (_) {}
@@ -305,10 +311,12 @@ exports.action = async (req, res) => {
     emailSvc.notifyAdvanceFullyApproved(id).catch(console.error);
     // Notify employee their advance is fully approved
     try {
+      const approvedMsg = `Your advance salary request of ₹${advance.amount} has been fully approved.`;
       await db.query(
         `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'✅ Advance Approved',$2,'advance')`,
-        [advance.employee_id, `Your advance salary request of ₹${advance.amount} has been fully approved.`]
+        [advance.employee_id, approvedMsg]
       );
+      fcm.sendToEmployee(db, advance.employee_id, '✅ Advance Approved', approvedMsg, { screen: 'advance' }).catch(() => {});
     } catch (_) {}
 
     // ── Auto-record in project_expenditures when advance is fully approved ──
@@ -860,13 +868,14 @@ exports.upsertEMI = async (req, res) => {
          req.user.id]
       );
       // Notify employee
+      const loanSetupMsg = `A loan of ₹${parseFloat(loan_amount).toLocaleString('en-IN')} has been set up for you. Monthly EMI: ₹${parseFloat(monthly_emi).toLocaleString('en-IN')} × ${total_installments} installments starting ${emi_start_month}/${emi_start_year}.`;
       await client.query(
         `INSERT INTO notifications(employee_id,type,title,message)
          VALUES($1,'advance','💰 Loan/EMI Setup',
            $2)`,
-        [employee_id,
-         `A loan of ₹${parseFloat(loan_amount).toLocaleString('en-IN')} has been set up for you. Monthly EMI: ₹${parseFloat(monthly_emi).toLocaleString('en-IN')} × ${total_installments} installments starting ${emi_start_month}/${emi_start_year}.`]
+        [employee_id, loanSetupMsg]
       );
+      fcm.sendToEmployee(db, employee_id, '💰 Loan/EMI Setup', loanSetupMsg, { screen: 'advance' }).catch(() => {});
       await client.query('COMMIT');
       res.json({ success: true, message: 'EMI loan created successfully', id: r.rows[0].id });
     }
@@ -963,11 +972,12 @@ exports.markDisbursedWithEMI = async (req, res) => {
     const emp = adv.rows[0];
     const paidN = parseInt(installments_paid);
     const totalN = parseInt(total_installments);
+    const disbMsg = `Your advance of ₹${parseFloat(emp.amount).toLocaleString('en-IN')} has been disbursed. EMI: ₹${parseFloat(monthly_emi).toLocaleString('en-IN')}/month × ${totalN} installments. ${paidN > 0 ? paidN + ' installment(s) already marked paid. Remaining: ' + (totalN - paidN) + '.' : 'Starting ' + emi_start_month + '/' + emi_start_year + '.'}`;
     await client.query(
       `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance','💰 Loan Disbursed',$2)`,
-      [emp.employee_id,
-       `Your advance of ₹${parseFloat(emp.amount).toLocaleString('en-IN')} has been disbursed. EMI: ₹${parseFloat(monthly_emi).toLocaleString('en-IN')}/month × ${totalN} installments. ${paidN > 0 ? paidN + ' installment(s) already marked paid. Remaining: ' + (totalN - paidN) + '.' : 'Starting ' + emi_start_month + '/' + emi_start_year + '.'}`]
+      [emp.employee_id, disbMsg]
     ).catch(()=>{});
+    fcm.sendToEmployee(db, emp.employee_id, '💰 Loan Disbursed', disbMsg, { screen: 'advance' }).catch(() => {});
 
     await client.query('COMMIT');
     res.json({ success: true, message: `Advance marked as disbursed with ${totalN} EMI installments (${paidN} already paid)` });
@@ -1034,6 +1044,7 @@ exports.markEMIPaid = async (req, res) => {
       `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance',$2,$3)`,
       [loan.employee_id, isCleared ? '✅ Loan Cleared!' : '💳 EMI Recorded', msg]
     ).catch(()=>{});
+    fcm.sendToEmployee(db, loan.employee_id, isCleared ? '✅ Loan Cleared!' : '💳 EMI Recorded', msg, { screen: 'advance' }).catch(() => {});
 
     await client.query('COMMIT');
     res.json({

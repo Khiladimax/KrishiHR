@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/leaveController.js — COMPLETE with approval chain
 const db      = require('../config/db');
 const { getEmployeeRegion } = require('../config/regionHelper');
@@ -178,6 +179,7 @@ exports.apply = async (req, res) => {
               `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'📋 Leave Request',$2,'leave')`,
               [r.id, notifMsg]
             );
+            fcm.sendToEmployee(db, r.id, '📋 Leave Request', notifMsg, { screen: 'leaves' }).catch(() => {});
           }
         }
         // HR is NOT notified when leave is applied — only reporting manager is notified
@@ -299,14 +301,13 @@ exports.action = async (req, res) => {
       const rejectorName = `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim();
       const leaveFrom = new Date(leave.from_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
       const leaveTo   = new Date(leave.to_date).toLocaleDateString('en-IN',   { day: '2-digit', month: 'short', year: 'numeric' });
+      const rejMsg = `Your ${leave.lt_code || 'leave'} request from ${leaveFrom} to ${leaveTo} has been rejected by ${rejectorName}.${remarks ? ' Reason: ' + remarks : ''}`;
       await client.query(
         `INSERT INTO notifications(employee_id, type, title, message, is_read, expires_at)
          VALUES($1,'leave','❌ Leave Request Rejected',$2,FALSE,NOW() + INTERVAL '48 hours')`,
-        [
-          leave.employee_id,
-          `Your ${leave.lt_code || 'leave'} request from ${leaveFrom} to ${leaveTo} has been rejected by ${rejectorName}.${remarks ? ' Reason: ' + remarks : ''}`
-        ]
+        [leave.employee_id, rejMsg]
       );
+      fcm.sendToEmployee(db, leave.employee_id, '❌ Leave Request Rejected', rejMsg, { screen: 'leaves', channel: 'krishihr_alerts' }).catch(() => {});
 
       await client.query('COMMIT');
       emailSvc.notifyLeaveRejected(id, req.user.id, remarks).catch(console.error);
@@ -399,27 +400,26 @@ exports.action = async (req, res) => {
     );
     const emp = empName.rows[0];
     for (const hr of hrList.rows) {
+      const hrMsg = `${emp.first_name} ${emp.last_name} (${emp.employee_code})'s leave has been approved by manager for ${leave.days_requested} day(s) from ${leave.from_date} to ${leave.to_date}.`;
       await db.query(
         `INSERT INTO notifications(employee_id, type, title, message, is_read, expires_at)
          VALUES($1,'leave_approved','✅ Leave Approved — FYI',$2,FALSE,NOW() + INTERVAL '48 hours')`,
-        [hr.id,
-         `${emp.first_name} ${emp.last_name} (${emp.employee_code})'s leave has been approved by manager for ${leave.days_requested} day(s) from ${leave.from_date} to ${leave.to_date}.`
-        ]
+        [hr.id, hrMsg]
       );
+      fcm.sendToEmployee(db, hr.id, '✅ Leave Approved — FYI', hrMsg, { screen: 'leaves' }).catch(() => {});
     }
 
     // ── In-app notification to employee (approved) ─────────────────────────
     const approverName = `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim();
     const appFrom = new Date(leave.from_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const appTo   = new Date(leave.to_date).toLocaleDateString('en-IN',   { day: '2-digit', month: 'short', year: 'numeric' });
+    const appMsg  = `Your ${leave.lt_code || 'leave'} request from ${appFrom} to ${appTo} has been approved by ${approverName}.`;
     await db.query(
       `INSERT INTO notifications(employee_id, type, title, message, is_read, expires_at)
        VALUES($1,'leave','✅ Leave Request Approved',$2,FALSE,NOW() + INTERVAL '48 hours')`,
-      [
-        leave.employee_id,
-        `Your ${leave.lt_code || 'leave'} request from ${appFrom} to ${appTo} has been approved by ${approverName}.`
-      ]
+      [leave.employee_id, appMsg]
     );
+    fcm.sendToEmployee(db, leave.employee_id, '✅ Leave Request Approved', appMsg, { screen: 'leaves' }).catch(() => {});
 
     res.json({ success: true, message: 'Leave approved successfully' });
   } catch (err) {
@@ -1210,12 +1210,13 @@ exports.revoke = async (req, res) => {
     );
     const emp = empInfo.rows[0];
     if (emp?.mgr_id) {
+      const revokeMsg = `${emp.first_name} ${emp.last_name} (${emp.employee_code}) has revoked their approved leave from ${fromDate} to ${leave.to_date.toString().split('T')[0]}. ${reason ? 'Reason: ' + reason : ''}`;
       await client.query(
         `INSERT INTO notifications(employee_id, type, title, message, expires_at)
          VALUES($1,'leave','↩️ Leave Revoked',$2,NOW() + INTERVAL '48 hours')`,
-        [emp.mgr_id,
-         `${emp.first_name} ${emp.last_name} (${emp.employee_code}) has revoked their approved leave from ${fromDate} to ${leave.to_date.toString().split('T')[0]}. ${reason ? 'Reason: ' + reason : ''}`]
+        [emp.mgr_id, revokeMsg]
       );
+      fcm.sendToEmployee(db, emp.mgr_id, '↩️ Leave Revoked', revokeMsg, { screen: 'leaves' }).catch(() => {});
     }
 
     await client.query('COMMIT');

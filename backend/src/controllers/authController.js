@@ -251,3 +251,22 @@ exports.forgotReset = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ── FCM Token ─────────────────────────────────────────────────────────────────
+// POST /auth/fcm-token  (authenticated)
+// Android calls this on login and whenever FCM refreshes the token.
+exports.updateFcmToken = async (req, res) => {
+  try {
+    const { fcm_token } = req.body;
+    if (!fcm_token) return res.status(400).json({ success: false, message: 'fcm_token required' });
+
+    await db.query(
+      `UPDATE employees SET fcm_token = $1 WHERE id = $2`,
+      [fcm_token, req.user.id]
+    );
+    res.json({ success: true, message: 'FCM token updated' });
+  } catch (err) {
+    console.error('[FCM token update]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

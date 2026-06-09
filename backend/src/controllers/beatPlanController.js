@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/beatPlanController.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Feature #7 — Beat Plan / Journey Plan (PJP)
@@ -75,14 +76,13 @@ exports.createPlan = async (req, res) => {
     }
 
     // Notify the employee
+    const beatMsg = `Your beat plan for ${plan_date} has been ${planRes.rows[0].id ? 'updated' : 'created'} with ${(stops || []).length} stop(s).`;
     await db.query(`
       INSERT INTO notifications (employee_id, type, title, message)
       VALUES ($1, 'beat_plan', '📍 Beat Plan Assigned',
         $2)
-    `, [
-      employee_id,
-      `Your beat plan for ${plan_date} has been ${planRes.rows[0].id ? 'updated' : 'created'} with ${(stops || []).length} stop(s).`
-    ]);
+    `, [employee_id, beatMsg]);
+    fcm.sendToEmployee(db, employee_id, '📍 Beat Plan Assigned', beatMsg, { screen: 'attendance' }).catch(() => {});
 
     res.json({ success: true, message: 'Beat plan saved', plan_id: planId });
   } catch (err) {

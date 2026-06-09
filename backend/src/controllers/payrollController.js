@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/payrollController.js — COMPLETE FIX WITH DEBUGGING
 // The issue: Frontend not sending file + month/year data correctly
 
@@ -397,6 +398,7 @@ exports.uploadPayroll = async (req, res) => {
             `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance',$2,$3)`,
             [empId, isCleared ? '✅ Loan Cleared!' : '💳 EMI Deducted', notifMsg]
           ).catch(()=>{});
+          fcm.sendToEmployee(db, empId, isCleared ? '✅ Loan Cleared!' : '💳 EMI Deducted', notifMsg, { screen: 'advance' }).catch(() => {});
         }
       } catch(emiErr) { console.error('[EMI auto-record]', emiErr.message); }
 

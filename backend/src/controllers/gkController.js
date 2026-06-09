@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/gkController.js
 // Daily GK Questions + Thought of the Day
 // Scoring: +1 correct, -0.33 wrong, 0 skipped
@@ -981,12 +982,14 @@ exports.announceTop5 = async (req, res) => {
     // ── Notify ALL active employees via in-app notification ──────────────
     try {
       const allEmps = await db.query(`SELECT id FROM employees WHERE is_active = true`);
+      const gkMsg = `🏆 ${r.rows[0]?.name || 'Top performer'} topped the leaderboard! Check the announcement for full results.`;
       for (const emp of allEmps.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, type, title, message)
            VALUES($1, 'announcement', $2, $3)`,
-          [emp.id, title, `🏆 ${r.rows[0]?.name || 'Top performer'} topped the leaderboard! Check the announcement for full results.`]
+          [emp.id, title, gkMsg]
         );
+        fcm.sendToEmployee(db, emp.id, title, gkMsg, { screen: 'more' }).catch(() => {});
       }
       // ── Broadcast via Socket.IO so online users see it instantly ─────
       if (global.io) {

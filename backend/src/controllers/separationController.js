@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // separationController.js — 4-level approval flow
 // Flow: Employee submits → L1 Manager → L2 HR → L3 Accounts → L4 Admin → completed
 // Notice periods: employee=30d, tl/manager=45d, admin/hr/accounts/super_admin=90d
@@ -30,6 +31,7 @@ async function notifyByRole(client, role, title, message) {
          VALUES($1,'separation',$2,$3,NOW() + INTERVAL '48 hours')`,
         [row.id, title, message]
       );
+      fcm.sendToEmployee(db, row.id, title, message, { screen: 'more', channel: 'krishihr_alerts' }).catch(() => {});
     }
   } catch (notifErr) {
     // Notification failure must never crash the approval transaction
@@ -44,6 +46,7 @@ async function notifyEmployee(client, empId, title, message) {
        VALUES($1,'separation',$2,$3,NOW() + INTERVAL '48 hours')`,
       [empId, title, message]
     );
+    fcm.sendToEmployee(db, empId, title, message, { screen: 'more', channel: 'krishihr_alerts' }).catch(() => {});
   } catch (notifErr) {
     console.error('[notifyEmployee] Failed to notify emp:', empId, notifErr.message);
   }
@@ -695,11 +698,13 @@ exports.processLWD = async (req, res) => {
              password_hash='DEACTIVATED_' || gen_random_uuid(), updated_at=NOW() WHERE id=$4`,
         [row.last_working_date, row.type, row.reason, row.employee_id]
       );
+      const deactMsg = `Your last working day (${row.last_working_date}) has passed. Account has been deactivated.`;
       await db.query(
         `INSERT INTO notifications(employee_id, type, title, message, expires_at)
          VALUES($1,'separation','🔒 Account Deactivated',$2,NOW() + INTERVAL '48 hours')`,
-        [row.employee_id, `Your last working day (${row.last_working_date}) has passed. Account has been deactivated.`]
+        [row.employee_id, deactMsg]
       );
+      fcm.sendToEmployee(db, row.employee_id, '🔒 Account Deactivated', deactMsg, { channel: 'krishihr_alerts' }).catch(() => {});
       deactivated.push(`${row.employee_code} — ${row.first_name} ${row.last_name}`);
     }
     const msg = deactivated.length

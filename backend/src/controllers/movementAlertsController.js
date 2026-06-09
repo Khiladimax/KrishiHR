@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/movementAlertsController.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Feature #10 — Low Battery / No GPS / Tracking Silence Alerts
@@ -187,14 +188,12 @@ async function upsertAlert(emp, type, details) {
 
       if (!alreadyNotified.rows.length) {
         const emoji = { silence: '📵', low_battery: '🔋', gps_off: '📍', net_off: '📶' }[type] || '⚠️';
+        const alertTitle = `${emoji} Tracking Alert — ${emp.emp_name}`;
         await db.query(`
           INSERT INTO notifications (employee_id, type, title, message)
           VALUES ($1, 'tracking_alert', $2, $3)
-        `, [
-          emp.reporting_manager_id,
-          `${emoji} Tracking Alert — ${emp.emp_name}`,
-          details.message
-        ]);
+        `, [emp.reporting_manager_id, alertTitle, details.message]);
+        fcm.sendToEmployee(db, emp.reporting_manager_id, alertTitle, details.message, { screen: 'attendance', channel: 'krishihr_alerts' }).catch(() => {});
 
         await db.query(`
           UPDATE movement_alerts SET manager_notified = true

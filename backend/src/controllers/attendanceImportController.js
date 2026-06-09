@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/attendanceImportController.js
 // Bulk import attendance from Excel (P/A/H/LH/LWP/EL/SL/CL/OD + WFH)
 // FIXED: getMonthlyReport moved here from attendanceController.js,
@@ -214,12 +215,13 @@ exports.applyWFH = async (req, res) => {
        WHERE e.id=$1`, [empId]
     );
     if (manager.rows.length) {
+      const wfhImportMsg = `${req.user.first_name} ${req.user.last_name} has requested WFH from ${from_date} to ${to_date}. Reason: ${reason}`;
       await client.query(
         `INSERT INTO notifications(employee_id, title, message, type)
          VALUES($1,'🏠 WFH Request',$2,'wfh')`,
-        [manager.rows[0].id,
-         `${req.user.first_name} ${req.user.last_name} has requested WFH from ${from_date} to ${to_date}. Reason: ${reason}`]
+        [manager.rows[0].id, wfhImportMsg]
       );
+      fcm.sendToEmployee(db, manager.rows[0].id, '🏠 WFH Request', wfhImportMsg, { screen: 'attendance' }).catch(() => {});
     }
 
     await client.query('COMMIT');
@@ -269,13 +271,14 @@ exports.actionWFH = async (req, res) => {
       }
     }
 
+    const wfhActMsg = `Your WFH request for ${wfh.rows[0].from_date} to ${wfh.rows[0].to_date} has been ${newStatus}.${remarks ? ' Remarks: ' + remarks : ''}`;
+    const wfhActTitle = `${newStatus === 'approved' ? '✅' : '❌'} WFH Request ${newStatus}`;
     await client.query(
       `INSERT INTO notifications(employee_id, title, message, type)
        VALUES($1,$2,$3,'wfh')`,
-      [wfh.rows[0].employee_id,
-       `${newStatus === 'approved' ? '✅' : '❌'} WFH Request ${newStatus}`,
-       `Your WFH request for ${wfh.rows[0].from_date} to ${wfh.rows[0].to_date} has been ${newStatus}.${remarks ? ' Remarks: ' + remarks : ''}`]
+      [wfh.rows[0].employee_id, wfhActTitle, wfhActMsg]
     );
+    fcm.sendToEmployee(db, wfh.rows[0].employee_id, wfhActTitle, wfhActMsg, { screen: 'attendance', channel: 'krishihr_alerts' }).catch(() => {});
 
     await client.query('COMMIT');
     res.json({ success: true, message: `WFH ${newStatus}` });

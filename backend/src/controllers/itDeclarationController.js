@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/itDeclarationController.js
 // Investment Declaration + Proof Upload + HR Review
 
@@ -397,16 +398,16 @@ exports.reviewDeclaration = async (req, res) => {
     const decl = await db.query(`SELECT employee_id, financial_year FROM it_declarations WHERE id=$1`, [declId]);
     if (decl.rows.length) {
       const { employee_id, financial_year } = decl.rows[0];
+      const itTitle = action === 'approve' ? '✅ IT Declaration Approved' : '❌ IT Declaration Rejected';
+      const itMsg   = action === 'approve'
+        ? `Your IT Declaration for FY ${financial_year} has been approved.`
+        : `Your IT Declaration for FY ${financial_year} was rejected. Reason: ${comment || 'No reason given'}`;
       await db.query(
         `INSERT INTO notifications(employee_id, title, message, type)
          VALUES($1,$2,$3,'it_declaration')`,
-        [employee_id,
-         action === 'approve' ? '✅ IT Declaration Approved' : '❌ IT Declaration Rejected',
-         action === 'approve'
-           ? `Your IT Declaration for FY ${financial_year} has been approved.`
-           : `Your IT Declaration for FY ${financial_year} was rejected. Reason: ${comment || 'No reason given'}`
-        ]
+        [employee_id, itTitle, itMsg]
       );
+      fcm.sendToEmployee(db, employee_id, itTitle, itMsg, { screen: 'payroll', channel: action === 'approve' ? 'krishihr_general' : 'krishihr_alerts' }).catch(() => {});
     }
 
     res.json({ success: true, message: `Declaration ${status}` });

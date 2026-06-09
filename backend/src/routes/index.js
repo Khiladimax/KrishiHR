@@ -46,6 +46,7 @@ router.post('/auth/forgot-password/verify-pan', authCtrl.forgotVerifyPAN);
 router.post('/auth/forgot-password/reset',      authCtrl.forgotReset);
 router.get ('/auth/me',          authenticate,  authCtrl.getMe);
 router.post('/auth/change-password', authenticate, authCtrl.changePassword);
+router.post('/auth/fcm-token',   authenticate,  authCtrl.updateFcmToken);
 router.post('/auth/update-photo',     authenticate, authCtrl.updatePhoto);
 
 // ── Employees ─────────────────────────────────────────────────────────────────

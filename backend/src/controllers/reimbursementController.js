@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/reimbursementController.js
 // Approval chain: same logic as advance (Manager → COO → MD → Accounts)
 
@@ -61,6 +62,7 @@ async function notifyEmployee(employeeId, title, message) {
     `INSERT INTO notifications(employee_id,title,message,type) VALUES($1,$2,$3,'reimbursement')`,
     [employeeId, title, message]
   ).catch(() => {});
+  fcm.sendToEmployee(db, employeeId, title, message, { screen: 'reimbursement' }).catch(() => {});
 }
 async function notifyByCode(code, title, message) {
   const rows = await db.query(

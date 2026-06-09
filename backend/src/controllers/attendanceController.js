@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/attendanceController.js
 const db = require('../config/db');
 const { getEmployeeRegion } = require('../config/regionHelper');
@@ -236,13 +237,13 @@ exports.punchOut = async (req, res) => {
             );
 
             // Notify employee (no expires_at column in this table)
+            const revertMsg = `1 ${leave.lt_code} day credited back — you worked on ${today}. Remaining: ${newDays} day(s).`;
             await db.query(
               `INSERT INTO notifications(employee_id, type, title, message)
                VALUES($1,'leave',$2,$3)`,
-              [empId,
-               '✅ Leave Day Reverted',
-               `1 ${leave.lt_code} day credited back — you worked on ${today}. Remaining: ${newDays} day(s).`]
+              [empId, '✅ Leave Day Reverted', revertMsg]
             );
+            fcm.sendToEmployee(db, empId, '✅ Leave Day Reverted', revertMsg, { screen: 'leaves' }).catch(() => {});
           }
         }
       } catch (leaveErr) {
@@ -354,13 +355,13 @@ exports.punchOut = async (req, res) => {
                       ? `${holidayName} (${today})`
                       : `2nd/4th Saturday (${today})`;
 
+                  const compoffMsg = `${creditLabel} Comp Off auto-credited for working on ${occasion}. Apply it as leave anytime.`;
                   await db.query(
                     `INSERT INTO notifications(employee_id, type, title, message)
                      VALUES($1,'leave',$2,$3)`,
-                    [empId,
-                     '🔄 Comp Off Credited!',
-                     `${creditLabel} Comp Off auto-credited for working on ${occasion}. Apply it as leave anytime.`]
+                    [empId, '🔄 Comp Off Credited!', compoffMsg]
                   );
+                  fcm.sendToEmployee(db, empId, '🔄 Comp Off Credited!', compoffMsg, { screen: 'leaves' }).catch(() => {});
                 }
               }
             }
@@ -854,6 +855,7 @@ exports.requestRegularization = async (req, res) => {
            'attendance_regularization')`,
         [recipientId, notifMsg, empId, date]
       );
+      fcm.sendToEmployee(db, recipientId, '📋 Regularization Request', notifMsg, { screen: 'attendance' }).catch(() => {});
     }
 
     await client.query('COMMIT');
@@ -1043,16 +1045,13 @@ exports.actionRegularization = async (req, res) => {
     }
 
     // Notify the employee
+    const regActionMsg = `Your attendance regularization request for ${att.date} has been ${newStatus}${remarks ? '. Remarks: ' + remarks : ''}.`;
     await client.query(
       `INSERT INTO notifications(employee_id, title, message, type, reference_id, reference_type)
        VALUES($1,$2,$3,'regularization',$4,'attendance_regularization')`,
-      [
-        att.employee_id,
-        action === 'approve' ? '✅ Regularization Approved' : '❌ Regularization Rejected',
-        `Your attendance regularization request for ${att.date} has been ${newStatus}${remarks ? '. Remarks: ' + remarks : ''}.`,
-        attendance_id
-      ]
+      [att.employee_id, action === 'approve' ? '✅ Regularization Approved' : '❌ Regularization Rejected', regActionMsg, attendance_id]
     );
+    fcm.sendToEmployee(db, att.employee_id, action === 'approve' ? '✅ Regularization Approved' : '❌ Regularization Rejected', regActionMsg, { screen: 'attendance', channel: 'krishihr_alerts' }).catch(() => {});
 
     await client.query('COMMIT');
     emailSvc.notifyRegularizationActioned(att.employee_id, att.date, action, remarks, reviewerId).catch(console.error);
@@ -1224,6 +1223,7 @@ exports.applyOD = async (req, res) => {
     for (const r of notifyRows.rows) {
       await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,'🚗 OD Request',$2,'od')`,
         [r.id, notifMsg]);
+      fcm.sendToEmployee(db, r.id, '🚗 OD Request', notifMsg, { screen: 'attendance' }).catch(() => {});
     }
     await client.query('COMMIT');
     emailSvc.notifyODApplied(empId, rangeLabel, reason, location).catch(console.error);
@@ -1329,9 +1329,10 @@ exports.actionOD = async (req, res) => {
     }
     const actor = `${req.user.first_name} ${req.user.last_name}`;
     const emoji = action === 'approve' ? '✅' : '❌';
+    const odActionMsg = `Your OD request for ${rec.date} has been ${newStatus} by ${actor}.${remarks?' Remarks: '+remarks:''}`;
     await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,$2,$3,'od')`,
-      [rec.employee_id, `${emoji} OD ${newStatus}`,
-       `Your OD request for ${rec.date} has been ${newStatus} by ${actor}.${remarks?' Remarks: '+remarks:''}`]);
+      [rec.employee_id, `${emoji} OD ${newStatus}`, odActionMsg]);
+    fcm.sendToEmployee(db, rec.employee_id, `${emoji} OD ${newStatus}`, odActionMsg, { screen: 'attendance', channel: 'krishihr_alerts' }).catch(() => {});
     await client.query('COMMIT');
     emailSvc.notifyODActioned(rec.employee_id, rec.date, action, remarks, req.user.id).catch(console.error);
     res.json({ success: true, message: `OD request ${newStatus}` });
@@ -1384,6 +1385,9 @@ exports.bulkActionOD = async (req, res) => {
         [rec.employee_id, `${action==='approve'?'✅':'❌'} OD ${newStatus}`,
          `Your OD for ${rec.date} has been ${newStatus} by ${actor}.${remarks?' Remarks: '+remarks:''}`]
       );
+      fcm.sendToEmployee(db, rec.employee_id, `${action==='approve'?'✅':'❌'} OD ${newStatus}`,
+        `Your OD for ${rec.date} has been ${newStatus} by ${actor}.${remarks?' Remarks: '+remarks:''}`,
+        { screen: 'attendance', channel: 'krishihr_alerts' }).catch(() => {});
       actioned++;
     }
     await client.query('COMMIT');
@@ -1447,6 +1451,7 @@ exports.applyWFH = async (req, res) => {
     for (const r of notifyRows.rows) {
       await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,'🏠 WFH Request',$2,'wfh')`,
         [r.id, notifMsg]);
+      fcm.sendToEmployee(db, r.id, '🏠 WFH Request', notifMsg, { screen: 'attendance' }).catch(() => {});
     }
     await client.query('COMMIT');
     emailSvc.notifyWFHApplied(empId, rangeLabel, reason).catch(console.error);
@@ -1574,9 +1579,10 @@ exports.actionWFH = async (req, res) => {
     }
     const actor = `${req.user.first_name} ${req.user.last_name}`;
     const emoji = action === 'approve' ? '✅' : '❌';
+    const wfhActionMsg = `Your WFH request for ${rec.from_date} has been ${newStatus} by ${actor}.${remarks?' Remarks: '+remarks:''}`;
     await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,$2,$3,'wfh')`,
-      [rec.employee_id, `${emoji} WFH ${newStatus}`,
-       `Your WFH request for ${rec.from_date} has been ${newStatus} by ${actor}.${remarks?' Remarks: '+remarks:''}`]);
+      [rec.employee_id, `${emoji} WFH ${newStatus}`, wfhActionMsg]);
+    fcm.sendToEmployee(db, rec.employee_id, `${emoji} WFH ${newStatus}`, wfhActionMsg, { screen: 'attendance', channel: 'krishihr_alerts' }).catch(() => {});
     await client.query('COMMIT');
     emailSvc.notifyWFHActioned(rec.employee_id, rec.from_date, action, remarks, req.user.id).catch(console.error);
     res.json({ success: true, message: `WFH request ${newStatus}` });
