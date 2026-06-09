@@ -650,9 +650,9 @@ exports.assignBuffer = async (req, res) => {
       [employee_id, ruleType, req.user.id]
     );
 
-    // FIX: Also update employee_type to match
+    // Never downgrade an offsite employee — they stay offsite even if assigned an office location
     await client.query(
-      `UPDATE employees SET employee_type = $1 WHERE id = $2`,
+      `UPDATE employees SET employee_type = $1 WHERE id = $2 AND employee_type != 'offsite'`,
       [is_universal ? 'offsite' : 'onsite', employee_id]
     );
 
@@ -700,9 +700,9 @@ exports.bulkAssignBuffer = async (req, res) => {
         [eid, ruleType, req.user.id]
       );
 
-      // FIX: Sync employee_type
+      // Never downgrade an offsite employee — they stay offsite even if assigned an office location
       await client.query(
-        `UPDATE employees SET employee_type = $1 WHERE id = $2`,
+        `UPDATE employees SET employee_type = $1 WHERE id = $2 AND employee_type != 'offsite'`,
         [empType, eid]
       );
     }
@@ -805,7 +805,7 @@ exports.fixOfficeUniversal = async (req, res) => {
     for (const row of wrongRes.rows) {
       await client.query(`UPDATE employee_geofence SET is_universal = FALSE WHERE employee_id = $1 AND office_location_id = $2`, [row.employee_id, row.office_location_id]);
       await client.query(`INSERT INTO employee_buffer_rules (employee_id, rule_type, state, district, assigned_by, updated_at) VALUES ($1, 'office', NULL, NULL, $2, NOW()) ON CONFLICT (employee_id) DO UPDATE SET rule_type = 'office', state = NULL, district = NULL, assigned_by = $2, updated_at = NOW()`, [row.employee_id, req.user.id]);
-      await client.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [row.employee_id]);
+      await client.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1 AND employee_type != 'offsite'`, [row.employee_id]);
       fixed++;
     }
     await client.query("COMMIT");
@@ -1188,7 +1188,7 @@ exports.upsertBufferRule = async (req, res) => {
     // Only office→onsite, state/district→offsite mappings are automatic.
     // For universal: keep whatever employee_type they already have.
     if (rule_type === 'office') {
-      await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1`, [employee_id]);
+      await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1 AND employee_type != 'offsite'`, [employee_id]);
       // If a specific office_location_id is provided, move the employee there:
       // delete ALL old geofence rows then insert the new one so they leave Mumbai and appear under Delhi.
       const office_location_id = req.body.office_location_id;
