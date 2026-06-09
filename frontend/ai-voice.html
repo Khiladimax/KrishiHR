@@ -2071,14 +2071,11 @@ async function handleCompOff(query) {
     const recent = credits.slice(0, 3);
 
     if (anyOf(lower, ['balance','how many','left','available','compoff balance'])) {
+      const compMsg = balance > 0
+        ? '🔄 **Comp-Off Balance**\n\nAvailable: **' + balance + ' day' + (balance !== 1 ? 's' : '') + '**\n\nYou can apply for comp-off leave using your available balance.'
+        : '🔄 **Comp-Off Balance**\n\nNo comp-off balance currently. You earn comp-off by working on holidays or weekends.';
       return {
-        text: `🔄 **Comp-Off Balance**
-
-Available: **${balance} day${balance !== 1 ? 's' : ''}**${balance > 0 ? '
-
-You can apply for comp-off leave using your available balance.' : '
-
-No comp-off balance currently. You earn comp-off by working on holidays or weekends.'}`,
+        text: compMsg,
         chips: balance > 0 ? [{ label:'🌿 Apply Comp-Off', href:'leaves.html' }] : []
       };
     }
@@ -2652,5 +2649,6 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+
 
 
