@@ -1797,10 +1797,8 @@ exports.logMovement = async (req, res) => {
   try {
     const empId = req.user.id;
     const { lat, lng, accuracy, gps_status, internet_status, battery } = req.body;
-    console.log(`[PING] emp=${empId} lat=${lat} lng=${lng} acc=${accuracy} gps=${gps_status} net=${internet_status} batt=${battery}`);
 
     if (!lat || !lng) {
-      console.log(`[PING] SKIP emp=${empId} reason=no_lat_lng`);
       return res.status(400).json({ success: false, message: 'lat and lng are required' });
     }
 
@@ -1815,7 +1813,6 @@ exports.logMovement = async (req, res) => {
     // accuracy=0 means "unknown" (punch-in point) — allow it; only reject clearly bad readings
     const acc = parseFloat(accuracy) || 0;
     if (!isPunchIn && acc > 0 && acc > 500) {
-      console.log(`[PING] SKIP emp=${empId} reason=poor_accuracy acc=${acc}`);
       return res.json({ success: true, skipped: true, reason: 'poor_accuracy' });
     }
 
@@ -1835,20 +1832,16 @@ exports.logMovement = async (req, res) => {
     const hasOD     = parseInt(has_od) > 0;
     const punchedIn  = !!punch_in;
     const punchedOut = !!punch_out;
-    console.log(`[PING] emp=${empId} today=${today} hhmm=${currentHHMM} hasOD=${hasOD} punchedIn=${punchedIn} punchedOut=${punchedOut}`);
 
     if (hasOD) {
       if (currentHHMM < 930 || currentHHMM > 1830) {
-        console.log(`[PING] SKIP emp=${empId} reason=od_outside_window hhmm=${currentHHMM}`);
         return res.json({ success: true, skipped: true, reason: 'od_outside_window' });
       }
     } else {
       if (!punchedIn) {
-        console.log(`[PING] SKIP emp=${empId} reason=not_punched_in today=${today}`);
         return res.status(400).json({ success: false, message: 'Not punched in today' });
       }
       if (punchedOut) {
-        console.log(`[PING] SKIP emp=${empId} reason=punched_out`);
         return res.json({ success: true, skipped: true, reason: 'punched_out' });
       }
     }
@@ -1862,27 +1855,21 @@ exports.logMovement = async (req, res) => {
     if (lastPt.rows.length && !isPunchIn) {
       const prev = lastPt.rows[0];
       const timeDiffMs = Date.now() - new Date(prev.logged_at).getTime();
-      console.log(`[PING] emp=${empId} timeSinceLast=${Math.round(timeDiffMs/1000)}s`);
       if (timeDiffMs < 20000) {
         // 20s gate — allows 30s pings even if slightly early
-        console.log(`[PING] SKIP emp=${empId} reason=too_soon timeDiffMs=${timeDiffMs}`);
         return res.json({ success: true, skipped: true, reason: 'too_soon' });
       }
       const distKm = haversineKm(parseFloat(prev.lat), parseFloat(prev.lng), parseFloat(lat), parseFloat(lng));
       const timeDiffHrs = timeDiffMs / 3600000;
       const speedKmh = timeDiffHrs > 0 ? distKm / timeDiffHrs : 0;
       const isJitter = (distKm * 1000) < 50;
-      console.log(`[PING] emp=${empId} distM=${Math.round(distKm*1000)} speedKmh=${Math.round(speedKmh)} isJitter=${isJitter}`);
       // Only skip GPS teleport jumps (>150 km/h) — NOT stationary points
       // Stationary employees must be tracked every 30s regardless of movement
       if (!isJitter && speedKmh > 150) {
-        console.log(`[PING] SKIP emp=${empId} reason=gps_jump speedKmh=${Math.round(speedKmh)}`);
         return res.json({ success: true, skipped: true, reason: 'gps_jump' });
       }
     } else if (!lastPt.rows.length) {
-      console.log(`[PING] emp=${empId} ${isPunchIn ? 'punch-in anchor point (bypass)' : 'first point of the day'}`);
     } else {
-      console.log(`[PING] emp=${empId} punch-in anchor — bypassing time/distance gates`);
     }
 
     await db.query(
@@ -1890,7 +1877,6 @@ exports.logMovement = async (req, res) => {
        VALUES($1,$2,$3,$4,$5,$6,$7,NOW())`,
       [empId, lat, lng, acc, gpsOn, netOn, batt]
     );
-    console.log(`[PING] SAVED emp=${empId} lat=${lat} lng=${lng} acc=${acc}`);
 
     if (Math.random() < 0.02) {
       db.query(`DELETE FROM employee_movement_log WHERE logged_at < NOW() - INTERVAL '3 days'`)
@@ -2420,4 +2406,5 @@ exports.getMovementSummary = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
 
