@@ -358,11 +358,14 @@ async function loadMovementDetail(employeeId, date, empName) {
     const allMarkers   = [];
     const allBounds    = new google.maps.LatLngBounds();
 
+    // First & last verified points for START / END pins
+    const verifiedSegs = segments.filter(s => s.type === 'verified');
+    const firstSeg = verifiedSegs[0];
+    const lastSeg  = verifiedSegs[verifiedSegs.length - 1];
+
     // ── Draw each segment ─────────────────────────────────────────────────
     for (const seg of segments) {
       if (seg.type === 'verified') {
-        // Show ALL points — no distance filtering
-        // Every 30-second ping is shown in timeline even if employee is stationary
         const smoothedPts = seg.points;
         // ── BLUE solid polyline ──
         const path = smoothedPts.map(p => ({ lat: p.lat, lng: p.lng }));
@@ -380,9 +383,13 @@ async function loadMovementDetail(employeeId, date, empName) {
           if (snapped && snapped.length >= 2) poly.setPath(snapped);
         });
 
-        // Blue dot markers for intermediate points (use smoothed points — no jitter web)
+        // Blue dot markers for ALL intermediate points (no S/E pins)
         smoothedPts.forEach((pt, idx) => {
-          if (idx === 0 || idx === smoothedPts.length - 1) return; // S/E markers handle endpoints
+          // Skip first point of first seg (START pin) and last point of last seg (END/NOW pin)
+          const isGlobalFirst = seg === firstSeg && idx === 0;
+          const isGlobalLast  = seg === lastSeg  && idx === smoothedPts.length - 1;
+          if (isGlobalFirst || isGlobalLast) return;
+
           const dotEl = document.createElement('div');
           dotEl.style.cssText = 'width:10px;height:10px;border-radius:50%;background:#3b82f6;border:2px solid #fff;box-shadow:0 0 0 1.5px #3b82f6;cursor:pointer';
           const dot = new google.maps.marker.AdvancedMarkerElement({
@@ -396,24 +403,27 @@ async function loadMovementDetail(employeeId, date, empName) {
           allMarkers.push(dot);
         });
 
-        // S{n} green pin
-        allMarkers.push(makePinMarker(seg.points[0], seg.startLabel, '#16a34a', 'Tracking Started'));
-        // E{n} — red pin if ended, pulsing NOW if still live
-        if (seg.is_live) {
-          // Live segment — show single pulsing NOW marker, no red end pin
-          allMarkers.push(makeNowMarker(seg.points[seg.points.length-1]));
-        } else {
-          allMarkers.push(makePinMarker(seg.points[seg.points.length-1], seg.endLabel, '#dc2626', 'Tracking Lost'));
+        // Only show START pin on first segment's first point
+        if (seg === firstSeg) {
+          allMarkers.push(makePinMarker(seg.points[0], 'START', '#16a34a', 'Punch In — Tracking Started'));
+        }
+        // Only show END/NOW pin on last segment's last point
+        if (seg === lastSeg) {
+          if (seg.is_live) {
+            allMarkers.push(makeNowMarker(seg.points[seg.points.length - 1]));
+          } else {
+            allMarkers.push(makePinMarker(seg.points[seg.points.length - 1], 'END', '#dc2626', 'Punch Out — Tracking Ended'));
+          }
         }
 
       } else if (seg.type === 'gap') {
-        // ── ORANGE dashed polyline — Directions API ──
+        // ── ORANGE dashed polyline for tracking gap ──
         const fromPt = { lat: seg.from.lat, lng: seg.from.lng };
         const toPt   = { lat: seg.to.lat,   lng: seg.to.lng   };
         allBounds.extend(fromPt);
         allBounds.extend(toPt);
 
-        // Dashed placeholder immediately
+        // Orange dashed line
         const orangePoly = new google.maps.Polyline({
           path: [fromPt, toPt], geodesic: true,
           strokeColor: '#f97316', strokeOpacity: 0, strokeWeight: 5,
@@ -423,19 +433,19 @@ async function loadMovementDetail(employeeId, date, empName) {
         });
         allPolylines.push(orangePoly);
 
-        // Gap label
-        const mid = { lat: (seg.from.lat+seg.to.lat)/2, lng: (seg.from.lng+seg.to.lng)/2 };
-        const labelText = `⏸ Tracking Gap  ${seg.from.time_label} – ${seg.to.time_label}  (${seg.dur_label})`;
-        // Gap label removed — dashed orange line already indicates tracking gap clearly
-        // allMarkers.push(makeGapLabel(mid, labelText));
+        // Orange dot at gap start and end to mark "no location" boundaries
+        [fromPt, toPt].forEach(pt => {
+          const el = document.createElement('div');
+          el.style.cssText = 'width:12px;height:12px;border-radius:50%;background:#f97316;border:2px solid #fff;box-shadow:0 0 0 1.5px #f97316';
+          allMarkers.push(new google.maps.marker.AdvancedMarkerElement({
+            position: pt, map: _mvGoogleMap, content: el, zIndex: 6
+          }));
+        });
 
-        // Fetch Directions API bike route
+        // Fetch Directions API bike route to show estimated path
         fetchBikeRoute(fromPt, toPt, seg).then(routePath => {
           if (routePath && routePath.length >= 2) {
             orangePoly.setPath(routePath);
-            // Update label to midpoint of actual route
-            const midIdx = Math.floor(routePath.length / 2);
-            // label is already placed — position is approximate, that's fine
           }
         });
       }
