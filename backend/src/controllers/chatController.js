@@ -107,6 +107,19 @@ exports.listGroups = async (req, res) => {
       WHERE cgm.left_at IS NULL AND (cgm.deleted_at IS NULL)
       ORDER BY last_message_at DESC NULLS LAST, g.created_at DESC
     `, [empId]);
+
+    // Mark recent messages from OTHERS as delivered (this device is online & polling).
+    // Does NOT set seen_at — that only happens when the chat is opened (getMessages).
+    db.query(`
+      INSERT INTO message_delivery_status(message_id, employee_id, delivered_at)
+      SELECT cm.id, $1, NOW()
+      FROM chat_messages cm
+      JOIN chat_group_members m ON m.group_id = cm.group_id AND m.employee_id = $1 AND m.left_at IS NULL
+      WHERE cm.sender_id != $1
+        AND cm.created_at > NOW() - INTERVAL '2 days'
+      ON CONFLICT(message_id, employee_id) DO NOTHING
+    `, [empId]).catch(() => {});
+
     res.json({ success: true, data: result.rows });
   } catch (e) {
     console.error('[chat listGroups]', e.message);
@@ -1182,4 +1195,5 @@ exports.migrate = async () => {
 
   console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
 };
+
 
