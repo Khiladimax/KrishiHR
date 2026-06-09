@@ -432,10 +432,10 @@ exports.getMessages = async (req, res) => {
         CONCAT(e.first_name,' ',e.last_name) AS sender_name,
         e.employee_code AS sender_code,
         e.profile_picture AS sender_photo, e.role AS sender_role,
-        -- Delivery: seen by others?
-        (SELECT COUNT(*) FROM message_delivery_status mds
+        -- Delivery: seen by others? (cast to int — node-postgres returns COUNT as string)
+        (SELECT COUNT(*)::int FROM message_delivery_status mds
            WHERE mds.message_id=cm.id AND mds.employee_id != $1 AND mds.seen_at IS NOT NULL) AS seen_count,
-        (SELECT COUNT(*) FROM message_delivery_status mds
+        (SELECT COUNT(*)::int FROM message_delivery_status mds
            WHERE mds.message_id=cm.id AND mds.employee_id != $1 AND mds.delivered_at IS NOT NULL) AS delivered_count,
         -- Reply-to preview
         (SELECT rc.content FROM chat_messages rc WHERE rc.id=cm.reply_to_id) AS reply_content,
@@ -1195,5 +1195,6 @@ exports.migrate = async () => {
 
   console.log('✅ Chat tables migrated (v3 — ALTER TABLE safe upgrade)');
 };
+
 
 
