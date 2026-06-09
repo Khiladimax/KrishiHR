@@ -10,41 +10,45 @@ function init() {
     const admin = require('firebase-admin');
     if (admin.apps.length) {
       messaging = admin.messaging();
-      console.log('[FCM] ✅ Firebase Admin SDK already initialized.');
+      console.log('[FCM] ✅ Already initialized.');
       return;
     }
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!raw) {
-      console.warn('[FCM] ⚠️  FIREBASE_SERVICE_ACCOUNT env var not set — push disabled.');
+      console.warn('[FCM] ⚠️  FIREBASE_SERVICE_ACCOUNT not set — push disabled.');
       return;
     }
-    // Fix: Render sometimes double-escapes \n in the private_key — unescape it
     const fixed = raw.replace(/\\\\n/g, '\\n');
-    const serviceAccount = JSON.parse(fixed);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    const sa = JSON.parse(fixed);
+    admin.initializeApp({ credential: admin.credential.cert(sa) });
     messaging = admin.messaging();
-    console.log('[FCM] ✅ Firebase Admin SDK initialized. Project:', serviceAccount.project_id);
+    console.log('[FCM] ✅ Initialized. Project:', sa.project_id);
   } catch (err) {
-    console.error('[FCM] ❌ Firebase Admin SDK init FAILED:', err.message);
+    console.error('[FCM] ❌ Init FAILED:', err.message);
     messaging = null;
   }
 }
 
-/**
- * Send push notification to a single employee.
- */
 async function sendToEmployee(db, employeeId, title, body, data = {}) {
   init();
-  if (!messaging) return;
+  if (!messaging) {
+    console.warn('[FCM] sendToEmployee skipped — messaging not initialized');
+    return;
+  }
 
   try {
     const result = await db.query(
       `SELECT fcm_token FROM employees WHERE id = $1 AND fcm_token IS NOT NULL`,
       [employeeId]
     );
-    if (!result.rows.length) return;
+    if (!result.rows.length) {
+      console.log(`[FCM] No token for employee ${employeeId} — skipping push`);
+      return;
+    }
 
     const token = result.rows[0].fcm_token;
+    console.log(`[FCM] Sending "${title}" to employee ${employeeId} (token: ${token.substring(0,20)}...)`);
+
     const message = {
       token,
       notification: { title, body },
@@ -63,19 +67,18 @@ async function sendToEmployee(db, employeeId, title, body, data = {}) {
       },
     };
 
-    await messaging.send(message);
+    const msgId = await messaging.send(message);
+    console.log(`[FCM] ✅ Sent to employee ${employeeId}. Message ID: ${msgId}`);
   } catch (err) {
     if (err.code === 'messaging/registration-token-not-registered') {
+      console.warn(`[FCM] Stale token for employee ${employeeId} — clearing`);
       try { await db.query(`UPDATE employees SET fcm_token = NULL WHERE id = $1`, [employeeId]); } catch (_) {}
     } else {
-      console.warn(`[FCM] sendToEmployee(${employeeId}) failed:`, err.message);
+      console.error(`[FCM] ❌ Send failed for employee ${employeeId}:`, err.code, err.message);
     }
   }
 }
 
-/**
- * Send push to multiple employees in parallel.
- */
 async function sendToEmployees(db, employeeIds, title, body, data = {}) {
   if (!employeeIds || !employeeIds.length) return;
   await Promise.allSettled(

@@ -563,24 +563,44 @@ function makeGapLabel(pos, label) {
   });
 }
 
-// ── Road-snap a blue segment (Roads API) ──────────────────────────────────────
-async function roadSnapSegment(rawPath) {
-  if (rawPath.length < 2) return rawPath;
-  const MAX = 100, snapped = [];
-  for (let s = 0; s < rawPath.length; s += MAX) {
-    const chunk   = rawPath.slice(s, s + MAX);
-    const pathStr = chunk.map(p => `${p.lat},${p.lng}`).join('|');
+// ── Snap blue route to roads using Directions API (no billing needed) ─────────
+function roadSnapSegment(rawPath) {
+  if (rawPath.length < 2) return Promise.resolve(rawPath);
+  return new Promise(resolve => {
     try {
-      const r = await fetch(
-        `https://roads.googleapis.com/v1/snapToRoads?path=${pathStr}&interpolate=true&key=${MAPS_KEY}`
-      );
-      const d = await r.json();
-      if (d.snappedPoints?.length) {
-        d.snappedPoints.forEach(sp => snapped.push({ lat: sp.location.latitude, lng: sp.location.longitude }));
-      } else chunk.forEach(p => snapped.push(p));
-    } catch { chunk.forEach(p => snapped.push(p)); }
-  }
-  return snapped;
+      const svc = new google.maps.DirectionsService();
+      const origin      = rawPath[0];
+      const destination = rawPath[rawPath.length - 1];
+      // Up to 8 waypoints evenly spread for road accuracy
+      const waypoints = [];
+      if (rawPath.length > 2) {
+        const step = Math.max(1, Math.floor(rawPath.length / 9));
+        for (let i = step; i < rawPath.length - 1; i += step) {
+          if (waypoints.length >= 8) break;
+          waypoints.push({ location: new google.maps.LatLng(rawPath[i].lat, rawPath[i].lng), stopover: false });
+        }
+      }
+      const req = {
+        origin:      new google.maps.LatLng(origin.lat, origin.lng),
+        destination: new google.maps.LatLng(destination.lat, destination.lng),
+        waypoints,
+        travelMode:  google.maps.TravelMode.TWO_WHEELER,
+        optimizeWaypoints: false
+      };
+      svc.route(req, (result, status) => {
+        if (status === 'OK' && result.routes[0]) {
+          resolve(result.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
+        } else {
+          // Fallback to DRIVING mode
+          svc.route({ ...req, travelMode: google.maps.TravelMode.DRIVING }, (r2, s2) => {
+            if (s2 === 'OK' && r2.routes[0]) {
+              resolve(r2.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
+            } else resolve(rawPath);
+          });
+        }
+      });
+    } catch (_) { resolve(rawPath); }
+  });
 }
 
 // ── Directions API for gap (bike route) ──────────────────────────────────────
