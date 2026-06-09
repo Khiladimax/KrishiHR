@@ -1,14 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2E7D45">
-<link rel="apple-touch-icon" href="/Logo_kcms.png">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="KrishiHR"><meta name="viewport" content="width=device-width,initial-scale=1"> 
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"> 
 <title id="page-title">AI HR Assistant</title>
 <style>:root{--cfg-primary:#4a8c1c;--cfg-accent:#8dc63f;--cfg-light:#b5d400;}</style>
 <script>(function(){var t=document.getElementById('page-title');if(t)t.textContent='KrishiHR — AI Assistant';})();</script> 
@@ -2641,13 +2634,6 @@ window.addEventListener('load', () => {
     speakTTS(`${greet} ${userName}! I am your AI HR Assistant for ${companyName}. I can help you with payslips, leaves, attendance, salary, and employee contacts. How may I help you today?`);
   }, 600);
 });
-</script>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    });
-  }
 </script>
 </body>
 </html>

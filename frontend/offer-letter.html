@@ -2,13 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2E7D45">
-<link rel="apple-touch-icon" href="/Logo_kcms.png">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="KrishiHR">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Offer Letter | KrishiHR</title>
   <link rel="icon" type="image/x-icon" href="Logo.ico">
@@ -723,13 +716,6 @@ function showToast(msg) {
 
 buildSidebar('offer-letter.html');
 loadNotifBadge();
-</script>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    });
-  }
 </script>
 </body>
 </html>

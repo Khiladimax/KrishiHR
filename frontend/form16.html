@@ -1,14 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2E7D45">
-<link rel="apple-touch-icon" href="/Logo_kcms.png">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="KrishiHR"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KrishiHR - Form 16</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -399,23 +392,9 @@ function printF16() {
   var w = window.open('', '_blank', 'width=900,height=700');
   var css = '\n  @page { size: A4 portrait; margin: 10mm 10mm; }\n  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }\n  body { margin: 0; padding: 10px; font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; }\n  /* Form sections */\n  .form16-section { border: 1px solid #c8e6c9; border-radius: 8px; overflow: visible; margin-bottom: 14px; page-break-inside: auto; }\n  .form16-section-title { background: #e8f5e9; color: #1B5E20; font-weight: 700; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid #c8e6c9; text-transform: uppercase; letter-spacing: 0.5px; page-break-after: avoid; }\n  /* f16 rows */\n  .f16-row { display: flex; justify-content: space-between; padding: 5px 12px; border-bottom: 1px solid #f1f8e9; font-size: 12px; }\n  .f16-row .f16-label { color: #555; }\n  .f16-row .f16-value { font-weight: 600; }\n  .f16-row.total { background: #e8f5e9; font-weight: 700; color: #1B5E20; }\n  .f16-row.total .f16-label, .f16-row.total .f16-value { color: #1B5E20; font-size: 13px; }\n  /* table */\n  .form16-table { width: 100%; border-collapse: collapse; font-size: 11px; }\n  .form16-table th { background: #f1f8e9; color: #2E7D32; font-weight: 700; padding: 6px 8px; border: 1px solid #c8e6c9; text-align: left; }\n  .form16-table td { padding: 5px 8px; border: 1px solid #e8f5e9; }\n  .form16-table tr:nth-child(even) td { background: #f9fbe7; }\n  .form16-table tfoot tr td { background: #e8f5e9; font-weight: 700; color: #1B5E20; }\n  tr { page-break-inside: avoid; }\n  /* quarter grid */\n  .quarter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }\n  .quarter-box { background: #f9fbe7; border: 1px solid #c8e6c9; border-radius: 6px; padding: 8px 12px; }\n  .quarter-box .q-title { font-size: 11px; font-weight: 700; color: #2E7D32; margin-bottom: 4px; }\n  .quarter-box .q-row { display: flex; justify-content: space-between; font-size: 11px; color: #555; }\n  .quarter-box .q-row span:last-child { font-weight: 600; color: #1a1a1a; }\n  /* badge */\n  .badge-fy { display: inline-block; background: rgba(255,255,255,0.15); color: #fff; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid rgba(255,255,255,0.4); }\n  /* header image area */\n  img { max-width: 100%; }\n  /* no-print hidden */\n  .no-print { display: none !important; }\n';
   var html = '<!DOCTYPE html><html><head>' +
-    '<meta charset="UTF-8">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2E7D45">
-<link rel="apple-touch-icon" href="/Logo_kcms.png">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="KrishiHR"><title>Form 16</title>' +
+    '<meta charset="UTF-8"><title>Form 16</title>' +
     '<style>' + css + '</style>' +
-    '</head><body>' + el.innerHTML + '<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    });
-  }
-</script>
-</body></html>';
+    '</head><body>' + el.innerHTML + '</body></html>';
 
   w.document.open();
   w.document.write(html);
@@ -429,13 +408,6 @@ function printF16() {
   }, 1500);
 }
 
-</script>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    });
-  }
 </script>
 </body>
 </html>
