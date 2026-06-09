@@ -55,6 +55,8 @@ router.get   ('/employees/export-master',        authenticate, authorize(...EMP_
 router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin'), empCtrl.exportAttendanceRegister);
 router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
 router.get   ('/employees/contacts',      authenticate,                          empCtrl.getContacts);
+// All active employees — open to any authenticated user (for chat DM picker, employee search)
+router.get   ('/employees/for-chat',      authenticate,                          empCtrl.getAllForChat);
 router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
 router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
 router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
@@ -1004,4 +1006,5 @@ router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 
 
 module.exports = router;
+
 
