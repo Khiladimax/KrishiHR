@@ -57,18 +57,18 @@ async function getChain(employeeId) {
 }
 
 // ── Notify helper ─────────────────────────────────────────────────────────────
-async function notifyEmployee(employeeId, title, message) {
+async function notifyEmployee(employeeId, title, message, screen = 'more') {
   await db.query(
     `INSERT INTO notifications(employee_id,title,message,type) VALUES($1,$2,$3,'reimbursement')`,
     [employeeId, title, message]
   ).catch(() => {});
-  fcm.sendToEmployee(db, employeeId, title, message, { screen: 'reimbursement' }).catch(() => {});
+  fcm.sendToEmployee(db, employeeId, title, message, { screen }).catch(() => {});
 }
-async function notifyByCode(code, title, message) {
+async function notifyByCode(code, title, message, screen = 'more') {
   const rows = await db.query(
     `SELECT id FROM employees WHERE employee_code=$1 AND is_active=true`, [code]
   ).catch(() => ({ rows: [] }));
-  for (const r of rows.rows) await notifyEmployee(r.id, title, message);
+  for (const r of rows.rows) await notifyEmployee(r.id, title, message, screen);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -129,7 +129,7 @@ exports.apply = async (req, res) => {
     );
     const empName = empInfo.rows[0]?.name || 'An employee';
     await notifyByCode(chain[0], '🧾 Reimbursement Request',
-      `${empName} submitted a reimbursement of ₹${total.toLocaleString('en-IN')} — "${title}". Awaiting your approval.`);
+      `${empName} submitted a reimbursement of ₹${total.toLocaleString('en-IN')} — "${title}". Awaiting your approval.`, 'approvals');
 
     res.status(201).json({ success: true, message: 'Reimbursement submitted', data: { id: reimbId, total, chain } });
   } catch (err) {
@@ -395,7 +395,7 @@ exports.action = async (req, res) => {
       // Notify next approver
       const empName = (await db.query(`SELECT CONCAT(first_name,' ',last_name) AS n FROM employees WHERE id=$1`, [reimb.employee_id])).rows[0]?.n;
       await notifyByCode(nextCode, '🧾 Reimbursement Request',
-        `${empName}'s reimbursement "${reimb.title}" of ₹${finalApprovedAmount.toLocaleString('en-IN')} is awaiting your approval.`);
+        `${empName}'s reimbursement "${reimb.title}" of ₹${finalApprovedAmount.toLocaleString('en-IN')} is awaiting your approval.`, 'approvals');
       return res.json({ success: true, message: 'Approved. Forwarded to next approver.' });
     }
 
@@ -776,7 +776,7 @@ exports.submitDraft = async (req, res) => {
     const empName = empInfo.rows[0]?.name || 'An employee';
     const title   = existing.rows[0].title;
     await notifyByCode(chain[0], '🧾 Reimbursement Request',
-      `${empName} submitted a reimbursement of ₹${total.toLocaleString('en-IN')} — "${title}". Awaiting your approval.`);
+      `${empName} submitted a reimbursement of ₹${total.toLocaleString('en-IN')} — "${title}". Awaiting your approval.`, 'approvals');
 
     res.json({ success: true, message: 'Draft submitted successfully', data: { id, total, chain } });
   } catch (err) {

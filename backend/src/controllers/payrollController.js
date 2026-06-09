@@ -423,6 +423,11 @@ exports.uploadPayroll = async (req, res) => {
     );
     for (const row of processedEmps.rows) {
       emailSvc.notifyPayslipReleased(row.employee_id, monthName, yearNum).catch(console.error);
+      fcm.sendToEmployee(db, row.employee_id,
+        '💰 Payslip Released',
+        `Your payslip for ${monthName} ${yearNum} is ready. Tap to view.`,
+        { screen: 'payroll', channel: 'krishihr_general' }
+      ).catch(() => {});
     }
 
     res.json({

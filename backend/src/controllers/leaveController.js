@@ -307,7 +307,7 @@ exports.action = async (req, res) => {
          VALUES($1,'leave','❌ Leave Request Rejected',$2,FALSE,NOW() + INTERVAL '48 hours')`,
         [leave.employee_id, rejMsg]
       );
-      fcm.sendToEmployee(db, leave.employee_id, '❌ Leave Request Rejected', rejMsg, { screen: 'leaves', channel: 'krishihr_alerts' }).catch(() => {});
+      fcm.sendToEmployee(db, leave.employee_id, '❌ Leave Request Rejected', rejMsg, { screen: 'leave', channel: 'krishihr_alerts' }).catch(() => {});
 
       await client.query('COMMIT');
       emailSvc.notifyLeaveRejected(id, req.user.id, remarks).catch(console.error);
@@ -406,7 +406,7 @@ exports.action = async (req, res) => {
          VALUES($1,'leave_approved','✅ Leave Approved — FYI',$2,FALSE,NOW() + INTERVAL '48 hours')`,
         [hr.id, hrMsg]
       );
-      fcm.sendToEmployee(db, hr.id, '✅ Leave Approved — FYI', hrMsg, { screen: 'leaves' }).catch(() => {});
+      fcm.sendToEmployee(db, hr.id, '✅ Leave Approved — FYI', hrMsg, { screen: 'leave' }).catch(() => {});
     }
 
     // ── In-app notification to employee (approved) ─────────────────────────
@@ -419,7 +419,7 @@ exports.action = async (req, res) => {
        VALUES($1,'leave','✅ Leave Request Approved',$2,FALSE,NOW() + INTERVAL '48 hours')`,
       [leave.employee_id, appMsg]
     );
-    fcm.sendToEmployee(db, leave.employee_id, '✅ Leave Request Approved', appMsg, { screen: 'leaves' }).catch(() => {});
+    fcm.sendToEmployee(db, leave.employee_id, '✅ Leave Request Approved', appMsg, { screen: 'leave' }).catch(() => {});
 
     res.json({ success: true, message: 'Leave approved successfully' });
   } catch (err) {
@@ -1216,7 +1216,7 @@ exports.revoke = async (req, res) => {
          VALUES($1,'leave','↩️ Leave Revoked',$2,NOW() + INTERVAL '48 hours')`,
         [emp.mgr_id, revokeMsg]
       );
-      fcm.sendToEmployee(db, emp.mgr_id, '↩️ Leave Revoked', revokeMsg, { screen: 'leaves' }).catch(() => {});
+      fcm.sendToEmployee(db, emp.mgr_id, '↩️ Leave Revoked', revokeMsg, { screen: 'leave' }).catch(() => {});
     }
 
     await client.query('COMMIT');

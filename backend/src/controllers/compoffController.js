@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // compoffController.js — Comp Off Credit & Usage Management
 const db = require('../config/db');
 const { getEmployeeRegion } = require('../config/regionHelper');
@@ -100,6 +101,15 @@ exports.grantCredit = async (req, res) => {
     }
 
     await client.query('COMMIT');
+    // Push notification to employee
+    const occasion = worked_type === 'holiday'
+      ? `${holiday_name || 'holiday'} (${worked_date})`
+      : `weekend (${worked_date})`;
+    fcm.sendToEmployee(db, employee_id,
+      '🔄 Comp Off Credited!',
+      `${days} Comp Off day(s) credited for working on ${occasion}. Apply it as leave anytime.`,
+      { screen: 'leave', channel: 'krishihr_general' }
+    ).catch(() => {});
     res.json({ success: true, message: `Comp off of ${days} day(s) credited successfully`, data: result.rows[0] });
   } catch (err) {
     await client.query('ROLLBACK');

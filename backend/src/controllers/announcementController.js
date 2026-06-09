@@ -1,3 +1,4 @@
+const fcm = require('../services/fcmService');
 // src/controllers/announcementController.js — UPDATED
 // Fix 1: Like & Comment on announcements
 // Fix 2: Images stored as base64 in DB (no disk — works on Render after restarts)
@@ -45,6 +46,25 @@ exports.create = async (req, res) => {
     // Send email to all relevant employees (async)
     const emailSvc = require('../config/emailService');
     emailSvc.notifyAnnouncement(r.rows[0].id).catch(console.error);
+    // Push notification to all relevant active employees
+    try {
+      const ann = r.rows[0];
+      let empQuery = `SELECT id FROM employees WHERE is_active=true`;
+      const params = [];
+      if (target_role && target_role !== 'all') {
+        params.push(target_role);
+        empQuery += ` AND role=$${params.length}`;
+      }
+      if (department_id) {
+        params.push(department_id);
+        empQuery += ` AND department_id=$${params.length}`;
+      }
+      const emps = await db.query(empQuery, params);
+      const pushBody = ann.content?.replace(/<[^>]+>/g, '').substring(0, 100) || title;
+      for (const emp of emps.rows) {
+        fcm.sendToEmployee(db, emp.id, `📢 ${title}`, pushBody, { screen: 'more', channel: 'krishihr_general' }).catch(() => {});
+      }
+    } catch (_) {}
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

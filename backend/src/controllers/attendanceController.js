@@ -243,7 +243,7 @@ exports.punchOut = async (req, res) => {
                VALUES($1,'leave',$2,$3)`,
               [empId, '✅ Leave Day Reverted', revertMsg]
             );
-            fcm.sendToEmployee(db, empId, '✅ Leave Day Reverted', revertMsg, { screen: 'leaves' }).catch(() => {});
+            fcm.sendToEmployee(db, empId, '✅ Leave Day Reverted', revertMsg, { screen: 'leave' }).catch(() => {});
           }
         }
       } catch (leaveErr) {
@@ -361,7 +361,7 @@ exports.punchOut = async (req, res) => {
                      VALUES($1,'leave',$2,$3)`,
                     [empId, '🔄 Comp Off Credited!', compoffMsg]
                   );
-                  fcm.sendToEmployee(db, empId, '🔄 Comp Off Credited!', compoffMsg, { screen: 'leaves' }).catch(() => {});
+                  fcm.sendToEmployee(db, empId, '🔄 Comp Off Credited!', compoffMsg, { screen: 'leave' }).catch(() => {});
                 }
               }
             }
