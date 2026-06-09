@@ -527,15 +527,17 @@ function buildWelcomePills() {
 
   // Manager/TL extra pills
   const managerPills = [
-    { icon:'👥', label:'Team Attendance', query:'Team attendance today', accent: true },
-    { icon:'📝', label:'Pending Leaves',  query:'Team pending leaves',   accent: true },
-    { icon:'📊', label:'Team Members',    query:'My team members',       accent: true },
+    { icon:'👥', label:'Team Attendance',    query:'Team attendance today', accent: true },
+    { icon:'📝', label:'Pending Leaves',     query:'Team pending leaves',   accent: true },
+    { icon:'📊', label:'Team Members',       query:'My team members',       accent: true },
+    { icon:'📈', label:'Attendance Pattern', query:'Attendance pattern last 30 days', accent: true },
   ];
 
   // Admin/HR/Accounts extra pills
   const adminPills = [
     { icon:'👥', label:'Team Attendance', query:'Team attendance today', accent: true },
     { icon:'📝', label:'Leave Requests',  query:'Team pending leaves',   accent: true },
+    { icon:'📈', label:'Late Arrivals',   query:'Who is late this month', accent: true },
   ];
 
   let pills = [...base];
@@ -668,6 +670,21 @@ async function sendText(query) {
     } else if (anyOf(lower, ['notice period','resignation'])) {
       response = await handleNoticePeriod();
       chips = [{ label:'🚪 Separation', href:'separation.html' }];
+    } else if (anyOf(lower, ['it declaration','income tax','tax declaration','80c','hra','section 80','tds','tax saving','form 16','it decl','tax status','tax submitted','declare tax'])) {
+      const r = await handleITDeclaration(query);
+      response = r.text; chips = r.chips;
+    } else if (anyOf(lower, ['comp off','compoff','compensatory','comp-off','comp leave','worked on holiday','worked holiday','worked weekend'])) {
+      const r = await handleCompOff(query);
+      response = r.text; chips = r.chips;
+    } else if (anyOf(lower, ['provision','probation','confirmation','on probation','notice period confirmation','confirm my employment','provision period','probation period','probation status'])) {
+      const r = await handleProvision();
+      response = r.text; chips = r.chips;
+    } else if (anyOf(lower, ['resign','separation','full and final','fnf','last working','notice period status','separation status','my resignation','withdraw resignation'])) {
+      const r = await handleSeparation(query);
+      response = r.text; chips = r.chips;
+    } else if (isManagerUp && anyOf(lower, ['attendance pattern','who is late','late arrivals','attendance trend','frequent absent','attendance analysis','absenteeism','punctuality','late employees','who comes late','attendance insight','attendance report'])) {
+      const r = await handleAttendancePattern(query);
+      response = r.text; chips = r.chips;
     } else if (isManagerUp && anyOf(lower, ['team pending','pending leave','team leave','leave request','leave approval','approve leave','who applied leave','team leave request'])) {
       const r = await handleTeamLeaveRequests(); response = r.text; chips = r.chips;
     } else if (isManagerUp && anyOf(lower, ['my team','team member','team list','team contact','who is in my team','show my team','direct report'])) {
@@ -1965,6 +1982,425 @@ function levDist(a, b) {
   return dp[m][n];
 }
 
+// ════════ IT DECLARATION ════════════════════════════════════
+async function handleITDeclaration(query) {
+  const lower = query.toLowerCase();
+  try {
+    const res = await api('GET', '/it-declaration');
+    if (!res?.success || !res.data) {
+      return {
+        text: `📝 No IT Declaration found for this financial year, ${userName}. You can submit your tax-saving declarations on the IT Declaration page.`,
+        chips: [{ label:'📝 IT Declaration', href:'it-declaration.html' }]
+      };
+    }
+    const d = res.data;
+    const fy = d.financial_year || `${new Date().getFullYear()-1}-${new Date().getFullYear()}`;
+    const status = d.status || 'draft';
+    const statusIcon = status === 'approved' ? '✅' : status === 'submitted' ? '📤' : status === 'rejected' ? '❌' : '📝';
+    const totalDeclared = parseFloat(d.total_declared || d.total || 0);
+    const taxSaved = parseFloat(d.estimated_tax_saving || d.tax_saving || 0);
+    const deadline = d.deadline ? fmtDate(d.deadline) : 'check with HR';
+
+    // Specific section queries
+    if (anyOf(lower, ['80c','ppf','elss','insurance','nsc','tuition'])) {
+      const s80c = parseFloat(d.section_80c || 0);
+      return {
+        text: `📊 **Section 80C — FY ${fy}**
+
+Declared: ₹${fmtMoney(s80c)} / ₹1,50,000 limit
+${s80c >= 150000 ? '✅ Limit fully utilised!' : `⚠️ ₹${fmtMoney(150000 - s80c)} more can be saved`}
+
+Includes: PF contribution, LIC, ELSS, PPF, home loan principal, tuition fees.`,
+        chips: [{ label:'📝 Update Declaration', href:'it-declaration.html' }]
+      };
+    }
+    if (anyOf(lower, ['hra','house rent','rent'])) {
+      const hra = parseFloat(d.hra_exemption || d.hra || 0);
+      return {
+        text: `🏠 **HRA Exemption — FY ${fy}**
+
+Claimed: ₹${fmtMoney(hra)}
+
+To claim HRA, submit rent receipts and landlord's PAN (if rent > ₹1L/year).`,
+        chips: [{ label:'📝 IT Declaration', href:'it-declaration.html' }]
+      };
+    }
+
+    let msg = `🧾 **IT Declaration — FY ${fy}**
+
+${statusIcon} Status: **${status}**
+💰 Total Declared: ₹${fmtMoney(totalDeclared)}`;
+    if (taxSaved > 0) msg += `
+💚 Est. Tax Saving: ₹${fmtMoney(taxSaved)}`;
+    if (d.section_80c) msg += `
+📌 Section 80C: ₹${fmtMoney(d.section_80c)}`;
+    if (d.hra_exemption || d.hra) msg += `
+🏠 HRA: ₹${fmtMoney(d.hra_exemption || d.hra)}`;
+    msg += `
+📅 Deadline: ${deadline}`;
+    if (status === 'draft') msg += `
+
+⚠️ Declaration is in **draft** — submit it before the deadline!`;
+    else if (status === 'rejected') msg += `
+
+❌ Declaration was rejected. Please review and resubmit.`;
+
+    return {
+      text: msg,
+      chips: [{ label:'📝 IT Declaration', href:'it-declaration.html' }]
+    };
+  } catch(_) {
+    return {
+      text: `📝 Open the IT Declaration page to view or update your tax-saving declarations for this financial year.`,
+      chips: [{ label:'📝 IT Declaration', href:'it-declaration.html' }]
+    };
+  }
+}
+
+// ════════ COMP-OFF ════════════════════════════════════════════
+async function handleCompOff(query) {
+  const lower = query.toLowerCase();
+  try {
+    const [balRes, creditRes] = await Promise.all([
+      api('GET', '/compoff/balance'),
+      api('GET', '/compoff/credits')
+    ]);
+
+    const balance = parseFloat(balRes?.data?.balance || balRes?.data?.available || 0);
+    const credits = creditRes?.data || [];
+    const recent = credits.slice(0, 3);
+
+    if (anyOf(lower, ['balance','how many','left','available','compoff balance'])) {
+      return {
+        text: `🔄 **Comp-Off Balance**
+
+Available: **${balance} day${balance !== 1 ? 's' : ''}**${balance > 0 ? '
+
+You can apply for comp-off leave using your available balance.' : '
+
+No comp-off balance currently. You earn comp-off by working on holidays or weekends.'}`,
+        chips: balance > 0 ? [{ label:'🌿 Apply Comp-Off', href:'leaves.html' }] : []
+      };
+    }
+
+    let msg = `🔄 **Comp-Off Summary**
+
+Balance: **${balance} day${balance !== 1 ? 's' : ''}**`;
+    if (recent.length) {
+      msg += `
+
+**Recent Credits:**
+` + recent.map(c =>
+        `• ${fmtDate(c.worked_date)} — ${c.days_credited} day (${c.worked_type || 'holiday'})`
+      ).join('
+');
+    } else {
+      msg += '
+
+No comp-off credits yet. Work on a holiday or weekend to earn comp-off.';
+    }
+    return {
+      text: msg,
+      chips: [{ label:'🌿 Apply Leave', href:'leaves.html' }]
+    };
+  } catch(_) {
+    return {
+      text: `🔄 Check your comp-off balance and credits on the Leaves page.`,
+      chips: [{ label:'🌿 Leaves', href:'leaves.html' }]
+    };
+  }
+}
+
+// ════════ PROVISION / PROBATION ══════════════════════════════
+async function handleProvision() {
+  try {
+    // Employees can see their own provision status via /provision (HR sees all)
+    // For regular employees, check via /auth/me or /employees/me for provision status
+    const meRes = await api('GET', '/auth/me');
+    const emp = meRes?.data;
+
+    if (!emp) {
+      return {
+        text: `📋 Provision details not available. Please contact HR for your probation/confirmation status.`,
+        chips: []
+      };
+    }
+
+    const joining = emp.joining_date ? new Date(emp.joining_date) : null;
+    const provision = emp.provision_period_months || 6;
+    const isOnProvision = emp.is_on_provision || emp.employment_status === 'probation';
+
+    if (joining) {
+      const confirmDate = new Date(joining);
+      confirmDate.setMonth(confirmDate.getMonth() + provision);
+      const today = new Date();
+      const daysLeft = Math.ceil((confirmDate - today) / 86400000);
+
+      if (isOnProvision && daysLeft > 0) {
+        return {
+          text: `📋 **Probation Status**
+
+You are currently on probation period.
+
+📅 Joining: ${fmtDate(emp.joining_date)}
+⏱️ Probation: ${provision} months
+✅ Confirmation due: **${fmtDate(confirmDate.toISOString())}** (${daysLeft} days away)
+
+If you have questions about your confirmation, please speak with HR.`,
+          chips: []
+        };
+      } else if (!isOnProvision) {
+        return {
+          text: `✅ **Employment Status: Confirmed**
+
+${userName}, your employment is confirmed. Joined ${fmtDate(emp.joining_date)}.`,
+          chips: []
+        };
+      }
+    }
+
+    // HR/Admin: show team provision list
+    if (isPrivAdmin) {
+      const res = await api('GET', '/provision');
+      if (res?.success && res.data?.length) {
+        const onProv = res.data.filter(e => e.is_on_provision);
+        const dueSoon = onProv.filter(e => {
+          if (!e.confirmation_due) return false;
+          const days = Math.ceil((new Date(e.confirmation_due) - new Date()) / 86400000);
+          return days <= 30 && days >= 0;
+        });
+        let msg = `📋 **Provision Report**
+
+👥 On probation: **${onProv.length}** employee${onProv.length !== 1 ? 's' : ''}`;
+        if (dueSoon.length) {
+          msg += `
+⚠️ Due for confirmation in 30 days:
+` + dueSoon.map(e =>
+            `• ${e.employee_name} — ${fmtDate(e.confirmation_due)}`
+          ).join('
+');
+        }
+        return { text: msg, chips: [{ label:'📋 Provision', href:'provision.html' }] };
+      }
+    }
+
+    return {
+      text: `📋 Contact HR for your probation/confirmation details.`,
+      chips: []
+    };
+  } catch(_) {
+    return {
+      text: `📋 Provision details are managed by HR. Contact them for your confirmation status.`,
+      chips: []
+    };
+  }
+}
+
+// ════════ SEPARATION / RESIGNATION ═══════════════════════════
+async function handleSeparation(query) {
+  const lower = query.toLowerCase();
+  try {
+    const res = await api('GET', '/separations/my');
+    const seps = res?.data || [];
+
+    // Check notice period
+    const npRes = await api('GET', '/separations/notice-period');
+    const noticeDays = npRes?.success ? (npRes.data?.notice_period_days || 30) : 30;
+
+    if (anyOf(lower, ['how to resign','want to resign','i want to resign','how do i resign','resignation process','how to submit'])) {
+      return {
+        text: `🚪 **How to Resign at ${COMPANY}**
+
+1️⃣ Go to the **Separation** page
+2️⃣ Click "Submit Resignation"
+3️⃣ Select last working date (notice period: **${noticeDays} days**)
+4️⃣ Write your reason
+5️⃣ Submit — your manager will be notified
+
+📋 After submission: Manager → HR → Accounts → Admin approval flow.`,
+        chips: [{ label:'🚪 Resign', href:'separation.html' }]
+      };
+    }
+
+    if (anyOf(lower, ['notice period','how many days notice','notice days'])) {
+      return {
+        text: `📋 Your notice period is **${noticeDays} days** as per your employment contract.
+
+Your last working date = resignation date + ${noticeDays} days (subject to approval).`,
+        chips: [{ label:'🚪 Separation', href:'separation.html' }]
+      };
+    }
+
+    if (anyOf(lower, ['withdraw','cancel resignation','take back'])) {
+      const active = seps.find(s => !['completed','rejected','withdrawn'].includes(s.status));
+      if (active) {
+        return {
+          text: `📋 You have an active resignation (Status: **${active.status}**).
+
+To withdraw, go to the Separation page and click "Withdraw".`,
+          chips: [{ label:'🚪 My Resignation', href:'separation.html' }]
+        };
+      }
+      return {
+        text: `No active resignation to withdraw, ${userName}.`,
+        chips: []
+      };
+    }
+
+    if (!seps.length) {
+      return {
+        text: `No separation requests on record, ${userName}.
+
+📋 Notice period: **${noticeDays} days**
+
+To resign, go to the Separation page.`,
+        chips: [{ label:'🚪 Separation', href:'separation.html' }]
+      };
+    }
+
+    const latest = seps[0];
+    const statusIcon = { 'pending':'⏳', 'approved':'✅', 'rejected':'❌', 'completed':'🏁', 'withdrawn':'↩️' }[latest.status] || '📋';
+    let msg = `🚪 **Separation Status**
+
+${statusIcon} Status: **${latest.status}**`;
+    if (latest.last_working_date) msg += `
+📅 Last Working Day: **${fmtDate(latest.last_working_date)}**`;
+    if (latest.notice_period_days) msg += `
+⏱️ Notice Period: ${latest.notice_period_days} days`;
+    if (latest.reason) msg += `
+📝 Reason: ${latest.reason.slice(0,80)}`;
+
+    return {
+      text: msg,
+      chips: [{ label:'🚪 View Separation', href:'separation.html' }]
+    };
+  } catch(_) {
+    return {
+      text: `🚪 Check your resignation status on the Separation page.`,
+      chips: [{ label:'🚪 Separation', href:'separation.html' }]
+    };
+  }
+}
+
+// ════════ ATTENDANCE PATTERN ANALYSIS (Manager+) ═════════════
+async function handleAttendancePattern(query) {
+  const lower = query.toLowerCase();
+  try {
+    // Fetch last 30 days attendance for the team
+    const today = new Date();
+    const from = new Date(today); from.setDate(from.getDate() - 30);
+    const fromStr = from.toISOString().split('T')[0];
+    const toStr   = today.toISOString().split('T')[0];
+
+    const [teamRes, summaryRes] = await Promise.all([
+      api('GET', `/attendance?from=${fromStr}&to=${toStr}&team=true`).catch(() => null),
+      api('GET', `/attendance/summary?from=${fromStr}&to=${toStr}&team=true`).catch(() => null)
+    ]);
+
+    const records = teamRes?.data || summaryRes?.data || [];
+    if (!records.length) {
+      return {
+        text: `📊 No attendance data found for the last 30 days. Try checking the Attendance page directly.`,
+        chips: [{ label:'🕐 Attendance', href:'attendance.html' }]
+      };
+    }
+
+    // Group by employee and analyse
+    const empMap = {};
+    records.forEach(r => {
+      const id = r.employee_id || r.id;
+      const name = r.employee_name || r.name || `Emp ${id}`;
+      if (!empMap[id]) empMap[id] = { name, late: 0, absent: 0, present: 0, total: 0 };
+      empMap[id].total++;
+      const status = (r.status || '').toLowerCase();
+      if (status === 'late' || status === 'late_present') empMap[id].late++;
+      else if (status === 'absent' || !r.punch_in) empMap[id].absent++;
+      else empMap[id].present++;
+    });
+
+    const employees = Object.values(empMap);
+    const totalWorkDays = 22; // approx working days in 30 days
+
+    // Sort by most late first
+    const mostLate = [...employees].sort((a,b) => b.late - a.late).filter(e => e.late > 0).slice(0, 5);
+    const mostAbsent = [...employees].sort((a,b) => b.absent - a.absent).filter(e => e.absent > 0).slice(0, 5);
+    const totalLate = employees.reduce((s,e) => s+e.late, 0);
+    const totalAbsent = employees.reduce((s,e) => s+e.absent, 0);
+    const avgAttendance = employees.length ? ((employees.reduce((s,e) => s+e.present, 0) / employees.length)).toFixed(1) : 0;
+
+    // Specific queries
+    if (anyOf(lower, ['who is late','late arrivals','comes late','late employees','punctuality','frequent late'])) {
+      if (!mostLate.length) return { text: `✅ Great news — no late arrivals in the last 30 days!`, chips: [] };
+      const rows = mostLate.map(e => `• **${e.name}** — ${e.late} late${e.late > 1 ? 's' : ''} in 30 days`).join('
+');
+      return {
+        text: `⏰ **Late Arrivals — Last 30 Days**
+
+${rows}
+
+Total late instances across team: ${totalLate}`,
+        chips: [{ label:'🕐 Attendance Report', href:'attendance.html' }]
+      };
+    }
+
+    if (anyOf(lower, ['absent','absenteeism','who is absent','missing days'])) {
+      if (!mostAbsent.length) return { text: `✅ No absences recorded in the last 30 days!`, chips: [] };
+      const rows = mostAbsent.map(e => `• **${e.name}** — ${e.absent} absent day${e.absent > 1 ? 's' : ''}`).join('
+');
+      return {
+        text: `🔴 **Absences — Last 30 Days**
+
+${rows}
+
+Total absent days across team: ${totalAbsent}`,
+        chips: [{ label:'🕐 Attendance Report', href:'attendance.html' }]
+      };
+    }
+
+    // General attendance pattern overview
+    let msg = `📊 **Team Attendance Pattern — Last 30 Days**
+
+`;
+    msg += `👥 Team size: ${employees.length} | Avg attendance: ${avgAttendance} days
+`;
+    msg += `⏰ Total late instances: **${totalLate}**
+`;
+    msg += `🔴 Total absent days: **${totalAbsent}**
+`;
+
+    if (mostLate.length) {
+      msg += `
+⚠️ **Most Late Arrivals:**
+` + mostLate.slice(0,3).map(e => `• ${e.name} — ${e.late}x late`).join('
+');
+    }
+    if (mostAbsent.length) {
+      msg += `
+
+🔴 **Most Absences:**
+` + mostAbsent.slice(0,3).map(e => `• ${e.name} — ${e.absent} days`).join('
+');
+    }
+
+    const concerns = employees.filter(e => e.late >= 3 || e.absent >= 3);
+    if (concerns.length) {
+      msg += `
+
+⚠️ **${concerns.length} employee${concerns.length > 1 ? 's' : ''} need${concerns.length === 1 ? 's' : ''} attention** (3+ late/absent)`;
+    }
+
+    return {
+      text: msg,
+      chips: [{ label:'📊 Full Report', href:'attendance.html' }]
+    };
+  } catch(e) {
+    return {
+      text: `📊 I couldn't fetch the attendance pattern data. Try the Attendance page for full reports.`,
+      chips: [{ label:'🕐 Attendance', href:'attendance.html' }]
+    };
+  }
+}
+
 async function handleWithClaude(query) {
   const systemPrompt = `You are a helpful voice HR assistant for ${COMPANY}. Employee: ${userName} (${user?.role||'employee'}).
 Reply in 2-4 sentences max. Use plain text suitable for speech. No markdown symbols. Use "rupees" not ₹.
@@ -2216,4 +2652,5 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+
 
