@@ -2066,8 +2066,8 @@ async function handleCompOff(query) {
       api('GET', '/compoff/credits')
     ]);
 
-    const balance = parseFloat(balRes?.data?.balance || balRes?.data?.available || 0);
-    const credits = creditRes?.data || [];
+    const balance = parseFloat(balRes && balRes.data ? (balRes.data.balance || balRes.data.available || 0) : 0);
+    const credits = (creditRes && creditRes.data) ? creditRes.data : [];
     const recent = credits.slice(0, 3);
 
     if (anyOf(lower, ['balance','how many','left','available','compoff balance'])) {
@@ -2080,29 +2080,22 @@ async function handleCompOff(query) {
       };
     }
 
-    let msg = `🔄 **Comp-Off Summary**
-
-Balance: **${balance} day${balance !== 1 ? 's' : ''}**`;
+    let msg = '🔄 **Comp-Off Summary**\n\nBalance: **' + balance + ' day' + (balance !== 1 ? 's' : '') + '**';
     if (recent.length) {
-      msg += `
-
-**Recent Credits:**
-` + recent.map(c =>
-        `• ${fmtDate(c.worked_date)} — ${c.days_credited} day (${c.worked_type || 'holiday'})`
-      ).join('
-');
+      const creditLines = recent.map(function(c) {
+        return '• ' + fmtDate(c.worked_date) + ' — ' + c.days_credited + ' day (' + (c.worked_type || 'holiday') + ')';
+      });
+      msg += '\n\n**Recent Credits:**\n' + creditLines.join('\n');
     } else {
-      msg += '
-
-No comp-off credits yet. Work on a holiday or weekend to earn comp-off.';
+      msg += '\n\nNo comp-off credits yet. Work on a holiday or weekend to earn comp-off.';
     }
     return {
       text: msg,
       chips: [{ label:'🌿 Apply Leave', href:'leaves.html' }]
     };
-  } catch(_) {
+  } catch(e) {
     return {
-      text: `🔄 Check your comp-off balance and credits on the Leaves page.`,
+      text: '🔄 Check your comp-off balance and credits on the Leaves page.',
       chips: [{ label:'🌿 Leaves', href:'leaves.html' }]
     };
   }
@@ -2649,6 +2642,7 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+
 
 
 
