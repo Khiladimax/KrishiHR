@@ -1593,5 +1593,12 @@ function buildExcel(data, from, to, statusFilter) {
   toast(`✅ Excel downloaded — ${data.length} reimbursement(s), ${totalItems} item(s), ${totalApprovals} approval action(s)`);
 }
 </script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>
