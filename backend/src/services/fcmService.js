@@ -1,59 +1,50 @@
 // src/services/fcmService.js — Firebase Admin Push Notifications
-// Uses GOOGLE_APPLICATION_CREDENTIALS env var (path to serviceAccount.json)
-// OR FIREBASE_SERVICE_ACCOUNT env var (JSON string for Railway/cloud deploys)
 
-let admin = null;
+let messaging = null;
+let initialized = false;
 
-function getAdmin() {
-  if (admin) return admin;
+function init() {
+  if (initialized) return;
+  initialized = true;
   try {
-    admin = require('firebase-admin');
-    if (!admin.apps.length) {
-      let credential;
-      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        // Cloud deploy: JSON string in env var
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        credential = admin.credential.cert(serviceAccount);
-      } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-        // Local dev: path to serviceAccount.json file
-        credential = admin.credential.applicationDefault();
-      } else {
-        console.warn('[FCM] No Firebase credentials configured — push notifications disabled.');
-        return null;
-      }
-      admin.initializeApp({ credential });
-      console.log('[FCM] Firebase Admin SDK initialized.');
+    const admin = require('firebase-admin');
+    if (admin.apps.length) {
+      messaging = admin.messaging();
+      console.log('[FCM] ✅ Firebase Admin SDK already initialized.');
+      return;
     }
-    return admin;
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!raw) {
+      console.warn('[FCM] ⚠️  FIREBASE_SERVICE_ACCOUNT env var not set — push disabled.');
+      return;
+    }
+    // Fix: Render sometimes double-escapes \n in the private_key — unescape it
+    const fixed = raw.replace(/\\\\n/g, '\\n');
+    const serviceAccount = JSON.parse(fixed);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    messaging = admin.messaging();
+    console.log('[FCM] ✅ Firebase Admin SDK initialized. Project:', serviceAccount.project_id);
   } catch (err) {
-    console.warn('[FCM] firebase-admin not available:', err.message);
-    return null;
+    console.error('[FCM] ❌ Firebase Admin SDK init FAILED:', err.message);
+    messaging = null;
   }
 }
 
 /**
- * Send a push notification to a single employee.
- * Looks up the employee's fcm_token from the DB, then sends via FCM.
- *
- * @param {object} db         - pg pool instance
- * @param {number} employeeId - employee.id
- * @param {string} title      - notification title
- * @param {string} body       - notification body
- * @param {object} [data]     - optional key-value data payload (e.g. { screen: 'leaves', channel: 'krishihr_alerts' })
+ * Send push notification to a single employee.
  */
 async function sendToEmployee(db, employeeId, title, body, data = {}) {
-  const firebaseAdmin = getAdmin();
-  if (!firebaseAdmin) return; // FCM not configured — silently skip
+  init();
+  if (!messaging) return;
 
   try {
     const result = await db.query(
       `SELECT fcm_token FROM employees WHERE id = $1 AND fcm_token IS NOT NULL`,
       [employeeId]
     );
-    if (!result.rows.length) return; // No FCM token registered for this employee
+    if (!result.rows.length) return;
 
     const token = result.rows[0].fcm_token;
-
     const message = {
       token,
       notification: { title, body },
@@ -72,14 +63,10 @@ async function sendToEmployee(db, employeeId, title, body, data = {}) {
       },
     };
 
-    await firebaseAdmin.messaging().send(message);
+    await messaging.send(message);
   } catch (err) {
-    // Log but never throw — push failure should never break the main request
     if (err.code === 'messaging/registration-token-not-registered') {
-      // Token is stale — clear it
-      try {
-        await db.query(`UPDATE employees SET fcm_token = NULL WHERE id = $1`, [employeeId]);
-      } catch (_) {}
+      try { await db.query(`UPDATE employees SET fcm_token = NULL WHERE id = $1`, [employeeId]); } catch (_) {}
     } else {
       console.warn(`[FCM] sendToEmployee(${employeeId}) failed:`, err.message);
     }
@@ -87,14 +74,7 @@ async function sendToEmployee(db, employeeId, title, body, data = {}) {
 }
 
 /**
- * Send push to multiple employees at once.
- * Fires all sends in parallel (non-blocking on failure).
- *
- * @param {object}   db          - pg pool
- * @param {number[]} employeeIds - array of employee IDs
- * @param {string}   title
- * @param {string}   body
- * @param {object}   [data]
+ * Send push to multiple employees in parallel.
  */
 async function sendToEmployees(db, employeeIds, title, body, data = {}) {
   if (!employeeIds || !employeeIds.length) return;
@@ -103,4 +83,4 @@ async function sendToEmployees(db, employeeIds, title, body, data = {}) {
   );
 }
 
-module.exports = { sendToEmployee, sendToEmployees };
+module.exports = { sendToEmployee, sendToEmployees, init };

@@ -15,6 +15,8 @@ const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
 const itDeclCtrl = require('./controllers/itDeclarationController');
 const fcm        = require('./services/fcmService');
+// Initialize FCM at startup — logs success or failure immediately
+fcm.init();
 
 const app    = express();
 const server = http.createServer(app);
