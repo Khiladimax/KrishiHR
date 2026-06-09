@@ -2167,8 +2167,7 @@ ${userName}, your employment is confirmed. Joined ${fmtDate(emp.joining_date)}.`
 ⚠️ Due for confirmation in 30 days:
 ` + dueSoon.map(e =>
             `• ${e.employee_name} — ${fmtDate(e.confirmation_due)}`
-          ).join('
-');
+          ).join('\n');
         }
         return { text: msg, chips: [{ label:'📋 Provision', href:'provision.html' }] };
       }
@@ -2321,8 +2320,7 @@ async function handleAttendancePattern(query) {
     // Specific queries
     if (anyOf(lower, ['who is late','late arrivals','comes late','late employees','punctuality','frequent late'])) {
       if (!mostLate.length) return { text: `✅ Great news — no late arrivals in the last 30 days!`, chips: [] };
-      const rows = mostLate.map(e => `• **${e.name}** — ${e.late} late${e.late > 1 ? 's' : ''} in 30 days`).join('
-');
+      const rows = mostLate.map(e => `• **${e.name}** — ${e.late} late${e.late > 1 ? 's' : ''} in 30 days`).join('\n');
       return {
         text: `⏰ **Late Arrivals — Last 30 Days**
 
@@ -2335,8 +2333,7 @@ Total late instances across team: ${totalLate}`,
 
     if (anyOf(lower, ['absent','absenteeism','who is absent','missing days'])) {
       if (!mostAbsent.length) return { text: `✅ No absences recorded in the last 30 days!`, chips: [] };
-      const rows = mostAbsent.map(e => `• **${e.name}** — ${e.absent} absent day${e.absent > 1 ? 's' : ''}`).join('
-');
+      const rows = mostAbsent.map(e => `• **${e.name}** — ${e.absent} absent day${e.absent > 1 ? 's' : ''}`).join('\n');
       return {
         text: `🔴 **Absences — Last 30 Days**
 
@@ -2361,15 +2358,13 @@ Total absent days across team: ${totalAbsent}`,
     if (mostLate.length) {
       msg += `
 ⚠️ **Most Late Arrivals:**
-` + mostLate.slice(0,3).map(e => `• ${e.name} — ${e.late}x late`).join('
-');
+` + mostLate.slice(0,3).map(e => `• ${e.name} — ${e.late}x late`).join('\n');
     }
     if (mostAbsent.length) {
       msg += `
 
 🔴 **Most Absences:**
-` + mostAbsent.slice(0,3).map(e => `• ${e.name} — ${e.absent} days`).join('
-');
+` + mostAbsent.slice(0,3).map(e => `• ${e.name} — ${e.absent} days`).join('\n');
     }
 
     const concerns = employees.filter(e => e.late >= 3 || e.absent >= 3);
@@ -2642,6 +2637,7 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+
 
 
 
