@@ -769,6 +769,26 @@ async function start() {
           ALTER TABLE employees
           ADD COLUMN IF NOT EXISTS deactivation_remark TEXT DEFAULT NULL
         `).catch(() => {});
+        // ── FCM token column ──────────────────────────────────────────────
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS fcm_token TEXT`).catch(() => {});
+        // ── movement_alerts table (created here so server never errors on cold DB) ──
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS movement_alerts (
+            id            SERIAL PRIMARY KEY,
+            employee_id   INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+            alert_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+            alert_type    VARCHAR(30) NOT NULL,
+            status        VARCHAR(20) NOT NULL DEFAULT 'open',
+            details       JSONB,
+            manager_notified BOOLEAN DEFAULT FALSE,
+            resolved_at   TIMESTAMPTZ,
+            created_at    TIMESTAMPTZ DEFAULT NOW(),
+            updated_at    TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(employee_id, alert_date, alert_type)
+          )
+        `).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_emp_date ON movement_alerts(employee_id, alert_date)`).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_status ON movement_alerts(status)`).catch(() => {});
         console.log('✅ DB schema ready');
         // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
         // startup — they held DB connections and starved the pool causing login timeouts.
