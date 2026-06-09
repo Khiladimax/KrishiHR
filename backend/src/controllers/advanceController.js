@@ -117,7 +117,7 @@ exports.apply = async (req, res) => {
             `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'💰 Advance Request',$2,'advance')`,
             [r.id, notifMsg]
           );
-          fcm.sendToEmployee(db, r.id, '💰 Advance Request', notifMsg, { screen: 'advance' }).catch(() => {});
+          fcm.sendToEmployee(db, r.id, '💰 Advance Request', notifMsg, { screen: 'approvals', tab: '3' }).catch(() => {});
         }
       } catch (notifErr) {
         console.error('Advance notification error:', notifErr.message);
@@ -222,7 +222,7 @@ exports.action = async (req, res) => {
             `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'⚠️ Advance Amount Revised',$2,'advance')`,
             [advance.employee_id, reviseMsg]
           );
-          fcm.sendToEmployee(db, advance.employee_id, '⚠️ Advance Amount Revised', reviseMsg, { screen: 'advance', channel: 'krishihr_alerts' }).catch(() => {});
+          fcm.sendToEmployee(db, advance.employee_id, '⚠️ Advance Amount Revised', reviseMsg, { screen: 'more', channel: 'krishihr_alerts' }).catch(() => {});
         } catch (_) {}
       }
     }
@@ -240,7 +240,7 @@ exports.action = async (req, res) => {
           `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'❌ Advance Rejected',$2,'advance')`,
           [advance.employee_id, rejMsg]
         );
-        fcm.sendToEmployee(db, advance.employee_id, '❌ Advance Rejected', rejMsg, { screen: 'advance', channel: 'krishihr_alerts' }).catch(() => {});
+        fcm.sendToEmployee(db, advance.employee_id, '❌ Advance Rejected', rejMsg, { screen: 'more', channel: 'krishihr_alerts' }).catch(() => {});
       } catch (_) {}
       return res.json({ success: true, message: 'Advance rejected' });
     }
@@ -280,7 +280,7 @@ exports.action = async (req, res) => {
               `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'💰 Advance Request',$2,'advance')`,
               [r.id, fwdMsg]
             );
-            fcm.sendToEmployee(db, r.id, '💰 Advance Request', fwdMsg, { screen: 'advance' }).catch(() => {});
+            fcm.sendToEmployee(db, r.id, '💰 Advance Request', fwdMsg, { screen: 'approvals', tab: '3' }).catch(() => {});
           }
         }
       } catch (_) {}
@@ -316,7 +316,7 @@ exports.action = async (req, res) => {
         `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'✅ Advance Approved',$2,'advance')`,
         [advance.employee_id, approvedMsg]
       );
-      fcm.sendToEmployee(db, advance.employee_id, '✅ Advance Approved', approvedMsg, { screen: 'advance' }).catch(() => {});
+      fcm.sendToEmployee(db, advance.employee_id, '✅ Advance Approved', approvedMsg, { screen: 'more' }).catch(() => {});
     } catch (_) {}
 
     // ── Auto-record in project_expenditures when advance is fully approved ──
@@ -875,7 +875,7 @@ exports.upsertEMI = async (req, res) => {
            $2)`,
         [employee_id, loanSetupMsg]
       );
-      fcm.sendToEmployee(db, employee_id, '💰 Loan/EMI Setup', loanSetupMsg, { screen: 'advance' }).catch(() => {});
+      fcm.sendToEmployee(db, employee_id, '💰 Loan/EMI Setup', loanSetupMsg, { screen: 'more' }).catch(() => {});
       await client.query('COMMIT');
       res.json({ success: true, message: 'EMI loan created successfully', id: r.rows[0].id });
     }
@@ -977,7 +977,7 @@ exports.markDisbursedWithEMI = async (req, res) => {
       `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance','💰 Loan Disbursed',$2)`,
       [emp.employee_id, disbMsg]
     ).catch(()=>{});
-    fcm.sendToEmployee(db, emp.employee_id, '💰 Loan Disbursed', disbMsg, { screen: 'advance' }).catch(() => {});
+    fcm.sendToEmployee(db, emp.employee_id, '💰 Loan Disbursed', disbMsg, { screen: 'more' }).catch(() => {});
 
     await client.query('COMMIT');
     res.json({ success: true, message: `Advance marked as disbursed with ${totalN} EMI installments (${paidN} already paid)` });
@@ -1044,7 +1044,7 @@ exports.markEMIPaid = async (req, res) => {
       `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance',$2,$3)`,
       [loan.employee_id, isCleared ? '✅ Loan Cleared!' : '💳 EMI Recorded', msg]
     ).catch(()=>{});
-    fcm.sendToEmployee(db, loan.employee_id, isCleared ? '✅ Loan Cleared!' : '💳 EMI Recorded', msg, { screen: 'advance' }).catch(() => {});
+    fcm.sendToEmployee(db, loan.employee_id, isCleared ? '✅ Loan Cleared!' : '💳 EMI Recorded', msg, { screen: 'more' }).catch(() => {});
 
     await client.query('COMMIT');
     res.json({

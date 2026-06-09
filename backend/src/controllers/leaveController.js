@@ -179,7 +179,7 @@ exports.apply = async (req, res) => {
               `INSERT INTO notifications(employee_id, title, message, type) VALUES($1,'📋 Leave Request',$2,'leave')`,
               [r.id, notifMsg]
             );
-            fcm.sendToEmployee(db, r.id, '📋 Leave Request', notifMsg, { screen: 'leaves' }).catch(() => {});
+            fcm.sendToEmployee(db, r.id, '📋 Leave Request', notifMsg, { screen: 'approvals', tab: '0' }).catch(() => {});
           }
         }
         // HR is NOT notified when leave is applied — only reporting manager is notified

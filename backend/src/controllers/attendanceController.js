@@ -855,7 +855,7 @@ exports.requestRegularization = async (req, res) => {
            'attendance_regularization')`,
         [recipientId, notifMsg, empId, date]
       );
-      fcm.sendToEmployee(db, recipientId, '📋 Regularization Request', notifMsg, { screen: 'attendance' }).catch(() => {});
+      fcm.sendToEmployee(db, recipientId, '📋 Regularization Request', notifMsg, { screen: 'approvals', tab: '2' }).catch(() => {});
     }
 
     await client.query('COMMIT');
@@ -1223,7 +1223,7 @@ exports.applyOD = async (req, res) => {
     for (const r of notifyRows.rows) {
       await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,'🚗 OD Request',$2,'od')`,
         [r.id, notifMsg]);
-      fcm.sendToEmployee(db, r.id, '🚗 OD Request', notifMsg, { screen: 'attendance' }).catch(() => {});
+      fcm.sendToEmployee(db, r.id, '🚗 OD Request', notifMsg, { screen: 'approvals', tab: '1' }).catch(() => {});
     }
     await client.query('COMMIT');
     emailSvc.notifyODApplied(empId, rangeLabel, reason, location).catch(console.error);
@@ -1451,7 +1451,7 @@ exports.applyWFH = async (req, res) => {
     for (const r of notifyRows.rows) {
       await client.query(`INSERT INTO notifications(employee_id,title,message,type) VALUES($1,'🏠 WFH Request',$2,'wfh')`,
         [r.id, notifMsg]);
-      fcm.sendToEmployee(db, r.id, '🏠 WFH Request', notifMsg, { screen: 'attendance' }).catch(() => {});
+      fcm.sendToEmployee(db, r.id, '🏠 WFH Request', notifMsg, { screen: 'approvals', tab: '1' }).catch(() => {});
     }
     await client.query('COMMIT');
     emailSvc.notifyWFHApplied(empId, rangeLabel, reason).catch(console.error);

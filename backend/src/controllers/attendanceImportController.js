@@ -221,7 +221,7 @@ exports.applyWFH = async (req, res) => {
          VALUES($1,'🏠 WFH Request',$2,'wfh')`,
         [manager.rows[0].id, wfhImportMsg]
       );
-      fcm.sendToEmployee(db, manager.rows[0].id, '🏠 WFH Request', wfhImportMsg, { screen: 'attendance' }).catch(() => {});
+      fcm.sendToEmployee(db, manager.rows[0].id, '🏠 WFH Request', wfhImportMsg, { screen: 'approvals', tab: '1' }).catch(() => {});
     }
 
     await client.query('COMMIT');
