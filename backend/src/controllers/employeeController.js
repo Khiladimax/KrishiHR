@@ -129,6 +129,26 @@ exports.getAll = async (req, res) => {
 
 // Get Contacts — open to all authenticated users (HR, Accounts, Reporting Manager lookup)
 // Used by AI chatbot for all roles including employee/tl/manager
+// All active employees for chat DM picker — no role scoping
+exports.getAllForChat = async (req, res) => {
+  try {
+    const result = await require('../config/db').query(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
+              e.role, e.is_active, e.profile_picture,
+              d.name AS department_name, des.title AS designation_title
+       FROM employees e
+       LEFT JOIN departments  d   ON e.department_id  = d.id
+       LEFT JOIN designations des ON e.designation_id = des.id
+       WHERE e.is_active = true
+         AND NOT EXISTS (SELECT 1 FROM separations s WHERE s.employee_id=e.id AND s.status='completed')
+       ORDER BY e.first_name, e.last_name`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch(e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
 exports.getContacts = async (req, res) => {
   try {
     const { type, manager_id } = req.query;
@@ -1937,3 +1957,4 @@ exports.exportAttendanceRegister = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
