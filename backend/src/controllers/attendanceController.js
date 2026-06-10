@@ -2008,11 +2008,38 @@ exports.getMovementSegmented = async (req, res) => {
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    // ── Step 0: Drop bad initial GPS lock points ─────────────────────────────
+    // The first 1-3 points after app startup often have terrible accuracy
+    // (GPS hasn't locked yet). Drop leading points that are far from the
+    // cluster of subsequent points — they cause fake 40+ km gaps.
+    let filteredPts = [...pts];
+    if (filteredPts.length >= 4) {
+      // Check if first point is an outlier vs the next few points
+      const refPts = filteredPts.slice(1, Math.min(6, filteredPts.length));
+      const refLat = refPts.reduce((s, p) => s + p.lat, 0) / refPts.length;
+      const refLng = refPts.reduce((s, p) => s + p.lng, 0) / refPts.length;
+      let removed = 0;
+      while (filteredPts.length > 3 && removed < 3) {
+        const first = filteredPts[0];
+        const R = 6371, toRad = d => d * Math.PI / 180;
+        const dLat = toRad(refLat - first.lat), dLng = toRad(refLng - first.lng);
+        const a2 = Math.sin(dLat/2)**2 + Math.cos(toRad(first.lat))*Math.cos(toRad(refLat))*Math.sin(dLng/2)**2;
+        const distFromCluster = R * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1-a2));
+        // If first point is more than 5km from the cluster of next points, drop it
+        if (distFromCluster > 5) {
+          filteredPts.shift();
+          removed++;
+        } else break;
+      }
+      if (removed > 0) console.log(`[Segmented] Dropped ${removed} bad initial GPS point(s) (outlier distance > 5km)`);
+    }
+    const pts_clean = filteredPts;
+
     // ── Step 1: Remove GPS teleport jumps ───────────────────────────────────
-    const clean = [pts[0]];
-    for (let i = 1; i < pts.length; i++) {
+    const clean = [pts_clean[0]];
+    for (let i = 1; i < pts_clean.length; i++) {
       const prev = clean[clean.length - 1];
-      const cur  = pts[i];
+      const cur  = pts_clean[i];
       const diffMs  = cur.ts - prev.ts;
       const distKm  = havKm(prev, cur);
       const isJitter = (distKm * 1000) < 50; // < 50m = GPS noise, not real movement
