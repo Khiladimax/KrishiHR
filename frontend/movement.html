@@ -608,27 +608,28 @@ function fetchBikeRoute(from, to, seg) {
   return new Promise(resolve => {
     if (!google.maps.DirectionsService) { resolve(null); return; }
     const svc = new google.maps.DirectionsService();
-    svc.route({
-      origin: new google.maps.LatLng(from.lat, from.lng),
-      destination: new google.maps.LatLng(to.lat, to.lng),
-      travelMode: google.maps.TravelMode.TWO_WHEELER,
-      provideRouteAlternatives: false
-    }, (result, status) => {
-      if (status === 'OK' && result.routes[0]) {
-        resolve(result.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
-      } else {
-        // Fallback: DRIVING
+
+    function tryMode(travelMode) {
+      return new Promise(res => {
         svc.route({
           origin: new google.maps.LatLng(from.lat, from.lng),
           destination: new google.maps.LatLng(to.lat, to.lng),
-          travelMode: google.maps.TravelMode.DRIVING
-        }, (r2, s2) => {
-          if (s2 === 'OK' && r2.routes[0]) {
-            resolve(r2.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
-          } else resolve(null);
+          travelMode,
+          optimizeWaypoints: false
+        }, (result, status) => {
+          if (status === 'OK' && result.routes[0])
+            res(result.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
+          else res(null);
         });
-      }
-    });
+      });
+    }
+
+    // Try TWO_WHEELER → DRIVING → WALKING (most permissive for rural roads)
+    tryMode(google.maps.TravelMode.TWO_WHEELER)
+      .then(r => r || tryMode(google.maps.TravelMode.DRIVING))
+      .then(r => r || tryMode(google.maps.TravelMode.WALKING))
+      .then(r => resolve(r))
+      .catch(() => resolve(null));
   });
 }
 
