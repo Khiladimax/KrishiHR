@@ -114,6 +114,21 @@ exports.punchOut = async (req, res) => {
     if (existing.rows[0].punch_out)
       return res.status(400).json({ success: false, message: 'Already punched out today' });
 
+    // ── 5-minute cooldown: prevent punch-out within 5 minutes of punch-in ────
+    const punchInTime = existing.rows[0].punch_in; // e.g. "09:40:00"
+    const [piH, piM, piS] = punchInTime.split(':').map(Number);
+    const serverIST0 = getISTTimeParts();
+    const punchInTotalSecs  = piH * 3600 + piM * 60 + (piS || 0);
+    const serverTotalSecs   = serverIST0.hour * 3600 + serverIST0.minute * 60 + serverIST0.second;
+    const diffSecs = serverTotalSecs - punchInTotalSecs;
+    if (diffSecs < 300) { // less than 5 minutes
+      const remaining = Math.ceil((300 - diffSecs) / 60);
+      return res.status(400).json({
+        success: false,
+        message: `Please wait ${remaining} more minute${remaining > 1 ? 's' : ''} before punching out`
+      });
+    }
+
     // ── Geo-boundary validation ───────────────────────────────────────────────
     const geoCheck = await validateEmployeeBuffer(empId, location_lat, location_lng);
     if (!geoCheck.valid) {
