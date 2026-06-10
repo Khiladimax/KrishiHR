@@ -609,25 +609,37 @@ function fetchBikeRoute(from, to, seg) {
     if (!google.maps.DirectionsService) { resolve(null); return; }
     const svc = new google.maps.DirectionsService();
 
-    function tryMode(travelMode) {
-      return new Promise(res => {
-        svc.route({
-          origin: new google.maps.LatLng(from.lat, from.lng),
-          destination: new google.maps.LatLng(to.lat, to.lng),
-          travelMode,
-          optimizeWaypoints: false
-        }, (result, status) => {
-          if (status === 'OK' && result.routes[0])
-            res(result.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
+    // Calculate straight-line distance
+    const R = 6371;
+    const dLat = (to.lat - from.lat) * Math.PI / 180;
+    const dLng = (to.lng - from.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(from.lat*Math.PI/180) * Math.cos(to.lat*Math.PI/180) * Math.sin(dLng/2)**2;
+    const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    // For long gaps, add intermediate waypoints along the straight line
+    const buildWaypoints = (count) => {
+      const wps = [];
+      for (let i = 1; i < count; i++) {
+        const f = i / count;
+        wps.push({ location: new google.maps.LatLng(from.lat + (to.lat - from.lat) * f, from.lng + (to.lng - from.lng) * f), stopover: false });
+      }
+      return wps;
+    };
+
+    const wps = distKm > 30 ? buildWaypoints(Math.min(Math.floor(distKm / 15), 8)) : [];
+
+    const tryMode = (travelMode, waypoints) => new Promise(res => {
+      svc.route({ origin: new google.maps.LatLng(from.lat, from.lng), destination: new google.maps.LatLng(to.lat, to.lng), waypoints, travelMode, optimizeWaypoints: false },
+        (result, status) => {
+          if (status === 'OK' && result.routes[0]) res(result.routes[0].overview_path.map(ll => ({ lat: ll.lat(), lng: ll.lng() })));
           else res(null);
         });
-      });
-    }
+    });
 
-    // Try TWO_WHEELER → DRIVING → WALKING (most permissive for rural roads)
-    tryMode(google.maps.TravelMode.TWO_WHEELER)
-      .then(r => r || tryMode(google.maps.TravelMode.DRIVING))
-      .then(r => r || tryMode(google.maps.TravelMode.WALKING))
+    tryMode(google.maps.TravelMode.TWO_WHEELER, wps)
+      .then(r => r || tryMode(google.maps.TravelMode.DRIVING, wps))
+      .then(r => r || tryMode(google.maps.TravelMode.DRIVING, []))
+      .then(r => r || tryMode(google.maps.TravelMode.WALKING, []))
       .then(r => resolve(r))
       .catch(() => resolve(null));
   });
