@@ -219,7 +219,9 @@ exports.uploadPayroll = async (req, res) => {
     const iOtherAllow = col('other');
     const iGratuity   = col('gratuity');
     const iGross      = col('gross');
-    const iPFEmp      = col('pf');
+    const iPFEmp      = col('pf employee') !== -1 ? col('pf employee') : col('pf emp') !== -1 ? col('pf emp') : col('pf');
+    const iPFAdmin    = col('pf admin');
+    const iPFEr       = col('pf employer') !== -1 ? col('pf employer') : col('pf er');
     const iTDS        = col('tds') !== -1 ? col('tds') : col('income tax') !== -1 ? col('income tax') : col('income_tax');
     const iESIEmp     = col('esi');
     const iPT         = col('prof');
@@ -304,6 +306,8 @@ exports.uploadPayroll = async (req, res) => {
       const gratuity    = n(row[iGratuity]);
       const gross       = n(row[iGross]);
       const pfEmp       = n(row[iPFEmp]);
+      const pfAdmin     = iPFAdmin >= 0 ? n(row[iPFAdmin]) : 0;
+      const pfEr        = iPFEr    >= 0 ? n(row[iPFEr])    : 0;
       const tds         = iTDS >= 0 ? n(row[iTDS]) : 0;
       const esiEmp      = n(row[iESIEmp]);
       const pt          = n(row[iPT]);
@@ -319,17 +323,17 @@ exports.uploadPayroll = async (req, res) => {
         `INSERT INTO payroll
            (employee_id, month, year, working_days, present_days, lop_days, paid_days,
             basic, hra, conveyance, special_allowance, gratuity, gross_salary,
-            pf_employee, esi_employee, professional_tax, lwf, loan_emi_recovery, tds,
+            pf_employee, pf_employer, pf_admin, esi_employee, professional_tax, lwf, loan_emi_recovery, tds,
             total_deductions, net_salary, status, payment_date, upload_id)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
          ON CONFLICT(employee_id, month, year) DO UPDATE SET
            working_days=$4, present_days=$5, lop_days=$6, paid_days=$7,
            basic=$8, hra=$9, conveyance=$10, special_allowance=$11, gratuity=$12, gross_salary=$13,
-           pf_employee=$14, esi_employee=$15, professional_tax=$16, lwf=$17, loan_emi_recovery=$18,
-           tds=$19, total_deductions=$20, net_salary=$21, status=$22, payment_date=$23, upload_id=$24`,
+           pf_employee=$14, pf_employer=$15, pf_admin=$16, esi_employee=$17, professional_tax=$18, lwf=$19, loan_emi_recovery=$20,
+           tds=$21, total_deductions=$22, net_salary=$23, status=$24, payment_date=$25, upload_id=$26`,
         [empId, monthNum, yearNum, workDays, presentDays, lopDays, paidDays,
          basic, hra, conveyance, otherAllow, gratuity, gross,
-         pfEmp, esiEmp, pt, lwf, loanEmi, tds,
+         pfEmp, pfEr, pfAdmin, esiEmp, pt, lwf, loanEmi, tds,
          totalDed, netPay, status,
          status === 'paid' ? `${yearNum}-${String(monthNum).padStart(2,'0')}-28` : null,
          uploadId]
