@@ -163,7 +163,7 @@ body {
 
 .logo-text {
   font-family: 'DM Sans', sans-serif;
-  font-size: 16px; font-weight: 800;
+  font-size: 22px; font-weight: 800;
   letter-spacing: -.3px;
   color: #fff;
   line-height: 1.1;
@@ -172,11 +172,7 @@ body {
 .logo-text span { color: #a3d96a; }
 
 .logo-sub {
-  font-size: 8.5px;
-  color: rgba(255,255,255,.4);
-  font-weight: 500;
-  letter-spacing: .2px;
-  margin-top: 2px;
+  display: none;
 }
 
 #sidebar-nav {
@@ -752,7 +748,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 .modal-title {
   font-family: 'DM Sans', sans-serif;
-  font-size: 16px; font-weight: 800;
+  font-size: 22px; font-weight: 800;
   color: var(--text); letter-spacing: -.2px;
 }
 
@@ -824,7 +820,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 .cal-month-lbl {
   font-family: 'DM Sans', sans-serif;
-  font-size: 16px; font-weight: 800;
+  font-size: 22px; font-weight: 800;
   min-width: 165px; text-align: center;
   color: var(--text);
 }
