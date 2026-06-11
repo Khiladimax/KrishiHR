@@ -650,11 +650,7 @@ exports.assignBuffer = async (req, res) => {
       [employee_id, ruleType, req.user.id]
     );
 
-    // Never downgrade an offsite employee — they stay offsite even if assigned an office location
-    await client.query(
-      `UPDATE employees SET employee_type = $1 WHERE id = $2 AND employee_type != 'offsite'`,
-      [is_universal ? 'offsite' : 'onsite', employee_id]
-    );
+    // employee_type is managed by HR only — geofence assignment must not change it
 
     await client.query('COMMIT');
     res.json({ success: true, message: `Buffer assigned${is_universal ? ' (universal)' : ''}` });
@@ -676,7 +672,6 @@ exports.bulkAssignBuffer = async (req, res) => {
       return res.status(400).json({ success: false, message: 'employee_ids[] and office_location_id required' });
 
     const ruleType = is_universal ? 'universal' : 'office';
-    const empType  = is_universal ? 'offsite'   : 'onsite';
 
     for (const eid of employee_ids) {
       // Delete ALL old geofence rows so employee moves cleanly to the new office
@@ -700,11 +695,7 @@ exports.bulkAssignBuffer = async (req, res) => {
         [eid, ruleType, req.user.id]
       );
 
-      // Never downgrade an offsite employee — they stay offsite even if assigned an office location
-      await client.query(
-        `UPDATE employees SET employee_type = $1 WHERE id = $2 AND employee_type != 'offsite'`,
-        [empType, eid]
-      );
+      // employee_type is managed by HR only — geofence assignment must not change it
     }
     await client.query('COMMIT');
     res.json({ success: true, message: `Buffer assigned to ${employee_ids.length} employees` });
@@ -805,7 +796,7 @@ exports.fixOfficeUniversal = async (req, res) => {
     for (const row of wrongRes.rows) {
       await client.query(`UPDATE employee_geofence SET is_universal = FALSE WHERE employee_id = $1 AND office_location_id = $2`, [row.employee_id, row.office_location_id]);
       await client.query(`INSERT INTO employee_buffer_rules (employee_id, rule_type, state, district, assigned_by, updated_at) VALUES ($1, 'office', NULL, NULL, $2, NOW()) ON CONFLICT (employee_id) DO UPDATE SET rule_type = 'office', state = NULL, district = NULL, assigned_by = $2, updated_at = NOW()`, [row.employee_id, req.user.id]);
-      await client.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1 AND employee_type != 'offsite'`, [row.employee_id]);
+      // employee_type is managed by HR only — geofence assignment must not change it
       fixed++;
     }
     await client.query("COMMIT");
@@ -1188,7 +1179,7 @@ exports.upsertBufferRule = async (req, res) => {
     // Only office→onsite, state/district→offsite mappings are automatic.
     // For universal: keep whatever employee_type they already have.
     if (rule_type === 'office') {
-      await db.query(`UPDATE employees SET employee_type = 'onsite' WHERE id = $1 AND employee_type != 'offsite'`, [employee_id]);
+      // employee_type is managed by HR only — geofence assignment must not change it
       // If a specific office_location_id is provided, move the employee there:
       // delete ALL old geofence rows then insert the new one so they leave Mumbai and appear under Delhi.
       const office_location_id = req.body.office_location_id;
@@ -1201,7 +1192,7 @@ exports.upsertBufferRule = async (req, res) => {
         );
       }
     } else if (rule_type === 'state' || rule_type === 'district') {
-      await db.query(`UPDATE employees SET employee_type = 'offsite' WHERE id = $1`, [employee_id]);
+      // employee_type is managed by HR only — geofence assignment must not change it
       // Remove any stale office_location-based geofence row so the employee stops
       // appearing under the old office/district location card.
       // The new district assignment is tracked purely via employee_buffer_rules.
