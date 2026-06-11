@@ -355,22 +355,34 @@ exports.uploadPayroll = async (req, res) => {
          uploadId]
       );
 
-      // Auto-deduct loan EMI if any
-      if (loanEmi > 0) {
-        await client.query(
-          `UPDATE advance_salary
-           SET installments_paid = installments_paid + 1,
-               balance_remaining = GREATEST(0, balance_remaining - $1),
-               updated_at = NOW()
-           WHERE employee_id=$2 AND status='approved' AND balance_remaining > 0`,
-          [loanEmi, empId]
-        );
-        await client.query(
-          `UPDATE advance_salary SET status='cleared', updated_at=NOW()
-           WHERE employee_id=$1 AND status='approved' AND balance_remaining <= 0`,
+      // ── Auto-update EMI based on payroll month vs EMI start month ──
+      // installments_paid = months elapsed from emi_start to payroll month (no double increment on re-upload)
+      try {
+        const loanRes = await client.query(
+          `SELECT id, monthly_emi, total_installments, emi_start_month, emi_start_year, amount
+           FROM advance_salary
+           WHERE employee_id=$1 AND status='disbursed' AND total_installments > 0
+           ORDER BY approved_at ASC LIMIT 1`,
           [empId]
         );
-      }
+        if (loanRes.rows.length) {
+          const loan        = loanRes.rows[0];
+          const startMonth  = parseInt(loan.emi_start_month);
+          const startYear   = parseInt(loan.emi_start_year);
+          const rawPaid     = ((yearNum - startYear) * 12 + (monthNum - startMonth)) + 1;
+          const finalPaid   = Math.min(Math.max(rawPaid, 0), parseInt(loan.total_installments));
+          const balanceRem  = Math.max(0, parseFloat(loan.amount) - (finalPaid * parseFloat(loan.monthly_emi)));
+          const isCleared   = finalPaid >= parseInt(loan.total_installments);
+          await client.query(
+            `UPDATE advance_salary
+             SET installments_paid=$1, balance_remaining=$2,
+                 status=CASE WHEN $3 THEN 'cleared' ELSE 'disbursed' END,
+                 updated_at=NOW()
+             WHERE id=$4`,
+            [finalPaid, balanceRem, isCleared, loan.id]
+          );
+        }
+      } catch(emiErr) { console.error('[EMI update]', emiErr.message); }
 
       // ── Auto-record salary in project_expenditures for assigned employees ──
       try {
