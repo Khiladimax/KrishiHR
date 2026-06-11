@@ -208,27 +208,38 @@ exports.uploadPayroll = async (req, res) => {
     );
     const col = (name) => headers.findIndex(h => h.includes(name));
 
+    // Column indices mapped exactly from Excel template headers
+    // Col 0: Emp Code, Col 1: Full Name, Col 2: Present Days
+    // Col 3: Basic, Col 4: HRA, Col 5: Conveyance, Col 6: Gratuity, Col 7: Other Allowance
+    // Col 8: PF Employee, Col 9: ESI Employee, Col 10: PT, Col 11: TDS, Col 12: LWF
+    // Col 13: EMI Recovery, Col 14: Total Deductions
+    // Col 15: PF Employer, Col 16: ESI Employer, Col 17: PF Admin
+    // Col 18: Gross, Col 19: Net, Col 20: CTC/Month, Col 21: CTC/Annual
+    // Col 22: Payment Status, Col 23: Remarks
     const iEmpCode    = col('emp code') !== -1 ? col('emp code') : col('full name') !== -1 ? col('full name') : col('name');
-    const iWorkDays   = col('working');
     const iPresentDays= col('present');
+    const iWorkDays   = col('working');
     const iLOP        = col('lop');
-    const iPaidDays   = col('paid');
+    const iPaidDays   = -1; // not in template
     const iBasic      = col('basic');
     const iHRA        = col('hra');
     const iConveyance = col('conveyance') !== -1 ? col('conveyance') : col('travel');
-    const iOtherAllow = col('other');
     const iGratuity   = col('gratuity');
-    const iGross      = col('gross');
-    const iPFEmp      = col('pf employee') !== -1 ? col('pf employee') : col('pf emp') !== -1 ? col('pf emp') : col('pf');
-    const iPFAdmin    = col('pf admin');
-    const iPFEr       = col('pf employer') !== -1 ? col('pf employer') : col('pf er');
+    const iOtherAllow = col('other');
+    const iPFEmp      = col('pf employee') !== -1 ? col('pf employee') : col('pf emp');
+    const iESIEmp     = col('esi employee') !== -1 ? col('esi employee') : col('esi');
+    const iPT         = col('professional') !== -1 ? col('professional') : col('prof');
     const iTDS        = col('tds') !== -1 ? col('tds') : col('income tax') !== -1 ? col('income tax') : col('income_tax');
-    const iESIEmp     = col('esi');
-    const iPT         = col('prof');
     const iLWF        = col('lwf');
-    const iTotalDed   = col('total');
-    const iLoanEMI    = col('loan') !== -1 ? col('loan') : col('salary deduction') !== -1 ? col('salary deduction') : col('emi') !== -1 ? col('emi') : col('loan/emi');
+    const iLoanEMI    = col('emi recovery') !== -1 ? col('emi recovery') : col('loan') !== -1 ? col('loan') : col('emi');
+    const iTotalDed   = col('total emp') !== -1 ? col('total emp') : col('total');
+    const iPFEr       = col('pf employer') !== -1 ? col('pf employer') : col('pf er');
+    const iESIEr      = col('esi employer') !== -1 ? col('esi employer') : col('esi er');
+    const iPFAdmin    = col('pf admin');
+    const iGross      = col('gross');
     const iNetPay     = col('net');
+    const iCTCMonth   = col('ctc') !== -1 ? col('ctc') : col('ctc / month') !== -1 ? col('ctc / month') : -1;
+    const iCTCAnnual  = col('annual') !== -1 ? col('annual') : -1;
     const iStatus     = col('payment');
     const iRemarks    = col('remarks');
 
@@ -305,16 +316,20 @@ exports.uploadPayroll = async (req, res) => {
       const otherAllow  = n(row[iOtherAllow]);
       const gratuity    = n(row[iGratuity]);
       const gross       = n(row[iGross]);
-      const pfEmp       = n(row[iPFEmp]);
-      const pfAdmin     = iPFAdmin >= 0 ? n(row[iPFAdmin]) : 0;
-      const pfEr        = iPFEr    >= 0 ? n(row[iPFEr])    : 0;
-      const tds         = iTDS >= 0 ? n(row[iTDS]) : 0;
-      const esiEmp      = n(row[iESIEmp]);
-      const pt          = n(row[iPT]);
-      const lwf         = n(row[iLWF]);
-      const totalDed    = n(row[iTotalDed]);
-      const loanEmi     = iLoanEMI >= 0 ? n(row[iLoanEMI]) : 0;
+      // Read ALL values directly from Excel — zero auto-calculation
+      const pfEmp       = iPFEmp    >= 0 ? n(row[iPFEmp])    : 0;
+      const esiEmp      = iESIEmp   >= 0 ? n(row[iESIEmp])   : 0;
+      const pt          = iPT       >= 0 ? n(row[iPT])       : 0;
+      const tds         = iTDS      >= 0 ? n(row[iTDS])      : 0;
+      const lwf         = iLWF      >= 0 ? n(row[iLWF])      : 0;
+      const loanEmi     = iLoanEMI  >= 0 ? n(row[iLoanEMI])  : 0;
+      const totalDed    = iTotalDed >= 0 ? n(row[iTotalDed]) : 0;
+      const pfEr        = iPFEr     >= 0 ? n(row[iPFEr])     : 0;
+      const esiEr       = iESIEr    >= 0 ? n(row[iESIEr])    : 0;
+      const pfAdmin     = iPFAdmin  >= 0 ? n(row[iPFAdmin])  : 0;
       const netPay      = n(row[iNetPay]);
+      const ctcMonth    = iCTCMonth >= 0 ? n(row[iCTCMonth]) : 0;
+      const ctcAnnual   = iCTCAnnual>= 0 ? n(row[iCTCAnnual]): 0;
       const statusRaw   = String(row[iStatus] || 'paid').toLowerCase().trim();
       const status      = statusRaw === 'paid' ? 'paid' : 'pending';
 
@@ -323,18 +338,19 @@ exports.uploadPayroll = async (req, res) => {
         `INSERT INTO payroll
            (employee_id, month, year, working_days, present_days, lop_days, paid_days,
             basic, hra, conveyance, special_allowance, gratuity, gross_salary,
-            pf_employee, pf_employer, pf_admin, esi_employee, professional_tax, lwf, loan_emi_recovery, tds,
-            total_deductions, net_salary, status, payment_date, upload_id)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+            pf_employee, pf_employer, pf_admin, esi_employee, esi_employer, professional_tax, lwf, loan_emi_recovery, tds,
+            total_deductions, net_salary, ctc_monthly, status, payment_date, upload_id)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
          ON CONFLICT(employee_id, month, year) DO UPDATE SET
            working_days=$4, present_days=$5, lop_days=$6, paid_days=$7,
            basic=$8, hra=$9, conveyance=$10, special_allowance=$11, gratuity=$12, gross_salary=$13,
-           pf_employee=$14, pf_employer=$15, pf_admin=$16, esi_employee=$17, professional_tax=$18, lwf=$19, loan_emi_recovery=$20,
-           tds=$21, total_deductions=$22, net_salary=$23, status=$24, payment_date=$25, upload_id=$26`,
+           pf_employee=$14, pf_employer=$15, pf_admin=$16, esi_employee=$17, esi_employer=$18,
+           professional_tax=$19, lwf=$20, loan_emi_recovery=$21, tds=$22,
+           total_deductions=$23, net_salary=$24, ctc_monthly=$25, status=$26, payment_date=$27, upload_id=$28`,
         [empId, monthNum, yearNum, workDays, presentDays, lopDays, paidDays,
          basic, hra, conveyance, otherAllow, gratuity, gross,
-         pfEmp, pfEr, pfAdmin, esiEmp, pt, lwf, loanEmi, tds,
-         totalDed, netPay, status,
+         pfEmp, pfEr, pfAdmin, esiEmp, esiEr, pt, lwf, loanEmi, tds,
+         totalDed, netPay, ctcMonth, status,
          status === 'paid' ? `${yearNum}-${String(monthNum).padStart(2,'0')}-28` : null,
          uploadId]
       );
