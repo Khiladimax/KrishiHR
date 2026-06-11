@@ -385,46 +385,7 @@ exports.uploadPayroll = async (req, res) => {
         }
       } catch(hookErr) { console.error('[payroll.hook]', hookErr.message); }
 
-      // ── Auto-record EMI installment if employee has active loan ──────────
-      try {
-        const emiCheck = await client.query(
-          `SELECT id, monthly_emi, installments_paid, total_installments
-           FROM advance_salary
-           WHERE employee_id=$1 AND status='disbursed'
-             AND installments_paid < total_installments
-           ORDER BY approved_at ASC LIMIT 1`,
-          [empId]
-        );
-        if (emiCheck.rows.length) {
-          const loan = emiCheck.rows[0];
-          const newPaid   = parseInt(loan.installments_paid) + 1;
-          const isCleared = newPaid >= parseInt(loan.total_installments);
-          await client.query(
-            `INSERT INTO loan_recovery_log
-               (advance_id, employee_id, payroll_month, payroll_year, emi_amount, installment_no, notes)
-             VALUES($1,$2,$3,$4,$5,$6,$7)
-             ON CONFLICT(advance_id,payroll_month,payroll_year) DO NOTHING`,
-            [loan.id, empId, monthNum, yearNum, loan.monthly_emi, newPaid,
-             'Installment ' + newPaid + '/' + loan.total_installments]
-          );
-          await client.query(
-            `UPDATE advance_salary
-             SET installments_paid=$1,
-                 status=CASE WHEN $2 THEN 'cleared' ELSE status END,
-                 updated_at=NOW()
-             WHERE id=$3`,
-            [newPaid, isCleared, loan.id]
-          );
-          const notifMsg = isCleared
-            ? '🎉 Your loan is fully repaid! Final installment (' + newPaid + '/' + loan.total_installments + ') deducted from ' + monthName + ' ' + yearNum + ' salary.'
-            : '💳 EMI installment ' + newPaid + '/' + loan.total_installments + ' of ₹' + parseFloat(loan.monthly_emi).toLocaleString('en-IN') + ' deducted from ' + monthName + ' ' + yearNum + ' salary.';
-          await client.query(
-            `INSERT INTO notifications(employee_id,type,title,message) VALUES($1,'advance',$2,$3)`,
-            [empId, isCleared ? '✅ Loan Cleared!' : '💳 EMI Deducted', notifMsg]
-          ).catch(()=>{});
-          fcm.sendToEmployee(db, empId, isCleared ? '✅ Loan Cleared!' : '💳 EMI Deducted', notifMsg, { screen: 'more' }).catch(() => {});
-        }
-      } catch(emiErr) { console.error('[EMI auto-record]', emiErr.message); }
+      // EMI amount is read directly from Excel (loanEmi) — no auto installment tracking
 
       processed++;
     }
