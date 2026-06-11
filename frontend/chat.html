@@ -736,7 +736,7 @@ body { font-family: var(--font); background: #EAF7FC; color: var(--wa-text); ove
     </div>
     <div>
       <div class="logo-text-wrap">
-        <div class="logo-text" id="sidebar-logo-text"></div>
+        <div class="logo-text" id="sidebar-logo-text">Krishi<span>HR</span></div>
       </div>
     </div>
   </div>
@@ -1122,7 +1122,7 @@ if (typeof loadNotifBadge === "function") loadNotifBadge();
 if (window.CFG) {
   document.getElementById('page-title').textContent = 'KrishiHR — Chat';
   const lt = document.getElementById('sidebar-logo-text');
-  if (lt) lt.textContent = 'KrishiHR';
+  // logo text set directly in HTML
 }
 
 const token = Auth.getToken();
