@@ -125,6 +125,7 @@ exports.uploadPayroll = async (req, res) => {
 
     // ✅ Validate file
     if (!req.file) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         message: 'Excel file required. Make sure file input is included in form.' 
@@ -134,6 +135,7 @@ exports.uploadPayroll = async (req, res) => {
     // ✅ Validate month/year
     const { month, year } = req.body;
     if (!month || !year) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         message: 'month and year required in form data' 
@@ -146,6 +148,7 @@ exports.uploadPayroll = async (req, res) => {
 
     // Validate month/year ranges
     if (monthNum < 1 || monthNum > 12 || yearNum < 2020 || yearNum > 2100) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         message: 'Invalid month (1-12) or year (2020-2100)' 
@@ -158,6 +161,7 @@ exports.uploadPayroll = async (req, res) => {
       [monthNum, yearNum]
     );
     if (dup.rows.length) {
+      await client.query('ROLLBACK');
       return res.status(409).json({ 
         success: false, 
         message: `${monthName} ${yearNum} payroll already processed` 
