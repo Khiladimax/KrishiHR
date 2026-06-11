@@ -1122,11 +1122,7 @@ if (typeof loadNotifBadge === "function") loadNotifBadge();
 if (window.CFG) {
   document.getElementById('page-title').textContent = 'KrishiHR — Chat';
   const lt = document.getElementById('sidebar-logo-text');
-  
-  const cs = document.getElementById('sidebar-company-short');
-  
-  const ed = document.getElementById('sidebar-edition');
-  
+  if (lt) lt.textContent = 'KrishiHR';
 }
 
 const token = Auth.getToken();
