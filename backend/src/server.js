@@ -1030,7 +1030,7 @@ setInterval(async () => {
 
 
 
-// ── Cron: Punch-IN reminder at 10:20 AM IST (Mon–Sat) ────────────────────────
+// ── Cron: Punch-IN reminder at 10:00 AM IST (Mon–Sat) ────────────────────────
 // Notifies active employees who have NOT punched in yet today
 cron.schedule('0 10 * * 1-6', async () => {
   console.log('⏰ [Punch-IN reminder] Checking unpunched employees...');
@@ -1082,9 +1082,9 @@ cron.schedule('0 10 * * 1-6', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
-// ── Cron: Punch-OUT reminder at 7:00 PM IST (Mon–Sat) ────────────────────────
+// ── Cron: Punch-OUT reminder at 6:30 PM IST (Mon–Sat) ────────────────────────
 // Notifies employees who punched in today but have NOT punched out yet
-cron.schedule('35 18 * * 1-6', async () => {
+cron.schedule('30 18 * * 1-6', async () => {
   console.log('⏰ [Punch-OUT reminder] Checking missing punch-outs...');
   try {
     const today = new Intl.DateTimeFormat('en-CA', {
