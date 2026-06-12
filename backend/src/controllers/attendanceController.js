@@ -63,8 +63,32 @@ exports.punchIn = async (req, res) => {
 
     // ── FIX: Use IST time — Render server runs on UTC ─────────────────────────
     const ist = getISTTimeParts();
-    const isLate = ist.hour > 10 || (ist.hour === 10 && ist.minute > 30);
-    const status = isLate ? 'late' : 'present';
+    // ── Late rules (effective 2025-07-01) ─────────────────────────────────────
+    // After 10:10 → late (1 mark)   After 11:00 → late (2 marks = auto half-day candidate)
+    const RULES_EFFECTIVE = new Date('2025-07-01T00:00:00');
+    const todayDateObj = new Date(today + 'T00:00:00');
+    const applyNewRules = todayDateObj >= RULES_EFFECTIVE;
+
+    let status;
+    let lateMarks = 0; // 0, 1, or 2
+    if (applyNewRules) {
+      const afterEleven = ist.hour >= 11;
+      const afterTenTen = ist.hour > 10 || (ist.hour === 10 && ist.minute >= 10);
+      if (afterEleven) {
+        status = 'late';
+        lateMarks = 2; // counts as 2 late marks
+      } else if (afterTenTen) {
+        status = 'late';
+        lateMarks = 1;
+      } else {
+        status = 'present';
+        lateMarks = 0;
+      }
+    } else {
+      const isLate = ist.hour > 10 || (ist.hour === 10 && ist.minute > 30);
+      status = isLate ? 'late' : 'present';
+      lateMarks = isLate ? 1 : 0;
+    }
 
     const locStr = punch_in_location ||
       (location_lat && location_lng ? `GPS: ${parseFloat(location_lat).toFixed(4)},${parseFloat(location_lng).toFixed(4)}` : 'Manual');
@@ -74,19 +98,58 @@ exports.punchIn = async (req, res) => {
 
     if (existing.rows.length) {
       await db.query(
-        `UPDATE attendance SET punch_in=$1, punch_in_location=$2, status=$3, location_lat=$4, location_lng=$5
-         WHERE employee_id=$6 AND date=$7`,
-        [punchInTime, locStr, status, location_lat||null, location_lng||null, empId, today]
+        `UPDATE attendance SET punch_in=$1, punch_in_location=$2, status=$3, location_lat=$4, location_lng=$5, late_marks=$6
+         WHERE employee_id=$7 AND date=$8`,
+        [punchInTime, locStr, status, location_lat||null, location_lng||null, lateMarks, empId, today]
       );
     } else {
       await db.query(
-        `INSERT INTO attendance(employee_id, date, punch_in, punch_in_location, status, location_lat, location_lng)
-         VALUES($1,$2,$3,$4,$5,$6,$7)`,
-        [empId, today, punchInTime, locStr, status, location_lat||null, location_lng||null]
+        `INSERT INTO attendance(employee_id, date, punch_in, punch_in_location, status, location_lat, location_lng, late_marks)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [empId, today, punchInTime, locStr, status, location_lat||null, location_lng||null, lateMarks]
       );
     }
 
-    res.json({ success: true, message: `Punched in at ${punchInTime.slice(0,5)}${isLate?' (Late)':''}` });
+    // ── Auto half-day on 6th+ late mark in same month (effective July 2025) ──
+    if (applyNewRules && lateMarks > 0) {
+      try {
+        const mon = today.slice(0, 7); // "YYYY-MM"
+        const lateRes = await db.query(
+          `SELECT COALESCE(SUM(COALESCE(late_marks,1)),0) AS total_late
+           FROM attendance
+           WHERE employee_id=$1
+             AND TO_CHAR(date,'YYYY-MM')=$2
+             AND status='late'
+             AND date <= $3::date`,
+          [empId, mon, today]
+        );
+        const totalLateThisMonth = parseInt(lateRes.rows[0].total_late) || 0;
+        if (totalLateThisMonth >= 6) {
+          // 6th late mark reached → convert today to half-day
+          await db.query(
+            `UPDATE attendance SET status='half-day' WHERE employee_id=$1 AND date=$2`,
+            [empId, today]
+          );
+          status = 'half-day';
+          // Notify employee
+          await db.query(
+            `INSERT INTO notifications(employee_id, type, title, message)
+             VALUES($1,'attendance','⚠️ Auto Half-Day Marked',$2)`,
+            [empId, `You have accumulated ${totalLateThisMonth} late mark(s) this month. Today has been automatically marked as half-day.`]
+          );
+          const fcm2 = require('../services/fcmService');
+          fcm2.sendToEmployee(db, empId, '⚠️ Auto Half-Day Marked',
+            `You've reached ${totalLateThisMonth} late marks this month. Today is marked as half-day.`,
+            { screen: 'attendance', channel: 'krishihr_alerts' }
+          ).catch(() => {});
+        }
+      } catch (lateAutoErr) {
+        console.error('[AutoHalfDay] Error:', lateAutoErr.message);
+      }
+    }
+
+    const lateLabel = lateMarks === 2 ? ' (Late ×2)' : lateMarks === 1 ? ' (Late)' : '';
+    res.json({ success: true, message: `Punched in at ${punchInTime.slice(0,5)}${lateLabel}`, late_marks: lateMarks });
   } catch (err) {
     console.error('[PunchIn Error]', err.message, err.code);
     // Return specific DB errors to help debug
@@ -804,6 +867,28 @@ exports.requestRegularization = async (req, res) => {
     // Must not be a future date
     if (new Date(date) > new Date())
       return res.status(400).json({ success: false, message: 'Cannot regularize a future date' });
+
+    // ── Max 5 regularizations per month (effective July 1, 2025) ─────────────
+    const regDate = new Date(date);
+    const REG_RULES_START = new Date('2025-07-01T00:00:00');
+    if (regDate >= REG_RULES_START) {
+      const regMon = date.slice(0, 7); // "YYYY-MM"
+      const countRes = await client.query(
+        `SELECT COUNT(*) AS cnt FROM attendance
+         WHERE employee_id=$1
+           AND TO_CHAR(date,'YYYY-MM')=$2
+           AND regularization_status IN ('pending','approved')`,
+        [empId, regMon]
+      );
+      const regCount = parseInt(countRes.rows[0].cnt) || 0;
+      if (regCount >= 5) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: `You have already used ${regCount} regularization(s) this month. Maximum allowed is 5 per month.`
+        });
+      }
+    }
 
     // Check for an existing pending request for same date
     const existing = await client.query(
