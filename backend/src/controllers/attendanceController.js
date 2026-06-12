@@ -63,9 +63,10 @@ exports.punchIn = async (req, res) => {
 
     // ── FIX: Use IST time — Render server runs on UTC ─────────────────────────
     const ist = getISTTimeParts();
-    // ── Late rules (effective 2025-07-01) ─────────────────────────────────────
-    // After 10:10 → late (1 mark)   After 11:00 → late (2 marks = auto half-day candidate)
-    const RULES_EFFECTIVE = new Date('2025-07-01T00:00:00');
+    // ── Late rules (effective 2026-07-01) ─────────────────────────────────────
+    // After 10:10 → late (1 mark)   After 11:00 → late (2 marks)
+    // After 3 accumulated late marks, each additional late mark = auto half-day
+    const RULES_EFFECTIVE = new Date('2026-07-01T00:00:00');
     const todayDateObj = new Date(today + 'T00:00:00');
     const applyNewRules = todayDateObj >= RULES_EFFECTIVE;
 
@@ -110,7 +111,8 @@ exports.punchIn = async (req, res) => {
       );
     }
 
-    // ── Auto half-day on 6th+ late mark in same month (effective July 2025) ──
+    // ── Auto half-day on 4th+ late mark in same month (effective July 2026) ──
+    // First 3 late marks are allowed; from the 4th mark onwards each = auto half-day
     if (applyNewRules && lateMarks > 0) {
       try {
         const mon = today.slice(0, 7); // "YYYY-MM"
@@ -124,8 +126,8 @@ exports.punchIn = async (req, res) => {
           [empId, mon, today]
         );
         const totalLateThisMonth = parseInt(lateRes.rows[0].total_late) || 0;
-        if (totalLateThisMonth >= 6) {
-          // 6th late mark reached → convert today to half-day
+        if (totalLateThisMonth > 3) {
+          // 4th+ late mark reached → convert today to half-day
           await db.query(
             `UPDATE attendance SET status='half-day' WHERE employee_id=$1 AND date=$2`,
             [empId, today]
@@ -135,7 +137,7 @@ exports.punchIn = async (req, res) => {
           await db.query(
             `INSERT INTO notifications(employee_id, type, title, message)
              VALUES($1,'attendance','⚠️ Auto Half-Day Marked',$2)`,
-            [empId, `You have accumulated ${totalLateThisMonth} late mark(s) this month. Today has been automatically marked as half-day.`]
+            [empId, `You have accumulated ${totalLateThisMonth} late mark(s) this month (3 allowed). Today has been automatically marked as half-day.`]
           );
           const fcm2 = require('../services/fcmService');
           fcm2.sendToEmployee(db, empId, '⚠️ Auto Half-Day Marked',
@@ -264,10 +266,10 @@ exports.punchOut = async (req, res) => {
 
     // Update attendance record
     await db.query(
-      `UPDATE attendance SET punch_out=$1, punch_out_location=$2, working_hours=$3, status=$4,
-       location_lat_out=$5, location_lng_out=$6
-       WHERE employee_id=$7 AND date=$8`,
-      [punchOutTime, locStr, hoursWorked.toFixed(2), status,
+      `UPDATE attendance SET punch_out=$1, punch_out_location=$2, status=$3,
+       location_lat_out=$4, location_lng_out=$5
+       WHERE employee_id=$6 AND date=$7`,
+      [punchOutTime, locStr, status,
        location_lat||null, location_lng||null, empId, today]
     );
 
@@ -868,9 +870,9 @@ exports.requestRegularization = async (req, res) => {
     if (new Date(date) > new Date())
       return res.status(400).json({ success: false, message: 'Cannot regularize a future date' });
 
-    // ── Max 5 regularizations per month (effective July 1, 2025) ─────────────
+    // ── Max 3 regularizations per month (effective July 1, 2026) ─────────────
     const regDate = new Date(date);
-    const REG_RULES_START = new Date('2025-07-01T00:00:00');
+    const REG_RULES_START = new Date('2026-07-01T00:00:00');
     if (regDate >= REG_RULES_START) {
       const regMon = date.slice(0, 7); // "YYYY-MM"
       const countRes = await client.query(
@@ -881,11 +883,11 @@ exports.requestRegularization = async (req, res) => {
         [empId, regMon]
       );
       const regCount = parseInt(countRes.rows[0].cnt) || 0;
-      if (regCount >= 5) {
+      if (regCount >= 3) {
         await client.query('ROLLBACK');
         return res.status(400).json({
           success: false,
-          message: `You have already used ${regCount} regularization(s) this month. Maximum allowed is 5 per month.`
+          message: `You have already used ${regCount} regularization(s) this month. Maximum allowed is 3 per month.`
         });
       }
     }
@@ -1121,15 +1123,13 @@ exports.actionRegularization = async (req, res) => {
         `UPDATE attendance
          SET punch_in                  = COALESCE(regularization_punch_in,  punch_in),
              punch_out                 = COALESCE(regularization_punch_out, punch_out),
-             working_hours             = $1,
-             status                    = $2,
+             status                    = $1,
              regularization_status     = 'approved',
-             regularization_actioned_by= $3,
+             regularization_actioned_by= $2,
              regularization_actioned_at= NOW(),
-             regularization_remarks    = $4
-         WHERE id=$5`,
-        [hoursWorked > 0 ? hoursWorked.toFixed(2) : att.working_hours,
-         newAttStatus, reviewerId, remarks || null, attendance_id]
+             regularization_remarks    = $3
+         WHERE id=$4`,
+        [newAttStatus, reviewerId, remarks || null, attendance_id]
       );
     } else {
       // Reject — just update the regularization fields, leave attendance unchanged
