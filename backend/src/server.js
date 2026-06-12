@@ -773,7 +773,7 @@ async function start() {
         `).catch(() => {});
         // ── FCM token column ──────────────────────────────────────────────
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS fcm_token TEXT`).catch(() => {});
-        // ── late_marks column for new late-penalty rules (July 2025) ─────────
+        // ── late_marks column for new late-penalty rules (July 2026) ─────────
         await db.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_marks SMALLINT DEFAULT 0`).catch(() => {});
         // ── movement_alerts table (created here so server never errors on cold DB) ──
         await db.query(`
