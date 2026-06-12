@@ -773,6 +773,8 @@ async function start() {
         `).catch(() => {});
         // ── FCM token column ──────────────────────────────────────────────
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS fcm_token TEXT`).catch(() => {});
+        // ── late_marks column for new late-penalty rules (July 2025) ─────────
+        await db.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_marks SMALLINT DEFAULT 0`).catch(() => {});
         // ── movement_alerts table (created here so server never errors on cold DB) ──
         await db.query(`
           CREATE TABLE IF NOT EXISTS movement_alerts (
@@ -1030,7 +1032,7 @@ setInterval(async () => {
 
 // ── Cron: Punch-IN reminder at 10:20 AM IST (Mon–Sat) ────────────────────────
 // Notifies active employees who have NOT punched in yet today
-cron.schedule('20 10 * * 1-6', async () => {
+cron.schedule('0 10 * * 1-6', async () => {
   console.log('⏰ [Punch-IN reminder] Checking unpunched employees...');
   try {
     const today = new Intl.DateTimeFormat('en-CA', {
@@ -1082,7 +1084,7 @@ cron.schedule('20 10 * * 1-6', async () => {
 
 // ── Cron: Punch-OUT reminder at 7:00 PM IST (Mon–Sat) ────────────────────────
 // Notifies employees who punched in today but have NOT punched out yet
-cron.schedule('0 19 * * 1-6', async () => {
+cron.schedule('35 18 * * 1-6', async () => {
   console.log('⏰ [Punch-OUT reminder] Checking missing punch-outs...');
   try {
     const today = new Intl.DateTimeFormat('en-CA', {
