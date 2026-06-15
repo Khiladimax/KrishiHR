@@ -294,6 +294,26 @@ cron.schedule('55 23 * * 1-6', async () => {
 cron.schedule('5 21 * * 1-6', async () => {
   console.log('⏰ Checking for missing punch-outs...');
   try {
+    // ── Safety-net: auto punch-OUT for WFH/super_admin/KC718 who missed 18:30 cron ──
+    const safetyDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+    const safetyEmps = await db.query(
+      `SELECT id, role, employee_code FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+    );
+    for (const emp of safetyEmps.rows) {
+      const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
+      await db.query(
+        `UPDATE attendance
+         SET punch_out='18:30:00', punch_out_location=$3,
+             working_hours=9.0, status='present'
+         WHERE employee_id=$1 AND date=$2
+           AND punch_in IS NOT NULL AND punch_out IS NULL`,
+        [emp.id, safetyDate, isOfficeUser ? 'Office' : 'Work from Home']
+      );
+    }
+    console.log(`✅ Safety-net auto punch-OUT done for ${safetyEmps.rows.length} WFH/admin employees`);
+
     await attCtrl.fixMissingPunchOuts();
   } catch (err) {
     console.error('❌ fixMissingPunchOuts cron failed:', err.message);
@@ -325,7 +345,7 @@ cron.schedule('30 9 * * 1-6', async () => {
     if (await isNonWorkingDay(today)) { console.log('Non-working day — skipping WFH punch-in'); return; }
 
     const wfhEmps = await db.query(
-      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+      `SELECT id, role, employee_code FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
     );
     if (!wfhEmps.rows.length) { console.log('No permanent WFH/auto-present employees'); return; }
 
@@ -361,7 +381,7 @@ cron.schedule('30 18 * * 1-6', async () => {
     if (await isNonWorkingDay(today)) { console.log('Non-working day — skipping WFH punch-out'); return; }
 
     const wfhEmps = await db.query(
-      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+      `SELECT id, role, employee_code FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
     );
     if (!wfhEmps.rows.length) return;
 
@@ -401,7 +421,7 @@ cron.schedule('30 18 * * 1-6', async () => {
     if (await isNonWorkingDay(today)) return;
 
     const wfhEmps = await db.query(
-      `SELECT id, role FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
+      `SELECT id, role, employee_code FROM employees WHERE is_active=true AND (is_wfh_permanent=true OR role='super_admin' OR employee_code='KC718')`
     );
     if (!wfhEmps.rows.length) return;
 
@@ -1082,9 +1102,10 @@ cron.schedule('0 10 * * 1-6', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
-// ── Cron: Punch-OUT reminder at 6:30 PM IST (Mon–Sat) ────────────────────────
+// ── Cron: Punch-OUT reminder at 6:35 PM IST (Mon–Sat) ────────────────────────
 // Notifies employees who punched in today but have NOT punched out yet
-cron.schedule('30 18 * * 1-6', async () => {
+// NOTE: runs at 18:35 (5 min after auto punch-OUT at 18:30) to avoid conflict
+cron.schedule('35 18 * * 1-6', async () => {
   console.log('⏰ [Punch-OUT reminder] Checking missing punch-outs...');
   try {
     const today = new Intl.DateTimeFormat('en-CA', {
