@@ -71,6 +71,11 @@
             <option value="manager">Manager</option>
             <option value="tl">Team Lead</option>
             <option value="employee">Employee</option>
+            <option value="client_admin">Client Admin</option>
+          </select>
+          <select id="client-filter" class="form-control" style="width:180px;display:none" onchange="onClientFilterChange()">
+            <option value="all">👥 All Employees</option>
+            <option value="own">🏢 Own Employees (KC)</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="clearFilters()">✕ Clear</button>
           <span id="emp-count" class="text-muted" style="padding:8px 0;font-size:13px;margin-left:4px"></span>
@@ -98,7 +103,7 @@
           <table>
             <thead><tr>
               <th>Employee</th><th>Code</th><th>Department</th><th>Designation</th>
-              <th>Role</th><th>Category</th><th>Status</th><th>Reporting To</th><th>Joining Date</th><th>App Ver.</th><th></th>
+              <th>Role</th><th>Category</th><th class="client-col" style="display:none">Client</th><th>Status</th><th>Reporting To</th><th>Joining Date</th><th>App Ver.</th><th></th>
             </tr></thead>
             <tbody id="emp-tbody"></tbody>
           </table>
@@ -1102,8 +1107,8 @@ let empData = [];
 let assignEmpData = [];
 
 // ── ISSUE 7 FIX ───────────────────────────────────────────────────────────────
-// Block 1: Separated + Import tabs — HR + Accounts only
-if (Role.is('hr', 'accounts')) {
+// Block 1: Separated + Import tabs — HR + Accounts + Client Admin only
+if (Role.is('hr', 'accounts', 'client_admin')) {
   document.getElementById('separated-tab').style.display = '';
   document.getElementById('import-tab').style.display    = '';
   loadSeparatedCount();
@@ -1116,8 +1121,8 @@ if (Role.is('admin', 'super_admin')) {
   document.getElementById('reshuffle-tab').style.display = '';
 }
 
-// Block 3: Add / Export / Import BUTTONS — HR + Accounts only
-if (Role.is('hr', 'accounts')) {
+// Block 3: Add / Export / Import BUTTONS — HR + Accounts + Client Admin only
+if (Role.is('hr', 'accounts', 'client_admin')) {
   document.getElementById('add-emp-btn').innerHTML = `
     <button class="btn btn-outline btn-sm" onclick="downloadMasterExcel()">⬇ Export Excel</button>
     <button class="btn btn-outline btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="openMasterExport()">📊 Master Excel</button>
@@ -1131,6 +1136,35 @@ if (Role.is('hr', 'accounts')) {
 
 loadDepartments();
 loadEmployees();
+
+// ── Client Deployment: show client filter for admin/super_admin ──────────────
+let clientsData = [];
+if (Role.is('admin', 'super_admin', 'hr', 'accounts')) {
+  document.getElementById('client-filter').style.display = '';
+  // Show client column in table
+  document.querySelectorAll('.client-col').forEach(el => el.style.display = '');
+  loadClients();
+}
+
+async function loadClients() {
+  const data = await api('GET', '/clients');
+  if (!data?.success) return;
+  clientsData = data.data || [];
+  const sel = document.getElementById('client-filter');
+  clientsData.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `🏭 ${c.name} (${c.employee_count || 0})`;
+    sel.appendChild(opt);
+  });
+}
+
+let _clientFilter = 'all';
+function onClientFilterChange() {
+  _clientFilter = document.getElementById('client-filter').value;
+  loadEmployees();
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ── Departments ───────────────────────────────────────────────────────────────
 async function loadDepartments() {
@@ -1149,10 +1183,13 @@ async function loadDepartments() {
 
 // ── Employees ─────────────────────────────────────────────────────────────────
 async function loadEmployees() {
-  // Fetch active + inactive employees in parallel
+  // Build query string with optional client_id filter
+  const clientParam = _clientFilter && _clientFilter !== 'all' 
+    ? `&client_id=${_clientFilter === 'own' ? 'own' : _clientFilter}` : '';
+  
   const [activeRes, inactiveRes] = await Promise.all([
-    api('GET', '/employees'),
-    api('GET', '/employees?is_active=false')
+    api('GET', `/employees?_=1${clientParam}`),
+    api('GET', `/employees?is_active=false${clientParam}`)
   ]);
   if (!activeRes?.success) return;
   const activeList   = activeRes.data || [];
@@ -1262,6 +1299,7 @@ function renderEmployees(list) {
         const labels = { permanent:'Permanent', provision:'⏳ Provision', contractual:'Contractual' };
         return `<span class="badge" style="${styles[cat]}">${labels[cat]||cat}</span>`;
       })()}</td>
+      <td class="client-col" style="display:none">${e.client_name ? `<span style="background:#e0f2fe;color:#0369a1;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap">🏭 ${e.client_name}</span>` : `<span style="color:var(--muted);font-size:11px">Own</span>`}</td>
       <td>
         ${inactive
           ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">⏸ Inactive</span>`

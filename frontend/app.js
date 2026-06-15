@@ -10,7 +10,7 @@ const Auth = {
   guard:      () => { if (!Auth.getToken()) { window.location.href = 'login.html'; return false; } return true; },
   guardDashboard: () => {
     if (!Auth.getToken()) { window.location.href = 'login.html'; return false; }
-    if (!['admin','super_admin','hr','accounts'].includes(Auth.getUser()?.role)) { window.location.href = 'attendance.html'; return false; }
+    if (!['admin','super_admin','hr','accounts','client_admin'].includes(Auth.getUser()?.role)) { window.location.href = 'attendance.html'; return false; }
     return true;
   },
   logout: () => { Auth.clear(); window.location.href = 'login.html'; },
@@ -82,10 +82,12 @@ const Role = {
   isAdminOnly:   ()     => Role.is('admin','super_admin'),
   isManagerUp:   ()     => Role.is('admin','super_admin','hr','accounts','manager'),
   isDashboard:   ()     => Role.is('admin','super_admin','hr','accounts','manager','tl'),
-  canApproveLeave: ()   => Role.is('admin','manager','tl'),            // only these can approve leaves
+  isClientAdmin: ()     => Role.is('client_admin'),
+  canManageEmployees: () => Role.is('admin','super_admin','hr','accounts','client_admin'),
+  canApproveLeave: ()   => Role.is('admin','manager','tl','client_admin'),
   canUploadPayroll: ()  => Role.is('accounts'),                        // only accounts can upload payroll
   canProcessAdvancePayment: () => Role.is('accounts'),                 // only accounts can mark advance paid
-  badge: r => ({admin:'#ef4444',super_admin:'#7c3aed',hr:'#10b981',accounts:'#f59e0b',manager:'#4361ee',tl:'#f59e0b',employee:'#6b7280'})[r]||'#6b7280',
+  badge: r => ({admin:'#ef4444',super_admin:'#7c3aed',hr:'#10b981',accounts:'#f59e0b',manager:'#4361ee',tl:'#f59e0b',employee:'#6b7280',client_admin:'#0891b2'})[r]||'#6b7280',
 };
 
 // SVG icons — consistent, clean, professional
@@ -117,7 +119,7 @@ const NAV_GROUPS = [
   {
     label: null,
     items: [
-      { href:'dashboard.html',      icon: ICONS.dashboard,    label:'Dashboard',        roles:['admin','super_admin','hr','accounts','manager','tl'] },
+      { href:'dashboard.html',      icon: ICONS.dashboard,    label:'Dashboard',        roles:['admin','super_admin','hr','accounts','manager','tl','client_admin'] },
     ]
   },
   {
@@ -125,8 +127,8 @@ const NAV_GROUPS = [
     items: [
       { href:'attendance.html',     icon: ICONS.attendance,   label:'Attendance',       always:true },
       { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
-      { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl'] },
-      { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    always:true, hideRoles:['admin','super_admin','hr','accounts','manager','tl'] },
+      { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl','client_admin'] },
+      { href:'announcements.html',  icon: ICONS.announcements,label:'Announcements',    always:true, hideRoles:['admin','super_admin','hr','accounts','manager','tl','client_admin'] },
       { href:'chat.html',           icon: ICONS.chat || '💬',  label:'Chat & Meetings',  always:true },
     ]
   },
@@ -141,7 +143,7 @@ const NAV_GROUPS = [
   {
     label: 'Organisation',
     items: [
-      { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl'] },
+      { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl','client_admin'] },
       { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr'] },
       { href:'separation.html',     icon: ICONS.separation,   label:'Separation',       always:true },
     ]
@@ -149,7 +151,7 @@ const NAV_GROUPS = [
   {
     label: 'Finance',
     items: [
-      { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['super_admin','hr','accounts'] },
+      { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['super_admin','hr','accounts','client_admin'] },
       { href:'advance.html',        icon: ICONS.advance,        label:'Advance Salary',   always:true },
       { href:'reimbursement.html',  icon: ICONS.reimbursement,  label:'Reimbursement',    always:true },
       { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },

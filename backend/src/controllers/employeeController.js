@@ -84,6 +84,19 @@ exports.getAll = async (req, res) => {
       params.push(req.user.client_id);
     }
 
+    // ── Super admin: optional client_id filter (own=NULL, or specific client) ──
+    const { client_id: qClientId } = req.query;
+    if (qClientId !== undefined && ['admin','super_admin','hr','accounts'].includes(userRole)) {
+      if (qClientId === 'own' || qClientId === 'null' || qClientId === '') {
+        conditions.push(`e.client_id IS NULL`);
+      } else if (qClientId === 'all') {
+        // no filter — show everything
+      } else {
+        conditions.push(`e.client_id=$${idx++}`);
+        params.push(parseInt(qClientId));
+      }
+    }
+
     if (department_id)       { conditions.push(`e.department_id=$${idx++}`);           params.push(parseInt(department_id)); }
     if (filterRole)          { conditions.push(`e.role=$${idx++}`);                        params.push(filterRole); }
     if (employee_category)   { conditions.push(`e.employee_category=$${idx++}`);           params.push(employee_category); }
