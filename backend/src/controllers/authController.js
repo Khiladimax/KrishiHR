@@ -64,7 +64,7 @@ exports.login = async (req, res) => {
       );
     }
 
-    const token = signToken({ id: emp.id, role: emp.role, email: emp.email, device_id: device_id || null });
+    const token = signToken({ id: emp.id, role: emp.role, email: emp.email, device_id: device_id || null, client_id: emp.client_id || null });
 
     // Remove sensitive fields
     const { password_hash, pan_number, aadhar_number, bank_account, ...safeEmp } = emp;

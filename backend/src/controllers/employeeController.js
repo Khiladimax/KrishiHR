@@ -78,6 +78,12 @@ exports.getAll = async (req, res) => {
       params.push(userId);
     }
 
+    // ── Client deployment scoping: client_admin sees ONLY their client's employees ──
+    if (userRole === 'client_admin' && req.user.client_id) {
+      conditions.push(`e.client_id=$${idx++}`);
+      params.push(req.user.client_id);
+    }
+
     if (department_id)       { conditions.push(`e.department_id=$${idx++}`);           params.push(parseInt(department_id)); }
     if (filterRole)          { conditions.push(`e.role=$${idx++}`);                        params.push(filterRole); }
     if (employee_category)   { conditions.push(`e.employee_category=$${idx++}`);           params.push(employee_category); }
@@ -102,6 +108,8 @@ exports.getAll = async (req, res) => {
          e.department_id, e.designation_id, e.reporting_manager_id, e.team_leader_id,
          e.basic_salary, e.ctc, e.city,
          e.separation_date, e.separation_type, e.separation_reason,
+         e.client_id,
+         cl.name AS client_name,
          sep_active.last_working_date AS sep_last_working_date,
          d.name   AS department_name,
          des.title AS designation_title,
@@ -114,6 +122,7 @@ exports.getAll = async (req, res) => {
        LEFT JOIN designations des ON e.designation_id = des.id
        LEFT JOIN employees    m   ON e.reporting_manager_id = m.id
        LEFT JOIN employees    tl  ON e.team_leader_id  = tl.id
+       LEFT JOIN clients      cl  ON e.client_id        = cl.id
        LEFT JOIN provision_confirmations pc ON pc.employee_id = e.id
        LEFT JOIN separations sep_active ON sep_active.employee_id = e.id AND sep_active.status = 'completed'
        WHERE ${conditions.join(' AND ')}

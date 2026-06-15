@@ -15,18 +15,22 @@ exports.uploadMiddleware = multer({
 }).single('file');
 
 // Column mapping from our Excel template (0-indexed)
+// Column A = Client Name (blank = own employee, filled = deployed to that client)
 const COL = {
-  employee_code: 0, password: 1, first_name: 2, last_name: 3,
-  email: 4, phone: 5, alternate_phone: 6, gender: 7, date_of_birth: 8,
-  blood_group: 9, marital_status: 10, joining_date: 11, employment_type: 12,
-  role: 13, department_id: 14, designation_id: 15,
-  reporting_manager_id: 16, team_leader_id: 17,
-  basic_salary: 18, hra: 19, special_allowance: 20, travel_allowance: 21,
-  ctc: 22, pan_number: 23, aadhar_number: 24, uan_number: 25,
-  bank_name: 26, bank_account: 27, bank_ifsc: 28, bank_branch: 29,
-  address_line1: 30, city: 31, state: 32, pincode: 33,
-  probation_end_date: 34, notes: 35
+  client_name: 0,
+  employee_code: 1, password: 2, first_name: 3, last_name: 4,
+  email: 5, phone: 6, alternate_phone: 7, gender: 8, date_of_birth: 9,
+  blood_group: 10, marital_status: 11, joining_date: 12, employment_type: 13,
+  role: 14, department_id: 15, designation_id: 16,
+  reporting_manager_id: 17, team_leader_id: 18,
+  basic_salary: 19, hra: 20, special_allowance: 21, travel_allowance: 22,
+  ctc: 23, pan_number: 24, aadhar_number: 25, uan_number: 26,
+  bank_name: 27, bank_account: 28, bank_ifsc: 29, bank_branch: 30,
+  address_line1: 31, city: 32, state: 33, pincode: 34,
+  probation_end_date: 35, notes: 36
 };
+
+const { findOrCreateClient } = require('./clientController');
 
 function clean(val) {
   return val !== null && val !== undefined && val !== '' ? String(val).trim() : null;
@@ -101,8 +105,15 @@ exports.importEmployees = async (req, res) => {
 
       const hash = await bcrypt.hash(password, 10);
       const role_val = clean(row[COL.role]) || 'employee';
-      const valid_roles = ['employee','tl','manager','hr','accounts','admin'];
+      const valid_roles = ['employee','tl','manager','hr','accounts','admin','client_admin'];
       const role = valid_roles.includes(role_val) ? role_val : 'employee';
+
+      // ── Client deployment: resolve client_name → client_id ────────────────
+      const clientName = clean(row[COL.client_name]);
+      let client_id = null;
+      if (clientName) {
+        client_id = await findOrCreateClient(clientName, client);
+      }
 
       try {
         const result = await client.query(
@@ -115,10 +126,10 @@ exports.importEmployees = async (req, res) => {
              pan_number, aadhar_number, uan_number,
              bank_name, bank_account, bank_ifsc, bank_branch,
              address_line1, city, state, pincode,
-             probation_end_date, is_active
+             probation_end_date, is_active, client_id
            ) VALUES (
              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-             $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,true
+             $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,true,$36
            ) RETURNING id, employee_code, first_name, last_name, email`,
           [
             employee_code,
@@ -156,6 +167,7 @@ exports.importEmployees = async (req, res) => {
             clean(row[COL.state]),
             clean(row[COL.pincode]),
             toDate(row[COL.probation_end_date]),
+            client_id,
           ]
         );
 

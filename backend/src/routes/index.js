@@ -25,9 +25,10 @@ const provCtrl       = require('../controllers/provisionController');
 const offerCtrl      = require('../controllers/offerLetterController');
 const itDeclCtrl     = require('../controllers/itDeclarationController');
 const compoffCtrl    = require('../controllers/compoffController');
+const clientCtrl     = require('../controllers/clientController');
 
 const ADMIN      = ['admin','super_admin'];
-const HR_ADMIN   = ['hr','admin','super_admin','accounts'];
+const HR_ADMIN   = ['hr','admin','super_admin','accounts','client_admin'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
 // KC346 geofence access — hardcoded north zone manager
@@ -35,7 +36,7 @@ const authorizeGeofence = (req, res, next) => {
   if (['admin','super_admin'].includes(req.user.role) || req.user.employee_code === 'KC346') return next();
   return res.status(403).json({ success: false, message: 'Access denied. Required: admin or super_admin' });
 };
-const EMP_MGMT   = ['hr','accounts','admin','super_admin'];
+const EMP_MGMT   = ['hr','accounts','admin','super_admin','client_admin'];
 const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -83,6 +84,12 @@ router.post('/employees/import',
   empImportCtrl.uploadMiddleware,
   empImportCtrl.importEmployees
 );
+
+// ── Client Deployment Management ──────────────────────────────────────────────
+router.get ('/clients',              authenticate, authorize(...EMP_MGMT),  clientCtrl.listClients);
+router.post('/clients',              authenticate, authorize(...ADMIN),     clientCtrl.createClient);
+router.put ('/clients/:id',          authenticate, authorize(...ADMIN),     clientCtrl.updateClient);
+router.get ('/clients/:id/employees',authenticate, authorize(...EMP_MGMT), clientCtrl.listClientEmployees);
 
 // ── Attendance ────────────────────────────────────────────────────────────────
 router.post('/attendance/punch-in',         authenticate, attCtrl.punchIn);
