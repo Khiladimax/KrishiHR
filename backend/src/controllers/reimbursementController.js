@@ -8,6 +8,7 @@ const multer   = require('multer');
 
 const COO_CODE      = 'KC718';
 const MD_CODE       = 'KC01';
+const CBO_CODE      = 'KC03';   // CBO — same approval power as MD
 const ACCOUNTS_CODE = 'KC7708';
 
 // ── File upload middleware (same as IT declaration — base64 in DB) ─────────────
@@ -38,7 +39,7 @@ async function getChain(employeeId) {
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
 
   // MD / super_admin applies → Accounts only (1 step)
-  if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
+  if (employee_code === MD_CODE || employee_code === CBO_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
 
   // Accounts applies → COO → MD (no self-loop)
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
@@ -201,7 +202,7 @@ exports.getAll = async (req, res) => {
       conds.push(`r.employee_id=$${idx++}`); params.push(employee_id);
     } else if (userRole === 'hr') {
       // see all
-    } else if (userRole === 'super_admin') {
+    } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
       conds.push(`(r.current_approver_code=$${idx++} OR (r.approval_chain::text LIKE $${idx++} AND EXISTS(SELECT 1 FROM reimbursement_approvals ra WHERE ra.reimbursement_id=r.id AND ra.approver_id=$${idx++} AND ra.action='approve')) OR r.employee_id=$${idx++})`);
       params.push(userCode, `%"${userCode}"%`, userId, userId);
     } else if (userRole === 'accounts') {
@@ -299,7 +300,7 @@ exports.action = async (req, res) => {
     try { chain = Array.isArray(reimb.approval_chain) ? reimb.approval_chain : JSON.parse(reimb.approval_chain); }
     catch (_) { chain = []; }
 
-    const isSuperAdmin      = actorRole === 'super_admin';
+    const isSuperAdmin      = actorRole === 'super_admin' || actorCode === CBO_CODE;
     const isCurrentApprover = actorCode === reimb.current_approver_code;
     if (!isSuperAdmin && !isCurrentApprover)
       return res.status(403).json({ success: false, message: 'You are not the current approver' });

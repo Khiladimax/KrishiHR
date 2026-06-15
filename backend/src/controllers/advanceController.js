@@ -8,6 +8,7 @@ const emailSvc = require('../config/emailService');
 
 const COO_CODE      = 'KC718';  // Gurudatt
 const MD_CODE       = 'KC01';   // Sunil
+const CBO_CODE      = 'KC03';   // CBO — same approval power as MD
 const ACCOUNTS_CODE = 'KC7708'; // Anshu
 
 // ── Dynamic advance chain — no hardcoded employee codes ──────────────────────
@@ -16,6 +17,7 @@ const ACCOUNTS_CODE = 'KC7708'; // Anshu
 //   hr role         → skip_manager = true → goes directly to COO → MD → Accounts
 //   accounts role   → COO → MD (no self-loop)
 //   super_admin/MD  → Accounts only
+//   CBO (KC03)      → Accounts only (same as MD)
 //   COO             → MD → Accounts
 //   everyone else   → Reporting Manager → COO → MD → Accounts
 // HR can update employee role via employees.html to control the chain
@@ -34,8 +36,8 @@ async function getAdvanceChain(employeeId) {
   // COO applies → MD → Accounts
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
 
-  // MD / super_admin applies → Accounts only
-  if (employee_code === MD_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
+  // MD / super_admin / CBO applies → Accounts only
+  if (employee_code === MD_CODE || employee_code === CBO_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
 
   // Accounts applies → COO → MD (no self-loop)
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
@@ -181,7 +183,7 @@ exports.action = async (req, res) => {
     } else { chain = []; }
 
     const currentCode = advance.current_approver_code;
-    const isSuperAdmin = actorRole === 'super_admin';
+    const isSuperAdmin = actorRole === 'super_admin' || actorCode === CBO_CODE;
     const isCurrentApprover = actorCode === currentCode;
 
     // Block self-approval
@@ -367,6 +369,7 @@ exports.getMine = async (req, res) => {
 // ── Get Advances ──────────────────────────────────────────────────────────────
 // Visibility rules:
 //   super_admin / hr  → see ALL requests
+//   CBO (KC03)        → same as super_admin: pending for them + already approved + own
 //   accounts          → see requests where they are current_approver OR fully approved (status=approved) OR own requests
 //   admin (COO etc.)  → see requests where they are current_approver OR already passed through them (approval_chain contains their code) OR own requests
 //   manager / tl      → see requests where they are current_approver OR own requests
@@ -388,8 +391,8 @@ exports.getAll = async (req, res) => {
     } else if (userRole === 'hr') {
       // HR sees everything (read-only oversight) — no scope filter
 
-    } else if (userRole === 'super_admin') {
-      // MD (super_admin / KC01) sees ONLY:
+    } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
+      // MD (super_admin / KC01) and CBO (KC03) see ONLY:
       //   1. Requests where it is currently THEIR turn (current_approver_code = their code)
       //   2. Requests they have already approved (passed through them)
       //   3. Their own requests
@@ -536,7 +539,7 @@ exports.getStats = async (req, res) => {
     } else if (userRole === 'accounts') {
       scopeFilter = `WHERE (status='approved' OR status='disbursed' OR current_approver_code=$1 OR employee_id=$2)`;
       params = [userCode, userId];
-    } else if (['super_admin', 'admin'].includes(userRole)) {
+    } else if (['super_admin', 'admin'].includes(userRole) || userCode === CBO_CODE) {
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2 OR EXISTS (
         SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2
       ))`;
