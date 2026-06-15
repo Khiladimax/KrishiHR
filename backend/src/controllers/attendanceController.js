@@ -2501,7 +2501,15 @@ exports.getMovementSummary = async (req, res) => {
       const { points } = map[key];
       let km = 0;
       for (let i = 1; i < points.length; i++) {
-        km += haversine(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+        const d = haversine(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+        // Skip GPS jitter (< 10m movement)
+        if (d < 0.01) continue;
+        // Speed filter: skip if > 150 km/h (likely GPS jump/outlier)
+        const t1 = new Date(points[i-1].time).getTime();
+        const t2 = new Date(points[i].time).getTime();
+        const dtHrs = (t2 - t1) / 3600000;
+        if (dtHrs > 0 && (d / dtHrs) > 150) continue;
+        km += d;
       }
       map[key].total_km     = Math.round(km * 100) / 100;
       map[key].point_count  = points.length;
