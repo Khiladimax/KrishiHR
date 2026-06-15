@@ -305,7 +305,7 @@ cron.schedule('5 21 * * 1-6', async () => {
       const isOfficeUser = emp.role === 'super_admin' || emp.employee_code === 'KC718';
       await db.query(
         `UPDATE attendance
-         SET punch_out='18:35:00', punch_out_location=$3,
+         SET punch_out='18:30:00', punch_out_location=$3,
              status='present'
          WHERE employee_id=$1 AND date=$2
            AND punch_in IS NOT NULL AND punch_out IS NULL`,
@@ -370,9 +370,8 @@ cron.schedule('30 9 * * 1-6', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
-// ── Cron 2: Auto punch-OUT for permanent WFH + super_admin at 6:35 PM IST ────
-// NOTE: moved from 18:30 → 18:35 so punch-out reminder (18:35) doesn't fire before auto-punch completes
-cron.schedule('35 18 * * 1-6', async () => {
+// ── Cron 2: Auto punch-OUT for permanent WFH + super_admin at 6:30 PM IST ────
+cron.schedule('30 18 * * 1-6', async () => {
   console.log('⏰ Auto punch-OUT for permanent WFH employees and super_admin...');
   try {
     const today = new Intl.DateTimeFormat('en-CA', {
@@ -391,7 +390,7 @@ cron.schedule('35 18 * * 1-6', async () => {
       // Only fill punch-out if punch-in exists and punch-out is missing
       await db.query(
         `UPDATE attendance
-         SET punch_out='18:35:00', punch_out_location=$3,
+         SET punch_out='18:30:00', punch_out_location=$3,
              status='present'
          WHERE employee_id=$1 AND date=$2
            AND punch_in IS NOT NULL AND punch_out IS NULL`,
@@ -445,7 +444,7 @@ cron.schedule('35 18 * * 1-6', async () => {
       if (afterPunchOut) {
         await db.query(
           `UPDATE attendance
-           SET punch_out='18:35:00', punch_out_location=$3,
+           SET punch_out='18:30:00', punch_out_location=$3,
                status='present'
            WHERE employee_id=$1 AND date=$2
              AND punch_in IS NOT NULL AND punch_out IS NULL`,
@@ -1103,10 +1102,10 @@ cron.schedule('0 10 * * 1-6', async () => {
   }
 }, { timezone: 'Asia/Kolkata' });
 
-// ── Cron: Punch-OUT reminder at 6:40 PM IST (Mon–Sat) ────────────────────────
+// ── Cron: Punch-OUT reminder at 6:25 PM IST (Mon–Sat) ────────────────────────
 // Notifies employees who punched in today but have NOT punched out yet
-// NOTE: runs at 18:40 (5 min after auto punch-OUT at 18:35) to avoid conflict
-cron.schedule('40 18 * * 1-6', async () => {
+// NOTE: runs at 18:25 (5 min BEFORE auto punch-OUT at 18:30) — warns employees to punch out
+cron.schedule('25 18 * * 1-6', async () => {
   console.log('⏰ [Punch-OUT reminder] Checking missing punch-outs...');
   try {
     const today = new Intl.DateTimeFormat('en-CA', {
