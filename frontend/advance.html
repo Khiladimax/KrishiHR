@@ -456,7 +456,7 @@ const CODE_TO_LEVEL = {
 // Pending Approval tab: only for actual approvers (manager, tl, admin, accounts, super_admin)
 // All Requests tab: only for super_admin and accounts (full visibility roles)
 const isHR         = user.role === 'hr';
-const isSuperAdmin = user.role === 'super_admin';
+const isSuperAdmin = user.role === 'super_admin' || user.employee_code === 'KC03';
 const isAccounts   = user.role === 'accounts';
 const isAdmin      = user.role === 'admin';
 const isManagerTL  = ['manager', 'tl'].includes(user.role);
@@ -595,14 +595,17 @@ function advanceCard(adv, showActions = false) {
   const isAccountsUser = user.role === 'accounts';
   const isMD           = user.employee_code === 'KC01';
   const isCOO          = user.employee_code === 'KC718';
+  const isSuperApprover = user.role === 'super_admin' || user.employee_code === 'KC03';
 
   let canAct = false;
   let isPaymentStage = false;
 
   if (showActions && adv.status === 'pending') {
-    // Match by current_approver_code on the advance record
-    if (adv.current_approver_code && adv.current_approver_code === user.employee_code) {
-      canAct = true;  // This includes MD (KC01/super_admin) when it's his turn in chain
+    // super_admin (MD/KC01) and CBO (KC03) can approve ANY pending request
+    if (isSuperApprover) {
+      canAct = true;
+    } else if (adv.current_approver_code && adv.current_approver_code === user.employee_code) {
+      canAct = true;
     }
   }
 
@@ -828,10 +831,12 @@ async function loadPending() {
   ]);
 
   // Strict frontend filter: only show what this user can actually act on RIGHT NOW
-  // pending: must be current_approver_code match
+  // super_admin (MD) and CBO (KC03) can approve ANY pending request at any stage
   const pending = (pendingRes?.data || []).filter(a =>
     a.employee_id !== user.id &&
-    a.current_approver_code === user.employee_code
+    (isSuperAdmin
+      ? a.status === 'pending'
+      : a.current_approver_code === user.employee_code)
   );
 
   // Disbursement queue for Accounts: ALL approved advances regardless of current_approver_code

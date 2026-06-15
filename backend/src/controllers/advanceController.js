@@ -392,26 +392,9 @@ exports.getAll = async (req, res) => {
       // HR sees everything (read-only oversight) — no scope filter
 
     } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
-      // MD (super_admin / KC01) and CBO (KC03) see ONLY:
-      //   1. Requests where it is currently THEIR turn (current_approver_code = their code)
-      //   2. Requests they have already approved (passed through them)
-      //   3. Their own requests
-      // NOT requests still sitting at manager/COO level — those are not their business yet
-      conds.push(`(
-        a.current_approver_code = $${idx++}
-        OR (
-          a.approval_chain::text LIKE $${idx++}
-          AND a.current_approver_code IS DISTINCT FROM $${idx++}
-          AND EXISTS (
-            SELECT 1 FROM advance_approvals aa
-            WHERE aa.advance_id = a.id
-              AND aa.approver_id = $${idx++}
-              AND aa.action = 'approve'
-          )
-        )
-        OR a.employee_id = $${idx++}
-      )`);
-      params.push(userCode, `%"${userCode}"%`, userCode, userId, userId);
+      // MD (super_admin / KC01) and CBO (KC03) see ALL requests
+      // They are top-level approvers who can act on any pending request at any stage
+      // No scope filter — same as HR oversight but with full approval power
 
     } else if (userRole === 'accounts') {
       // Accounts sees:
@@ -539,7 +522,9 @@ exports.getStats = async (req, res) => {
     } else if (userRole === 'accounts') {
       scopeFilter = `WHERE (status='approved' OR status='disbursed' OR current_approver_code=$1 OR employee_id=$2)`;
       params = [userCode, userId];
-    } else if (['super_admin', 'admin'].includes(userRole) || userCode === CBO_CODE) {
+    } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
+      // MD and CBO see all stats — no scope filter
+    } else if (userRole === 'admin') {
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2 OR EXISTS (
         SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2
       ))`;

@@ -289,9 +289,10 @@ async function loadReimbursements(tab) {
       filtered = data.filter(d => d.status !== 'draft'); // drafts go to Drafts tab only
     }
     if (tab === 'pending') {
+      const isSuperApprover = currentUser.role === 'super_admin' || currentUser.employee_code === 'KC03';
       filtered = data.filter(d =>
         d.status === 'pending' &&
-        d.current_approver_code === currentUser.employee_code
+        (isSuperApprover ? true : d.current_approver_code === currentUser.employee_code)
       );
     }
 
@@ -375,8 +376,9 @@ function buildPipeline(r) {
 
 function renderCard(r, tab) {
   const pillClass = `pill-${r.status}`;
+  const isSuperApprover = currentUser?.role === 'super_admin' || currentUser?.employee_code === 'KC03';
   const isApprover = r.status === 'pending' &&
-                     r.current_approver_code === currentUser?.employee_code;
+                     (isSuperApprover || r.current_approver_code === currentUser?.employee_code);
   const isOwner    = r.employee_id === currentUser?.id;
   const isAccounts = currentUser?.role === 'accounts';
 
