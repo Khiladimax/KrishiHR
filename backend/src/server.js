@@ -306,7 +306,7 @@ cron.schedule('5 21 * * 1-6', async () => {
       await db.query(
         `UPDATE attendance
          SET punch_out='18:35:00', punch_out_location=$3,
-             working_hours=9.08, status='present'
+             status='present'
          WHERE employee_id=$1 AND date=$2
            AND punch_in IS NOT NULL AND punch_out IS NULL`,
         [emp.id, safetyDate, isOfficeUser ? 'Office' : 'Work from Home']
@@ -392,7 +392,7 @@ cron.schedule('35 18 * * 1-6', async () => {
       await db.query(
         `UPDATE attendance
          SET punch_out='18:35:00', punch_out_location=$3,
-             working_hours=9.08, status='present'
+             status='present'
          WHERE employee_id=$1 AND date=$2
            AND punch_in IS NOT NULL AND punch_out IS NULL`,
         [emp.id, today, isOfficeUser ? 'Office' : 'Work from Home']
@@ -446,7 +446,7 @@ cron.schedule('35 18 * * 1-6', async () => {
         await db.query(
           `UPDATE attendance
            SET punch_out='18:35:00', punch_out_location=$3,
-               working_hours=9.08, status='present'
+               status='present'
            WHERE employee_id=$1 AND date=$2
              AND punch_in IS NOT NULL AND punch_out IS NULL`,
           [emp.id, today, isOfficeUser ? 'Office' : 'Work from Home']
