@@ -6,323 +6,299 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:24px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:24px; }
 .kpi-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
-.kpi-label { font-size:11.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
-.kpi-val   { font-size:28px; font-weight:800; color:var(--text); line-height:1.1; }
-.kpi-card.green { border-color:var(--green); background:var(--green-l); }
-.kpi-card.blue  { border-color:#3b82f6; background:#eff6ff; }
-.kpi-card.orange{ border-color:var(--orange); background:var(--orange-l); }
+.kpi-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.kpi-val   { font-size:28px; font-weight:800; color:var(--text); }
+.kpi-card.blue   { border-color:#3b82f6; background:#eff6ff; }
+.kpi-card.green  { border-color:var(--green); background:var(--green-l); }
+.kpi-card.orange { border-color:var(--orange); background:var(--orange-l); }
 
-.clients-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+.clients-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
 .client-card {
   background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius);
   padding:20px; cursor:pointer; transition:all .18s;
 }
 .client-card:hover { border-color:var(--accent); box-shadow:var(--shadow-md); transform:translateY(-2px); }
-.client-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
-.client-name { font-size:16px; font-weight:700; color:var(--text); }
-.client-id   { font-size:11px; color:var(--muted2); font-family:monospace; margin-top:2px; }
-.client-stat { display:flex; gap:16px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
-.client-stat-item { text-align:center; flex:1; }
-.client-stat-val  { font-size:20px; font-weight:800; color:var(--accent); }
-.client-stat-lbl  { font-size:10.5px; color:var(--muted); margin-top:2px; }
-.client-email { font-size:12px; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:5px; }
+.client-card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+.client-name { font-size:15px; font-weight:700; color:var(--text); }
+.client-meta { font-size:12px; color:var(--muted); margin-top:3px; }
+.client-stats { display:flex; gap:0; margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.cs-item { flex:1; text-align:center; }
+.cs-val { font-size:20px; font-weight:800; color:var(--accent); }
+.cs-lbl { font-size:10px; color:var(--muted); margin-top:1px; text-transform:uppercase; letter-spacing:.3px; }
 
-.status-badge { font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:20px; text-transform:uppercase; }
-.status-badge.active   { background:var(--green-l); color:var(--green-d); }
-.status-badge.inactive { background:var(--red-l);   color:var(--red-d); }
+.status-pill { font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; text-transform:uppercase; }
+.status-pill.active   { background:var(--green-l); color:var(--green-d); }
+.status-pill.inactive { background:var(--red-l);   color:var(--red-d); }
 
-/* ── Side Panel ── */
+/* Panel */
 .panel-overlay { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1199; display:none; backdrop-filter:blur(2px); }
 .panel-overlay.open { display:block; }
-.detail-panel {
-  position:fixed; top:0; right:-520px; width:520px; max-width:100vw; height:100vh;
+.slide-panel {
+  position:fixed; top:0; right:-500px; width:480px; max-width:100vw; height:100vh;
   background:var(--surface); box-shadow:var(--shadow-xl); z-index:1200;
-  transition:right .3s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column;
+  transition:right .28s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; overflow:hidden;
 }
-.detail-panel.open { right:0; }
-.panel-header { padding:22px 24px 16px; border-bottom:1.5px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
-.panel-title  { font-size:18px; font-weight:700; color:var(--text); }
-.panel-body   { flex:1; overflow-y:auto; padding:24px; }
-.panel-footer { padding:16px 24px; border-top:1.5px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
+.slide-panel.open { right:0; }
+.sp-head { padding:20px 24px 16px; border-bottom:1.5px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+.sp-title { font-size:17px; font-weight:700; color:var(--text); }
+.sp-body  { flex:1; overflow-y:auto; padding:20px 24px; }
+.sp-foot  { padding:14px 24px; border-top:1.5px solid var(--border); display:flex; gap:10px; justify-content:flex-end; flex-shrink:0; }
 
-.form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.emp-list-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
-.emp-avatar-sm { width:34px; height:34px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.emp-info-sm .name { font-size:13px; font-weight:600; color:var(--text); }
-.emp-info-sm .code { font-size:11px; color:var(--muted2); font-family:monospace; }
-.empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
-.empty-state .icon { font-size:40px; margin-bottom:10px; }
+.emp-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+.emp-row:last-child { border-bottom:none; }
+.emp-av { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.emp-n  { font-size:13px; font-weight:600; color:var(--text); }
+.emp-c  { font-size:11px; color:var(--muted2); font-family:monospace; }
 </style>
 </head>
 <body>
-<div class="app-layout">
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo" id="sidebar-logo-mark"></div>
-    <nav id="sidebar-nav"></nav>
-    <div class="sidebar-user" id="sidebar-user"></div>
-  </aside>
-
-  <main class="main-content">
-    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-      <div>
-        <h1 class="page-title">🏭 Client Management</h1>
-        <p style="color:var(--muted);font-size:13px;margin-top:4px">Manage client organisations and their deployed employees</p>
-      </div>
-      <button class="btn btn-primary" onclick="openAddClient()">+ New Client</button>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
+    <div><div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div></div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
 
-    <!-- KPI Cards -->
-    <div class="kpi-grid" id="kpi-grid">
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">🏭 Client Management</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-primary btn-sm" onclick="openAddClient()">+ New Client</button>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
       <div class="kpi-card blue">
         <div class="kpi-label">Total Clients</div>
         <div class="kpi-val" id="kpi-total">—</div>
       </div>
       <div class="kpi-card green">
-        <div class="kpi-label">Active Clients</div>
+        <div class="kpi-label">Active</div>
         <div class="kpi-val" id="kpi-active">—</div>
       </div>
       <div class="kpi-card orange">
         <div class="kpi-label">Total Deployed</div>
-        <div class="kpi-val" id="kpi-employees">—</div>
+        <div class="kpi-val" id="kpi-emp">—</div>
       </div>
     </div>
 
     <!-- Search -->
-    <div style="display:flex;gap:12px;margin-bottom:20px">
-      <input id="search-input" class="form-control" placeholder="🔍 Search clients..." style="max-width:300px" oninput="filterClients()">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px">
+      <input id="srch" class="form-control" placeholder="🔍  Search clients…" style="max-width:280px" oninput="render()">
     </div>
 
-    <!-- Clients Grid -->
-    <div id="clients-grid" class="clients-grid">
+    <!-- Grid -->
+    <div id="grid" class="clients-grid">
       <div class="loader"><div class="spinner"></div></div>
     </div>
-  </main>
+
+  </div>
 </div>
 
-<!-- Panel Overlay -->
-<div class="panel-overlay" id="panel-overlay" onclick="closePanel()"></div>
-
-<!-- Client Detail / Add Panel -->
-<div class="detail-panel" id="detail-panel">
-  <div class="panel-header">
-    <div class="panel-title" id="panel-title">New Client</div>
+<!-- Overlay + Panel -->
+<div class="panel-overlay" id="overlay" onclick="closePanel()"></div>
+<div class="slide-panel" id="panel">
+  <div class="sp-head">
+    <div class="sp-title" id="sp-title">New Client</div>
     <button class="btn btn-ghost btn-sm" onclick="closePanel()">✕</button>
   </div>
-  <div class="panel-body" id="panel-body">
-    <!-- filled dynamically -->
-  </div>
-  <div class="panel-footer" id="panel-footer"></div>
+  <div class="sp-body" id="sp-body"></div>
+  <div class="sp-foot" id="sp-foot"></div>
 </div>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script>
 Auth.guard();
-const user = Auth.getUser();
 buildSidebar('clients.html');
+const user = Auth.getUser();
+if (!user || !['admin','super_admin'].includes(user.role)) location.href = 'dashboard.html';
 
-// Only admin/super_admin can access this page
-if (!user || !['admin','super_admin'].includes(user.role)) {
-  window.location.href = 'dashboard.html';
+let ALL = [];
+
+async function load() {
+  const r = await api('GET', '/clients');
+  if (!r?.success) return;
+  ALL = r.data || [];
+  document.getElementById('kpi-total').textContent  = ALL.length;
+  document.getElementById('kpi-active').textContent = ALL.filter(c=>c.status==='active').length;
+  document.getElementById('kpi-emp').textContent    = ALL.reduce((s,c)=>s+parseInt(c.employee_count||0),0);
+  render();
 }
 
-let allClients = [];
-
-// ── Load clients ──────────────────────────────────────────────────────────────
-async function loadClients() {
-  const res = await api('GET', '/clients');
-  if (!res?.success) return;
-  allClients = res.data || [];
-
-  // KPIs
-  document.getElementById('kpi-total').textContent   = allClients.length;
-  document.getElementById('kpi-active').textContent  = allClients.filter(c => c.status === 'active').length;
-  document.getElementById('kpi-employees').textContent = allClients.reduce((s,c) => s + parseInt(c.employee_count||0), 0);
-
-  renderClients(allClients);
-}
-
-function filterClients() {
-  const q = document.getElementById('search-input').value.toLowerCase();
-  renderClients(q ? allClients.filter(c => c.name.toLowerCase().includes(q) || (c.admin_email||'').toLowerCase().includes(q)) : allClients);
-}
-
-function renderClients(list) {
-  const grid = document.getElementById('clients-grid');
+function render() {
+  const q = document.getElementById('srch').value.toLowerCase();
+  const list = q ? ALL.filter(c=>c.name.toLowerCase().includes(q)||(c.admin_email||'').toLowerCase().includes(q)) : ALL;
+  const g = document.getElementById('grid');
   if (!list.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="icon">🏭</div><p>No clients found</p><button class="btn btn-primary" onclick="openAddClient()">+ Add First Client</button></div>`;
+    g.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">🏭</div>
+      <p style="font-size:15px;font-weight:600">No clients yet</p>
+      <p style="font-size:13px;margin:6px 0 16px">Create your first client to start deploying employees</p>
+      <button class="btn btn-primary" onclick="openAddClient()">+ New Client</button>
+    </div>`;
     return;
   }
-  grid.innerHTML = list.map(c => `
-    <div class="client-card" onclick="openClientDetail(${c.id})">
-      <div class="client-card-header">
+  g.innerHTML = list.map(c=>`
+    <div class="client-card" onclick="openDetail(${c.id})">
+      <div class="client-card-top">
         <div>
           <div class="client-name">${c.name}</div>
-          <div class="client-id">ID: ${c.id}</div>
-          ${c.admin_email ? `<div class="client-email">📧 ${c.admin_email}</div>` : ''}
-          ${c.admin_phone ? `<div class="client-email">📱 ${c.admin_phone}</div>` : ''}
+          ${c.admin_email?`<div class="client-meta">📧 ${c.admin_email}</div>`:''}
+          ${c.admin_phone?`<div class="client-meta">📱 ${c.admin_phone}</div>`:''}
         </div>
-        <span class="status-badge ${c.status||'active'}">${c.status||'active'}</span>
+        <span class="status-pill ${c.status||'active'}">${c.status||'active'}</span>
       </div>
-      <div class="client-stat">
-        <div class="client-stat-item">
-          <div class="client-stat-val">${c.employee_count||0}</div>
-          <div class="client-stat-lbl">Employees</div>
+      <div class="client-stats">
+        <div class="cs-item">
+          <div class="cs-val">${c.employee_count||0}</div>
+          <div class="cs-lbl">Employees</div>
         </div>
-        <div class="client-stat-item">
-          <div class="client-stat-val" style="color:var(--green-d)">${c.status==='active'?'✓':'✗'}</div>
-          <div class="client-stat-lbl">Status</div>
+        <div class="cs-item">
+          <div class="cs-val" style="font-size:13px;color:var(--muted)">${new Date(c.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+          <div class="cs-lbl">Created</div>
         </div>
-        <div class="client-stat-item">
-          <div class="client-stat-val" style="font-size:12px;color:var(--muted)">${new Date(c.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
-          <div class="client-stat-lbl">Created</div>
+        <div class="cs-item">
+          <div class="cs-val" style="font-size:13px">ID: ${c.id}</div>
+          <div class="cs-lbl">Client ID</div>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ── Add Client ─────────────────────────────────────────────────────────────────
+// ── Add ───────────────────────────────────────────────────────────────────────
 function openAddClient() {
-  document.getElementById('panel-title').textContent = '+ New Client';
-  document.getElementById('panel-body').innerHTML = `
+  document.getElementById('sp-title').textContent = '+ New Client';
+  document.getElementById('sp-body').innerHTML = `
     <div class="form-group"><label class="form-label">Client Name *</label>
-      <input id="cl-name" class="form-control" placeholder="e.g. Tata AIG Insurance"></div>
-    <div class="form-grid-2">
+      <input id="f-name" class="form-control" placeholder="e.g. Tata AIG Insurance"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="form-group"><label class="form-label">Admin Email</label>
-        <input id="cl-email" class="form-control" type="email" placeholder="admin@client.com"></div>
+        <input id="f-email" class="form-control" type="email" placeholder="admin@client.com"></div>
       <div class="form-group"><label class="form-label">Admin Phone</label>
-        <input id="cl-phone" class="form-control" placeholder="10-digit mobile"></div>
+        <input id="f-phone" class="form-control" placeholder="10-digit number"></div>
     </div>
-    <div class="form-group"><label class="form-label">Notes</label>
-      <textarea id="cl-notes" class="form-control" rows="3" placeholder="Optional notes about this client..."></textarea></div>
     <div class="form-group"><label class="form-label">Status</label>
-      <select id="cl-status" class="form-control">
+      <select id="f-status" class="form-control">
         <option value="active">Active</option>
         <option value="inactive">Inactive</option>
-      </select>
-    </div>
+      </select></div>
+    <div class="form-group"><label class="form-label">Notes</label>
+      <textarea id="f-notes" class="form-control" rows="3" placeholder="Optional notes…"></textarea></div>
   `;
-  document.getElementById('panel-footer').innerHTML = `
+  document.getElementById('sp-foot').innerHTML = `
     <button class="btn btn-outline" onclick="closePanel()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveClient()">✓ Create Client</button>
-  `;
+    <button class="btn btn-primary" onclick="saveNew()">✓ Create Client</button>`;
   openPanel();
 }
 
-async function saveClient() {
-  const name = document.getElementById('cl-name').value.trim();
-  if (!name) { toast('Client name is required', 'error'); return; }
-
-  const res = await api('POST', '/clients', {
+async function saveNew() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { toast('Client name is required','error'); return; }
+  const r = await api('POST','/clients',{
     name,
-    admin_email: document.getElementById('cl-email').value.trim() || null,
-    admin_phone: document.getElementById('cl-phone').value.trim() || null,
-    notes: document.getElementById('cl-notes').value.trim() || null,
-    status: document.getElementById('cl-status').value,
+    admin_email: document.getElementById('f-email').value.trim()||null,
+    admin_phone: document.getElementById('f-phone').value.trim()||null,
+    status:      document.getElementById('f-status').value,
+    notes:       document.getElementById('f-notes').value.trim()||null,
   });
-
-  if (res?.success) {
-    toast(`✅ Client "${name}" created!`);
-    closePanel();
-    loadClients();
-  } else {
-    toast(res?.message || 'Failed to create client', 'error');
-  }
+  if (r?.success) { toast(`✅ "${name}" created`); closePanel(); load(); }
+  else toast(r?.message||'Failed','error');
 }
 
-// ── Client Detail ──────────────────────────────────────────────────────────────
-async function openClientDetail(id) {
-  const client = allClients.find(c => c.id === id);
-  if (!client) return;
-
-  document.getElementById('panel-title').textContent = `🏭 ${client.name}`;
-
-  // Load employees for this client
-  const empRes = await api('GET', `/clients/${id}/employees`);
-  const employees = empRes?.data || [];
-
-  document.getElementById('panel-body').innerHTML = `
-    <div style="margin-bottom:20px">
-      <div class="form-group"><label class="form-label">Client Name</label>
-        <input id="edit-cl-name" class="form-control" value="${client.name}"></div>
-      <div class="form-grid-2">
-        <div class="form-group"><label class="form-label">Admin Email</label>
-          <input id="edit-cl-email" class="form-control" type="email" value="${client.admin_email||''}"></div>
-        <div class="form-group"><label class="form-label">Admin Phone</label>
-          <input id="edit-cl-phone" class="form-control" value="${client.admin_phone||''}"></div>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group"><label class="form-label">Status</label>
-          <select id="edit-cl-status" class="form-control">
-            <option value="active" ${client.status==='active'?'selected':''}>Active</option>
-            <option value="inactive" ${client.status==='inactive'?'selected':''}>Inactive</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group"><label class="form-label">Notes</label>
-        <textarea id="edit-cl-notes" class="form-control" rows="2">${client.notes||''}</textarea></div>
-    </div>
-
-    <div style="margin-top:20px">
-      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">
-        👥 Deployed Employees (${employees.length})
-      </div>
-      ${employees.length ? employees.map(e => `
-        <div class="emp-list-item">
-          <div class="emp-avatar-sm">${(e.first_name?.[0]||'')}${(e.last_name?.[0]||'')}</div>
-          <div class="emp-info-sm" style="flex:1">
-            <div class="name">${e.first_name} ${e.last_name||''} 
-              ${e.role==='client_admin'?'<span style="background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700">ADMIN</span>':''}
-            </div>
-            <div class="code">${e.employee_code} · ${e.department_name||'—'} · ${e.designation_title||'—'}</div>
-          </div>
-          <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${e.is_active?'var(--green-l)':'var(--red-l)'};color:${e.is_active?'var(--green-d)':'var(--red-d)'};font-weight:600">
-            ${e.is_active?'Active':'Inactive'}
-          </span>
-        </div>
-      `).join('') : '<div class="empty-state"><div class="icon">👤</div><p>No employees yet<br><small>Import employees with this client name in Column A</small></p></div>'}
-    </div>
-  `;
-
-  document.getElementById('panel-footer').innerHTML = `
+// ── Detail ────────────────────────────────────────────────────────────────────
+async function openDetail(id) {
+  const c = ALL.find(x=>x.id===id); if(!c) return;
+  document.getElementById('sp-title').textContent = `🏭 ${c.name}`;
+  document.getElementById('sp-body').innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  document.getElementById('sp-foot').innerHTML = `
     <button class="btn btn-outline" onclick="closePanel()">Close</button>
-    <button class="btn btn-primary" onclick="updateClient(${id})">💾 Save Changes</button>
-  `;
+    <button class="btn btn-primary" onclick="saveEdit(${id})">💾 Save</button>`;
   openPanel();
+
+  // Load employees
+  const er = await api('GET',`/clients/${id}/employees`);
+  const emps = er?.data||[];
+
+  document.getElementById('sp-body').innerHTML = `
+    <div class="form-group"><label class="form-label">Client Name</label>
+      <input id="e-name" class="form-control" value="${c.name}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Admin Email</label>
+        <input id="e-email" class="form-control" type="email" value="${c.admin_email||''}"></div>
+      <div class="form-group"><label class="form-label">Admin Phone</label>
+        <input id="e-phone" class="form-control" value="${c.admin_phone||''}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Status</label>
+        <select id="e-status" class="form-control">
+          <option value="active" ${c.status==='active'?'selected':''}>Active</option>
+          <option value="inactive" ${c.status==='inactive'?'selected':''}>Inactive</option>
+        </select></div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes</label>
+      <textarea id="e-notes" class="form-control" rows="2">${c.notes||''}</textarea></div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1.5px solid var(--border)">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">
+        👥 Deployed Employees <span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;margin-left:6px">${emps.length}</span>
+      </div>
+      ${emps.length ? emps.map(e=>`
+        <div class="emp-row">
+          <div class="emp-av">${(e.first_name?.[0]||'')}${(e.last_name?.[0]||'')}</div>
+          <div style="flex:1">
+            <div class="emp-n">${e.first_name} ${e.last_name||''}
+              ${e.role==='client_admin'?`<span style="background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;margin-left:4px">ADMIN</span>`:''}
+            </div>
+            <div class="emp-c">${e.employee_code} · ${e.department_name||'—'}</div>
+          </div>
+          <span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:${e.is_active?'var(--green-l)':'var(--red-l)'};color:${e.is_active?'var(--green-d)':'var(--red-d)'}">${e.is_active?'Active':'Inactive'}</span>
+        </div>`).join('') :
+        `<div style="text-align:center;padding:30px 0;color:var(--muted)">
+          <div style="font-size:30px;margin-bottom:8px">👤</div>
+          <p style="font-size:13px">No employees yet</p>
+          <p style="font-size:12px;margin-top:4px">Import employees with <b>${c.name}</b> in Column A</p>
+        </div>`}
+    </div>`;
 }
 
-async function updateClient(id) {
-  const res = await api('PUT', `/clients/${id}`, {
-    name:        document.getElementById('edit-cl-name').value.trim(),
-    admin_email: document.getElementById('edit-cl-email').value.trim() || null,
-    admin_phone: document.getElementById('edit-cl-phone').value.trim() || null,
-    status:      document.getElementById('edit-cl-status').value,
-    notes:       document.getElementById('edit-cl-notes').value.trim() || null,
+async function saveEdit(id) {
+  const r = await api('PUT',`/clients/${id}`,{
+    name:        document.getElementById('e-name').value.trim(),
+    admin_email: document.getElementById('e-email').value.trim()||null,
+    admin_phone: document.getElementById('e-phone').value.trim()||null,
+    status:      document.getElementById('e-status').value,
+    notes:       document.getElementById('e-notes').value.trim()||null,
   });
-
-  if (res?.success) {
-    toast('✅ Client updated!');
-    closePanel();
-    loadClients();
-  } else {
-    toast(res?.message || 'Failed to update', 'error');
-  }
+  if (r?.success) { toast('✅ Client updated'); closePanel(); load(); }
+  else toast(r?.message||'Failed','error');
 }
 
-// ── Panel helpers ──────────────────────────────────────────────────────────────
-function openPanel() {
-  document.getElementById('detail-panel').classList.add('open');
-  document.getElementById('panel-overlay').classList.add('open');
-}
-function closePanel() {
-  document.getElementById('detail-panel').classList.remove('open');
-  document.getElementById('panel-overlay').classList.remove('open');
-}
+function openPanel()  { document.getElementById('panel').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function closePanel() { document.getElementById('panel').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
 
-loadClients();
+load();
 </script>
 </body>
 </html>
