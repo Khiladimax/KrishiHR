@@ -1152,7 +1152,7 @@ loadEmployees();
 
 // ── Client Deployment: show client filter for admin/super_admin ──────────────
 let clientsData = [];
-if (Role.is('admin', 'super_admin')) {  document.getElementById('client-filter').style.display = '';
+if (Role.is('admin', 'super_admin', 'hr', 'accounts')) {  document.getElementById('client-filter').style.display = '';
   // Show client column in table
   document.querySelectorAll('.client-col').forEach(el => el.style.display = '');
   loadClients();
