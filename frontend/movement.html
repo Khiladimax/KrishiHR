@@ -241,6 +241,13 @@ async function loadMovementSummary() {
   const rows = res.data || [];
   if (!rows.length) { wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:14px">No movement data found for selected filters</div>'; return; }
 
+  // Sort: tracked employees (point_count > 0) first, not-tracking at bottom
+  rows.sort((a, b) => {
+    if (a.point_count === 0 && b.point_count > 0) return 1;
+    if (a.point_count > 0 && b.point_count === 0) return -1;
+    return b.total_km - a.total_km; // within each group, sort by km descending
+  });
+
   let html = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
       <th style="padding:10px 12px;text-align:left;font-weight:600;color:#374151">Employee</th>
