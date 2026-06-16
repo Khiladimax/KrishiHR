@@ -421,6 +421,13 @@ router.get('/dashboard', authenticate, async (req, res) => {
     );
     const unreadNotifCount = parseInt(unreadNotifRes.rows[0].count) || 0;
 
+    // Total employee count scoped by client
+    const empCountFilter = req.user.client_id
+      ? `WHERE client_id = ${parseInt(req.user.client_id)} AND is_active = true`
+      : `WHERE client_id IS NULL AND is_active = true`;
+    const empCountRes = await db.query(`SELECT COUNT(*) FROM employees ${empCountFilter}`);
+    const totalEmployees = parseInt(empCountRes.rows[0].count) || 0;
+
     res.json({
       success: true,
       data: {
@@ -429,6 +436,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
         pending_leave_approvals:      pendingCount,
         pending_regularizations:      pendingRegCount,
         unread_notifications:         unreadNotifCount,
+        total_employees:              totalEmployees,
       }
     });
   } catch(e) {

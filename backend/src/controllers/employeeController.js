@@ -80,8 +80,11 @@ exports.getAll = async (req, res) => {
 
     // ── Client deployment scoping: client_admin sees ONLY their client's employees ──
     if (userRole === 'client_admin' && req.user.client_id) {
+      console.log(`[EmployeeGetAll] client_admin ${req.user.id} scoped to client_id=${req.user.client_id}`);
       conditions.push(`e.client_id=$${idx++}`);
       params.push(req.user.client_id);
+    } else if (userRole === 'client_admin') {
+      console.log(`[EmployeeGetAll] client_admin ${req.user.id} has NO client_id in DB!`);
     }
 
     // ── Super admin: optional client_id filter (own=NULL, or specific client) ──
