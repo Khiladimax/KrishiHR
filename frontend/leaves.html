@@ -330,7 +330,7 @@ let leaveTypesData = [];
 let balanceData    = [];
 let holidayDates   = new Set();
 
-if (Role.is('admin','super_admin','hr','manager','tl','accounts')) document.getElementById('approvals-tab').style.display = '';
+if (Role.is('admin','super_admin','hr','manager','tl','accounts','client_admin')) document.getElementById('approvals-tab').style.display = '';
 if (Role.isAdminOrHR() || Role.is('accounts')) {
   document.getElementById('all-tab').style.display = '';
   // accrual tab hidden — auto-runs via cron

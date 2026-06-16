@@ -762,6 +762,30 @@ if (Role.is('admin')) {
   document.getElementById('reg-status-filter').style.display = '';
   document.getElementById('reg-filter-label').style.display = '';
 }
+// Client Admin — sees all their client's employees
+if (Role.is('client_admin')) {
+  document.getElementById('team-tab').style.display = '';
+  document.getElementById('loc-tab').style.display = '';
+  document.getElementById('reg-status-filter').style.display = '';
+  document.getElementById('reg-filter-label').style.display = '';
+  document.getElementById('emp-filter').style.display = '';
+  document.getElementById('sum-emp-select').style.display = '';
+  loadEmployeeFilter();
+  loadSummaryEmployeePicker();
+  document.getElementById('download-tab').style.display = '';
+  // Init download tab for client_admin
+  (function initClientAdminDownload() {
+    const NOW = new Date();
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dlMonth = document.getElementById('dl-month');
+    const dlYear  = document.getElementById('dl-year');
+    if (dlMonth && !dlMonth.options.length)
+      MONTHS.forEach((m,i) => dlMonth.innerHTML += `<option value="${i+1}" ${i+1===NOW.getMonth()+1?'selected':''}>${m}</option>`);
+    if (dlYear && !dlYear.options.length)
+      for (let y = NOW.getFullYear(); y >= 2020; y--)
+        dlYear.innerHTML += `<option value="${y}" ${y===NOW.getFullYear()?'selected':''}>${y}</option>`;
+  })();
+}
 // Accounts — can download all employee reports but no team-today tab
 if (Role.is('accounts')) {
   document.getElementById('sum-emp-select').style.display = '';
@@ -1852,7 +1876,7 @@ async function loadTeamToday() {
   }
 
   // Load pending OD/WFH for approvers
-  const isApprover = Role.isManagerUp() || Role.is('hr','admin','super_admin','tl');
+  const isApprover = Role.isManagerUp() || Role.is('hr','admin','super_admin','tl','client_admin');
   if (isApprover) loadTeamODWFHPending();
 }
 
