@@ -21,16 +21,27 @@ function toLocalDateString(d) {
 // Returns ordered array of approver employee_codes.
 async function getLeaveApprovalChain(employeeId) {
   const emp = await db.query(
-    `SELECT e.employee_code, e.reporting_manager_id,
+    `SELECT e.employee_code, e.reporting_manager_id, e.client_id,
             m.employee_code AS manager_code, m.role AS manager_role
      FROM employees e
      LEFT JOIN employees m ON e.reporting_manager_id = m.id
      WHERE e.id=$1`, [employeeId]
   );
   if (!emp.rows.length) return [];
-  const { employee_code, manager_code, manager_role } = emp.rows[0];
+  const { employee_code, manager_code, manager_role, client_id } = emp.rows[0];
 
   const MD_CODE = 'KC01';
+
+  // Client deployed employee → client_admin is the ONLY approver
+  if (client_id) {
+    const clientAdmin = await db.query(
+      `SELECT employee_code FROM employees
+       WHERE client_id=$1 AND role='client_admin' AND is_active=true LIMIT 1`,
+      [client_id]
+    );
+    if (clientAdmin.rows.length) return [clientAdmin.rows[0].employee_code];
+    return []; // no approver fallback = auto-approved
+  }
 
   // MD / super_admin applies → no approver needed (auto-approved)
   if (employee_code === MD_CODE) return [];
@@ -240,6 +251,7 @@ exports.action = async (req, res) => {
     // Verify actor is allowed to act
     const isSuperAdmin      = actorRole === 'super_admin';
     const isAdmin           = actorRole === 'admin';
+    const isClientAdmin     = actorRole === 'client_admin';
     const isCurrentApprover = actorCode === currentCode;
 
     // super_admin (KC01/MD) may only action leave for KC718 (COO)
@@ -259,28 +271,37 @@ exports.action = async (req, res) => {
     if (leave.employee_id === req.user.id)
       return res.status(403).json({ success: false, message: 'You cannot approve your own leave request' });
 
-    // Check if actor is the employee's reporting manager or team leader
-    // (covers org changes after leave was applied, and HR who doubles as reporting manager)
-    let isTeamManager = false;
-    if (!isAdmin && !isCurrentApprover) {
-      const teamCheck = await client.query(
-        `SELECT 1 FROM employees
-         WHERE id=$1 AND (reporting_manager_id=$2 OR team_leader_id=$2)`,
-        [leave.employee_id, req.user.id]
+    // client_admin can approve any leave for their client's employees
+    if (isClientAdmin) {
+      const empCheck = await client.query(
+        `SELECT client_id FROM employees WHERE id=$1`, [leave.employee_id]
       );
-      isTeamManager = teamCheck.rows.length > 0;
+      if (empCheck.rows[0]?.client_id !== req.user.client_id) {
+        return res.status(403).json({ success: false, message: 'You can only approve leave for your own organisation' });
+      }
+      // client_admin is allowed — skip further checks
+    } else {
+      // Check if actor is the employee's reporting manager or team leader
+      let isTeamManager = false;
+      if (!isAdmin && !isCurrentApprover) {
+        const teamCheck = await client.query(
+          `SELECT 1 FROM employees
+           WHERE id=$1 AND (reporting_manager_id=$2 OR team_leader_id=$2)`,
+          [leave.employee_id, req.user.id]
+        );
+        isTeamManager = teamCheck.rows.length > 0;
+      }
+
+      // HR is allowed ONLY if they are the current approver or the employee's reporting manager.
+      if (actorRole === 'hr' && !isCurrentApprover && !isTeamManager)
+        return res.status(403).json({
+          success: false,
+          message: 'HR can approve leave only if they are the reporting manager for this employee.'
+        });
+
+      if (!isAdmin && !isCurrentApprover && !isTeamManager)
+        return res.status(403).json({ success: false, message: 'You are not the current approver for this leave' });
     }
-
-    // HR is allowed ONLY if they are the current approver or the employee's reporting manager.
-    // Otherwise HR is notified only and cannot approve/reject.
-    if (actorRole === 'hr' && !isCurrentApprover && !isTeamManager)
-      return res.status(403).json({
-        success: false,
-        message: 'HR can approve leave only if they are the reporting manager for this employee.'
-      });
-
-    if (!isAdmin && !isCurrentApprover && !isTeamManager)
-      return res.status(403).json({ success: false, message: 'You are not the current approver for this leave' });
 
     // ── REJECT ────────────────────────────────────────────────
     if (action === 'reject') {
