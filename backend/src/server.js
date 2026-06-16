@@ -823,6 +823,11 @@ async function start() {
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_emp_date ON movement_alerts(employee_id, alert_date)`).catch(() => {});
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_status ON movement_alerts(status)`).catch(() => {});
         console.log('✅ DB schema ready');
+        // Expand any VARCHAR columns that may be too short
+        await db.query(`ALTER TABLE employees ALTER COLUMN blood_group TYPE VARCHAR(10)`).catch(() => {});
+        await db.query(`ALTER TABLE employees ALTER COLUMN gender TYPE VARCHAR(20)`).catch(() => {});
+        await db.query(`ALTER TABLE employees ALTER COLUMN pincode TYPE VARCHAR(15)`).catch(() => {});
+        await db.query(`ALTER TABLE employees ALTER COLUMN level TYPE VARCHAR(20)`).catch(() => {});
         // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
         // startup — they held DB connections and starved the pool causing login timeouts.
         // Run these manually via pgAdmin when needed.

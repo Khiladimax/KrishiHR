@@ -68,11 +68,10 @@ exports.importEmployees = async (req, res) => {
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
     console.log(`[Import] Total rows in sheet: ${rows.length}`);
     console.log(`[Import] Row 0 (header):`, rows[0]?.slice(0,6));
-    console.log(`[Import] Row 1 (hints):`, rows[1]?.slice(0,6));
-    console.log(`[Import] Row 2 (first data):`, rows[2]?.slice(0,6));
+    console.log(`[Import] Row 1 (first data):`, rows[1]?.slice(0,6));
 
-    // Skip header row (1) + hint row (2) = data starts at index 2 (row 3)
-    const dataRows = rows.slice(2).filter(r => {
+    // Skip header row only (row 1) = data starts at index 1 (row 2)
+    const dataRows = rows.slice(1).filter(r => {
       const code = clean(r[COL.employee_code]);
       return code && !code.toLowerCase().startsWith('emp code') && !code.toLowerCase().startsWith('kcms00');
     });
@@ -235,6 +234,10 @@ exports.importEmployees = async (req, res) => {
       } catch (rowErr) {
         await client.query(`ROLLBACK TO SAVEPOINT row_save`).catch(() => {});
         console.error(`[Import] Row ${rowNum} error:`, rowErr.message);
+        // Log all values to find which is too long
+        if (rowErr.message.includes('too long')) {
+          console.log(`[Import] Row ${rowNum} values:`, row.slice(0, 15).map((v,i) => `col${i}=${String(v).substring(0,20)}`));
+        }
         results.errors.push(`Row ${rowNum} (${employee_code}): ${rowErr.message}`);
       }
     }
