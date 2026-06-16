@@ -170,17 +170,17 @@ body {
 /* PAGE */
 .page {
   width: 210mm;
-  height: 297mm;
+  min-height: 297mm;
   margin: 0 auto;
   background: #fff;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
 }
+.body { flex: 1; }
+.ftr  { margin-top: auto; flex-shrink: 0; }
 @media screen {
-  body { background: #aaa; padding: 20px 0; }
-  .page { box-shadow: 0 2px 16px rgba(0,0,0,.25); margin-bottom: 24px; height: auto; min-height: 297mm; }
+  body { background: #888; padding: 20px 0; }
+  .page { box-shadow: 0 2px 16px rgba(0,0,0,.25); margin-bottom: 28px; }
 }
 
 /* HEADER — identical on every .page div */
@@ -357,19 +357,30 @@ ul.rules li {
 
 /* Print */
 @media print {
-  body { margin: 0; background: #fff; }
+  @page { size: A4; margin: 10mm 18mm 18mm 18mm; }
+
+  body { margin: 0; padding: 0; background: #fff; }
+
+  /* Each .page is one A4 sheet */
   .page {
     width: 100%;
-    height: 267mm;  /* A4 297mm - top 15mm - bottom 15mm */
+    min-height: 0;
     page-break-after: always;
     box-shadow: none;
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(297mm - 28mm); /* A4 minus margins */
   }
   .page:last-child { page-break-after: auto; }
+  .body  { flex: 1; }
+  .ftr   { margin-top: auto; flex-shrink: 0; }
+  .hdr   { flex-shrink: 0; }
+
   .page-break { page-break-before: always; }
   .sec { page-break-after: avoid; }
   ul.rules li { page-break-inside: avoid; }
   .sig-row { page-break-inside: avoid; }
+
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }`;
