@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "public": true,
+  "github": {
+    "silent": false
+  },
+  "buildCommand": null,
+  "outputDirectory": "frontend",
+  "ignoreCommand": "git diff HEAD^ HEAD --name-only | grep -qvE '^frontend/'",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+      ]
+    }
+  ]
+}
