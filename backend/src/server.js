@@ -832,6 +832,15 @@ async function start() {
           await db.query(`ALTER TABLE employees ALTER COLUMN ${col} TYPE TEXT`).catch(() => {});
         }
         console.log('✅ Employee columns expanded to TEXT');
+        // Add client_admin to role check constraint
+        await db.query(`
+          ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check
+        `).catch(() => {});
+        await db.query(`
+          ALTER TABLE employees ADD CONSTRAINT employees_role_check
+          CHECK (role IN ('employee','tl','manager','hr','accounts','admin','super_admin','client_admin'))
+        `).catch(() => {});
+        console.log('✅ Role constraint updated with client_admin');
         // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
         // startup — they held DB connections and starved the pool causing login timeouts.
         // Run these manually via pgAdmin when needed.
