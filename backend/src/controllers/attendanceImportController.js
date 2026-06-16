@@ -336,13 +336,16 @@ const MONTH_NAMES = ['January','February','March','April','May','June',
 exports.downloadAttendanceReport = async (req, res) => {
   try {
     // ── 1. Role gate ───────────────────────────────────────────────────────
-    const allowedRoles = ['hr', 'accounts'];
+    const allowedRoles = ['hr', 'accounts', 'client_admin'];
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only HR and Accounts can download attendance reports.'
+        message: 'Access denied. Only HR, Accounts and Client Admin can download attendance reports.'
       });
     }
+
+    const isClientAdmin = req.user.role === 'client_admin';
+    const clientId      = req.user.client_id;
 
     const { month, year, department_id } = req.query;
     const mon       = parseInt(month) || new Date().getMonth() + 1;
@@ -350,7 +353,7 @@ exports.downloadAttendanceReport = async (req, res) => {
     const monthName = MONTH_NAMES[mon - 1];
     const numDays   = new Date(yr, mon, 0).getDate();
 
-    // ── 2. Fetch employees (BUG FIX: separate query params from att params) ─
+    // ── 2. Fetch employees scoped by client if client_admin ──────────────
     let empQuery  = `SELECT e.id, e.employee_code,
                             CONCAT(e.first_name,' ',e.last_name) AS name,
                             d.name AS department,
@@ -361,14 +364,21 @@ exports.downloadAttendanceReport = async (req, res) => {
                      LEFT JOIN designations des ON e.designation_id = des.id
                      WHERE e.is_active = true`;
     let empParams = [];
+    let paramIdx  = 1;
+
+    // Client admin: restrict to their client's employees only
+    if (isClientAdmin && clientId) {
+      empQuery += ` AND e.client_id = $${paramIdx++}`;
+      empParams.push(clientId);
+    }
     if (department_id) {
-      empQuery += ` AND e.department_id = $1`;
-      empParams = [department_id];
+      empQuery += ` AND e.department_id = $${paramIdx++}`;
+      empParams.push(department_id);
     }
     empQuery += ` ORDER BY d.name, e.first_name`;
     const employees = await db.query(empQuery, empParams);
 
-    // ── 3. Fetch attendance for the month ─────────────────────────────────
+    // ── 3. Fetch attendance for the month scoped by client ───────────────
     let attQuery  = `SELECT employee_id,
                             TO_CHAR(date,'YYYY-MM-DD') AS date_str,
                             EXTRACT(DAY FROM date)::int AS day,
@@ -380,7 +390,10 @@ exports.downloadAttendanceReport = async (req, res) => {
                      WHERE EXTRACT(MONTH FROM date) = $1
                        AND EXTRACT(YEAR  FROM date) = $2`;
     let attParams = [mon, yr];
-    if (department_id) {
+    if (isClientAdmin && clientId) {
+      attQuery  += ` AND employee_id IN (SELECT id FROM employees WHERE client_id = $3)`;
+      attParams.push(clientId);
+    } else if (department_id) {
       attQuery  += ` AND employee_id IN (SELECT id FROM employees WHERE department_id = $3)`;
       attParams.push(department_id);
     }

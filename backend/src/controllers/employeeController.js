@@ -862,6 +862,10 @@ exports.exportMasterExcel = async (req, res) => {
     const y = parseInt(year)  || new Date().getFullYear();
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+    const isClientAdmin = req.user.role === 'client_admin';
+    const clientId      = req.user.client_id;
+    const clientFilter  = isClientAdmin && clientId ? `AND e.client_id = ${parseInt(clientId)}` : '';
+
     // ── 1. Employees + salary structure ─────────────────────────────────────
     const empResult = await db.query(`
       SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
@@ -902,9 +906,11 @@ exports.exportMasterExcel = async (req, res) => {
       LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
       WHERE (
         e.is_active = true
+        ${clientFilter}
         OR (
           -- Include employees deactivated this month or later
           e.is_active = false
+          ${clientFilter}
           AND (
             e.separation_date IS NULL
             OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1)

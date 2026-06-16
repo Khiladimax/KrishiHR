@@ -117,7 +117,7 @@ router.post('/attendance/regularize/action',authenticate, attCtrl.actionRegulari
 
 // ── Attendance Bulk Import (Excel) — kept here for reference (defined above) ──
 
-router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
+router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts','client_admin'), attImportCtrl.downloadAttendanceReport);
 
 // ── OD / WFH apply (all employees) ───────────────────────────────────────────
 router.post('/attendance/od',              authenticate, attCtrl.applyOD);
@@ -127,7 +127,7 @@ router.post('/attendance/od/:id/action',   authenticate, authorize('hr','super_a
 router.post('/attendance/wfh',             authenticate, attCtrl.applyWFH);
 router.get ('/attendance/wfh',             authenticate, attCtrl.getWFHRequests);
 router.post('/attendance/wfh/:id/action',  authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionWFH);
-router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts'), attImportCtrl.downloadAttendanceReport);
+router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts','client_admin'), attImportCtrl.downloadAttendanceReport);
 // KC718 / super_admin: mark own attendance for a date range without punch in/out
 router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
 
