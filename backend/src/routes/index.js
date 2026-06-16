@@ -33,7 +33,7 @@ const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
 // KC346 geofence access — hardcoded north zone manager
 const authorizeGeofence = (req, res, next) => {
-  if (['admin','super_admin'].includes(req.user.role) || req.user.employee_code === 'KC346') return next();
+  if (['admin','super_admin','client_admin'].includes(req.user.role) || req.user.employee_code === 'KC346') return next();
   return res.status(403).json({ success: false, message: 'Access denied. Required: admin or super_admin' });
 };
 const EMP_MGMT   = ['hr','accounts','admin','super_admin','client_admin'];

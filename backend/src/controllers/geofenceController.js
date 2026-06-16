@@ -1318,6 +1318,10 @@ exports.deleteBufferRule = async (req, res) => {
 // ── GET all rules (for admin list view) ──────────────────────────────────────
 exports.getAllBufferRules = async (req, res) => {
   try {
+    const clientFilter = req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+      : '';
+
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
               ebr.rule_type, ebr.state, ebr.district, ebr.assigned_at, ebr.updated_at,
@@ -1334,7 +1338,7 @@ exports.getAllBufferRules = async (req, res) => {
          LIMIT 1
        ) latest_eg ON TRUE
        LEFT JOIN office_locations ol ON ol.id = latest_eg.office_location_id
-       WHERE e.is_active = TRUE
+       WHERE e.is_active = TRUE ${clientFilter}
        ORDER BY e.first_name`
     );
     res.json({ success: true, data: r.rows });
