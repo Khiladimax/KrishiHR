@@ -923,7 +923,13 @@ let _expandedRows = new Set();   // location IDs currently expanded
 let _locEmployees = {};          // cache: locId → [employee, ...]
 let _assignLocId  = null;
 let _deleteLocId  = null;
-let _empClientFilter = 'own';    // employee tab client filter
+// client_admin employees all have a client_id set, so 'own' (which filters to
+// client_id IS NULL) would drop every single one of them. Default to 'all' for
+// client_admin — the backend already scopes the query to their client_id via JWT.
+let _empClientFilter = (() => {
+  const u = Auth.getUser();
+  return (u?.role === 'client_admin') ? 'all' : 'own';
+})();
 
 // ── Init employee tab client dropdown (admin/super_admin/hr only) ──
 (async () => {
@@ -1098,7 +1104,18 @@ async function loadAll() {
   _allLocations = allLocs;
   _allEmployees = allEmps;
   _allRules     = allRules;
-  _globalAssignedCount = isKC346 ? allEmps.length : (locData?.global_assigned_count ?? null);
+  // For client_admin: if they have no locations yet, global_assigned_count from backend
+  // will be 0 (no location rows = no count). Fall back to total employees visible to them.
+  const user = Auth.getUser();
+  if (isKC346) {
+    _globalAssignedCount = allEmps.length;
+  } else if (user?.role === 'client_admin') {
+    _globalAssignedCount = locData?.global_assigned_count > 0
+      ? locData.global_assigned_count
+      : allEmps.length;
+  } else {
+    _globalAssignedCount = locData?.global_assigned_count ?? null;
+  }
   _locEmployees = {}; // clear cache
   renderMapMarkers();
   updateStats();
