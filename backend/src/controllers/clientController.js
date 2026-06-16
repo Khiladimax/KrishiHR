@@ -128,6 +128,16 @@ async function createClient(req, res) {
 async function updateClient(req, res) {
   try {
     const { name, admin_email, admin_phone, status, notes } = req.body;
+    const clientId = req.params.id;
+
+    // Get current status to detect change
+    const current = await db.query(`SELECT status FROM clients WHERE id=$1`, [clientId]);
+    if (!current.rows.length)
+      return res.status(404).json({ success: false, message: 'Client not found' });
+
+    const prevStatus = current.rows[0].status;
+    const newStatus  = status || prevStatus;
+
     const result = await db.query(
       `UPDATE clients SET
          name = COALESCE($1, name),
@@ -138,13 +148,26 @@ async function updateClient(req, res) {
          updated_at = NOW()
        WHERE id = $6
        RETURNING *`,
-      [name, admin_email, admin_phone, status, notes, req.params.id]
+      [name, admin_email, admin_phone, status, notes, clientId]
     );
 
-    if (!result.rows.length) {
-      return res.status(404).json({ success: false, message: 'Client not found' });
+    // ── If status changed → bulk update all employees ─────────────────────────
+    if (newStatus !== prevStatus) {
+      const isActive = newStatus === 'active';
+      await db.query(
+        `UPDATE employees SET is_active=$1 WHERE client_id=$2`,
+        [isActive, clientId]
+      );
+      console.log(`[Client] ${isActive ? 'Reactivated' : 'Deactivated'} all employees for client ${clientId}`);
     }
-    res.json({ success: true, data: result.rows[0] });
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: newStatus !== prevStatus
+        ? `Client ${newStatus === 'active' ? 'activated' : 'deactivated'} — all employees updated`
+        : 'Client updated'
+    });
   } catch (err) {
     console.error('Update client error:', err);
     res.status(500).json({ success: false, message: err.message });

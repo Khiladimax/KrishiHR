@@ -284,14 +284,25 @@ async function openDetail(id) {
 }
 
 async function saveEdit(id) {
+  const newStatus = document.getElementById('e-status').value;
+  const c = ALL.find(x=>x.id===id);
+  
+  // Warn if deactivating
+  if (c && c.status === 'active' && newStatus === 'inactive') {
+    if (!confirm(`⚠️ Deactivating "${c.name}" will also deactivate ALL ${c.employee_count||0} deployed employees including the client admin.\n\nAre you sure?`)) return;
+  }
+  if (c && c.status === 'inactive' && newStatus === 'active') {
+    if (!confirm(`Reactivating "${c.name}" will also reactivate ALL their employees.\n\nContinue?`)) return;
+  }
+
   const r = await api('PUT',`/clients/${id}`,{
     name:        document.getElementById('e-name').value.trim(),
     admin_email: document.getElementById('e-email').value.trim()||null,
     admin_phone: document.getElementById('e-phone').value.trim()||null,
-    status:      document.getElementById('e-status').value,
+    status:      newStatus,
     notes:       document.getElementById('e-notes').value.trim()||null,
   });
-  if (r?.success) { toast('✅ Client updated'); closePanel(); load(); }
+  if (r?.success) { toast(`✅ ${r.message||'Client updated'}`); closePanel(); load(); }
   else toast(r?.message||'Failed','error');
 }
 
