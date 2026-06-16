@@ -1141,6 +1141,12 @@ if (Role.is('hr', 'accounts', 'client_admin')) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+let _clientFilter = 'all';
+function onClientFilterChange() {
+  _clientFilter = document.getElementById('client-filter').value;
+  loadEmployees();
+}
+
 loadDepartments();
 loadEmployees();
 
@@ -1171,13 +1177,6 @@ async function loadClients() {
     loadEmployees();
   }
 }
-
-let _clientFilter = 'all';
-function onClientFilterChange() {
-  _clientFilter = document.getElementById('client-filter').value;
-  loadEmployees();
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 // ── Departments ───────────────────────────────────────────────────────────────
 let _deptList = [];
