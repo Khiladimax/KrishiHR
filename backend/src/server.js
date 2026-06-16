@@ -824,10 +824,26 @@ async function start() {
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_status ON movement_alerts(status)`).catch(() => {});
         console.log('✅ DB schema ready');
         // Expand any VARCHAR columns that may be too short
-        await db.query(`ALTER TABLE employees ALTER COLUMN blood_group TYPE VARCHAR(10)`).catch(() => {});
-        await db.query(`ALTER TABLE employees ALTER COLUMN gender TYPE VARCHAR(20)`).catch(() => {});
-        await db.query(`ALTER TABLE employees ALTER COLUMN pincode TYPE VARCHAR(15)`).catch(() => {});
-        await db.query(`ALTER TABLE employees ALTER COLUMN level TYPE VARCHAR(20)`).catch(() => {});
+        const expandCols = [
+          ['employees', 'blood_group', 'VARCHAR(10)'],
+          ['employees', 'gender', 'VARCHAR(20)'],
+          ['employees', 'pincode', 'VARCHAR(15)'],
+          ['employees', 'level', 'VARCHAR(20)'],
+          ['employees', 'pan_number', 'VARCHAR(20)'],
+          ['employees', 'aadhar_number', 'VARCHAR(20)'],
+          ['employees', 'uan_number', 'VARCHAR(20)'],
+          ['employees', 'bank_ifsc', 'VARCHAR(20)'],
+          ['employees', 'bank_account', 'VARCHAR(30)'],
+          ['employees', 'bank_name', 'VARCHAR(100)'],
+          ['employees', 'phone', 'VARCHAR(20)'],
+          ['employees', 'alternate_phone', 'VARCHAR(20)'],
+          ['employees', 'marital_status', 'VARCHAR(20)'],
+          ['employees', 'employment_type', 'VARCHAR(30)'],
+          ['employees', 'employee_code', 'VARCHAR(30)'],
+        ];
+        for (const [table, col, type] of expandCols) {
+          await db.query(`ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${type}`).catch(() => {});
+        }
         // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
         // startup — they held DB connections and starved the pool causing login timeouts.
         // Run these manually via pgAdmin when needed.
