@@ -1106,7 +1106,7 @@ async function loadAll() {
   _allRules     = allRules;
   // For client_admin: if they have no locations yet, global_assigned_count from backend
   // will be 0 (no location rows = no count). Fall back to total employees visible to them.
-  const user = Auth.getUser();
+  // (user is already declared above via Auth.getUser())
   if (isKC346) {
     _globalAssignedCount = allEmps.length;
   } else if (user?.role === 'client_admin') {
