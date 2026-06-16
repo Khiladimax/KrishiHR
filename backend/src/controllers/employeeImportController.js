@@ -67,8 +67,8 @@ exports.importEmployees = async (req, res) => {
     const ws = wb.Sheets['Employee Import'] || wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-    // Skip title row (1) + header row (2) + hint row (3) = start at index 3
-    const dataRows = rows.slice(3).filter(r => {
+    // Skip header row (1) + hint row (2) = data starts at index 2 (row 3)
+    const dataRows = rows.slice(2).filter(r => {
       const code = clean(r[COL.employee_code]);
       return code && !code.toLowerCase().startsWith('emp code') && !code.toLowerCase().startsWith('kcms00');
     });
@@ -80,7 +80,7 @@ exports.importEmployees = async (req, res) => {
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
-      const rowNum = i + 4; // Excel row number for reporting
+      const rowNum = i + 3; // Excel row number for reporting (row 1=header, 2=hints, 3+=data)
 
       const employee_code = clean(row[COL.employee_code])?.toUpperCase();
       const first_name    = clean(row[COL.first_name]);
