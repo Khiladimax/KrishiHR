@@ -160,26 +160,21 @@ function buildOfferLetterHTML(ol) {
   const header = `
 <table class="hdr-tbl" cellpadding="0" cellspacing="0">
   <tr>
-    <td class="hdr-logo-cell" rowspan="2"><img src="${LOGO}" class="hdr-logo-img" alt="Krishi Care Logo"></td>
-    <td class="hdr-name-cell">Krishi Care &amp; Management Services Private Limited</td>
-    <td class="hdr-badge-cell" rowspan="2"><div class="hdr-badge">OFFICIAL<br>DOCUMENT</div></td>
+    <td class="hdr-logo-td" rowspan="3"><img src="${LOGO}" class="hdr-logo" alt="KCMS"></td>
+    <td class="hdr-name-td">Krishi Care &amp; Management Services Private Limited</td>
   </tr>
-  <tr>
-    <td class="hdr-addr-cell">
-      <div>Regd. &amp; Head Office: 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060</div>
-      <div>&#9993; hr@krishicare.in &nbsp;|&nbsp; &#127760; www.krishicare.com &nbsp;|&nbsp; &#9742; +91 22 6828 4109</div>
-    </td>
-  </tr>
+  <tr><td class="hdr-addr-td"><strong>Office Address:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway,<br>Shankarwadi Jogeshwari (East), Mumbai - 400060.</td></tr>
+  <tr><td class="hdr-contact-td">Email: <span class="elink">hr@krishicare.in</span> &nbsp;&nbsp; Website: <span class="elink">www.krishicare.in</span> &nbsp;&nbsp; Tel. - +912268284109</td></tr>
 </table>
-<div class="hdr-stripe"></div>`;
+<div class="hdr-rule"></div>
+<div class="hdr-corp">Corporate Office: H-12, Green Park Extension, New Delhi -110016. Tel: 011-41039506. &nbsp;&nbsp; CIN: ${COMPANY.cin}</div>
+<div class="hdr-rule2"></div>`;
 
   const footer = `
 <div class="pg-footer">
-  <div class="ftr-stripe"></div>
-  <table class="ftr-tbl" cellpadding="0" cellspacing="0"><tr>
-    <td class="ftr-left">Corporate Office: H-12, Green Park Extension, New Delhi - 110016 &nbsp;|&nbsp; Tel: 011-41039506</td>
-    <td class="ftr-right">CIN: ${COMPANY.cin}</td>
-  </tr></table>
+  <div class="ftr-rule"></div>
+  <p class="ftr-txt"><strong>Corporate Office:</strong> H-12, Green Park Extension, New Delhi -110016. Tel: 011-41039506.</p>
+  <p class="ftr-cin"><strong>CIN: ${COMPANY.cin}</strong></p>
 </div>`;
 
   const css = `
@@ -192,74 +187,66 @@ body {
   line-height: 1.5;
 }
 .pg { width: 210mm; margin: 0 auto; background: #fff; }
-.pg-body { padding: 10px 28px 8px; }
+.pg-body { padding: 8px 32px 8px; }
 .page-break { page-break-before: always; }
 
 /* HEADER */
-.hdr-tbl { width: 100%; border-collapse: collapse; background: #1B5E20; }
-.hdr-logo-cell { width: 90px; padding: 10px 8px 10px 14px; vertical-align: middle; }
-.hdr-logo-img { width: 80px; height: 80px; object-fit: contain; display: block; background: #fff; border-radius: 6px; padding: 4px; }
-.hdr-name-cell { padding: 8px 8px 2px; vertical-align: bottom; font-family: Arial, sans-serif; font-size: 14pt; font-weight: 900; color: #fff; text-align: center; }
-.hdr-addr-cell { padding: 2px 8px 8px; vertical-align: top; font-family: Arial, sans-serif; font-size: 8pt; color: #C8E6C9; text-align: center; line-height: 1.6; }
-.hdr-badge-cell { width: 80px; padding: 8px 12px 8px 4px; vertical-align: middle; }
-.hdr-badge { border: 1.5px solid rgba(255,255,255,0.5); border-radius: 6px; padding: 6px 8px; text-align: center; font-family: Arial, sans-serif; font-size: 7pt; font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: 1.5px; line-height: 1.9; }
-.hdr-stripe { height: 4px; background: linear-gradient(90deg, #A5D6A7, #FFD54F, #A5D6A7); }
+.hdr-tbl { width: 100%; border-collapse: collapse; }
+.hdr-logo-td { width: 90px; padding: 8px 12px 8px 0; vertical-align: middle; }
+.hdr-logo { width: 82px; height: 82px; object-fit: contain; display: block; }
+.hdr-name-td { font-size: 20pt; font-weight: bold; color: #000; vertical-align: bottom; padding-bottom: 2px; }
+.hdr-addr-td { font-size: 10pt; color: #000; line-height: 1.5; text-align: center; padding-top: 3px; }
+.hdr-contact-td { font-size: 9.5pt; color: #000; text-align: center; padding-top: 3px; padding-bottom: 6px; }
+.elink { color: #000; }
+.hdr-rule { border-top: 1.5px solid #000; margin: 4px 0 3px; }
+.hdr-corp { font-size: 8.5pt; text-align: center; color: #000; padding: 2px 0; }
+.hdr-rule2 { border-top: 1px solid #000; margin: 3px 0 0; }
 
 /* FOOTER */
-.pg-footer { margin-top: 14px; }
-.ftr-stripe { height: 3px; background: linear-gradient(90deg, #1B5E20, #A5D6A7, #1B5E20); margin-bottom: 5px; }
-.ftr-tbl { width: 100%; border-collapse: collapse; }
-.ftr-left { padding: 0 28px 8px; font-family: Arial, sans-serif; font-size: 8pt; color: #444; }
-.ftr-right { padding: 0 28px 8px; font-family: Arial, sans-serif; font-size: 8pt; color: #1B5E20; font-weight: 700; text-align: right; }
+.pg-footer { margin-top: 16px; }
+.ftr-rule { border-top: 1px solid #000; margin-bottom: 4px; }
+.ftr-txt { font-size: 9pt; text-align: center; color: #000; }
+.ftr-cin { font-size: 9pt; text-align: center; color: #000; margin-top: 2px; }
 
-/* LETTER */
-.date-line { text-align: right; font-size: 11pt; margin: 10px 0 10px; }
-.cand-block { border: 1px solid #C8E6C9; border-left: 4px solid #1B5E20; border-radius: 4px; padding: 8px 14px; margin: 8px 0 10px; background: #F9FBE7; }
-.cand-name { font-size: 12pt; font-weight: bold; color: #1B5E20; margin-bottom: 2px; }
-.cand-line { font-size: 11pt; line-height: 1.6; }
-.elink { color: #1565C0; text-decoration: underline; }
-.salut { font-size: 12pt; margin: 10px 0 8px; }
-.subj-bar { border-left: 4px solid #2E7D32; background: #F1F8E9; padding: 7px 14px; margin: 8px 0 10px; border-radius: 0 4px 4px 0; text-align: center; }
-.subj-bar p { font-size: 12pt; font-weight: bold; color: #1B5E20; text-decoration: underline; text-underline-offset: 2px; }
-.para { font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 7px; }
-.sec-hd { font-size: 12pt; font-weight: bold; color: #1B5E20; margin: 10px 0 4px; padding-left: 8px; border-left: 3px solid #A5D6A7; text-transform: uppercase; letter-spacing: 0.3px; }
-ul.rules { margin: 4px 0 8px 22px; }
-ul.rules li { font-size: 12pt; line-height: 1.6; margin-bottom: 5px; text-align: justify; }
+/* BODY */
+.pg-body { padding: 10px 32px 8px; }
+.date-line { text-align: right; font-size: 12pt; margin: 12px 0 14px; }
+.cand-block { margin: 0 0 12px 0; }
+.cand-name { font-size: 12pt; font-weight: bold; margin-bottom: 1px; }
+.cand-line { font-size: 12pt; line-height: 1.6; }
+.salut { font-size: 12pt; margin: 10px 0 10px; }
+.subj-line { font-size: 12pt; font-weight: bold; text-align: center; text-decoration: underline; margin: 8px 0 12px; }
+.para { font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 8px; }
+.sec-hd { font-size: 12pt; font-weight: bold; text-decoration: underline; margin: 12px 0 5px; }
+ul.rules { margin: 4px 0 8px 24px; }
+ul.rules li { font-size: 12pt; line-height: 1.6; margin-bottom: 6px; text-align: justify; }
 .sig-intro { font-size: 12pt; margin: 14px 0 10px; }
-.sig-row { display: flex; justify-content: space-between; margin-top: 8px; }
+.sig-row { display: flex; justify-content: space-between; margin-top: 36px; }
 .sig-col { width: 44%; }
 .sig-img { height: 44px; max-width: 160px; object-fit: contain; display: block; margin-bottom: 4px; }
-.sig-blank { height: 48px; border-bottom: 1px dashed #aaa; width: 150px; margin-bottom: 4px; }
-.sig-lbl { font-size: 11pt; line-height: 1.6; }
+.sig-blank { height: 44px; }
+.sig-lbl { font-size: 12pt; font-weight: bold; line-height: 1.6; }
 
 /* ANNEXURE */
-.ann-hdr { text-align: center; border: 1px solid #C8E6C9; background: #F1F8E9; border-radius: 6px; padding: 10px 16px; margin: 10px 0 12px; }
-.ann-hdr h2 { font-size: 13pt; color: #1B5E20; font-weight: bold; margin-bottom: 3px; }
-.ann-hdr p { font-size: 11pt; color: #444; }
-.ann-meta { border: 1px solid #DCEDC8; background: #F9FBE7; border-radius: 6px; padding: 10px 16px; margin-bottom: 12px; font-size: 11pt; line-height: 1.7; }
-.ann-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 20px; }
-.ann-meta strong { color: #1B5E20; }
-.ann-ctc { grid-column: 1/-1; font-size: 12pt; font-weight: bold; color: #1B5E20; border-top: 1px solid #C8E6C9; margin-top: 6px; padding-top: 6px; }
-.ann-tbl { width: 80%; margin: 0 auto 14px; border-collapse: collapse; font-size: 11pt; }
-.ann-tbl thead tr { background: #1B5E20; }
-.ann-tbl thead th { color: #fff; padding: 7px 10px; text-align: left; font-weight: bold; border: 1px solid #1B5E20; font-family: Arial, sans-serif; }
-.ann-tbl td { border: 1px solid #C8E6C9; padding: 5px 10px; }
-.ann-tbl tbody tr:nth-child(even) { background: #F9FBE7; }
-.c-sr { text-align: center; width: 50px; }
+.ann-title { font-size: 12pt; font-weight: bold; text-align: center; text-decoration: underline; margin: 14px 0 12px; }
+.ann-meta { font-size: 12pt; font-weight: bold; line-height: 1.8; margin-bottom: 12px; }
+.ann-tbl { width: 85%; margin: 0 auto 16px; border-collapse: collapse; font-size: 11pt; }
+.ann-tbl th { border: 1px solid #000; padding: 5px 10px; text-align: left; font-weight: bold; background: #fff; }
+.ann-tbl td { border: 1px solid #000; padding: 4px 10px; }
+.c-sr { text-align: center; width: 46px; }
 .c-num { text-align: right; width: 88px; }
-.r-sub td { font-weight: bold; background: #E8F5E9 !important; color: #1B5E20; }
-.r-net td { font-weight: bold; background: #E8F5E9 !important; color: #1B5E20; }
-.r-ctc td { font-weight: bold; background: #1B5E20 !important; color: #fff !important; }
-.ack-box { border: 1.5px solid #C8E6C9; border-radius: 6px; padding: 12px 18px; background: #F9FBE7; margin-top: 14px; }
-.ack-title { font-size: 12pt; font-weight: bold; color: #1B5E20; text-decoration: underline; margin-bottom: 8px; }
-.ack-para { font-size: 11pt; line-height: 1.6; margin-bottom: 14px; }
-.ack-tbl { width: 100%; border-collapse: collapse; font-size: 11pt; }
-.ack-lbl { white-space: nowrap; padding-right: 8px; width: 90px; font-weight: 600; }
-.ack-line { border-bottom: 1px solid #555; }
-.ack-gap { padding-left: 24px; }
+.r-sub td { font-weight: bold; }
+.r-net td { font-weight: bold; }
+.r-ctc td { font-weight: bold; }
+.ack-title { font-size: 12pt; font-weight: bold; text-decoration: underline; margin: 16px 0 8px; }
+.ack-para { font-size: 12pt; line-height: 1.6; margin-bottom: 20px; }
+.ack-tbl { width: 100%; border-collapse: collapse; font-size: 12pt; }
+.ack-lbl { white-space: nowrap; padding-right: 8px; width: 100px; }
+.ack-line { border-bottom: 1px solid #000; }
+.ack-gap { padding-left: 30px; }
 
 @media print {
-  body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; }
   .pg { width: 100%; }
   .page-break { page-break-before: always; }
   .sec-hd { page-break-after: avoid; }
@@ -276,47 +263,47 @@ ul.rules li { font-size: 12pt; line-height: 1.6; margin-bottom: 5px; text-align:
     <div class="cand-block">
       <p class="cand-name">${ol.candidate_name}</p>
       ${ol.candidate_address ? `<p class="cand-line">${ol.candidate_address.replace(/\\n/g,'<br>')}</p>` : ''}
-      ${ol.employee_code ? `<p class="cand-line"><strong>Employee Code:</strong> ${ol.employee_code}</p>` : ''}
-      ${ol.candidate_mobile ? `<p class="cand-line"><strong>Mob:</strong> ${ol.candidate_mobile}</p>` : ''}
-      ${ol.candidate_email  ? `<p class="cand-line"><strong>Email:</strong> <span class="elink">${ol.candidate_email}</span></p>` : ''}
+      ${ol.employee_code ? `<p class="cand-line"><strong>Employee Code &ndash; ${ol.employee_code}</strong></p>` : ''}
+      ${ol.candidate_mobile ? `<p class="cand-line"><strong>Mob &ndash; ${ol.candidate_mobile}</strong></p>` : ''}
+      ${ol.candidate_email  ? `<p class="cand-line"><strong>Email &ndash; ${ol.candidate_email}</strong></p>` : ''}
     </div>
-    <p class="salut">Dear ${ol.candidate_name.split(' ').filter(w=>!['Mr.','Ms.','Mrs.','Dr.'].includes(w))[0] || ol.candidate_name},</p>
-    <div class="subj-bar"><p>Sub: Letter of Offer / Appointment for the position of &ldquo;${ol.designation}&rdquo;</p></div>
+    <p class="salut">Dear ${ol.candidate_name},</p>
+    <p class="subj-line">Sub: Letter of offer/Appointment for the position of &ldquo;${ol.designation}&rdquo;</p>
     <p class="para">In reference to our discussions, we are pleased to offer you the position of <strong>&ldquo;${ol.designation}&rdquo;</strong> in Krishi Care &amp; Management Services Private Limited to be based at our <strong>${ol.location||'Mumbai'} Office</strong>${ol.joining_date ? ` as from <strong>${joiningDateHTML(ol.joining_date)}</strong>` : ''}.</p>
     <p class="para">The offer letter is valid for <strong>${ol.offer_valid_days||7} days</strong> by which time we must be informed of your decision; the said offer letter shall stand cancelled after the above-mentioned date.</p>
     <p class="para">We are pleased to issue this letter of offer on the following terms &amp; conditions:</p>
-    <p class="sec-hd">Emoluments</p>
+    <p class="sec-hd">EMOLUMENTS:</p>
     <p class="para">Your compensation on a cost to company basis will be <strong>Rs. ${Number(ctcAnnual).toLocaleString('en-IN')}/- PA (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong>. The remuneration has taken into consideration the status and responsibility of the appointment, and it is inclusive of all taxable and non-taxable emoluments, allowances and statutory contributions.</p>
-    <p class="sec-hd">Responsibilities</p>
+    <p class="sec-hd">RESPONSIBILITIES:</p>
     <p class="para">You will work as <strong>&ldquo;${ol.designation}&rdquo;</strong> of the Company and will be responsible for carrying out the operations of the Company as directed to you by the management. A detailed responsibility statement will be provided to you upon your joining.</p>
-    <p class="sec-hd">Probation Period</p>
+    <p class="sec-hd">PROBATION PERIOD:</p>
     <p class="para">You will be on a probationary period of <strong>${probStr} months</strong> during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.</p>
-    <p class="sec-hd">Separation of Services</p>
+    <p class="sec-hd">SEPERATION OF SERVICES:</p>
     <p class="para">Severance of relationship can be done by giving <strong>${noticeStr} month</strong> written notice. If you are unable to complete this notice period you will be liable to compensate the company ${noticeStr} months of salary or for the period not served.</p>
-    ${ol.custom_clauses ? `<p class="sec-hd">Additional Terms</p><p class="para">${ol.custom_clauses}</p>` : ''}
-    <p class="sec-hd">Other Rules &amp; Regulations</p>
+    ${ol.custom_clauses ? `<p class="sec-hd">ADDITIONAL TERMS:</p><p class="para">${ol.custom_clauses}</p>` : ''}
+    <p class="sec-hd">OTHER RULES AND REGULATION:</p>
     <p class="para">The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.</p>
     <ul class="rules">
-      <li>You will, in all respects, be governed by the company&rsquo;s rules and regulations.</li>
+      <li>You will, in all respects, be governed by the company&rsquo;s rules and regulations</li>
       <li>You will devote full time to the work of the Company and will not undertake any direct / indirect outside business or work, honorary or remunerative except with the prior written consent of the Management.</li>
       <li>You will abide by Leave Rules of company.</li>
-      <li>You have been engaged on the presumption that the particulars furnished by you in your application are correct. In case the said particulars are found to be incorrect or that you have concealed or withheld information or the relevant facts, the services can be terminated from the company without giving any reason and any time for notice of termination.</li>
-      <li>You will not, either during the period of your services or thereafter, disclose, divulge or communicate to any other person or group or company any strategic information of the organization or its clients.</li>
-      <li>All correspondence, records, documents and papers relating to the company&rsquo;s business which come into your possession shall be the absolute property of the company and shall be returned upon termination of employment.</li>
-      <li>You will be responsible for the safe keeping and return of all company property in your custody. The company shall have the right to deduct the monetary value of any loss from amounts payable to you.</li>
-      <li>You will keep us informed of your residential address. Any change should be notified in writing within one week.</li>
+      <li>You have been engaged on the presumption that the particulars furnished by you in your application are correct. In case the said particular are found to be incorrect or that you have concealed or withheld information or the relevant facts, the services can be terminated from the company without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of period.</li>
+      <li>You will not, either during the period of your services of thereafter, disclose divulge or communicate to any other person or group or company any strategic information of the organization or its clients.</li>
+      <li>All correspondence addressed to you by the company including press and other copies of such correspondence and all vouchers, books, records, including all note books containing notes or records of business or prices or other market data, samples and/or other papers belonging to the company, circulars and all other relevant papers and documents of any nature whatsoever relating to the company&rsquo;s business, which shall come into your possession in the course of your employment shall be the absolute property of the company and you shall, at any time during your employment or upon termination there for any reason whatsoever, deliver the same to the company and without claiming any lien thereon.</li>
+      <li>You will be responsible for the safe keeping and for returning in good condition and order, all on your own the company&rsquo;s property which may be in your use, custody, care or charge. The company shall have the right to deduct the monetary value of all such things from any amounts payable to you and to take such actions as may be deemed proper in the event of your failure to account for such property to the satisfaction of the management.</li>
+      <li>You will keep us informed of your residential (mailing &amp; permanent) address. Any change in the same should be notified in writing within one week. Failure to do so will be treated as willful withholding of information and appropriate action as deemed fit by management would be taken against you.</li>
     </ul>
-    <p class="para"><strong>If you are willing to accept this offer</strong> for the said position, we request you to submit 3 copies of your latest coloured Passport Size photograph, Self-attested copies of your academic qualifications, PAN Card, Aadhar Card, Address Proof, and last 3 months Pay Slip / Form 16 from your previous employer. In addition, upon joining, you will have to submit a copy of your relieving letter from your previous employer.</p>
+    <p class="para"><strong>If you are willing to accept this offer for the said position, we request you to submit 3 copies of your latest coloured Passport Size photograph, Self-attested Copy of your academic qualification, Self-attested copy of your PAN Card, Self-attested copy of your Aadhar Card, Self-attested Copy of Address Proof, and last 3 month Pay Slip / Form 16 from your previous employer. In addition, upon joining, you will have to submit a copy of your relieving letter from your previous employer.</strong></p>
     <p class="para">As a token of your acceptance and in confirmation of the terms and conditions of this offer, please sign the duplicate copy of this letter and return to us at the earliest duly intimating when you are going to join.</p>
-    <div class="sig-intro">Yours truly,<br><strong>From Krishi Care &amp; Management Services Private Limited,</strong></div>
+    <div class="sig-intro">Yours truly,<br>From <strong>Krishi Care &amp; Management Services Private Limited,</strong></div>
     <div class="sig-row">
       <div class="sig-col">
         ${ol.sig1_image ? `<img src="${ol.sig1_image}" class="sig-img" alt="">` : '<div class="sig-blank"></div>'}
-        <p class="sig-lbl"><strong>Authorized Signatory</strong></p>
+        <p class="sig-lbl">Authorized Signatory</p>
       </div>
       <div class="sig-col">
         ${ol.sig2_image ? `<img src="${ol.sig2_image}" class="sig-img" alt="">` : '<div class="sig-blank"></div>'}
-        <p class="sig-lbl"><strong>Authorized Signatory</strong><br>Human Resource</p>
+        <p class="sig-lbl">Human Resource<br>(Authorized Signatory)</p>
       </div>
     </div>
   </div>
@@ -327,60 +314,53 @@ ul.rules li { font-size: 12pt; line-height: 1.6; margin-bottom: 5px; text-align:
 <div class="pg page-break">
   ${header}
   <div class="pg-body">
-    <div class="ann-hdr">
-      <h2>Annexure I</h2>
-      <p>Annual Cost to Company and Other Benefits</p>
-    </div>
+    <p class="ann-title">Annexure I (Annual Cost to Company and Other Benefits)</p>
     <div class="ann-meta">
-      <div class="ann-meta-grid">
-        <div><strong>Name:</strong> ${ol.candidate_name}</div>
-        <div><strong>Designation:</strong> ${ol.designation}</div>
-        <div><strong>Location:</strong> ${ol.location||'Mumbai'}</div>
-        <div><strong>Date:</strong> ${formatDate(ol.offer_date || new Date())}</div>
-        <div class="ann-ctc">Annual Cost to Company: Rs. ${Number(ctcAnnual).toLocaleString('en-IN')}/- (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</div>
-      </div>
+      <div>Name: ${ol.candidate_name}</div>
+      <div>Designation: ${ol.designation}</div>
+      <div>Location: ${ol.location||'Mumbai'}</div>
+      <div>Annual Cost to Company &ndash; Rs.${Number(ctcAnnual).toLocaleString('en-IN')} /-PA</div>
+      <div>(Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</div>
     </div>
     <table class="ann-tbl">
       <thead><tr>
-        <th class="c-sr">Sr. No.</th>
+        <th class="c-sr">Sr.<br>No.</th>
         <th>Particulars</th>
-        <th class="c-num">Monthly (&#8377;)</th>
-        <th class="c-num">Yearly (&#8377;)</th>
+        <th class="c-num">Monthly</th>
+        <th class="c-num">Yearly</th>
       </tr></thead>
       <tbody>
         <tr><td class="c-sr">1</td><td>Fixed Basic</td><td class="c-num">${fmtV(basic)}</td><td class="c-num">${fmtV(basic*12)}</td></tr>
         <tr><td class="c-sr">2</td><td>HRA</td><td class="c-num">${fmtV(hra)}</td><td class="c-num">${fmtV(hra*12)}</td></tr>
-        ${conv>0?`<tr><td class="c-sr">2a</td><td>Conveyance Allowance</td><td class="c-num">${fmtV(conv)}</td><td class="c-num">${fmtV(conv*12)}</td></tr>`:''}
-        <tr><td class="c-sr">3</td><td>Other Allowances</td><td class="c-num">${fmtV(other)}</td><td class="c-num">${fmtV(other*12)}</td></tr>
+        ${conv>0?`<tr><td class="c-sr">2a</td><td>Conveyance Allowances (Fixed)</td><td class="c-num">${fmtV(conv)}</td><td class="c-num">${fmtV(conv*12)}</td></tr>`:''}
+        <tr><td class="c-sr">3</td><td>Other Allowances (Balance amount)</td><td class="c-num">${fmtV(other)}</td><td class="c-num">${fmtV(other*12)}</td></tr>
         <tr><td class="c-sr">4</td><td>Gratuity</td><td class="c-num">${fmtV(gratuity)}</td><td class="c-num">${fmtV(gratuity*12)}</td></tr>
-        <tr class="r-sub"><td class="c-sr">5</td><td>Gross Pay</td><td class="c-num">${fmtV(gross)}</td><td class="c-num">${fmtV(gross*12)}</td></tr>
-        <tr><td class="c-sr">6</td><td>Provident Fund (Employee)</td><td class="c-num">${pfEmp>0?fmtV(pfEmp):'&ndash;'}</td><td class="c-num">${pfEmp>0?fmtV(pfEmp*12):'&ndash;'}</td></tr>
-        <tr><td class="c-sr">7</td><td>Professional Tax</td><td class="c-num">${pt>0?fmtV(pt):'&ndash;'}</td><td class="c-num">${pt>0?fmtV(pt*12):'&ndash;'}</td></tr>
-        <tr class="r-sub"><td class="c-sr">8</td><td>Total Deduction</td><td class="c-num">${totalDed>0?fmtV(totalDed):'&ndash;'}</td><td class="c-num">${totalDed>0?fmtV(totalDed*12):'&ndash;'}</td></tr>
-        <tr class="r-net"><td class="c-sr">9</td><td>Net Salary (Gross &minus; Deductions)</td><td class="c-num">${fmtV(netSalary)}</td><td class="c-num">${fmtV(netSalary*12)}</td></tr>
-        <tr><td class="c-sr">10</td><td>Employer PF Contribution</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr):'&ndash;'}</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr*12):'&ndash;'}</td></tr>
-        <tr><td class="c-sr">11</td><td>Employer PF Admin Charges</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin):'&ndash;'}</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin*12):'&ndash;'}</td></tr>
-        <tr class="r-ctc"><td class="c-sr">12</td><td>Total Compensation Package</td><td class="c-num">${fmtV(ctcMonthly)}</td><td class="c-num">${fmtV(ctcAnnual)}</td></tr>
+        <tr class="r-sub"><td class="c-sr">5</td><td>Total Gross Salary</td><td class="c-num">${fmtV(gross)}</td><td class="c-num">${fmtV(gross*12)}</td></tr>
+        <tr><td class="c-sr">6</td><td>PF contribution by employee (on basic)</td><td class="c-num">${pfEmp>0?fmtV(pfEmp):'&ndash;'}</td><td class="c-num">${pfEmp>0?fmtV(pfEmp*12):'&ndash;'}</td></tr>
+        <tr><td class="c-sr">7</td><td>Professional Tax (PT)</td><td class="c-num">${pt>0?fmtV(pt):'&ndash;'}</td><td class="c-num">${pt>0?fmtV(pt*12):'&ndash;'}</td></tr>
+        <tr class="r-sub"><td class="c-sr">8</td><td>Total deductions (PF+PT)</td><td class="c-num">${totalDed>0?fmtV(totalDed):'&ndash;'}</td><td class="c-num">${totalDed>0?fmtV(totalDed*12):'&ndash;'}</td></tr>
+        <tr class="r-net"><td class="c-sr">9</td><td>Net Salary (Gross-Total deductions)</td><td class="c-num">${fmtV(netSalary)}</td><td class="c-num">${fmtV(netSalary*12)}</td></tr>
+        <tr><td class="c-sr">10</td><td>Employer PF contribution</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr):'&ndash;'}</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr*12):'&ndash;'}</td></tr>
+        <tr><td class="c-sr">11</td><td>Employer PF contribution Admin charges</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin):'&ndash;'}</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin*12):'&ndash;'}</td></tr>
+        <tr class="r-ctc"><td class="c-sr">12</td><td>CTC= Gross salary + (Employer PF+ESI)</td><td class="c-num">${fmtV(ctcMonthly)}</td><td class="c-num">${fmtV(ctcAnnual)}</td></tr>
       </tbody>
     </table>
-    <div class="ack-box">
-      <p class="ack-title">Acknowledgement &amp; Acceptance</p>
-      <p class="ack-para">I have read, understood and agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
-      <table class="ack-tbl" cellpadding="0" cellspacing="0">
-        <tr>
-          <td class="ack-lbl">Signature:</td>
-          <td class="ack-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
-          <td class="ack-lbl ack-gap">Date:</td>
-          <td class="ack-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
-        </tr>
-        <tr>
-          <td class="ack-lbl" style="padding-top:18px;">Name:</td>
-          <td class="ack-line" style="padding-top:18px;"></td>
-          <td class="ack-lbl ack-gap" style="padding-top:18px;">Location:</td>
-          <td class="ack-line" style="padding-top:18px;"></td>
-        </tr>
-      </table>
-    </div>
+    <p class="ack-title">Acknowledgement &amp; Acceptance</p>
+    <p class="ack-para">I have read understood, agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
+    <table class="ack-tbl" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="ack-lbl">Signature:</td>
+        <td class="ack-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <td class="ack-lbl ack-gap">Name:</td>
+        <td class="ack-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="ack-lbl" style="padding-top:18px;">Location:</td>
+        <td class="ack-line" style="padding-top:18px;"></td>
+        <td class="ack-lbl ack-gap" style="padding-top:18px;">Date</td>
+        <td class="ack-line" style="padding-top:18px;"></td>
+      </tr>
+    </table>
   </div>
   ${footer}
 </div>`;
@@ -397,6 +377,8 @@ ${annexure}
 </body>
 </html>`;
 }
+
+
 
 
 
