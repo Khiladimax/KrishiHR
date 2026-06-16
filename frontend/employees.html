@@ -604,6 +604,12 @@
                 <option value="Intern">Intern</option>
               </select>
             </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Department</label>
+              <select id="edit-dept" class="form-control" onchange="loadEditDesig()"><option value="">Select…</option></select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">Designation</label>
+              <select id="edit-desig" class="form-control"><option value="">Select…</option></select>
+            </div>
             <div class="form-group" style="margin:0"><label class="form-label">Category</label>
               <select id="edit-category" class="form-control">
                 <option value="permanent">Permanent</option>
@@ -627,6 +633,7 @@
                 <option value="accounts">Accounts</option>
                 <option value="admin">Admin</option>
                 <option value="super_admin">Super Admin (MD)</option>
+                <option value="client_admin">Client Admin</option>
               </select>
             </div>
             <div class="form-group" style="margin:0"><label class="form-label">Level</label><input id="edit-level" class="form-control" type="text" placeholder="L4, L5…"></div>
@@ -1167,9 +1174,11 @@ function onClientFilterChange() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Departments ───────────────────────────────────────────────────────────────
+let _deptList = [];
 async function loadDepartments() {
   const data = await api('GET', '/departments');
   if (!data?.success) return;
+  _deptList = data.data || [];
   const sel1 = document.getElementById('dept-filter');
   const sel2 = document.getElementById('new-dept');
   data.data.forEach(d => {
@@ -1583,6 +1592,15 @@ async function loadDesig() {
   const sel = document.getElementById('new-desig');
   sel.innerHTML = '<option value="">Select designation…</option>' +
     (data?.data || []).map(d => `<option value="${d.id}">${d.title}</option>`).join('');
+}
+
+async function loadEditDesig(selectedDesigId) {
+  const deptId = document.getElementById('edit-dept').value;
+  const sel = document.getElementById('edit-desig');
+  if (!deptId) { sel.innerHTML = '<option value="">Select…</option>'; return; }
+  const data = await api('GET', `/designations?department_id=${deptId}`);
+  sel.innerHTML = '<option value="">Select…</option>' +
+    (data?.data || []).map(d => `<option value="${d.id}" ${d.id == selectedDesigId ? 'selected' : ''}>${d.title}</option>`).join('');
 }
 
 async function generateEmpCode() {
@@ -2237,6 +2255,15 @@ async function openEditEmp(id) {
   document.getElementById('edit-address').value  = e.address_line1 || '';
   document.getElementById('edit-joining').value  = e.joining_date ? e.joining_date.split('T')[0] : '';
   document.getElementById('edit-emptype').value  = e.employment_type  || 'Full-Time';
+
+  // Populate Department dropdown
+  const deptSel = document.getElementById('edit-dept');
+  deptSel.innerHTML = '<option value="">Select…</option>' +
+    (_deptList || []).map(d => `<option value="${d.id}" ${d.id === e.department_id ? 'selected' : ''}>${d.name}</option>`).join('');
+
+  // Populate Designation dropdown for current department
+  await loadEditDesig(e.designation_id);
+
   document.getElementById('edit-category').value = e.employee_category || 'permanent';
   document.getElementById('edit-saturday-policy').value = e.saturday_policy || '2nd_4th_off';
   document.getElementById('edit-role').value     = e.role       || 'employee';
@@ -2356,6 +2383,8 @@ async function saveEmployeeEdit() {
     address_line1:       document.getElementById('edit-address').value.trim()    || null,
     joining_date:        document.getElementById('edit-joining').value           || null,
     employment_type:     document.getElementById('edit-emptype').value,
+    department_id:       document.getElementById('edit-dept').value             || null,
+    designation_id:      document.getElementById('edit-desig').value            || null,
     employee_category:   document.getElementById('edit-category').value,
     saturday_policy:     document.getElementById('edit-saturday-policy').value,
     role:                document.getElementById('edit-role').value,
