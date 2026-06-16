@@ -96,6 +96,11 @@ exports.getAll = async (req, res) => {
         params.push(parseInt(qClientId));
       }
     }
+    // client_admin requesting own_client — use their JWT client_id
+    if (qClientId === 'own_client' && userRole === 'client_admin' && req.user.client_id) {
+      conditions.push(`e.client_id=$${idx++}`);
+      params.push(req.user.client_id);
+    }
 
     if (department_id)       { conditions.push(`e.department_id=$${idx++}`);           params.push(parseInt(department_id)); }
     if (filterRole)          { conditions.push(`e.role=$${idx++}`);                        params.push(filterRole); }

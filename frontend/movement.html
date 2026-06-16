@@ -142,7 +142,7 @@ buildSidebar('movement.html');
   loadNotifBadge();
 
 const user = Auth.getUser();
-const allowed = ['admin','super_admin','hr','manager','tl'];
+const allowed = ['admin','super_admin','hr','manager','tl','client_admin'];
 if (!user || !allowed.includes(user.role)) window.location.href = 'attendance.html';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -152,11 +152,14 @@ const todayIST = () => new Intl.DateTimeFormat('en-CA', {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
-  const isKC718 = user && user.employee_code === 'KC718';
-  const seeAll  = isKC718 || ['super_admin','hr'].includes(user.role);
+  const isKC718       = user && user.employee_code === 'KC718';
+  const seeAll        = isKC718 || ['super_admin','hr'].includes(user.role);
+  const isClientAdmin = user.role === 'client_admin';
   const endpoint = seeAll
     ? '/employees?active=true&limit=500'
-    : `/employees?active=true&reporting_manager_id=${user.id}&limit=500`;
+    : isClientAdmin
+      ? '/employees?active=true&client_id=own_client&limit=500'
+      : `/employees?active=true&reporting_manager_id=${user.id}&limit=500`;
   const res = await api('GET', endpoint);
   if (res?.success) {
     const sel = document.getElementById('mv-emp');

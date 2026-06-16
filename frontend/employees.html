@@ -1152,7 +1152,7 @@ loadEmployees();
 
 // ── Client Deployment: show client filter for admin/super_admin ──────────────
 let clientsData = [];
-if (Role.is('admin', 'super_admin', 'hr', 'accounts')) {
+if (Role.is('admin', 'super_admin', 'hr', 'accounts', 'client_admin')) {
   document.getElementById('client-filter').style.display = '';
   // Show client column in table
   document.querySelectorAll('.client-col').forEach(el => el.style.display = '');
@@ -1519,8 +1519,8 @@ async function showEmpDetail(id) {
   const footer = document.getElementById('emp-detail-footer');
   // Build all buttons in ONE assignment — multiple innerHTML+= re-parses the DOM each time
   // which can cause button misalignment / double-firing issues
-  const canManage = Role.is('hr', 'accounts');
-  const canDanger = Role.is('admin', 'hr', 'accounts');
+  const canManage = Role.is('hr', 'accounts', 'client_admin');
+  const canDanger = Role.is('admin', 'hr', 'accounts', 'client_admin');
   const hrButtons = canManage ? `
     <button class="btn btn-outline btn-sm" id="btn-reset-pwd">🔑 Reset Password</button>
     <button class="btn btn-outline btn-sm" id="btn-toggle-wfh" style="${e.is_wfh_permanent ? 'background:#e0f2fe;color:#0369a1;border-color:#7dd3fc' : ''}">
