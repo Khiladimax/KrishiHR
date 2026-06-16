@@ -170,15 +170,17 @@ body {
 /* PAGE */
 .page {
   width: 210mm;
+  height: 297mm;
   margin: 0 auto;
   background: #fff;
   display: flex;
   flex-direction: column;
-  min-height: 297mm;
+  overflow: hidden;
+  position: relative;
 }
 @media screen {
   body { background: #aaa; padding: 20px 0; }
-  .page { box-shadow: 0 2px 16px rgba(0,0,0,.25); margin-bottom: 24px; }
+  .page { box-shadow: 0 2px 16px rgba(0,0,0,.25); margin-bottom: 24px; height: auto; min-height: 297mm; }
 }
 
 /* HEADER — identical on every .page div */
@@ -356,7 +358,14 @@ ul.rules li {
 /* Print */
 @media print {
   body { margin: 0; background: #fff; }
-  .page { width: 100%; min-height: 0; box-shadow: none; }
+  .page {
+    width: 100%;
+    height: 267mm;  /* A4 297mm - top 15mm - bottom 15mm */
+    page-break-after: always;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .page:last-child { page-break-after: auto; }
   .page-break { page-break-before: always; }
   .sec { page-break-after: avoid; }
   ul.rules li { page-break-inside: avoid; }
