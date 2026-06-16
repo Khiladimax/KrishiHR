@@ -47,10 +47,11 @@ async function getLeaveApprovalChain(employeeId) {
   if (employee_code === MD_CODE) return [];
 
   // KC718 (COO) → MD (KC01) is their approver
-  if (manager_role === 'super_admin') return [manager_code];
+  if (manager_role === 'super_admin') return [manager_code].filter(c => c !== employee_code);
 
   // Everyone else → their direct reporting manager
-  if (manager_code) return [manager_code];
+  // Filter out self in case reporting_manager is set to themselves in DB
+  if (manager_code && manager_code !== employee_code) return [manager_code];
 
   return [];
 }

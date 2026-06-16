@@ -57,7 +57,9 @@ async function getAdvanceChain(employeeId) {
   if (['manager', 'tl', 'admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 
   // Regular employee → Reporting Manager → COO → MD → Accounts (4 steps)
+  // Also exclude self in case reporting_manager_id points to themselves in DB
   const hasMgr = manager_code &&
+    manager_code !== employee_code &&
     manager_code !== COO_CODE &&
     manager_code !== MD_CODE &&
     manager_code !== ACCOUNTS_CODE;
