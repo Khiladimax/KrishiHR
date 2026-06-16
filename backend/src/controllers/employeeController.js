@@ -159,7 +159,19 @@ exports.getAll = async (req, res) => {
 // All active employees for chat DM picker — no role scoping
 exports.getAllForChat = async (req, res) => {
   try {
-    const result = await require('../config/db').query(
+    const db = require('../config/db');
+    const user = req.user;
+
+    // Scope by client_id: client_admin and their employees only see their org
+    let clientFilter = '';
+    if (user.client_id) {
+      clientFilter = `AND e.client_id = ${parseInt(user.client_id)}`;
+    } else if (user.role === 'employee') {
+      // Own-company employee: only sees own-company employees (client_id IS NULL)
+      clientFilter = `AND e.client_id IS NULL`;
+    }
+
+    const result = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
               e.role, e.is_active, e.profile_picture,
               d.name AS department_name, des.title AS designation_title
@@ -168,6 +180,7 @@ exports.getAllForChat = async (req, res) => {
        LEFT JOIN designations des ON e.designation_id = des.id
        WHERE e.is_active = true
          AND NOT EXISTS (SELECT 1 FROM separations s WHERE s.employee_id=e.id AND s.status='completed')
+         ${clientFilter}
        ORDER BY e.first_name, e.last_name`
     );
     res.json({ success: true, data: result.rows });

@@ -298,6 +298,13 @@ exports.getLeaderboard = async (req, res) => {
       streakMap[row.employee_id] = parseInt(row.streak) || 0;
     }
 
+    // Scope leaderboard by client_id for client employees
+    const clientFilter = req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+      : req.user.role === 'employee' && !req.user.client_id
+        ? `AND e.client_id IS NULL`
+        : '';
+
     // ── Step 2: Main leaderboard query (scores, counts) ──
     const r = await db.query(
       `SELECT
@@ -312,7 +319,7 @@ exports.getLeaderboard = async (req, res) => {
        FROM employees e
        JOIN gk_daily_responses gr ON gr.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
-       WHERE e.is_active = true ${dateFilter}
+       WHERE e.is_active = true ${clientFilter} ${dateFilter}
        GROUP BY e.id, e.first_name, e.last_name, e.employee_code, d.name
        HAVING COUNT(gr.id) > 0
        ORDER BY total_score DESC, correct DESC
