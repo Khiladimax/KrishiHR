@@ -75,7 +75,7 @@
           </select>
           <select id="client-filter" class="form-control" style="width:180px;display:none" onchange="onClientFilterChange()">
             <option value="all">👥 All Employees</option>
-            <option value="own">🏢 Own Employees (KC)</option>
+            <option value="own" selected>🏢 Own Employees (KC)</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="clearFilters()">✕ Clear</button>
           <span id="emp-count" class="text-muted" style="padding:8px 0;font-size:13px;margin-left:4px"></span>
@@ -1159,7 +1159,7 @@ async function loadClients() {
   });
 }
 
-let _clientFilter = 'all';
+let _clientFilter = 'own';
 function onClientFilterChange() {
   _clientFilter = document.getElementById('client-filter').value;
   loadEmployees();
