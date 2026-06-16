@@ -103,17 +103,19 @@ exports.getLocations = async (req, res) => {
     // True global distinct count — only employees actually visible under a location card.
     // Universal buffer-rule employees without a geofence row are NOT counted here
     // because they don't appear under any specific location card.
+    const clientFilter = req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+      : '';
+
     const globalRes = await db.query(
       `SELECT COUNT(DISTINCT emp_id) AS cnt FROM (
-         -- Employees assigned via employee_geofence (office locations + any universal assigned to a specific card)
          SELECT eg.employee_id AS emp_id
          FROM employee_geofence eg
-         JOIN employees e ON e.id = eg.employee_id AND e.is_active = TRUE
+         JOIN employees e ON e.id = eg.employee_id AND e.is_active = TRUE ${clientFilter}
          UNION
-         -- District-rule employees counted under a matching district zone card
          SELECT ebr.employee_id AS emp_id
          FROM employee_buffer_rules ebr
-         JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE
+         JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE ${clientFilter}
          WHERE ebr.rule_type = 'district'
            AND EXISTS (
              SELECT 1 FROM office_locations ol
@@ -123,10 +125,9 @@ exports.getLocations = async (req, res) => {
            )
            AND NOT EXISTS (SELECT 1 FROM employee_geofence eg2 WHERE eg2.employee_id = ebr.employee_id)
          UNION
-         -- State-rule employees counted under a matching state zone card
          SELECT ebr.employee_id AS emp_id
          FROM employee_buffer_rules ebr
-         JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE
+         JOIN employees e ON e.id = ebr.employee_id AND e.is_active = TRUE ${clientFilter}
          WHERE ebr.rule_type = 'state'
            AND EXISTS (
              SELECT 1 FROM office_locations ol
