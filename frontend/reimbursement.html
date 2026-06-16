@@ -234,7 +234,7 @@ function codeLabel(code) {
 }
 
 // Show tabs based on role
-const canSeeAll = ['hr','super_admin','admin','accounts'].includes(currentUser.role);
+const canSeeAll = ['hr','super_admin','admin','accounts','client_admin'].includes(currentUser.role);
 if (!canSeeAll) document.getElementById('tab-all').style.display = 'none';
 
 showTab('my');
@@ -290,11 +290,14 @@ async function loadReimbursements(tab) {
     }
     if (tab === 'pending') {
       const isSuperApprover = currentUser.role === 'super_admin' || currentUser.employee_code === 'KC03';
+      const isClientAdmin   = currentUser.role === 'client_admin';
       filtered = data.filter(d =>
         d.status === 'pending' &&
         (isSuperApprover
           ? (d.current_approver_code === 'KC01' || d.current_approver_code === 'KC03')
-          : d.current_approver_code === currentUser.employee_code)
+          : isClientAdmin
+            ? true  // backend already scoped to their org; all pending are theirs to approve
+            : d.current_approver_code === currentUser.employee_code)
       );
     }
 

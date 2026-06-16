@@ -453,22 +453,23 @@ const CODE_TO_LEVEL = {
 
 // ── Tab visibility logic ──────────────────────────────────────────────────────
 // HR can only see their OWN requests — they are NOT in the approval chain
-// Pending Approval tab: only for actual approvers (manager, tl, admin, accounts, super_admin)
+// Pending Approval tab: only for actual approvers (manager, tl, admin, accounts, super_admin, client_admin)
 // All Requests tab: only for super_admin and accounts (full visibility roles)
 const isHR         = user.role === 'hr';
 const isSuperAdmin = user.role === 'super_admin' || user.employee_code === 'KC03';
 const isAccounts   = user.role === 'accounts';
 const isAdmin      = user.role === 'admin';
 const isManagerTL  = ['manager', 'tl'].includes(user.role);
+const isClientAdmin = user.role === 'client_admin';
 
 // Show "Pending Approval" tab — approvers only (NOT hr)
-const canSeePending = isAdmin || isSuperAdmin || isAccounts || isManagerTL;
+const canSeePending = isAdmin || isSuperAdmin || isAccounts || isManagerTL || isClientAdmin;
 if (canSeePending) {
   document.getElementById('tab-pending-btn').style.display = '';
 }
 
-// Show "All Requests" tab — super_admin and accounts only (full oversight)
-const canSeeAll = isSuperAdmin || isAccounts;
+// Show "All Requests" tab — super_admin, accounts, and client_admin (full oversight of their org)
+const canSeeAll = isSuperAdmin || isAccounts || isClientAdmin;
 if (canSeeAll) {
   document.getElementById('tab-all-btn').style.display = '';
       document.getElementById('tab-emi-btn').style.display = '';
@@ -832,12 +833,14 @@ async function loadPending() {
 
   // Strict frontend filter: only show what this user can actually act on RIGHT NOW
   // MD (KC01/super_admin) and CBO (KC03) only see requests that have REACHED their level
-  // i.e. current_approver_code is KC01 or KC03 — COO must have already approved
+  // client_admin sees all pending requests from their org employees
   const pending = (pendingRes?.data || []).filter(a =>
     a.employee_id !== user.id &&
     (isSuperAdmin
       ? (a.current_approver_code === 'KC01' || a.current_approver_code === 'KC03')
-      : a.current_approver_code === user.employee_code)
+      : isClientAdmin
+        ? a.status === 'pending'
+        : a.current_approver_code === user.employee_code)
   );
 
   // Disbursement queue for Accounts: ALL approved advances regardless of current_approver_code
