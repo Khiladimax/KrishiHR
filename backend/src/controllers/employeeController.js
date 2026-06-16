@@ -1603,6 +1603,10 @@ exports.exportAttendanceRegister = async (req, res) => {
     const y = parseInt(year)  || new Date().getFullYear();
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+    const isClientAdmin = req.user.role === 'client_admin';
+    const clientFilter  = isClientAdmin && req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+
     // ── Employees (basic info only — no salary data needed) ─────────────────
     const empResult = await db.query(`
       SELECT e.id, e.employee_code, e.first_name, e.last_name,
@@ -1619,9 +1623,10 @@ exports.exportAttendanceRegister = async (req, res) => {
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
       WHERE (
-        e.is_active = true
+        (e.is_active = true ${clientFilter})
         OR (
           e.is_active = false
+          ${clientFilter}
           AND (e.separation_date IS NULL OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1))
           AND EXISTS (
             SELECT 1 FROM attendance a
@@ -1631,7 +1636,8 @@ exports.exportAttendanceRegister = async (req, res) => {
           )
         )
         OR (
-          EXISTS (
+          ${clientFilter.replace('AND e.','e.')||'TRUE'}
+          AND EXISTS (
             SELECT 1 FROM separations sep
             WHERE sep.employee_id = e.id AND sep.status = 'completed'
             AND sep.last_working_date >= MAKE_DATE($1::int, $2::int, 1)
