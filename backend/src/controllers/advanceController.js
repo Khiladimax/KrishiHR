@@ -392,9 +392,24 @@ exports.getAll = async (req, res) => {
       // HR sees everything (read-only oversight) — no scope filter
 
     } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
-      // MD (super_admin / KC01) and CBO (KC03) see ALL requests
-      // They are top-level approvers who can act on any pending request at any stage
-      // No scope filter — same as HR oversight but with full approval power
+      // MD (KC01) and CBO (KC03) see requests that have REACHED their level:
+      //   1. Currently awaiting their action (current_approver_code = MD_CODE or CBO_CODE)
+      //   2. Already passed through MD or CBO (they approved it) — now at Accounts or done
+      //   3. Their own requests
+      // NOT requests still sitting at Manager or COO level — those haven't reached them yet
+      conds.push(`(
+        a.current_approver_code IN ($${idx++}, $${idx++})
+        OR (
+          EXISTS (
+            SELECT 1 FROM advance_approvals aa
+            WHERE aa.advance_id = a.id
+              AND aa.approver_id = $${idx++}
+              AND aa.action = 'approve'
+          )
+        )
+        OR a.employee_id = $${idx++}
+      )`);
+      params.push(MD_CODE, CBO_CODE, userId, userId);
 
     } else if (userRole === 'accounts') {
       // Accounts sees:
@@ -523,7 +538,13 @@ exports.getStats = async (req, res) => {
       scopeFilter = `WHERE (status='approved' OR status='disbursed' OR current_approver_code=$1 OR employee_id=$2)`;
       params = [userCode, userId];
     } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
-      // MD and CBO see all stats — no scope filter
+      // MD and CBO see stats for requests at their level or already approved by them
+      scopeFilter = `WHERE (
+        current_approver_code IN ('${MD_CODE}','${CBO_CODE}')
+        OR EXISTS (SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$1)
+        OR employee_id=$1
+      )`;
+      params = [userId];
     } else if (userRole === 'admin') {
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2 OR EXISTS (
         SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2

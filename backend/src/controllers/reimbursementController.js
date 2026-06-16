@@ -203,8 +203,24 @@ exports.getAll = async (req, res) => {
     } else if (userRole === 'hr') {
       // see all
     } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
-      // MD and CBO see ALL requests — they are top-level approvers who can act on anything
-      // No scope filter (same as HR but with full approval power)
+      // MD (KC01) and CBO (KC03) see requests that have REACHED their level:
+      //   1. Currently at their turn (current_approver_code = KC01 or KC03)
+      //   2. Already approved by MD or CBO (passed through)
+      //   3. Their own requests
+      // NOT requests still at Manager or COO level
+      conds.push(`(
+        r.current_approver_code IN ('${MD_CODE}','${CBO_CODE}')
+        OR (
+          EXISTS (
+            SELECT 1 FROM reimbursement_approvals ra
+            WHERE ra.reimbursement_id = r.id
+              AND ra.approver_id = $${idx++}
+              AND ra.action = 'approve'
+          )
+        )
+        OR r.employee_id = $${idx++}
+      )`);
+      params.push(userId, userId);
     } else if (userRole === 'accounts') {
       conds.push(`(r.current_approver_code=$${idx++} OR (r.status='approved' AND r.current_approver_code IS NULL) OR r.employee_id=$${idx++})`);
       params.push(userCode, userId);
