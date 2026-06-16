@@ -236,7 +236,7 @@ exports.importEmployees = async (req, res) => {
         console.error(`[Import] Row ${rowNum} error:`, rowErr.message);
         // Log all values to find which is too long
         if (rowErr.message.includes('too long')) {
-          console.log(`[Import] Row ${rowNum} values:`, row.slice(0, 15).map((v,i) => `col${i}=${String(v).substring(0,20)}`));
+          row.forEach((v,i) => { if (String(v).length > 0) console.log(`  col${i} (${headers[i]||'?'})=${String(v)}`); });
         }
         results.errors.push(`Row ${rowNum} (${employee_code}): ${rowErr.message}`);
       }

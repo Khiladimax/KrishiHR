@@ -823,27 +823,15 @@ async function start() {
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_emp_date ON movement_alerts(employee_id, alert_date)`).catch(() => {});
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_status ON movement_alerts(status)`).catch(() => {});
         console.log('✅ DB schema ready');
-        // Expand any VARCHAR columns that may be too short
-        const expandCols = [
-          ['employees', 'blood_group', 'VARCHAR(10)'],
-          ['employees', 'gender', 'VARCHAR(20)'],
-          ['employees', 'pincode', 'VARCHAR(15)'],
-          ['employees', 'level', 'VARCHAR(20)'],
-          ['employees', 'pan_number', 'VARCHAR(20)'],
-          ['employees', 'aadhar_number', 'VARCHAR(20)'],
-          ['employees', 'uan_number', 'VARCHAR(20)'],
-          ['employees', 'bank_ifsc', 'VARCHAR(20)'],
-          ['employees', 'bank_account', 'VARCHAR(30)'],
-          ['employees', 'bank_name', 'VARCHAR(100)'],
-          ['employees', 'phone', 'VARCHAR(20)'],
-          ['employees', 'alternate_phone', 'VARCHAR(20)'],
-          ['employees', 'marital_status', 'VARCHAR(20)'],
-          ['employees', 'employment_type', 'VARCHAR(30)'],
-          ['employees', 'employee_code', 'VARCHAR(30)'],
-        ];
-        for (const [table, col, type] of expandCols) {
-          await db.query(`ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${type}`).catch(() => {});
+        // Force all employee string columns to TEXT to prevent 'value too long' errors
+        const toText = ['pan_number','aadhar_number','uan_number','bank_ifsc','bank_account',
+          'bank_name','bank_branch','phone','alternate_phone','marital_status','blood_group',
+          'gender','pincode','level','employee_code','employment_type','city','state',
+          'address_line1','address_line2','emergency_contact_phone','office_location'];
+        for (const col of toText) {
+          await db.query(`ALTER TABLE employees ALTER COLUMN ${col} TYPE TEXT`).catch(() => {});
         }
+        console.log('✅ Employee columns expanded to TEXT');
         // NOTE: fixWrongAbsents, fixMissingPunchOuts, fixTimezoneShiftedLeaves removed from
         // startup — they held DB connections and starved the pool causing login timeouts.
         // Run these manually via pgAdmin when needed.
