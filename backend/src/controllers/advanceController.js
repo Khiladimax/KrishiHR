@@ -457,8 +457,10 @@ exports.getAll = async (req, res) => {
 
     } else if (userRole === 'client_admin' && req.user.client_id) {
       // client_admin sees all requests from employees in their client org
-      // where they are the current approver OR requests that passed through them
-      conds.push(`(\n        a.employee_id IN (\n          SELECT id FROM employees WHERE client_id=$${idx++} AND is_active=true\n        )\n      )`);\n      params.push(req.user.client_id);\n\n    } else if (['manager', 'tl'].includes(userRole)) {
+      conds.push(`a.employee_id IN (SELECT id FROM employees WHERE client_id=$${idx++} AND is_active=true)`);
+      params.push(req.user.client_id);
+
+    } else if (['manager', 'tl'].includes(userRole)) {
       // Manager / TL sees:
       //   1. Requests where they are the current approver (pending action)
       //   2. Requests they already approved (passed through them)
