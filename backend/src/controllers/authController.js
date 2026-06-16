@@ -260,6 +260,12 @@ exports.updateFcmToken = async (req, res) => {
     const { fcm_token } = req.body;
     if (!fcm_token) return res.status(400).json({ success: false, message: 'fcm_token required' });
 
+    // Clear this token from any other employee who has it (e.g. shared/re-used device)
+    await db.query(
+      `UPDATE employees SET fcm_token = NULL WHERE fcm_token = $1 AND id != $2`,
+      [fcm_token, req.user.id]
+    );
+
     await db.query(
       `UPDATE employees SET fcm_token = $1 WHERE id = $2`,
       [fcm_token, req.user.id]
