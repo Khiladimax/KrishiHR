@@ -450,9 +450,17 @@ exports.getPayroll = async (req, res) => {
 
     let conds = [], params = [], idx = 1;
 
-    if (!['super_admin','accounts','hr'].includes(userRole)) {
+    if (!['super_admin','accounts','hr','client_admin'].includes(userRole)) {
       conds.push(`p.employee_id=$${idx++}`);
       params.push(userId);
+    } else if (userRole === 'client_admin') {
+      // Client admin sees only their client's payroll
+      conds.push(`e.client_id=$${idx++}`);
+      params.push(req.user.client_id);
+      if (employee_id) {
+        conds.push(`p.employee_id=$${idx++}`);
+        params.push(employee_id);
+      }
     } else if (employee_id) {
       conds.push(`p.employee_id=$${idx++}`);
       params.push(employee_id);
@@ -592,9 +600,11 @@ exports.getUploads = async (req, res) => {
   }
 };
 
-// ── Get All Salary Structures (HR/Admin) ──────────────────────────────────────
+// ── Get All Salary Structures (HR/Admin/Client Admin) ────────────────────────
 exports.getAllSalaryStructures = async (req, res) => {
   try {
+    const clientFilter = req.user.role === 'client_admin' && req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
     const result = await db.query(
       `SELECT ess.*,
               CONCAT(e.first_name,' ',e.last_name) AS employee_name,
@@ -602,7 +612,7 @@ exports.getAllSalaryStructures = async (req, res) => {
        FROM employee_salary_structure ess
        JOIN employees e ON ess.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
-       WHERE e.is_active=true
+       WHERE e.is_active=true ${clientFilter}
        ORDER BY d.name, e.first_name`
     );
     res.json({ success: true, data: result.rows });

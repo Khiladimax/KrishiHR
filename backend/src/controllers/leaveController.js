@@ -485,6 +485,18 @@ exports.getRequests = async (req, res) => {
         conds.push(`lr.employee_id != $${idx++}`);
         params.push(userId);
       }
+    } else if (userRole === 'client_admin') {
+      // Client admin sees leave requests from all their client's employees
+      conds.push(
+        `(lr.employee_id=$${idx++} OR EXISTS (
+          SELECT 1 FROM employees sub WHERE sub.id = lr.employee_id AND sub.client_id=$${idx++}
+        ))`
+      );
+      params.push(userId, req.user.client_id);
+      if (status === 'pending') {
+        conds.push(`lr.employee_id != $${idx++}`);
+        params.push(userId);
+      }
     } else {
       // Employee/accounts sees only own requests
       conds.push(`lr.employee_id=$${idx++}`);

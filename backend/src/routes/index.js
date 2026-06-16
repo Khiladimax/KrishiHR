@@ -134,14 +134,14 @@ router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
 // ── Movement Tracking ──────────────────────────────────────────────────────
 router.post('/attendance/movement/log',           authenticate, attCtrl.logMovement);
 router.post('/attendance/movement/log-batch',     authenticate, attCtrl.logMovementBatch);
-router.get ('/attendance/movement/segmented',     authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSegmented);
-router.get ('/attendance/movement/history',       authenticate, authorize('hr','super_admin','admin','manager','tl','employee'), attCtrl.getMovementHistory); // employee allowed for multi-live map self-query
-router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.getMovementSummary);
+router.get ('/attendance/movement/segmented',     authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), attCtrl.getMovementSegmented);
+router.get ('/attendance/movement/history',       authenticate, authorize('hr','super_admin','admin','manager','tl','employee','client_admin'), attCtrl.getMovementHistory); // employee allowed for multi-live map self-query
+router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), attCtrl.getMovementSummary);
 
 // ── Feature #10: Tracking Alerts ──────────────────────────────────────────────
-router.get ('/attendance/movement/alerts',              authenticate, authorize('hr','super_admin','admin','manager','tl'), alertsCtrl.getActiveAlerts);
-router.post('/attendance/movement/alerts/:id/resolve',  authenticate, authorize('hr','super_admin','admin','manager','tl'), alertsCtrl.resolveAlert);
-router.get ('/attendance/movement/alerts/employee/:employee_id', authenticate, authorize('hr','super_admin','admin','manager','tl'), alertsCtrl.getEmployeeAlertHistory);
+router.get ('/attendance/movement/alerts',              authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), alertsCtrl.getActiveAlerts);
+router.post('/attendance/movement/alerts/:id/resolve',  authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), alertsCtrl.resolveAlert);
+router.get ('/attendance/movement/alerts/employee/:employee_id', authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), alertsCtrl.getEmployeeAlertHistory);
 
 // ── Feature #7: Beat Plan / PJP ───────────────────────────────────────────────
 router.post('/attendance/beat-plan',                    authenticate, authorize('hr','super_admin','admin','manager','tl'), beatPlanCtrl.createPlan);
@@ -364,17 +364,25 @@ router.get('/dashboard', authenticate, async (req, res) => {
 
     let pendingCount = 0;
     let pendingRegCount = 0;
-    if (['manager','hr','admin','super_admin','tl'].includes(req.user.role)) {
-      const pRes = await db.query(
-        `SELECT COUNT(*) FROM leave_requests
+    if (['manager','hr','admin','super_admin','tl','client_admin'].includes(req.user.role)) {
+      let pendingQuery, pendingParams;
+      if (req.user.role === 'client_admin') {
+        // Client admin: count pending leaves from their client's employees
+        pendingQuery = `SELECT COUNT(*) FROM leave_requests lr
+          JOIN employees e ON e.id = lr.employee_id
+          WHERE lr.status='pending' AND lr.employee_id != $1 AND e.client_id = $2`;
+        pendingParams = [empId, req.user.client_id];
+      } else {
+        pendingQuery = `SELECT COUNT(*) FROM leave_requests
          WHERE status='pending'
            AND employee_id != $1
            AND (
              current_approver_code = (SELECT employee_code FROM employees WHERE id=$1)
              OR $2 IN ('hr','super_admin')
-           )`,
-        [empId, req.user.role]
-      );
+           )`;
+        pendingParams = [empId, req.user.role];
+      }
+      const pRes = await db.query(pendingQuery, pendingParams);
       pendingCount = parseInt(pRes.rows[0].count) || 0;
 
       // Also count pending regularization requests — direct reports only
@@ -390,6 +398,9 @@ router.get('/dashboard', authenticate, async (req, res) => {
       } else if (req.user.role === 'tl') {
         regParams = [empId];
         regCond = `WHERE a.regularization_status='pending' AND (e.team_leader_id=$1 OR e.id=$1)`;
+      } else if (req.user.role === 'client_admin') {
+        regParams = [req.user.client_id];
+        regCond = `WHERE a.regularization_status='pending' AND e.client_id=$1`;
       }
       if (regCond) {
         const rRes = await db.query(

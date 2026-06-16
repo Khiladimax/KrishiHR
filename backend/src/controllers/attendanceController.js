@@ -470,9 +470,9 @@ exports.get = async (req, res) => {
     const mon = parseInt(month) || new Date().getMonth() + 1;
     const yr  = parseInt(year)  || new Date().getFullYear();
 
-    // HR/Admin/Manager can query other employees
+    // HR/Admin/Manager/Client Admin can query other employees
     let targetId = empId;
-    if (employee_id && ['admin','super_admin','hr','accounts','manager','tl'].includes(role))
+    if (employee_id && ['admin','super_admin','hr','accounts','manager','tl','client_admin'].includes(role))
       targetId = parseInt(employee_id);
 
     const result = await db.query(
@@ -532,7 +532,7 @@ exports.getSummary = async (req, res) => {
     const yr  = parseInt(year)  || new Date().getFullYear();
 
     let targetId = empId;
-    if (employee_id && ['admin','super_admin','hr','accounts','manager','tl'].includes(role))
+    if (employee_id && ['admin','super_admin','hr','accounts','manager','tl','client_admin'].includes(role))
       targetId = parseInt(employee_id);
 
     // Get holidays for the month — filtered by employee region
@@ -666,6 +666,11 @@ exports.getTeamToday = async (req, res) => {
       // Direct reports only, exclude self
       empCond = `AND e.reporting_manager_id = $2 AND e.id != $2`;
       params.push(userId);
+
+    } else if (role === 'client_admin') {
+      // Client admin sees all employees deployed to their client
+      empCond = `AND e.client_id = $2 AND e.id != $3`;
+      params.push(req.user.client_id, userId);
 
     } else {
       // Employee sees only themselves
@@ -2379,6 +2384,7 @@ exports.getMovementSummary = async (req, res) => {
     const isSuperAdmin = caller.role === 'super_admin';
     // HR can also see all employees
     const isHR = caller.role === 'hr';
+    const isClientAdmin = caller.role === 'client_admin';
     const seeAll = isKC718 || isSuperAdmin || isHR;
 
     let whereClauses = `TO_CHAR(m.logged_at AT TIME ZONE 'Asia/Kolkata','YYYY-MM-DD') BETWEEN $1 AND $2`;
@@ -2386,7 +2392,7 @@ exports.getMovementSummary = async (req, res) => {
 
     if (employee_id) {
       // Specific employee requested — apply scope check for non-admins
-      if (!seeAll) {
+      if (!seeAll && !isClientAdmin) {
         // Verify this employee is a direct report of the caller
         const check = await db.query(
           `SELECT id FROM employees WHERE id=$1 AND reporting_manager_id=$2`,
@@ -2396,8 +2402,22 @@ exports.getMovementSummary = async (req, res) => {
           return res.status(403).json({ success: false, message: 'Access denied: not your direct report' });
         }
       }
+      // client_admin: verify employee belongs to their client
+      if (isClientAdmin) {
+        const check = await db.query(
+          `SELECT id FROM employees WHERE id=$1 AND client_id=$2`,
+          [employee_id, caller.client_id]
+        );
+        if (!check.rows.length) {
+          return res.status(403).json({ success: false, message: 'Access denied: not your client employee' });
+        }
+      }
       params.push(employee_id);
       whereClauses += ` AND m.employee_id = $${params.length}`;
+    } else if (isClientAdmin) {
+      // Client admin: see all employees deployed to their client
+      params.push(caller.client_id);
+      whereClauses += ` AND e.client_id = $${params.length}`;
     } else if (!seeAll) {
       // Scoped view: only direct reports of this manager/admin/tl
       params.push(caller.id);
