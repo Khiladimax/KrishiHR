@@ -651,9 +651,12 @@ router.get('/birthdays/upcoming', authenticate, async (req, res) => {
         ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata')::date + (gs.offset_days || ' days')::interval, 'MM-DD')
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
-      WHERE e.is_active = TRUE
+        AND e.is_active = TRUE
         AND e.date_of_birth IS NOT NULL
-        ${req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : req.user.role === 'employee' ? `AND e.client_id IS NULL` : ''}
+        ${req.user.client_id
+          ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+          : `AND e.client_id IS NULL`
+        }
       ORDER BY gs.offset_days ASC, e.first_name ASC
     `, [today, empId]);
 
@@ -841,7 +844,7 @@ router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
        WHERE e.is_active = true
          AND e.joining_date IS NOT NULL
          AND EXTRACT(YEAR FROM e.joining_date) < $1
-         ${req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : req.user.role === 'employee' ? `AND e.client_id IS NULL` : ''}
+         ${req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : `AND e.client_id IS NULL`}
          AND (
            TO_CHAR(e.joining_date,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
            OR (
