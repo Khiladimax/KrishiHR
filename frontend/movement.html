@@ -61,7 +61,15 @@
       <div class="card-header">
         <div class="section-title" style="margin:0">Employee Movement Tracker</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">
+        <!-- Client filter — KC admin/super_admin/hr only -->
+        <div class="form-group" style="margin:0" id="mv-client-wrap">
+          <label class="form-label">View By</label>
+          <select id="mv-client" class="form-control" onchange="onMvClientChange()">
+            <option value="kc">KC Employees</option>
+            <option value="all">All (KC + Clients)</option>
+          </select>
+        </div>
         <div class="form-group" style="margin:0">
           <label class="form-label">Employee</label>
           <select id="mv-emp" class="form-control">
@@ -153,16 +161,48 @@ const todayIST = () => new Intl.DateTimeFormat('en-CA', {
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
   const isKC718       = user && user.employee_code === 'KC718';
-  const seeAll        = isKC718 || ['super_admin','hr'].includes(user.role);
+  const seeAll        = isKC718 || ['super_admin','hr','admin'].includes(user.role);
   const isClientAdmin = user.role === 'client_admin';
-  const endpoint = seeAll
-    ? '/employees?active=true&limit=500'
-    : isClientAdmin
-      ? '/employees?active=true&client_id=own_client&limit=500'
-      : `/employees?active=true&reporting_manager_id=${user.id}&limit=500`;
+
+  // Show client filter only for KC admin roles
+  if (!seeAll) {
+    const wrap = document.getElementById('mv-client-wrap');
+    if (wrap) wrap.style.display = 'none';
+  }
+
+  await loadMvEmployees();
+  const today = todayIST();
+  document.getElementById('mv-from').value = today;
+  document.getElementById('mv-to').value   = today;
+  loadMovementSummary();
+})();
+
+async function onMvClientChange() {
+  await loadMvEmployees();
+  loadMovementSummary();
+}
+
+async function loadMvEmployees() {
+  const isKC718       = user && user.employee_code === 'KC718';
+  const seeAll        = isKC718 || ['super_admin','hr','admin'].includes(user.role);
+  const isClientAdmin = user.role === 'client_admin';
+  const clientFilter  = document.getElementById('mv-client')?.value || 'kc';
+
+  let endpoint;
+  if (isClientAdmin) {
+    endpoint = '/employees?active=true&client_id=own_client&limit=500';
+  } else if (seeAll) {
+    endpoint = clientFilter === 'all'
+      ? '/employees?active=true&limit=500'
+      : '/employees?active=true&client_id=null&limit=500';  // KC only: client_id IS NULL
+  } else {
+    endpoint = `/employees?active=true&reporting_manager_id=${user.id}&limit=500`;
+  }
+
   const res = await api('GET', endpoint);
   if (res?.success) {
     const sel = document.getElementById('mv-emp');
+    sel.innerHTML = '<option value="">All Employees</option>';
     (res.data || []).forEach(e => {
       const o = document.createElement('option');
       o.value = e.id;
@@ -170,11 +210,7 @@ const todayIST = () => new Intl.DateTimeFormat('en-CA', {
       sel.appendChild(o);
     });
   }
-  const today = todayIST();
-  document.getElementById('mv-from').value = today;
-  document.getElementById('mv-to').value   = today;
-  loadMovementSummary();
-})();
+}
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 async function loadMovementSummary() {
