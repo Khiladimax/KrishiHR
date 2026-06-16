@@ -802,15 +802,24 @@ async function start() {
             employee_id   INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
             alert_date    DATE NOT NULL DEFAULT CURRENT_DATE,
             alert_type    VARCHAR(30) NOT NULL,
+            message       TEXT,
             status        VARCHAR(20) NOT NULL DEFAULT 'open',
             details       JSONB,
-            manager_notified BOOLEAN DEFAULT FALSE,
+            notified_at   TIMESTAMPTZ DEFAULT NOW(),
             resolved_at   TIMESTAMPTZ,
+            resolved_by   INT REFERENCES employees(id),
+            resolution_note TEXT,
+            manager_notified BOOLEAN DEFAULT FALSE,
             created_at    TIMESTAMPTZ DEFAULT NOW(),
             updated_at    TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(employee_id, alert_date, alert_type)
           )
         `).catch(() => {});
+        // Add missing columns to existing movement_alerts table (idempotent)
+        await db.query(`ALTER TABLE movement_alerts ADD COLUMN IF NOT EXISTS message TEXT`).catch(() => {});
+        await db.query(`ALTER TABLE movement_alerts ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ DEFAULT NOW()`).catch(() => {});
+        await db.query(`ALTER TABLE movement_alerts ADD COLUMN IF NOT EXISTS resolved_by INT REFERENCES employees(id)`).catch(() => {});
+        await db.query(`ALTER TABLE movement_alerts ADD COLUMN IF NOT EXISTS resolution_note TEXT`).catch(() => {});
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_emp_date ON movement_alerts(employee_id, alert_date)`).catch(() => {});
         await db.query(`CREATE INDEX IF NOT EXISTS idx_alerts_status ON movement_alerts(status)`).catch(() => {});
         console.log('✅ DB schema ready');

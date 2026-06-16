@@ -112,10 +112,17 @@ exports.importEmployees = async (req, res) => {
       const clientName = clean(row[COL.client_name]);
       let client_id = null;
       if (clientName) {
-        client_id = await findOrCreateClient(clientName, client);
+        try {
+          client_id = await findOrCreateClient(clientName, client);
+        } catch (clientErr) {
+          results.errors.push(`Row ${rowNum}: failed to resolve client "${clientName}": ${clientErr.message}`);
+          await client.query(`ROLLBACK TO SAVEPOINT row_save`).catch(() => {});
+          continue;
+        }
       }
 
       try {
+        await client.query(`SAVEPOINT row_save`);
         const result = await client.query(
           `INSERT INTO employees (
              employee_code, first_name, last_name, email, phone, alternate_phone,
@@ -220,6 +227,7 @@ exports.importEmployees = async (req, res) => {
         }
 
       } catch (rowErr) {
+        await client.query(`ROLLBACK TO SAVEPOINT row_save`).catch(() => {});
         results.errors.push(`Row ${rowNum} (${employee_code}): ${rowErr.message}`);
       }
     }
