@@ -1319,9 +1319,22 @@ exports.deleteBufferRule = async (req, res) => {
 // ── GET all rules (for admin list view) ──────────────────────────────────────
 exports.getAllBufferRules = async (req, res) => {
   try {
-    const clientFilter = req.user.client_id
-      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
-      : '';
+    let clientFilter = '';
+    if (req.user.client_id) {
+      // client_admin: always scoped to their org
+      clientFilter = `AND e.client_id = ${parseInt(req.user.client_id)}`;
+    } else {
+      // admin: support ?client_filter=own|all|{id}
+      const qf = req.query.client_filter;
+      if (qf === 'all') {
+        clientFilter = ''; // show everyone
+      } else if (qf && !isNaN(parseInt(qf))) {
+        clientFilter = `AND e.client_id = ${parseInt(qf)}`;
+      } else {
+        // default 'own' — only KC employees
+        clientFilter = `AND e.client_id IS NULL`;
+      }
+    }
 
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,

@@ -742,6 +742,9 @@
             <option value="universal">🌍 Universal</option>
             <option value="none">⚠️ Unassigned</option>
           </select>
+          <select class="g-filter-sel" id="emp-client-filter" style="display:none;font-weight:600" onchange="onEmpClientChange()">
+            <option value="own">🏢 Own (KC)</option>
+          </select>
           <span class="g-count" id="emp-count"></span>
         </div>
 
@@ -920,6 +923,33 @@ let _expandedRows = new Set();   // location IDs currently expanded
 let _locEmployees = {};          // cache: locId → [employee, ...]
 let _assignLocId  = null;
 let _deleteLocId  = null;
+let _empClientFilter = 'own';    // employee tab client filter
+
+// ── Init employee tab client dropdown (admin/super_admin/hr only) ──
+(async () => {
+  const u = Auth.getUser();
+  if (!u || !['admin','super_admin','hr'].includes(u.role)) return;
+  const sel = document.getElementById('emp-client-filter');
+  if (!sel) return;
+  sel.style.display = '';
+  const r = await api('GET', '/clients');
+  if (r?.success && r.data?.length) {
+    r.data.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = `🏭 ${c.name}`;
+      sel.appendChild(o);
+    });
+  }
+})();
+
+async function onEmpClientChange() {
+  _empClientFilter = document.getElementById('emp-client-filter').value;
+  // Reload buffer rules for selected client
+  const ruleData = await api('GET', `/geofence/buffer-rules?client_filter=${_empClientFilter}`);
+  _allRules = ruleData?.data || [];
+  renderEmpTable();
+}
 
 // ── BR district data (needed for per-employee rule editing) ──
 const BR_STATES = ["ANDAMAN & NICOBAR","ANDHRA PRADESH","ARUNACHAL PRADESH","ASSAM","BIHAR","CHANDIGARH","CHHATTISGARH","DADRA,NAGAR HAVELI,DAMAN & DIU","DELHI","GOA","GUJARAT","HARYANA","HIMACHAL PRADESH","JAMMU & KASHMIR","JHARKHAND","KARNATAKA","KERALA","LADAKH","LAKSHADWEEP","MADHYA PRADESH","MAHARASHTRA","MANIPUR","MEGHALAYA","MIZORAM","NAGALAND","ODISHA","PUDUCHERRY","PUNJAB","RAJASTHAN","SIKKIM","TAMIL NADU","TELANGANA","TRIPURA","UTTAR PRADESH","UTTARAKHAND","WEST BENGAL"];
@@ -1013,8 +1043,8 @@ async function saveUnassignedAssignments() {
 async function loadAll() {
   const [locData, empData, ruleData] = await Promise.all([
     api('GET', '/geofence/locations'),
-    api('GET', '/employees'),
-    api('GET', '/geofence/buffer-rules')
+    api('GET', '/employees?client_id=all'),
+    api('GET', '/geofence/buffer-rules?client_filter=all')
   ]);
   const user = Auth.getUser();
   const isKC346 = user?.employee_code === 'KC346';
@@ -2141,6 +2171,12 @@ function renderEmpTable() {
   const filter = document.getElementById('emp-filter-rule')?.value || '';
 
   const emps = _allEmployees.filter(e => {
+    // Client filter: only show employees matching selected client
+    if (_empClientFilter === 'own') {
+      if (e.client_id != null) return false;
+    } else if (_empClientFilter && _empClientFilter !== 'all') {
+      if (String(e.client_id) !== String(_empClientFilter)) return false;
+    }
     const rule = _allRules.find(r => r.id == e.id);
     const rt   = rule?.rule_type || 'none';
     if (filter && filter !== rt) return false;
