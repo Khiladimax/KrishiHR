@@ -335,12 +335,14 @@ exports.getUnassignedEmployees = async (req, res) => {
 
     // ── Special case: Work From Home — show ALL unassigned employees ──────────
     if (locNameLower.includes('work from home') || locNameLower.includes('wfh') || locNameLower.includes('remote')) {
+      const clientFilter = req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
       const result = await db.query(
         `SELECT e.id, e.employee_code, e.first_name, e.last_name,
                 d.name AS department_name, e.city
          FROM employees e
          LEFT JOIN departments d ON d.id = e.department_id
          WHERE e.is_active = TRUE
+           ${clientFilter}
            AND e.id NOT IN (
              SELECT employee_id FROM employee_geofence
              WHERE office_location_id = $1
@@ -761,6 +763,10 @@ exports.toggleUniversal = async (req, res) => {
 // ── Get employees with NO geofence assignment (unassigned to any location) ────
 exports.getUnassignedToAnyLocation = async (req, res) => {
   try {
+    const clientFilter = req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+      : '';
+
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.city, e.state,
               d.name AS department_name, e.employee_type,
@@ -769,6 +775,7 @@ exports.getUnassignedToAnyLocation = async (req, res) => {
        LEFT JOIN departments d ON d.id = e.department_id
        LEFT JOIN employee_buffer_rules ebr ON ebr.employee_id = e.id
        WHERE e.is_active = TRUE
+         ${clientFilter}
          AND NOT EXISTS (
            SELECT 1 FROM employee_geofence eg WHERE eg.employee_id = e.id
          )
