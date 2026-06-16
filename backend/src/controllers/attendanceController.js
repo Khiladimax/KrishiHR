@@ -2456,6 +2456,16 @@ exports.getMovementSummary = async (req, res) => {
     if (employee_id) {
       zeroParams.push(employee_id);
       scopeFilter = `AND e.id = $${zeroParams.length}`;
+    } else if (isClientAdmin) {
+      zeroParams.push(caller.client_id);
+      scopeFilter = `AND e.client_id = $${zeroParams.length}`;
+    } else if (seeAll) {
+      if (clientIdFilter === 'null' || clientIdFilter === 'kc') {
+        scopeFilter = `AND e.client_id IS NULL`;
+      } else if (clientIdFilter && clientIdFilter !== 'all') {
+        zeroParams.push(parseInt(clientIdFilter));
+        scopeFilter = `AND e.client_id = $${zeroParams.length}`;
+      }
     } else if (!seeAll) {
       zeroParams.push(caller.id);
       scopeFilter = `AND e.reporting_manager_id = $${zeroParams.length}`;
