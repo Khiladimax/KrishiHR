@@ -790,6 +790,11 @@ exports.getUnassignedToAnyLocation = async (req, res) => {
       ? `AND e.client_id = ${parseInt(req.user.client_id)}`
       : '';
 
+    // An employee is truly "unassigned" only if they have NEITHER:
+    //   - a row in employee_geofence (office/universal assignment), NOR
+    //   - a row in employee_buffer_rules (state/district/universal rule)
+    // Previously we only checked employee_geofence, so state/district employees
+    // (who have no geofence row) always appeared in the banner incorrectly.
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.city, e.state,
               d.name AS department_name, e.employee_type,
@@ -801,6 +806,9 @@ exports.getUnassignedToAnyLocation = async (req, res) => {
          ${clientFilter}
          AND NOT EXISTS (
            SELECT 1 FROM employee_geofence eg WHERE eg.employee_id = e.id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM employee_buffer_rules ebr2 WHERE ebr2.employee_id = e.id
          )
        ORDER BY e.first_name`
     );
