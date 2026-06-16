@@ -651,7 +651,7 @@ router.get('/birthdays/upcoming', authenticate, async (req, res) => {
         ON TO_CHAR(e.date_of_birth, 'MM-DD') = TO_CHAR((NOW() AT TIME ZONE 'Asia/Kolkata')::date + (gs.offset_days || ' days')::interval, 'MM-DD')
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
-        AND e.is_active = TRUE
+      WHERE e.is_active = TRUE
         AND e.date_of_birth IS NOT NULL
         ${req.user.client_id
           ? `AND e.client_id = ${parseInt(req.user.client_id)}`
