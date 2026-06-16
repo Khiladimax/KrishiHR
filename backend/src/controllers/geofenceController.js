@@ -20,18 +20,7 @@ exports.getLocations = async (req, res) => {
     const role   = req.user.role;
     const userId = req.user.id;
 
-    // Admin/super_admin can pass ?client_filter=own|all|{client_id}
-    const qClientFilter = req.query.client_filter;
-    let adminEmpFilter = '';
-    if (['admin','super_admin','hr'].includes(role) || req.user.employee_code === 'KC346') {
-      if (qClientFilter === 'own' || !qClientFilter) {
-        adminEmpFilter = `AND eg_emp.client_id IS NULL`;
-      } else if (qClientFilter === 'all') {
-        adminEmpFilter = '';
-      } else if (qClientFilter && !isNaN(parseInt(qClientFilter))) {
-        adminEmpFilter = `AND eg_emp.client_id = ${parseInt(qClientFilter)}`;
-      }
-    }
+    let q, params = [];
     if (['admin','super_admin','hr'].includes(role) || req.user.employee_code === 'KC346') {
       q = `SELECT ol.*,
                   (
@@ -64,7 +53,7 @@ exports.getLocations = async (req, res) => {
                   CONCAT(e.first_name,' ',e.last_name) AS created_by_name
            FROM office_locations ol
            LEFT JOIN employee_geofence eg ON ol.id = eg.office_location_id
-           LEFT JOIN employees eg_emp ON eg_emp.id = eg.employee_id AND eg_emp.is_active = TRUE ${adminEmpFilter}
+           LEFT JOIN employees eg_emp ON eg_emp.id = eg.employee_id AND eg_emp.is_active = TRUE
            LEFT JOIN employees e ON ol.created_by = e.id
            GROUP BY ol.id, e.first_name, e.last_name
            ORDER BY ol.name`;
@@ -797,17 +786,9 @@ exports.toggleUniversal = async (req, res) => {
 // ── Get employees with NO geofence assignment (unassigned to any location) ────
 exports.getUnassignedToAnyLocation = async (req, res) => {
   try {
-    let clientFilter = '';
-    if (req.user.client_id) {
-      clientFilter = `AND e.client_id = ${parseInt(req.user.client_id)}`;
-    } else {
-      const qClientFilter = req.query.client_filter;
-      if (!qClientFilter || qClientFilter === 'own') {
-        clientFilter = `AND e.client_id IS NULL`;
-      } else if (qClientFilter !== 'all' && !isNaN(parseInt(qClientFilter))) {
-        clientFilter = `AND e.client_id = ${parseInt(qClientFilter)}`;
-      }
-    }
+    const clientFilter = req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+      : '';
 
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.city, e.state,
@@ -1338,19 +1319,9 @@ exports.deleteBufferRule = async (req, res) => {
 // ── GET all rules (for admin list view) ──────────────────────────────────────
 exports.getAllBufferRules = async (req, res) => {
   try {
-    let clientFilter = '';
-    if (req.user.client_id) {
-      // client_admin: always scoped to their org
-      clientFilter = `AND e.client_id = ${parseInt(req.user.client_id)}`;
-    } else {
-      // admin/super_admin: support ?client_filter param
-      const qClientFilter = req.query.client_filter;
-      if (!qClientFilter || qClientFilter === 'own') {
-        clientFilter = `AND e.client_id IS NULL`;
-      } else if (qClientFilter !== 'all' && !isNaN(parseInt(qClientFilter))) {
-        clientFilter = `AND e.client_id = ${parseInt(qClientFilter)}`;
-      }
-    }
+    const clientFilter = req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}`
+      : '';
 
     const r = await db.query(
       `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.employee_type,
