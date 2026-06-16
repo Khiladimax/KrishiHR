@@ -233,6 +233,9 @@ async function loadMovementSummary() {
   wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7280">Loading…</div>';
   let url = `/attendance/movement/summary?from_date=${fromD}&to_date=${toD}`;
   if (empId) url += `&employee_id=${empId}`;
+  // Pass client filter for KC admin roles
+  const clientFilter = document.getElementById('mv-client')?.value;
+  if (clientFilter) url += `&client_id=${clientFilter}`;
   const res = await api('GET', url);
   if (!res?.success) { wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#ef4444">Failed to load data</div>'; return; }
   const rows = res.data || [];

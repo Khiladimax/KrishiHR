@@ -2375,17 +2375,16 @@ exports.getMovementHistory = async (req, res) => {
 // ── Daily movement summary — employee-wise KM per date ───────────────────
 exports.getMovementSummary = async (req, res) => {
   try {
-    const { from_date, to_date, employee_id } = req.query;
+    const { from_date, to_date, employee_id, client_id: clientIdFilter } = req.query;
     const fromD = from_date || getISTDate();
     const toD   = to_date   || getISTDate();
 
     const caller = req.user;
     const isKC718 = caller.employee_code === 'KC718';
     const isSuperAdmin = caller.role === 'super_admin';
-    // HR can also see all employees
     const isHR = caller.role === 'hr';
     const isClientAdmin = caller.role === 'client_admin';
-    const seeAll = isKC718 || isSuperAdmin || isHR;
+    const seeAll = isKC718 || isSuperAdmin || isHR || caller.role === 'admin';
 
     let whereClauses = `TO_CHAR(m.logged_at AT TIME ZONE 'Asia/Kolkata','YYYY-MM-DD') BETWEEN $1 AND $2`;
     const params = [fromD, toD];
@@ -2418,6 +2417,14 @@ exports.getMovementSummary = async (req, res) => {
       // Client admin: see all employees deployed to their client
       params.push(caller.client_id);
       whereClauses += ` AND e.client_id = $${params.length}`;
+    } else if (seeAll) {
+      // KC admin/super_admin/hr: filter by client dropdown selection
+      if (clientIdFilter === 'null' || clientIdFilter === 'kc') {
+        whereClauses += ` AND e.client_id IS NULL`;
+      } else if (clientIdFilter && clientIdFilter !== 'all') {
+        params.push(parseInt(clientIdFilter));
+        whereClauses += ` AND e.client_id = $${params.length}`;
+      }
     } else if (!seeAll) {
       // Scoped view: only direct reports of this manager/admin/tl
       params.push(caller.id);
