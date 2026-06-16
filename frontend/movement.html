@@ -67,7 +67,6 @@
           <label class="form-label">View By</label>
           <select id="mv-client" class="form-control" onchange="onMvClientChange()">
             <option value="kc">KC Employees</option>
-            <option value="all">All (KC + Clients)</option>
           </select>
         </div>
         <div class="form-group" style="margin:0">
@@ -164,10 +163,20 @@ const todayIST = () => new Intl.DateTimeFormat('en-CA', {
   const seeAll        = isKC718 || ['super_admin','hr','admin'].includes(user.role);
   const isClientAdmin = user.role === 'client_admin';
 
-  // Show client filter only for KC admin roles
   if (!seeAll) {
+    // Hide client filter for non-KC-admin roles
     const wrap = document.getElementById('mv-client-wrap');
     if (wrap) wrap.style.display = 'none';
+  } else {
+    // Load all clients and populate dropdown: KC Employees + one option per client
+    const clientRes = await api('GET', '/clients');
+    const sel = document.getElementById('mv-client');
+    (clientRes?.data || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = `${c.name} Employees`;
+      sel.appendChild(o);
+    });
   }
 
   await loadMvEmployees();
@@ -192,9 +201,11 @@ async function loadMvEmployees() {
   if (isClientAdmin) {
     endpoint = '/employees?active=true&client_id=own_client&limit=500';
   } else if (seeAll) {
-    endpoint = clientFilter === 'all'
-      ? '/employees?active=true&limit=500'
-      : '/employees?active=true&client_id=null&limit=500';  // KC only: client_id IS NULL
+    if (clientFilter === 'kc') {
+      endpoint = '/employees?active=true&client_id=null&limit=500';  // KC only
+    } else {
+      endpoint = `/employees?active=true&client_id=${clientFilter}&limit=500`;  // specific client
+    }
   } else {
     endpoint = `/employees?active=true&reporting_manager_id=${user.id}&limit=500`;
   }
