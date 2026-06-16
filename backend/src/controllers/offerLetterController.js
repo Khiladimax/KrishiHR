@@ -190,24 +190,24 @@ body {
 }
 .hdr-table { width: 100%; border-collapse: collapse; }
 .hdr-logo-cell {
-  width: 96px;
+  width: 100px;
   vertical-align: top;
-  padding-right: 10px;
+  padding-right: 8px;
 }
 .hdr-logo-img {
-  width: 86px;
-  height: 86px;
+  width: 82px;
+  height: 82px;
   object-fit: contain;
   display: block;
 }
 .hdr-tag {
-  font-size: 7pt;
+  font-size: 6pt;
   font-weight: bold;
-  color: #000;
+  color: #333;
   line-height: 1.3;
-  margin-top: 3px;
+  margin-top: 4px;
   text-align: center;
-  width: 86px;
+  width: 82px;
 }
 .hdr-name-cell { vertical-align: top; }
 .hdr-company {
@@ -226,7 +226,7 @@ body {
 .hdr-rule { border-top: 2px solid #000; margin: 8px 20px 0; }
 
 /* FOOTER */
-.ftr { padding: 0 20px 12px; margin-top: auto; flex-shrink: 0; }
+.ftr { padding: 0 20px 14px; margin-top: auto; flex-shrink: 0; }
 .ftr-rule { border-top: 1px solid #000; margin-bottom: 5px; }
 .ftr-text { font-size: 9pt; text-align: center; color: #000; line-height: 1.7; }
 .ftr-cin  { font-size: 9pt; text-align: center; font-weight: bold; color: #000; }
@@ -379,16 +379,16 @@ ul.rules li {
 <div class="hdr">
   <table class="hdr-table" cellpadding="0" cellspacing="0">
     <tr>
-      <td class="hdr-logo-cell" rowspan="2">
+      <td class="hdr-logo-cell">
         <img src="${LOGO}" class="hdr-logo-img" alt="KCMS">
         <div class="hdr-tag">BRINGING KRISHI AND<br>VIGYAN TOGETHER</div>
       </td>
       <td class="hdr-name-cell">
-        <div class="hdr-company">Krishi Care &amp; Management Services Private Limited</div>
+        <div class="hdr-company">&nbsp;&nbsp;&nbsp;Krishi Care &amp; Management Services Private Limited</div>
         <div class="hdr-addr">
           <strong>Office Address:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway,<br>
           Shankarwadi Jogeshwari (East), Mumbai - 400060.<br>
-          Email: <u>dipti.wadhaval@krishicare.in</u> &nbsp; Website: <u>www.krishicare.in</u> &nbsp; Tel. - +912268284109
+          Email: recruitments@krishicare.in &nbsp; Website: www.krishicare.in &nbsp; Tel. - +912268284109
         </div>
       </td>
     </tr>
@@ -417,14 +417,14 @@ ul.rules li {
       <br>
       ${ol.employee_code    ? `<p class="cand-line"><strong>Employee Code &ndash; ${ol.employee_code}</strong></p>` : ''}
       ${ol.candidate_mobile ? `<p class="cand-line"><strong>Mob &ndash; ${ol.candidate_mobile}</strong></p>` : ''}
-      ${ol.candidate_email  ? `<p class="cand-line"><strong>Email &ndash; <u>${ol.candidate_email}</u></strong></p>` : ''}
+      ${ol.candidate_email  ? `<p class="cand-line"><strong>Email &ndash; ${ol.candidate_email}</strong></p>` : ''}
     </div>
 
     <p class="salut">Dear ${ol.candidate_name},</p>
 
     <p class="subj">Sub: Letter of offer/Appointment for the position of &ldquo;${ol.designation}&rdquo;</p>
 
-    <p class="para">In reference to our discussions, we are pleased to offer you the position of <strong>&ldquo;<u>${ol.designation}</u>&rdquo;</strong> in Krishi Care &amp; Management Services Private Limited to be based at our <strong>${ol.location||'Mumbai'} Office</strong>${ol.joining_date ? ` as from <strong>${joiningDateHTML(ol.joining_date)}</strong>` : ''}.</p>
+    <p class="para">In reference to our discussions, we are pleased to offer you the position of <strong>&ldquo;${ol.designation}&rdquo;</strong> in Krishi Care &amp; Management Services Private Limited to be based at our <strong>${ol.location||'Mumbai'} Office</strong>${ol.joining_date ? ` as from <strong>${joiningDateHTML(ol.joining_date)}</strong>` : ''}.</p>
 
     <p class="para">The offer letter is valid for <strong>${ol.offer_valid_days||7} days</strong> by which time we must be informed of your decision; the said offer letter shall stand cancelled after the above-mentioned date.</p>
 
@@ -434,7 +434,7 @@ ul.rules li {
     <p class="para">Your compensation on a cost to company basis will be <strong>Rs. ${Number(ctcAnnual).toLocaleString('en-IN')} /- PA (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong>. The remuneration has taken into consideration the status and responsibility of the appointment, and it is inclusive of all taxable and non-taxable emoluments, allowances and statutory contributions.</p>
 
     <p class="sec">RESPONSIBILITIES:</p>
-    <p class="para">You will work as <strong>&ldquo;<u>${ol.designation}</u>&rdquo;</strong> of the Company and will be responsible for carrying out the operations of the Company as directed to you by the management. A detailed responsibility statement will be provided to you upon your joining.</p>
+    <p class="para">You will work as <strong>&ldquo;${ol.designation}&rdquo;</strong> of the Company and will be responsible for carrying out the operations of the Company as directed to you by the management. A detailed responsibility statement will be provided to you upon your joining.</p>
 
     <p class="sec">PROBATION PERIOD:</p>
     <p class="para">You will be on a probationary period of <strong>${probStr} months</strong> during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.</p>
