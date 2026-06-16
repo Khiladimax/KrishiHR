@@ -21,15 +21,11 @@ exports.getLocations = async (req, res) => {
     const userId = req.user.id;
 
     let q, params = [];
-    if (['admin','super_admin','hr','client_admin'].includes(role) || req.user.employee_code === 'KC346') {
+    if (['admin','super_admin','hr'].includes(role) || req.user.employee_code === 'KC346') {
       q = `SELECT ol.*,
-                  -- Count employees from employee_geofence (office/universal assignments)
-                  -- PLUS employees from employee_buffer_rules whose district/state matches
-                  -- the location name (district/state zone assignments).
                   (
                     COUNT(DISTINCT eg_emp.id)
                     +
-                    -- District match: location is a district zone AND district name matches
                     (SELECT COUNT(DISTINCT ebr.employee_id)
                      FROM employee_buffer_rules ebr
                      JOIN employees emp ON emp.id = ebr.employee_id AND emp.is_active = TRUE
@@ -42,7 +38,6 @@ exports.getLocations = async (req, res) => {
                        )
                     )
                     +
-                    -- State match: location is a state zone AND state name matches
                     (SELECT COUNT(DISTINCT ebr.employee_id)
                      FROM employee_buffer_rules ebr
                      JOIN employees emp ON emp.id = ebr.employee_id AND emp.is_active = TRUE
@@ -62,6 +57,33 @@ exports.getLocations = async (req, res) => {
            LEFT JOIN employees e ON ol.created_by = e.id
            GROUP BY ol.id, e.first_name, e.last_name
            ORDER BY ol.name`;
+
+    } else if (role === 'client_admin' && req.user.client_id) {
+      // client_admin: only locations that have their employees assigned OR they created
+      q = `SELECT ol.*,
+                  COUNT(DISTINCT eg_emp.id) AS assigned_count,
+                  CONCAT(e.first_name,' ',e.last_name) AS created_by_name
+           FROM office_locations ol
+           LEFT JOIN employee_geofence eg ON ol.id = eg.office_location_id
+           LEFT JOIN employees eg_emp ON eg_emp.id = eg.employee_id
+             AND eg_emp.is_active = TRUE
+             AND eg_emp.client_id = $1
+           LEFT JOIN employees e ON ol.created_by = e.id
+           WHERE ol.is_active = true
+             AND (
+               ol.created_by = $2
+               OR EXISTS (
+                 SELECT 1 FROM employee_geofence eg2
+                 JOIN employees emp2 ON emp2.id = eg2.employee_id
+                 WHERE eg2.office_location_id = ol.id
+                   AND emp2.client_id = $1
+                   AND emp2.is_active = TRUE
+               )
+             )
+           GROUP BY ol.id, e.first_name, e.last_name
+           ORDER BY ol.name`;
+      params = [req.user.client_id, userId];
+
     } else {
       q = `SELECT DISTINCT ol.*,
                   CONCAT(e.first_name,' ',e.last_name) AS created_by_name
