@@ -24,14 +24,25 @@ const ACCOUNTS_CODE = 'KC7708'; // Anshu
 
 async function getAdvanceChain(employeeId) {
   const emp = await db.query(
-    `SELECT e.employee_code, e.role, e.reporting_manager_id,
+    `SELECT e.employee_code, e.role, e.reporting_manager_id, e.client_id,
             m.employee_code AS manager_code
      FROM employees e
      LEFT JOIN employees m ON e.reporting_manager_id = m.id
      WHERE e.id=$1`, [employeeId]
   );
   if (!emp.rows.length) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
-  const { employee_code, role, manager_code } = emp.rows[0];
+  const { employee_code, role, manager_code, client_id } = emp.rows[0];
+
+  // Client deployed employee → client_admin is the ONLY approver
+  if (client_id) {
+    const clientAdmin = await db.query(
+      `SELECT employee_code FROM employees
+       WHERE client_id=$1 AND role='client_admin' AND is_active=true LIMIT 1`,
+      [client_id]
+    );
+    if (clientAdmin.rows.length) return [clientAdmin.rows[0].employee_code];
+    return [COO_CODE]; // fallback if no client_admin found
+  }
 
   // COO applies → MD → Accounts
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
@@ -43,9 +54,6 @@ async function getAdvanceChain(employeeId) {
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
 
   // admin / hr roles → skip reporting manager, go directly to COO → MD → Accounts
-  // This replaces the old hardcoded DIRECT_TO_COO set
-  // HR can assign admin/hr role to any employee in employees.html to give them this chain
-  // Manager / TL / admin / hr → COO → MD → Accounts (3 steps)
   if (['manager', 'tl', 'admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 
   // Regular employee → Reporting Manager → COO → MD → Accounts (4 steps)
@@ -184,13 +192,14 @@ exports.action = async (req, res) => {
 
     const currentCode = advance.current_approver_code;
     const isSuperAdmin = actorRole === 'super_admin' || actorCode === CBO_CODE;
+    const isClientAdmin = actorRole === 'client_admin';
     const isCurrentApprover = actorCode === currentCode;
 
     // Block self-approval
     if (advance.employee_id === req.user.id)
       return res.status(403).json({ success: false, message: 'You cannot approve your own advance request' });
 
-    if (!isSuperAdmin && !isCurrentApprover)
+    if (!isSuperAdmin && !isClientAdmin && !isCurrentApprover)
       return res.status(403).json({ success: false, message: 'You are not the current approver' });
 
     // Log this approval step

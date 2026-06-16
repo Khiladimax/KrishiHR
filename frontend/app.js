@@ -135,9 +135,9 @@ const NAV_GROUPS = [
   {
     label: 'Documents',
     items: [
-      { href:'form16.html',         icon: ICONS.form16,       label:'Form 16',          always:true },
-      { href:'it-declaration.html', icon: ICONS.itdecl,       label:'IT Declaration',   always:true },
-      { href:'payslip.html',        icon: ICONS.payslip,      label:'My Payslip',       always:true },
+      { href:'form16.html',         icon: ICONS.form16,       label:'Form 16',          always:true, hideRoles:['client_admin'] },
+      { href:'it-declaration.html', icon: ICONS.itdecl,       label:'IT Declaration',   always:true, hideRoles:['client_admin'] },
+      { href:'payslip.html',        icon: ICONS.payslip,      label:'My Payslip',       always:true, hideRoles:['client_admin'] },
     ]
   },
   {
@@ -152,8 +152,8 @@ const NAV_GROUPS = [
     label: 'Finance',
     items: [
       { href:'payroll.html',        icon: ICONS.payroll,      label:'Payroll',          roles:['super_admin','hr','accounts','client_admin'] },
-      { href:'advance.html',        icon: ICONS.advance,        label:'Advance Salary',   always:true },
-      { href:'reimbursement.html',  icon: ICONS.reimbursement,  label:'Reimbursement',    always:true },
+      { href:'advance.html',        icon: ICONS.advance,      label:'Advance Salary',   always:true },
+      { href:'reimbursement.html',  icon: ICONS.reimbursement,label:'Reimbursement',    always:true },
       { href:'provision.html',      icon: ICONS.provision,    label:'Provision',        roles:['admin','super_admin','hr','manager','tl'] },
       { href:'projects.html',       icon: ICONS.projects,     label:'Projects',         roles:['admin','super_admin','accounts'] },
       { href:'invoice.html',        icon: '🧾',                label:'Invoice Generator', roles:['admin','super_admin','hr','accounts'] },
@@ -162,7 +162,7 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin'], allowCodes:['KC346'] },
+      { href:'geofence.html',       icon: ICONS.geofence,     label:'Geofence',         roles:['admin','super_admin','client_admin'], allowCodes:['KC346'] },
       { href:'ai-voice.html',       icon: ICONS.aivoice,      label:'Voice Assistant',  always:true },
     ]
   },

@@ -26,14 +26,25 @@ exports.uploadMiddleware = upload.single('attachment');
 // ── Shared: same chain logic as advance ───────────────────────────────────────
 async function getChain(employeeId) {
   const emp = await db.query(
-    `SELECT e.employee_code, e.role,
+    `SELECT e.employee_code, e.role, e.client_id,
             m.employee_code AS manager_code
      FROM employees e
      LEFT JOIN employees m ON e.reporting_manager_id = m.id
      WHERE e.id=$1`, [employeeId]
   );
   if (!emp.rows.length) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
-  const { employee_code, role, manager_code } = emp.rows[0];
+  const { employee_code, role, manager_code, client_id } = emp.rows[0];
+
+  // Client deployed employee → client_admin is the ONLY approver
+  if (client_id) {
+    const clientAdmin = await db.query(
+      `SELECT employee_code FROM employees
+       WHERE client_id=$1 AND role='client_admin' AND is_active=true LIMIT 1`,
+      [client_id]
+    );
+    if (clientAdmin.rows.length) return [clientAdmin.rows[0].employee_code];
+    return [COO_CODE]; // fallback
+  }
 
   // COO applies → MD → Accounts (2 steps)
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
@@ -45,7 +56,6 @@ async function getChain(employeeId) {
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
 
   // Manager / TL / admin / hr → COO → MD → Accounts (3 steps)
-  // Managers skip the reporting-manager step — they start directly at COO
   if (['manager', 'tl', 'admin', 'hr'].includes(role)) return [COO_CODE, MD_CODE, ACCOUNTS_CODE];
 
   // Regular employee → Reporting Manager → COO → MD → Accounts (4 steps)
@@ -317,8 +327,9 @@ exports.action = async (req, res) => {
     catch (_) { chain = []; }
 
     const isSuperAdmin      = actorRole === 'super_admin' || actorCode === CBO_CODE;
+    const isClientAdmin     = actorRole === 'client_admin';
     const isCurrentApprover = actorCode === reimb.current_approver_code;
-    if (!isSuperAdmin && !isCurrentApprover)
+    if (!isSuperAdmin && !isClientAdmin && !isCurrentApprover)
       return res.status(403).json({ success: false, message: 'You are not the current approver' });
     if (reimb.employee_id === req.user.id)
       return res.status(403).json({ success: false, message: 'Cannot approve your own request' });
