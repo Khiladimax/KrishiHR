@@ -455,7 +455,10 @@ exports.getAll = async (req, res) => {
       )`);
       params.push(userCode, `%"${userCode}"%`, userCode, userCode, userId);
 
-    } else if (['manager', 'tl'].includes(userRole)) {
+    } else if (userRole === 'client_admin' && req.user.client_id) {
+      // client_admin sees all requests from employees in their client org
+      // where they are the current approver OR requests that passed through them
+      conds.push(`(\n        a.employee_id IN (\n          SELECT id FROM employees WHERE client_id=$${idx++} AND is_active=true\n        )\n      )`);\n      params.push(req.user.client_id);\n\n    } else if (['manager', 'tl'].includes(userRole)) {
       // Manager / TL sees:
       //   1. Requests where they are the current approver (pending action)
       //   2. Requests they already approved (passed through them)
@@ -559,6 +562,11 @@ exports.getStats = async (req, res) => {
         SELECT 1 FROM advance_approvals aa WHERE aa.advance_id=advance_salary.id AND aa.approver_id=$2
       ))`;
       params = [userCode, userId];
+    } else if (userRole === 'client_admin' && req.user.client_id) {
+      scopeFilter = `WHERE employee_id IN (
+        SELECT id FROM employees WHERE client_id=$1 AND is_active=true
+      )`;
+      params = [req.user.client_id];
     } else if (['manager', 'tl'].includes(userRole)) {
       scopeFilter = `WHERE (current_approver_code=$1 OR employee_id=$2)`;
       params = [userCode, userId];

@@ -237,7 +237,9 @@ exports.getAll = async (req, res) => {
     } else if (userRole === 'admin') {
       conds.push(`(r.current_approver_code=$${idx++} OR (r.approval_chain::text LIKE $${idx++} AND EXISTS(SELECT 1 FROM reimbursement_approvals ra WHERE ra.reimbursement_id=r.id AND ra.level_label=$${idx++} AND ra.action='approve')) OR r.employee_id=$${idx++})`);
       params.push(userCode, `%"${userCode}"%`, userCode, userId);
-    } else if (['manager','tl'].includes(userRole)) {
+    } else if (userRole === 'client_admin' && req.user.client_id) {
+      // client_admin sees all requests from employees in their client org
+      conds.push(`r.employee_id IN (\n        SELECT id FROM employees WHERE client_id=$${idx++} AND is_active=true\n      )`);\n      params.push(req.user.client_id);\n\n    } else if (['manager','tl'].includes(userRole)) {
       conds.push(`(r.current_approver_code=$${idx++} OR (r.approval_chain::text LIKE $${idx++} AND EXISTS(SELECT 1 FROM reimbursement_approvals ra WHERE ra.reimbursement_id=r.id AND ra.level_label=$${idx++} AND ra.action='approve')) OR r.employee_id=$${idx++} OR EXISTS(SELECT 1 FROM employees sub WHERE sub.id=r.employee_id AND (sub.reporting_manager_id=$${idx++} OR sub.team_leader_id=$${idx++})))`);
       params.push(userCode, `%"${userCode}"%`, userCode, userId, userId, userId);
     } else {
