@@ -1198,13 +1198,16 @@ async function loadDepartments() {
 
 // ── Employees ─────────────────────────────────────────────────────────────────
 async function loadEmployees() {
-  // Build query string with optional client_id filter
-  const clientParam = _clientFilter && _clientFilter !== 'all' 
-    ? `&client_id=${_clientFilter === 'own' ? 'own' : _clientFilter}` : '';
+  // Build query params
+  const params = [];
+  if (_clientFilter && _clientFilter !== 'all') {
+    params.push(`client_id=${_clientFilter === 'own' ? 'own' : _clientFilter}`);
+  }
+  const qs = params.length ? '?' + params.join('&') : '';
   
   const [activeRes, inactiveRes] = await Promise.all([
-    api('GET', `/employees?_=1${clientParam}`),
-    api('GET', `/employees?is_active=false${clientParam}`)
+    api('GET', `/employees${qs}`),
+    api('GET', `/employees?is_active=false${qs ? '&' + params.join('&') : ''}`)
   ]);
   if (!activeRes?.success) return;
   const activeList   = activeRes.data || [];
