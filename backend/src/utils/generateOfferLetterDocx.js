@@ -262,7 +262,11 @@ function buildBodyXml(ol) {
     parts.push(para(run(ol.custom_clauses, 20), {spacing:SP}));
   }
 
-  // OTHER RULES
+  // OTHER RULES — force page break so it always starts on page 2 with 3 blank lines gap
+  parts.push(PAGE_BREAK);
+  parts.push(emptyPara(0,0));
+  parts.push(emptyPara(0,0));
+  parts.push(emptyPara(0,0));
   parts.push(para(run('OTHER RULES AND REGULATION:', 20, {bold:true, underline:true}),
     {align:'left', spacing:SH}));
   parts.push(para(
