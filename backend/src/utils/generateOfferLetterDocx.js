@@ -244,8 +244,8 @@ function buildBodyXml(ol) {
     parts.push(para(run(ol.custom_clauses, 20), {spacing:{before:0,after:80,line:276}}));
   }
 
-  // OTHER RULES
-  parts.push(para(run('OTHER RULES AND REGULATION:', 20, {bold:true, underline:true}), {spacing:{before:100,after:40,line:276}}));
+  // OTHER RULES — page 2 starts near here; 3-line top gap so content doesn't sit flush under header
+  parts.push(para(run('OTHER RULES AND REGULATION:', 20, {bold:true, underline:true}), {spacing:{before:828,after:40,line:276}}));
   parts.push(para(run('The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.', 20), {spacing:{before:0,after:60,line:276}}));
 
   // Bullet list — numId 1 references the first numbering definition (bullets)
@@ -307,7 +307,10 @@ function buildBodyXml(ol) {
   // ── PAGE BREAK → ANNEXURE ─────────────────────────────────────────────────
   parts.push(PAGE_BREAK);
 
-  // Annexure title
+  // Annexure title — 3 blank lines after page break so content starts with space under header
+  parts.push(emptyPara(0, 0));
+  parts.push(emptyPara(0, 0));
+  parts.push(emptyPara(0, 0));
   parts.push(para(
     run('Annexure I (Annual Cost to Company and Other Benefits)', 20, {bold:true}),
     {align:'center', spacing:{before:60,after:80,line:276}}
