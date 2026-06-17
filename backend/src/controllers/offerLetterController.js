@@ -7,6 +7,11 @@ const { execFile } = require('child_process');
 const fs           = require('fs');
 const path         = require('path');
 const os           = require('os');
+const {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  Header, Footer, ImageRun, AlignmentType, BorderStyle, WidthType,
+  PageBreak, UnderlineType, LevelFormat
+} = require('docx');
 
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
@@ -536,6 +541,201 @@ ${ol.custom_clauses ? `<p class="sec">ADDITIONAL TERMS:</p><p class="para">${ol.
   return { html, pdfHtml: html, headerHtml: '', footerHtml: '' };
 }
 
+// ── BUILD OFFER LETTER AS DOCX (Word format with proper header/footer) ────────
+async function buildOfferLetterDOCX(ol) {
+  const basic    = parseFloat(ol.basic_monthly||0);
+  const hra      = parseFloat(ol.hra_monthly||0);
+  const conv     = parseFloat(ol.conveyance_monthly||0);
+  const other    = parseFloat(ol.other_allowance_monthly||0);
+  const gratuity = parseFloat(ol.gratuity_monthly||0);
+  const pfEmp    = parseFloat(ol.pf_employee_monthly||0);
+  const pfEmpr   = parseFloat(ol.pf_employer_monthly||0);
+  const pfAdmin  = parseFloat(ol.pf_admin_monthly||0);
+  const pt       = parseFloat(ol.professional_tax_monthly||0);
+
+  const gross      = basic + hra + conv + other + gratuity;
+  const totalDed   = pfEmp + pt;
+  const netSalary  = gross - totalDed;
+  const ctcMonthly = gross + pfEmpr + pfAdmin;
+  const ctcAnnual  = parseFloat(ol.ctc_annual || (ctcMonthly * 12));
+  const fmtV = v => Number(Math.round(v)).toLocaleString('en-IN');
+
+  function joiningDateText(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    const day = dt.getDate();
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const sup = [,'st','nd','rd'][day] || 'th';
+    return `${day}${sup} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+  }
+  const probWords   = {3:'three',6:'six',12:'twelve'};
+  const noticeWords = {1:'one',2:'two',3:'three',6:'six'};
+  const probStr   = probWords[ol.probation_months]       || `${ol.probation_months||6}`;
+  const noticeStr = noticeWords[ol.notice_period_months] || `${ol.notice_period_months||3}`;
+  const firstName = ol.candidate_name
+    ? ol.candidate_name.split(' ').filter(w => !['Mr.','Ms.','Mrs.','Dr.'].includes(w))[0]
+    : ol.candidate_name;
+
+  const logoPath = path.join(__dirname, '../../..', 'frontend', 'Logo_kcms.png');
+  let logoBuffer;
+  try { logoBuffer = fs.readFileSync(logoPath); } catch(e) { logoBuffer = null; }
+
+  const bdr = { style: BorderStyle.SINGLE, size: 4, color: '000000', space: 0 };
+  const borders = { top: bdr, bottom: bdr, left: bdr, right: bdr };
+
+  const b  = (text, opts={}) => new TextRun({ text, font: 'Arial', size: 20, bold: true, ...opts });
+  const r  = (text, opts={}) => new TextRun({ text, font: 'Arial MT', size: 20, ...opts });
+  const calB = (text) => new TextRun({ text, font: 'Calibri', size: 22, bold: true });
+
+  const bodyPara = (children, before=0, after=60) => new Paragraph({
+    children, alignment: AlignmentType.JUSTIFIED,
+    spacing: { before, after, line: 260, lineRule: 'auto' }
+  });
+  const headingPara = (text) => new Paragraph({
+    children: [new TextRun({ text, font: 'Arial', size: 20, bold: true, underline: { type: UnderlineType.SINGLE, color: '000000' } })],
+    spacing: { before: 200, after: 60 }, indent: { left: 57 }
+  });
+  const bulletPara = (text) => new Paragraph({
+    numbering: { reference: 'bullets', level: 0 },
+    children: [r(text)],
+    spacing: { before: 40, after: 40 }
+  });
+  const tCell = (text, w, align=AlignmentType.LEFT, bold=true) => new TableCell({
+    borders, width: { size: w, type: WidthType.DXA },
+    margins: { top: 40, bottom: 40, left: 80, right: 80 },
+    children: [new Paragraph({ alignment: align, spacing: { before: 0, after: 0 },
+      children: [new TextRun({ text, font: 'Arial MT', size: 20, bold })] })]
+  });
+
+  const headerChildren = [];
+  if (logoBuffer) {
+    headerChildren.push(new Paragraph({
+      children: [
+        new ImageRun({ data: logoBuffer, transformation: { width: 54, height: 66 }, type: 'png' }),
+        new TextRun({ text: '   Krishi Care & Management Services Private Limited', font: 'Arial', size: 38, bold: true }),
+      ],
+      spacing: { before: 0, after: 30 }
+    }));
+  } else {
+    headerChildren.push(new Paragraph({
+      children: [new TextRun({ text: 'Krishi Care & Management Services Private Limited', font: 'Arial', size: 38, bold: true })],
+      spacing: { before: 0, after: 30 }
+    }));
+  }
+  headerChildren.push(
+    new Paragraph({
+      children: [new TextRun({ text: 'Regd. & Head Office: 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.', font: 'Arial', size: 18, bold: true })],
+      alignment: AlignmentType.CENTER, spacing: { before: 20, after: 20 }
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: 'Email: recruitments@krishicare.in, Website: www.krishicare.in, Tel. - +912268284109', font: 'Arial', size: 18 })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 60 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '000000', space: 4 } }
+    })
+  );
+
+  const docHeader = new Header({ children: headerChildren });
+  const docFooter = new Footer({
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text: 'Corporate Office: H-12, Green Park Extension, New Delhi -110016. Tel: 011-41039506.', font: 'Arial', size: 18 })],
+        alignment: AlignmentType.CENTER,
+        border: { top: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
+        spacing: { before: 60, after: 20 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `CIN: ${COMPANY.cin}`, font: 'Arial', size: 18, bold: true })],
+        alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }
+      })
+    ]
+  });
+
+  const tblRows = [
+    new TableRow({ children: [tCell('Sr. No.',800,AlignmentType.CENTER,true), tCell('Particulars',4400,AlignmentType.LEFT,true), tCell('Monthly',1400,AlignmentType.RIGHT,true), tCell('Yearly',1400,AlignmentType.RIGHT,true)] }),
+    ...[
+      ['1','Fixed Basic',fmtV(basic),fmtV(basic*12),false],
+      ['2','HRA',fmtV(hra),fmtV(hra*12),false],
+      ...(conv>0?[['3','Conveyance Allowances',fmtV(conv),fmtV(conv*12),false]]:[]),
+      [`${conv>0?4:3}`,'Other Allowances',fmtV(other),fmtV(other*12),false],
+      [`${conv>0?5:4}`,'Gratuity',fmtV(gratuity),fmtV(gratuity*12),false],
+      [`${conv>0?6:5}`,'Gross Pay',fmtV(gross),fmtV(gross*12),true],
+      [`${conv>0?7:6}`,'Provident Fund',pfEmp>0?fmtV(pfEmp):'\u2013',pfEmp>0?fmtV(pfEmp*12):'\u2013',false],
+      [`${conv>0?8:7}`,'Professional Tax',pt>0?fmtV(pt):'\u2013',pt>0?fmtV(pt*12):'\u2013',false],
+      [`${conv>0?9:8}`,'Total Deduction',fmtV(totalDed),fmtV(totalDed*12),true],
+      [`${conv>0?10:9}`,'Net Salary (Gross - Total Deduction)',fmtV(netSalary),fmtV(netSalary*12),true],
+      [`${conv>0?11:10}`,'Employer PF contribution',pfEmpr>0?fmtV(pfEmpr):'\u2013',pfEmpr>0?fmtV(pfEmpr*12):'\u2013',false],
+      [`${conv>0?12:11}`,'Employer PF contribution Admin charges',pfAdmin>0?fmtV(pfAdmin):'\u2013',pfAdmin>0?fmtV(pfAdmin*12):'\u2013',false],
+      [`${conv>0?13:12}`,'Total Compensation Package',fmtV(ctcMonthly),fmtV(ctcAnnual),true],
+    ].map(([sr,part,mo,yr,bold]) => new TableRow({ children: [tCell(sr,800,AlignmentType.CENTER,bold),tCell(part,4400,AlignmentType.LEFT,bold),tCell(mo,1400,AlignmentType.RIGHT,bold),tCell(yr,1400,AlignmentType.RIGHT,bold)] }))
+  ];
+
+  const doc = new Document({
+    numbering: { config: [{ reference: 'bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '\u2022', alignment: AlignmentType.LEFT,
+      style: { paragraph: { indent: { left: 720, hanging: 360 }, spacing: { before: 40, after: 40 } }, run: { font: 'Symbol', size: 20 } } }] }] },
+    sections: [{
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1980, right: 425, bottom: 860, left: 566, header: 351, footer: 671 } } },
+      headers: { default: docHeader },
+      footers: { default: docFooter },
+      children: [
+        new Paragraph({ children: [calB(formatDate(ol.offer_date || new Date()))], alignment: AlignmentType.RIGHT, spacing: { before: 80, after: 80 } }),
+        new Paragraph({ children: [calB(ol.candidate_name)], spacing: { before: 10, after: 0 } }),
+        ...(ol.candidate_address ? ol.candidate_address.split('\n').map(line => new Paragraph({ children: [new TextRun({ text: line, font: 'Calibri', size: 22 })], spacing: { before: 20, after: 0 } })) : []),
+        new Paragraph({ spacing: { before: 20, after: 0 }, children: [] }),
+        ...(ol.employee_code    ? [new Paragraph({ children: [calB(`Employee Code \u2013 ${ol.employee_code}`)], spacing: { before: 0, after: 0 } })] : []),
+        ...(ol.candidate_mobile ? [new Paragraph({ children: [calB(`Mob \u2013 ${ol.candidate_mobile}`)], spacing: { before: 0, after: 0 } })] : []),
+        ...(ol.candidate_email  ? [new Paragraph({ children: [calB(`Email \u2013 ${ol.candidate_email}`)], spacing: { before: 0, after: 80 } })] : []),
+        new Paragraph({ children: [r(`Dear ${firstName},`)], spacing: { before: 0, after: 80 } }),
+        new Paragraph({ children: [new TextRun({ text: `Sub: Letter of offer/Appointment for the position of \u201c${ol.designation}\u201d`, font: 'Arial', size: 20, bold: true, underline: { type: UnderlineType.SINGLE, color: '000000' } })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 80 } }),
+        bodyPara([r('In reference to our discussions, we are pleased to offer you the position of '),b(`\u201c${ol.designation}\u201d`),r(' in Krishi Care & Management Services Private Limited to be based at our '),b(`${ol.location||'Mumbai'} Office`),...(ol.joining_date?[r(' as from '),b(joiningDateText(ol.joining_date))]:[]),r('.')],0,80),
+        bodyPara([r('The offer letter is valid for '),b(`${ol.offer_valid_days||7} days`),r(' by which time we must be informed of your decision; the said offer letter shall stand cancelled after the above-mentioned date.')],0,80),
+        bodyPara([r('We are pleased to issue this letter of offer on the following terms & conditions:')],0,40),
+        headingPara('EMOLUMENTS:'),
+        bodyPara([r('Your compensation on a cost to company basis will be '),b(`Rs.${Number(ctcAnnual).toLocaleString('en-IN')} /- PA (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)`),r('. The remuneration has taken into consideration the status and responsibility of the appointment, and it is inclusive of all taxable and non-taxable emoluments, allowances and statutory contributions.')],0,80),
+        headingPara('RESPONSIBILITIES:'),
+        bodyPara([r('You will work as '),b(`\u201c${ol.designation}\u201d`),r(' of the Company and will be responsible for carrying out the operations of the Company as directed to you by the management. A detailed responsibility statement will be provided to you upon your joining.')],0,80),
+        headingPara('PROBATION PERIOD:'),
+        bodyPara([r('You will be on a probationary period of '),b(`${probStr} months`),r(' during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.')],0,80),
+        headingPara('SEPERATION OF SERVICES:'),
+        bodyPara([r('Severance of relationship can be done by giving '),b(`${noticeStr} month`),r(` written notice. If you are unable to complete this notice period you will be liable to compensate the company ${noticeStr} months of salary or for the period not served.`)],0,80),
+        ...(ol.custom_clauses?[headingPara('ADDITIONAL TERMS:'),bodyPara([r(ol.custom_clauses)],0,80)]:[]),
+        headingPara('OTHER RULES AND REGULATION:'),
+        bodyPara([r('The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.')],0,60),
+        bulletPara('You will, in all respects, be governed by the company\u2019s rules and regulations'),
+        bulletPara('You will devote full time to the work of the Company and will not undertake any direct / indirect outside business or work, honorary or remunerative except with the prior written consent of the Management.'),
+        bulletPara('You will abide by Leave Rules of company.'),
+        bulletPara('You have been engaged on the presumption that the particulars furnished by you in your application are correct. In case the said particular are found to be incorrect or that you have concealed or withheld information or the relevant facts, the services can be terminated from the company without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of period.'),
+        bulletPara('You will not, either during the period of your services of thereafter, disclose divulge or communicate to any other person or group or company any strategic information of the organization or its clients.'),
+        bulletPara('All correspondence addressed to you by the company including press and other copies of such correspondence and all vouchers, books, records, including all note books containing notes or records of business or prices or other market data, samples and/or other papers belonging to the company, circulars and all other relevant papers and documents of any nature whatsoever relating to the company\u2019s business, which shall come into your possession in the course of your employment shall be the absolute property of the company and you shall, at any time during your employment or upon termination there for any reason whatsoever, deliver the same to the company and without claiming any lien thereon.'),
+        bulletPara('You will be responsible for the safe keeping and for returning in good condition and order, all on your own the company\u2019s property which may be in your use, custody, care or charge. The company shall have the right to deduct the monetary value of all such things from any amounts payable to you and to take such actions as may be deemed proper in the event of your failure to account for such property to the satisfaction of the management.'),
+        bulletPara('You will keep us informed of your residential (mailing & permanent) address. Any change in the same should be notified in writing within one week. Failure to do so will be treated as willful withholding of information and appropriate action as deemed fit by management would be taken against you.'),
+        new Paragraph({ spacing: { before: 100, after: 60 }, children: [] }),
+        new Paragraph({ children: [b('If you are willing to accept this offer for the said position, we request you to submit 3 copies of your latest coloured Passport Size photograph, Self-attested Copy of your academic qualification, Self-attested copy of your PAN Card, Self-attested copy of your Aadhar Card, Self-attested Copy of Address Proof, and last 3 month Pay Slip / Form 16 from your previous employer. In addition, upon joining, you will have to submit a copy of your relieving letter from your previous employer.')], alignment: AlignmentType.JUSTIFIED, spacing: { before: 60, after: 60 } }),
+        bodyPara([r('As a token of your acceptance and in confirmation of the terms and conditions of this offer, please sign the duplicate copy of this letter and return to us at the earliest duly intimating when you are going to join.')],0,100),
+        new Paragraph({ children: [r('Yours truly,')], spacing: { before: 0, after: 20 } }),
+        new Paragraph({ children: [r('From '),b('Krishi Care & Management Services Private Limited,')], spacing: { before: 0, after: 600 } }),
+        new Paragraph({ tabStops: [{type:'center',position:5400}], children: [r('Authorized Signatory'),new TextRun({text:'\t( Authorized Signatory)',font:'Arial MT',size:20})], spacing: { before: 0, after: 20 } }),
+        new Paragraph({ tabStops: [{type:'center',position:5400}], children: [r('\tHuman Resource')], spacing: { before: 0, after: 0 } }),
+        new Paragraph({ children: [new PageBreak()], spacing: { before: 0, after: 0 } }),
+        new Paragraph({ children: [b('Annexure I (Annual Cost to Company and Other Benefits)')], alignment: AlignmentType.CENTER, spacing: { before: 60, after: 60 } }),
+        new Paragraph({ children: [b(`Name: ${ol.candidate_name}`)], spacing: { before: 0, after: 30 } }),
+        new Paragraph({ children: [b(`Designation: ${ol.designation}`)], spacing: { before: 0, after: 30 } }),
+        new Paragraph({ children: [b(`Location: ${ol.location||'Mumbai'}`)], spacing: { before: 0, after: 30 } }),
+        new Paragraph({ children: [b(`Annual Cost to Company \u2013 Rs.${Number(ctcAnnual).toLocaleString('en-IN')} (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)`)], spacing: { before: 0, after: 80 } }),
+        new Table({ width: { size: 8000, type: WidthType.DXA }, columnWidths: [800,4400,1400,1400], rows: tblRows }),
+        new Paragraph({ spacing: { before: 120, after: 0 }, children: [] }),
+        new Paragraph({ children: [new TextRun({ text: 'Acknowledgement & Acceptance', font: 'Arial', size: 20, bold: true, underline: { type: UnderlineType.SINGLE, color: '000000' } })], spacing: { before: 80, after: 60 } }),
+        bodyPara([r('I have read understood, agree to the above terms and conditions, and hereby sign my acceptance of the same.')],0,200),
+        new Paragraph({ tabStops: [{type:'left',position:5400}], children: [r('Signature: ___________________\tDate: ___________________')], spacing: { before: 0, after: 120 } }),
+        new Paragraph({ tabStops: [{type:'left',position:5400}], children: [r('Name: ___________________\tLocation: ___________________')], spacing: { before: 0, after: 0 } }),
+      ]
+    }]
+  });
+  return Packer.toBuffer(doc);
+}
+
+
+
 
 
 
@@ -726,34 +926,26 @@ exports.sendEmail = async (req, res) => {
     // ── Build attachments array ──────────────────────────────────────────────
     const attachments = [];
 
-    // 1. Offer Letter as PDF (via wkhtmltopdf) or fallback to HTML
+    // 1. Offer Letter as PDF (DOCX → LibreOffice → PDF for perfect header/footer)
     try {
       const tmpDir  = os.tmpdir();
-      const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
-      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
-      fs.writeFileSync(tmpHtml, offerHTML);  // pdfHtml = body only, header/footer via wkhtmltopdf args
-
+      const safeName = ol.candidate_name.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+      const tmpDocx = path.join(tmpDir, `offer_${ol.id}_${safeName}.docx`);
+      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${safeName}.pdf`);
+      const docxBuffer = await buildOfferLetterDOCX(ol);
+      fs.writeFileSync(tmpDocx, docxBuffer);
       await new Promise((resolve, reject) => {
-        execFile('wkhtmltopdf', [
-          '--quiet',
-          '--page-size', 'A4',
-          '--margin-top', '0mm',
-          '--margin-bottom', '0mm',
-          '--margin-left', '0mm',
-          '--margin-right', '0mm',
-          '--enable-local-file-access',
-          tmpHtml, tmpPdf
-        ], (err) => { if (err) return reject(err); resolve(); });
+        execFile('libreoffice', ['--headless','--convert-to','pdf','--outdir',tmpDir,tmpDocx],
+          { timeout: 60000 }, (err) => { if (err) return reject(err); resolve(); });
       });
-
       const pdfBuffer = fs.readFileSync(tmpPdf);
-      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
+      try { fs.unlinkSync(tmpDocx); fs.unlinkSync(tmpPdf); } catch(_) {}
       attachments.push({
         name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`,
         content: pdfBuffer.toString('base64'),
       });
     } catch (pdfErr) {
-      console.error('Offer letter PDF generation failed, falling back to HTML:', pdfErr.message);
+      console.error('Offer letter DOCX->PDF failed, falling back to HTML:', pdfErr.message);
       attachments.push({
         name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
         content: Buffer.from(offerHTML).toString('base64'),
