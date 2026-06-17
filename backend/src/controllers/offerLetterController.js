@@ -928,16 +928,31 @@ exports.sendEmail = async (req, res) => {
 
     // 1. Offer Letter as PDF (DOCX → LibreOffice → PDF for perfect header/footer)
     try {
-      const tmpDir  = os.tmpdir();
-      const safeName = ol.candidate_name.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
-      const tmpDocx = path.join(tmpDir, `offer_${ol.id}_${safeName}.docx`);
-      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${safeName}.pdf`);
+      const tmpDir   = os.tmpdir();
+      const ts       = Date.now();
+      const tmpDocx  = path.join(tmpDir, `offer_${ol.id}_${ts}.docx`);
+      // LibreOffice names output as same basename with .pdf extension
+      const tmpPdf   = path.join(tmpDir, `offer_${ol.id}_${ts}.pdf`);
       const docxBuffer = await buildOfferLetterDOCX(ol);
       fs.writeFileSync(tmpDocx, docxBuffer);
+
       await new Promise((resolve, reject) => {
-        execFile('libreoffice', ['--headless','--convert-to','pdf','--outdir',tmpDir,tmpDocx],
-          { timeout: 60000 }, (err) => { if (err) return reject(err); resolve(); });
+        execFile('libreoffice', [
+          '--headless', '--convert-to', 'pdf', '--outdir', tmpDir, tmpDocx
+        ], { timeout: 90000 }, (err, stdout, stderr) => {
+          if (err) {
+            console.error('LibreOffice error:', err.message, stderr);
+            return reject(err);
+          }
+          resolve();
+        });
       });
+
+      // Verify PDF was created
+      if (!fs.existsSync(tmpPdf)) {
+        throw new Error(`LibreOffice did not produce PDF at ${tmpPdf}`);
+      }
+
       const pdfBuffer = fs.readFileSync(tmpPdf);
       try { fs.unlinkSync(tmpDocx); fs.unlinkSync(tmpPdf); } catch(_) {}
       attachments.push({
@@ -945,11 +960,20 @@ exports.sendEmail = async (req, res) => {
         content: pdfBuffer.toString('base64'),
       });
     } catch (pdfErr) {
-      console.error('Offer letter DOCX->PDF failed, falling back to HTML:', pdfErr.message);
-      attachments.push({
-        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
-        content: Buffer.from(offerHTML).toString('base64'),
-      });
+      console.error('Offer letter DOCX->PDF failed:', pdfErr.message);
+      // Last resort: send DOCX instead of HTML
+      try {
+        const docxBuffer2 = await buildOfferLetterDOCX(ol);
+        attachments.push({
+          name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.docx`,
+          content: docxBuffer2.toString('base64'),
+        });
+      } catch(e2) {
+        attachments.push({
+          name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
+          content: Buffer.from(offerHTML).toString('base64'),
+        });
+      }
     }
 
     // 2. Joining Form DOCX — always attach if file exists
