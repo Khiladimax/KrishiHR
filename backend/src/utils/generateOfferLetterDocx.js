@@ -262,13 +262,14 @@ function buildBodyXml(ol) {
     parts.push(para(run(ol.custom_clauses, 20), {spacing:SP}));
   }
 
-  // OTHER RULES — force page break so it always starts on page 2 with 3 blank lines gap
-  parts.push(PAGE_BREAK);
-  parts.push(emptyPara(0,0));
-  parts.push(emptyPara(0,0));
-  parts.push(emptyPara(0,0));
-  parts.push(para(run('OTHER RULES AND REGULATION:', 20, {bold:true, underline:true}),
-    {align:'left', spacing:SH}));
+  // OTHER RULES — pageBreakBefore forces new page; spacing.before=828 adds 3-line gap under header
+  parts.push('<w:p><w:pPr>' +
+    '<w:pageBreakBefore/>' +
+    '<w:spacing w:before="828" w:after="40" w:line="276" w:lineRule="auto"/>' +
+    '<w:jc w:val="left"/>' +
+    '</w:pPr>' +
+    run('OTHER RULES AND REGULATION:', 20, {bold:true, underline:true}) +
+    '</w:p>');
   parts.push(para(
     run('The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.', 20),
     {spacing:{before:0,after:60,line:276}}
