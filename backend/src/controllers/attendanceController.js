@@ -696,9 +696,9 @@ exports.getTeamToday = async (req, res) => {
       params.push(userId);
 
     } else if (role === 'client_admin') {
-      // Client admin sees all employees deployed to their client
-      empCond = `AND e.client_id = $2 AND e.id != $3`;
-      params.push(req.user.client_id, userId);
+      // Client admin sees all employees deployed to their client (including themselves)
+      empCond = `AND e.client_id = $2`;
+      params.push(req.user.client_id);
 
     } else {
       // Employee sees only themselves
@@ -847,6 +847,11 @@ exports.getPunchLocations = async (req, res) => {
     } else if (role === 'manager' || role === 'tl') {
       empCond = `AND e.reporting_manager_id = $2 AND e.id != $2`;
       params.push(userId);
+
+    } else if (role === 'client_admin') {
+      // Client admin sees all employees deployed to their client (including themselves)
+      empCond = `AND e.client_id = $2`;
+      params.push(req.user.client_id);
 
     } else {
       // Regular employee — show only themselves
