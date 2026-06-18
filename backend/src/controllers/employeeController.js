@@ -1150,8 +1150,8 @@ exports.exportMasterExcel = async (req, res) => {
         masterLastGroup = null; // reset sub-group for new client section
       }
 
-      // ── Sub-group: ONSITE / OFFSITE / DEACTIVATED within each client ─────
-      if (group !== masterLastGroup) {
+      // ── Sub-group: ONSITE / OFFSITE / DEACTIVATED — KCMS only ─────────────
+      if (!e.client_id && group !== masterLastGroup) {
         const sepRow = ri + 3 + masterGroupOffset;
         masterGroupOffset++;
         const groupLabel = group === 'onsite'  ? '  🏢 Onsite Employees'
@@ -1865,8 +1865,8 @@ exports.exportAttendanceRegister = async (req, res) => {
         lastGroup = null; // reset sub-group for new client
       }
 
-      // ── Sub-group separator ───────────────────────────────────────────────
-      if (group !== lastGroup) {
+      // ── Sub-group separator — KCMS only ──────────────────────────────────
+      if (!e.client_id && group !== lastGroup) {
         const sepRow = ri + 3 + groupRowOffset;
         groupRowOffset++;
         const groupLabel = group === 'onsite'  ? '  🏢 Onsite Employees'
