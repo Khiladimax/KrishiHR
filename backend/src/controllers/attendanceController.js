@@ -239,7 +239,7 @@ exports.punchOut = async (req, res) => {
     const hoursWorked = Math.max(0, (outMins - inMins) / 60);
 
     // Determine final status based on hours worked
-    // Present  = 7h+   (or punched in ≤10:30 AND punched out ≥18:30)
+    // Present  = 7h+ (with valid in/out times)
     // Half-day = >3h31m and <7h
     // Absent   = ≤3h30m
     const [outHH, outMM] = punchOutTime.slice(0, 5).split(':').map(Number);
@@ -248,11 +248,11 @@ exports.punchOut = async (req, res) => {
     const onTimeOut = punchOutTotalMins >= (18 * 60 + 30); // punch-out at or after 18:30
 
     let status = existing.rows[0].status;
-    if (onTimeIn && onTimeOut) {
-      // Punched in ≤10:30 and out ≥18:30 → always Present (not half-day)
-      status = 'present';
-    } else if (hoursWorked >= 7) {
-      status = status === 'late' ? 'late' : 'present';
+    // FIX (2026-06-18): Check hours worked FIRST before applying on-time shortcut
+    // Ensures half-day (3.5-7 hours) is not misclassified as full-day present
+    if (hoursWorked >= 7) {
+      // Only mark as present if they actually worked 7+ hours
+      status = (onTimeIn && onTimeOut) ? 'present' : (status === 'late' ? 'late' : 'present');
     } else if (hoursWorked > 3.5) {
       status = 'half-day';
     } else {
