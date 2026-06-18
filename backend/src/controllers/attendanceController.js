@@ -706,14 +706,31 @@ exports.getTeamToday = async (req, res) => {
       params.push(userId);
     }
 
-    // Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
+    // Apply client_id filter if provided (for admin/HR/accounts/all_admin dropdown)
     if (clientIdFilter && ['super_admin', 'hr', 'admin', 'all_admin', 'accounts'].includes(role)) {
-      // Override empCond entirely — the dropdown filter IS the scope.
-      // This lets any admin/HR/accounts see any client's full team, not just direct reports.
       params = [today]; // reset to just the date param
+
       if (clientIdFilter === 'kc') {
-        empCond = `AND e.client_id IS NULL AND e.role != 'super_admin'`;
+        // KC tab: show the user's own reporting tree (recursive direct reports)
+        // super_admin / hr / accounts / all_admin see ALL KC employees
+        if (['super_admin', 'hr', 'accounts', 'all_admin'].includes(role)) {
+          empCond = `AND e.client_id IS NULL AND e.role != 'super_admin'`;
+        } else {
+          // admin/manager: show everyone who reports up to this user (recursive)
+          empCond = `AND e.client_id IS NULL AND e.role != 'super_admin'
+            AND e.id IN (
+              WITH RECURSIVE subordinates AS (
+                SELECT id FROM employees WHERE reporting_manager_id = $2
+                UNION ALL
+                SELECT e2.id FROM employees e2
+                INNER JOIN subordinates s ON e2.reporting_manager_id = s.id
+              )
+              SELECT id FROM subordinates
+            )`;
+          params.push(userId);
+        }
       } else {
+        // Client tab (Bajaj, Tata AIG, etc): show full client team
         empCond = `AND e.client_id = $2`;
         params.push(parseInt(clientIdFilter));
       }
