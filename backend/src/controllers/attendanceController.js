@@ -238,25 +238,53 @@ exports.punchOut = async (req, res) => {
     const outMins = outH * 60 + outM;
     const hoursWorked = Math.max(0, (outMins - inMins) / 60);
 
-    // Determine final status based on hours worked
+    // ── Check for approved half-day leave FIRST ─────────────────────────────
+    // If employee has approved half-day leave (H-CL, H-SL, H-EL, etc), use that status
+    let status = existing.rows[0].status;
+    let halfDayLeaveFound = false;
+
+    try {
+      const halfDayLeaveRes = await db.query(
+        `SELECT lt.code FROM leave_requests lr
+         JOIN leave_types lt ON lr.leave_type_id = lt.id
+         WHERE lr.employee_id = $1
+           AND lr.status = 'approved'
+           AND $2::date BETWEEN lr.from_date AND lr.to_date
+           AND lr.is_half_day = true
+         LIMIT 1`,
+        [empId, today]
+      );
+
+      if (halfDayLeaveRes.rows.length) {
+        const leaveCode = halfDayLeaveRes.rows[0].code;
+        status = `H-${leaveCode}`; // e.g., "H-CL", "H-SL", "H-EL"
+        halfDayLeaveFound = true;
+      }
+    } catch (leaveErr) {
+      console.error('[HalfDayLeaveCheck Error]', leaveErr.message);
+      // If leave check fails, continue with normal logic
+    }
+
+    // ── Determine final status based on hours worked (only if no half-day leave) ──
     // Present  = 7h+ (with valid in/out times)
     // Half-day = >3h31m and <7h
     // Absent   = ≤3h30m
-    const [outHH, outMM] = punchOutTime.slice(0, 5).split(':').map(Number);
-    const punchOutTotalMins = outHH * 60 + outMM;
-    const onTimeIn  = inMins  <= (10 * 60 + 30);  // punch-in at or before 10:30
-    const onTimeOut = punchOutTotalMins >= (18 * 60 + 30); // punch-out at or after 18:30
+    if (!halfDayLeaveFound) {
+      const [outHH, outMM] = punchOutTime.slice(0, 5).split(':').map(Number);
+      const punchOutTotalMins = outHH * 60 + outMM;
+      const onTimeIn  = inMins  <= (10 * 60 + 30);  // punch-in at or before 10:30
+      const onTimeOut = punchOutTotalMins >= (18 * 60 + 30); // punch-out at or after 18:30
 
-    let status = existing.rows[0].status;
-    // FIX (2026-06-18): Check hours worked FIRST before applying on-time shortcut
-    // Ensures half-day (3.5-7 hours) is not misclassified as full-day present
-    if (hoursWorked >= 7) {
-      // Only mark as present if they actually worked 7+ hours
-      status = (onTimeIn && onTimeOut) ? 'present' : (status === 'late' ? 'late' : 'present');
-    } else if (hoursWorked > 3.5) {
-      status = 'half-day';
-    } else {
-      status = 'absent';
+      // FIX (2026-06-18): Check hours worked FIRST before applying on-time shortcut
+      // Ensures half-day (3.5-7 hours) is not misclassified as full-day present
+      if (hoursWorked >= 7) {
+        // Only mark as present if they actually worked 7+ hours
+        status = (onTimeIn && onTimeOut) ? 'present' : (status === 'late' ? 'late' : 'present');
+      } else if (hoursWorked > 3.5) {
+        status = 'half-day';
+      } else {
+        status = 'absent';
+      }
     }
 
     const locStr = punch_out_location ||
