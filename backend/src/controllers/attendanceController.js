@@ -706,12 +706,15 @@ exports.getTeamToday = async (req, res) => {
       params.push(userId);
     }
 
-    // NEW: Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
+    // Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
     if (clientIdFilter && ['super_admin', 'hr', 'admin', 'all_admin', 'accounts'].includes(role)) {
       if (clientIdFilter === 'kc') {
-        empCond += ` AND e.client_id IS NULL`;  // KC Employees (no client assigned)
+        // KC tab: keep existing empCond (your normal team scope) + restrict to KC employees only
+        empCond += ` AND e.client_id IS NULL`;
       } else {
-        empCond += ` AND e.client_id = $${params.length + 1}`;
+        // Client tab (Bajaj, Tata AIG, etc): override scope entirely — show full client team
+        params = [today];
+        empCond = `AND e.client_id = $2`;
         params.push(parseInt(clientIdFilter));
       }
     }
