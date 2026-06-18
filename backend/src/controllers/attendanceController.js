@@ -666,8 +666,8 @@ exports.getTeamToday = async (req, res) => {
       // MD: exclude super_admin role employees from team view
       empCond = `AND e.role != 'super_admin'`;
 
-    } else if (role === 'hr' || role === 'accounts') {
-      // HR/Accounts see all employees except super_admin (but CAN see themselves)
+    } else if (role === 'hr' || role === 'accounts' || role === 'all_admin') {
+      // HR/Accounts/All-Admin see all employees except super_admin (but CAN see themselves)
       empCond = `AND e.role != 'super_admin'`;
 
     } else if (role === 'admin') {
@@ -706,8 +706,8 @@ exports.getTeamToday = async (req, res) => {
       params.push(userId);
     }
 
-    // NEW: Apply client_id filter if provided (for KC admin/HR dropdown)
-    if (clientIdFilter && ['super_admin', 'hr', 'admin'].includes(role)) {
+    // NEW: Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
+    if (clientIdFilter && ['super_admin', 'hr', 'admin', 'all_admin', 'accounts'].includes(role)) {
       if (clientIdFilter === 'kc') {
         empCond += ` AND e.client_id IS NULL`;  // KC Employees (no client assigned)
       } else {
