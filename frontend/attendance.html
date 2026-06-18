@@ -375,7 +375,7 @@
             </select>
           </div>
         </div>
-        <div id="team-stats-bar" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px"></div>
+        <div id="team-stats-bar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:18px"></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Employee</th><th>Department</th><th>Status</th><th>Punch In</th><th>Punch Out</th><th>Hours</th></tr></thead>
           <tbody id="team-tbody"></tbody>
@@ -2046,6 +2046,7 @@ function renderTeam(list) {
   document.getElementById('team-stats-bar').innerHTML =
     [
       ['present','#22a855','#d1fae5'],
+      ['half-day','#eab308','#fef9c3'],
       ['absent', '#ef4444','#fee2e2'],
       ['late',   '#f59e0b','#fef3c7'],
       ['on-leave','#3b82f6','#dbeafe'],
@@ -2054,7 +2055,7 @@ function renderTeam(list) {
     ].map(([s,c,bg])=>`
       <div style="text-align:center;background:${bg};border-radius:12px;padding:14px 8px;border:1.5px solid ${c}33">
         <div style="font-size:28px;font-weight:800;color:${c};line-height:1;font-family:Manrope,sans-serif">${counts[s]||0}</div>
-        <div style="font-size:10px;font-weight:700;color:${c};margin-top:5px;text-transform:uppercase;letter-spacing:.5px">${s}</div>
+        <div style="font-size:10px;font-weight:700;color:${c};margin-top:5px;text-transform:uppercase;letter-spacing:.5px">${s.replace('-',' ')}</div>
       </div>`).join('');
 
   // Badge styles per status
