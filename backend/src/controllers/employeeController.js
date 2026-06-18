@@ -499,6 +499,10 @@ exports.previewNextCode = async (req, res) => {
 exports.exportExcel = async (req, res) => {
   try {
     const XLSX = require('xlsx');
+    const isClientAdminExport = req.user.role === 'client_admin';
+    const clientFilterExport  = isClientAdminExport && req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+
     const result = await db.query(
       `SELECT
          e.employee_code, e.first_name, e.last_name, e.email, e.phone,
@@ -510,61 +514,85 @@ exports.exportExcel = async (req, res) => {
          e.bank_name, e.bank_account, e.bank_ifsc,
          e.city, e.state,
          CONCAT(m.first_name,' ',m.last_name) AS reporting_manager,
-         e.is_active
+         e.is_active,
+         e.client_id,
+         cl.name AS client_name
        FROM employees e
        LEFT JOIN departments  d   ON e.department_id  = d.id
        LEFT JOIN designations des ON e.designation_id = des.id
        LEFT JOIN employees    m   ON e.reporting_manager_id = m.id
-       WHERE e.is_active = true
-       ORDER BY d.name, e.first_name`
+       LEFT JOIN clients      cl  ON e.client_id = cl.id
+       WHERE e.is_active = true ${clientFilterExport}
+       ORDER BY
+         CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
+         COALESCE(cl.name,''),
+         d.name, e.first_name`
     );
 
-    const rows = result.rows.map(r => ({
-      'Employee Code':     r.employee_code,
-      'First Name':        r.first_name,
-      'Last Name':         r.last_name || '',
-      'Email':             r.email,
-      'Phone':             r.phone || '',
-      'Gender':            r.gender || '',
-      'Date of Birth':     r.date_of_birth ? toISTDateString(r.date_of_birth) : '',
-      'Date of Joining':   r.joining_date  ? toISTDateString(r.joining_date)  : '',
-      'Department':        r.department || '',
-      'Designation':       r.designation || '',
-      'Role':              r.role,
-      'Employment Type':   r.employment_type || '',
-      'Category':          r.employee_category || '',
-      'Level':             r.level || '',
-      'Basic Salary':      r.basic_salary || 0,
-      'CTC Annual':        r.ctc || 0,
-      'PAN Number':        r.pan_number || '',
-      'Aadhar Number':     r.aadhar_number || '',
-      'UAN Number':        r.uan_number || '',
-      'PF Number':         r.pf_number || '',
-      'Bank Name':         r.bank_name || '',
-      'Bank Account':      r.bank_account || '',
-      'Bank IFSC':         r.bank_ifsc || '',
-      'City':              r.city || '',
-      'State':             r.state || '',
-      'Reporting Manager': r.reporting_manager || '',
-    }));
+    // ── Build rows grouped by client ─────────────────────────────────────────
+    // For client_admin: flat list. For HR/super_admin: KCMS first, then each client.
+    const ExcelJS2 = require('exceljs');
+    const wb2 = new ExcelJS2.Workbook();
+    wb2.creator = 'KrishiHR';
+    const ws2 = wb2.addWorksheet('Employees');
 
-    const wb  = XLSX.utils.book_new();
-    const ws  = XLSX.utils.json_to_sheet(rows);
-
-    // Column widths
-    ws['!cols'] = [
-      {wch:14},{wch:16},{wch:16},{wch:28},{wch:14},
-      {wch:8}, {wch:14},{wch:14},{wch:16},{wch:24},
-      {wch:12},{wch:14},{wch:12},{wch:8}, {wch:13},
-      {wch:13},{wch:14},{wch:16},{wch:14},{wch:18},
-      {wch:20},{wch:20},{wch:13},{wch:14},{wch:16},{wch:20},
+    const headers2 = [
+      'Employee Code','First Name','Last Name','Email','Phone','Gender',
+      'Date of Birth','Date of Joining','Department','Designation','Role',
+      'Employment Type','Category','Level','Basic Salary','CTC Annual',
+      'PAN Number','Aadhar Number','UAN Number','PF Number',
+      'Bank Name','Bank Account','Bank IFSC','City','State','Reporting Manager',
     ];
+    const colWidths2 = [14,16,16,28,14,8,14,14,16,24,12,14,12,8,13,13,14,16,14,18,20,20,13,14,16,20];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    // Header row
+    const hRow2 = ws2.addRow(headers2);
+    hRow2.eachCell(c => {
+      c.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+      c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+    hRow2.height = 20;
+    headers2.forEach((_, i) => { ws2.getColumn(i + 1).width = colWidths2[i]; });
 
-    const today = toISTDateString(new Date()); // FIX: IST instead of UTC
-    res.setHeader('Content-Disposition', `attachment; filename="employees_${today}.xlsx"`);
+    let lastClientGroup2 = '__UNSET__';
+    for (const r of result.rows) {
+      const clientKey2 = r.client_id ? String(r.client_id) : 'kcms';
+      const clientLabel2 = r.client_id
+        ? `🏢 ${(r.client_name || 'Client').toUpperCase()} EMPLOYEES`
+        : '🏢 KCMS EMPLOYEES';
+      const groupBg2 = r.client_id ? 'FF0D47A1' : 'FF1B5E20';
+
+      if (!isClientAdminExport && clientKey2 !== lastClientGroup2) {
+        const sepRow2 = ws2.addRow([clientLabel2]);
+        try { ws2.mergeCells(sepRow2.number, 1, sepRow2.number, headers2.length); } catch(_) {}
+        const sc2 = ws2.getCell(sepRow2.number, 1);
+        sc2.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+        sc2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: groupBg2 } };
+        sc2.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        sepRow2.height = 18;
+        lastClientGroup2 = clientKey2;
+      }
+
+      const dataRow2 = ws2.addRow([
+        r.employee_code, r.first_name, r.last_name || '', r.email, r.phone || '',
+        r.gender || '',
+        r.date_of_birth ? toISTDateString(r.date_of_birth) : '',
+        r.joining_date  ? toISTDateString(r.joining_date)  : '',
+        r.department || '', r.designation || '', r.role,
+        r.employment_type || '', r.employee_category || '', r.level || '',
+        r.basic_salary || 0, r.ctc || 0,
+        r.pan_number || '', r.aadhar_number || '', r.uan_number || '', r.pf_number || '',
+        r.bank_name || '', r.bank_account || '', r.bank_ifsc || '',
+        r.city || '', r.state || '', r.reporting_manager || '',
+      ]);
+      dataRow2.eachCell(c => { c.alignment = { vertical: 'middle' }; });
+    }
+
+    const buf = await wb2.xlsx.writeBuffer();
+
+    const today2 = toISTDateString(new Date());
+    res.setHeader('Content-Disposition', `attachment; filename="employees_${today2}.xlsx"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buf);
   } catch (err) {
@@ -919,12 +947,15 @@ exports.exportMasterExcel = async (req, res) => {
              e.is_active,
              e.deactivation_remark,
              e.separation_date,
-             e.is_wfh_permanent
+             e.is_wfh_permanent,
+             e.client_id,
+             cl2.name AS client_name
       FROM employees e
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
       LEFT JOIN employees    m   ON e.reporting_manager_id = m.id
       LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
+      LEFT JOIN clients      cl2 ON e.client_id = cl2.id
       WHERE (
         e.is_active = true
         ${clientFilter}
@@ -953,6 +984,8 @@ exports.exportMasterExcel = async (req, res) => {
         )
       )
       ORDER BY
+        CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
+        COALESCE(cl.name,''),
         CASE WHEN e.is_active = false THEN 2
              WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
@@ -1087,32 +1120,53 @@ exports.exportMasterExcel = async (req, res) => {
     });
     ws1.getRow(2).height = 30;
 
-    // ── Data rows — with ONSITE / OFFSITE / DEACTIVATED group separators ────
-    let masterLastGroup = null;
+    // ── Data rows — with CLIENT → ONSITE/OFFSITE/DEACTIVATED group separators ─
+    let masterLastClient = '__UNSET__';
+    let masterLastGroup  = null;
     let masterGroupOffset = 0;
+    const isClientAdminMaster = isClientAdmin; // already defined above
 
     employees.forEach((e, ri) => {
       const isDeactivated = e.is_active === false;
       const isOffsite     = !isDeactivated && e.saturday_policy === 'all_working';
       const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
+      const clientKey = e.client_id ? String(e.client_id) : 'kcms';
 
-      // ── Insert group separator row when group changes ─────────────────────
+      // ── Client section header (HR/super_admin only) ───────────────────────
+      if (!isClientAdminMaster && clientKey !== masterLastClient) {
+        const cRow = ri + 3 + masterGroupOffset;
+        masterGroupOffset++;
+        const cLabel = e.client_id
+          ? `🏢 ${(e.client_name || 'CLIENT').toUpperCase()} EMPLOYEES`
+          : '🏢 KCMS EMPLOYEES';
+        const cBg = e.client_id ? 'FF0D47A1' : 'FF1B5E20';
+        try { ws1.mergeCells(cRow, 1, cRow, totalCols); } catch(_) {}
+        const cc = ws1.getCell(cRow, 1);
+        cc.value = cLabel; cc.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        cc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cBg } };
+        cc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws1.getRow(cRow).height = 20;
+        masterLastClient = clientKey;
+        masterLastGroup = null; // reset sub-group for new client section
+      }
+
+      // ── Sub-group: ONSITE / OFFSITE / DEACTIVATED within each client ─────
       if (group !== masterLastGroup) {
         const sepRow = ri + 3 + masterGroupOffset;
         masterGroupOffset++;
-        const groupLabel = group === 'onsite'  ? '🏢 ONSITE EMPLOYEES'
-                         : group === 'offsite' ? '🌐 OFFSITE EMPLOYEES'
-                         :                       '❌ DEACTIVATED EMPLOYEES';
-        const groupBg    = group === 'onsite'  ? 'FF1B5E20'
-                         : group === 'offsite' ? 'FF0D47A1'
-                         :                      'FF4A0000';
+        const groupLabel = group === 'onsite'  ? '  🏢 Onsite Employees'
+                         : group === 'offsite' ? '  🌐 Offsite Employees'
+                         :                       '  ❌ Deactivated Employees';
+        const groupBg    = group === 'onsite'  ? 'FF2E7D32'
+                         : group === 'offsite' ? 'FF1565C0'
+                         :                      'FF6D1A1A';
         try { ws1.mergeCells(sepRow, 1, sepRow, totalCols); } catch(_) {}
         const sc = ws1.getCell(sepRow, 1);
         sc.value = groupLabel;
-        sc.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+        sc.font  = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
         sc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: groupBg } };
-        sc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
-        ws1.getRow(sepRow).height = 18;
+        sc.alignment = { horizontal: 'left', vertical: 'middle', indent: 2 };
+        ws1.getRow(sepRow).height = 16;
         masterLastGroup = group;
       }
 
@@ -1634,10 +1688,13 @@ exports.exportAttendanceRegister = async (req, res) => {
              e.is_wfh_permanent,
              e.deactivation_remark,
              e.separation_date,
-             e.separation_type
+             e.separation_type,
+             e.client_id,
+             cl.name AS client_name
       FROM employees e
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN clients      cl  ON e.client_id = cl.id
       WHERE (
         (e.is_active = true ${clientFilter})
         OR (
@@ -1661,6 +1718,8 @@ exports.exportAttendanceRegister = async (req, res) => {
         )
       )
       ORDER BY
+        CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
+        COALESCE(cl.name,''),
         CASE WHEN e.is_active = false THEN 2
              WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
@@ -1777,7 +1836,8 @@ exports.exportAttendanceRegister = async (req, res) => {
     });
     ws1.getRow(2).height = 30;
 
-    // Group employees: onsite → offsite → deactivated (already sorted by query)
+    // Group employees: client → onsite/offsite/deactivated
+    let lastClientAtt = '__UNSET__';
     let lastGroup = null;
     let groupRowOffset = 0;
 
@@ -1785,24 +1845,43 @@ exports.exportAttendanceRegister = async (req, res) => {
       const isDeactivated = e.is_active === false;
       const isOffsite     = !isDeactivated && e.saturday_policy === 'all_working';
       const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
+      const clientKeyAtt = e.client_id ? String(e.client_id) : 'kcms';
 
-      // Insert group separator row when group changes
+      // ── Client section header (HR/super_admin only) ───────────────────────
+      if (!isClientAdmin && clientKeyAtt !== lastClientAtt) {
+        const cRow = ri + 3 + groupRowOffset;
+        groupRowOffset++;
+        const cLabel = e.client_id
+          ? `🏢 ${(e.client_name || 'CLIENT').toUpperCase()} EMPLOYEES`
+          : '🏢 KCMS EMPLOYEES';
+        const cBg = e.client_id ? 'FF0D47A1' : 'FF1B5E20';
+        try { ws1.mergeCells(cRow, 1, cRow, totalCols); } catch(_) {}
+        const cc = ws1.getCell(cRow, 1);
+        cc.value = cLabel; cc.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        cc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cBg } };
+        cc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws1.getRow(cRow).height = 20;
+        lastClientAtt = clientKeyAtt;
+        lastGroup = null; // reset sub-group for new client
+      }
+
+      // ── Sub-group separator ───────────────────────────────────────────────
       if (group !== lastGroup) {
         const sepRow = ri + 3 + groupRowOffset;
         groupRowOffset++;
-        const groupLabel = group === 'onsite' ? '🏢 ONSITE EMPLOYEES'
-                         : group === 'offsite' ? '🌐 OFFSITE EMPLOYEES'
-                         : '❌ DEACTIVATED EMPLOYEES';
-        const groupBg = group === 'onsite' ? 'FF1B5E20'
-                      : group === 'offsite' ? 'FF0D47A1'
-                      : 'FF4A0000';
+        const groupLabel = group === 'onsite'  ? '  🏢 Onsite Employees'
+                         : group === 'offsite' ? '  🌐 Offsite Employees'
+                         :                       '  ❌ Deactivated Employees';
+        const groupBg = group === 'onsite'  ? 'FF2E7D32'
+                      : group === 'offsite' ? 'FF1565C0'
+                      : 'FF6D1A1A';
         try { ws1.mergeCells(sepRow, 1, sepRow, totalCols); } catch(_) {}
         const sepCell = ws1.getCell(sepRow, 1);
         sepCell.value = groupLabel;
-        sepCell.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+        sepCell.font  = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
         sepCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: groupBg } };
-        sepCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
-        ws1.getRow(sepRow).height = 18;
+        sepCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 2 };
+        ws1.getRow(sepRow).height = 16;
         lastGroup = group;
       }
 
@@ -1960,7 +2039,7 @@ exports.exportAttendanceRegister = async (req, res) => {
     for (let d = 1; d <= daysInMonth; d++) ws1.getColumn(5 + d).width = 5;
     for (let i = 1; i <= 9; i++) ws1.getColumn(5 + daysInMonth + i).width = 10;
 
-    const legendRow = employees.length + 4;
+    const legendRow = employees.length + 4 + groupRowOffset;
     try { ws1.mergeCells(legendRow, 1, legendRow, totalCols); } catch(_) {}
     const legendCell = ws1.getCell(legendRow, 1);
     legendCell.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Paid Leave  LWP=Unpaid Leave  H=Half Day  H-EL=Half EL  H-CL=Half CL  H-SL=Half SL  H-LWP=Half LWP (Unpaid)  H-WFH=Half WFH  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off  HOL=Holiday';
