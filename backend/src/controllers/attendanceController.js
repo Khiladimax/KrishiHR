@@ -706,12 +706,15 @@ exports.getTeamToday = async (req, res) => {
       params.push(userId);
     }
 
-    // NEW: Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
+    // Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
     if (clientIdFilter && ['super_admin', 'hr', 'admin', 'all_admin', 'accounts'].includes(role)) {
+      // Override empCond entirely — the dropdown filter IS the scope.
+      // This lets any admin/HR/accounts see any client's full team, not just direct reports.
+      params = [today]; // reset to just the date param
       if (clientIdFilter === 'kc') {
-        empCond += ` AND e.client_id IS NULL`;  // KC Employees (no client assigned)
+        empCond = `AND e.client_id IS NULL AND e.role != 'super_admin'`;
       } else {
-        empCond += ` AND e.client_id = $${params.length + 1}`;
+        empCond = `AND e.client_id = $2`;
         params.push(parseInt(clientIdFilter));
       }
     }
