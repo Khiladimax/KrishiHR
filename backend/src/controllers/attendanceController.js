@@ -663,8 +663,8 @@ exports.getTeamToday = async (req, res) => {
     let params  = [today];
 
     if (role === 'super_admin') {
-      // MD sees everyone (including themselves)
-      empCond = ``;
+      // MD: exclude super_admin role employees from team view
+      empCond = `AND e.role != 'super_admin'`;
 
     } else if (role === 'hr' || role === 'accounts') {
       // HR/Accounts see all employees except super_admin (but CAN see themselves)
