@@ -349,6 +349,12 @@
         <div class="card-header">
           <div class="card-title">👥 Team Attendance</div>
           <div class="flex gap-2 align-items-center flex-wrap">
+            <!-- Client filter — KC admin/super_admin/hr only -->
+            <div id="team-client-wrap" style="display:none">
+              <select id="team-client" class="form-control" style="width:160px" onchange="onTeamClientChange()">
+                <option value="kc">KC Employees</option>
+              </select>
+            </div>
             <!-- Date picker — defaults to today, can browse any date -->
             <input type="date" id="team-date" class="form-control" style="width:160px"
               oninput="loadTeamToday()" />
@@ -1588,7 +1594,13 @@ function switchTab(name) {
       dateEl.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata',
         year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
     }
-    loadTeamToday();
+    // Initialize client filter (if first time) and load team data
+    if (!window.teamClientFilterInitialized) {
+      window.teamClientFilterInitialized = true;
+      initTeamClientFilter();
+    } else {
+      loadTeamToday();
+    }
   }
   if (name==='regularize') loadRegularizations();
   if (name==='locations') { document.getElementById('loc-date').value = new Date().toISOString().split('T')[0]; loadLocationMap(); }
@@ -1867,9 +1879,17 @@ async function loadTeamToday() {
   if (dateEl && !dateEl.value) dateEl.value = today;
   const selectedDate = dateEl?.value || today;
 
-  // Always use team-today endpoint — pass date as query param
+  // Get client filter value
+  const clientId = document.getElementById('team-client')?.value || 'kc';
+
+  // Always use team-today endpoint — pass date & clientId as query params
   // This fixes the bug where past dates showed wrong/monthly data
-  const data = await api('GET', `/attendance/team-today?date=${selectedDate}`);
+  let endpoint = `/attendance/team-today?date=${selectedDate}`;
+  if (clientId !== 'kc') {
+    endpoint += `&client_id=${clientId}`;
+  }
+  
+  const data = await api('GET', endpoint);
   if (data?.success) {
     teamData = data.data;
     renderTeam(teamData);
@@ -1878,6 +1898,37 @@ async function loadTeamToday() {
   // Load pending OD/WFH for approvers
   const isApprover = Role.isManagerUp() || Role.is('hr','admin','super_admin','tl','client_admin');
   if (isApprover) loadTeamODWFHPending();
+}
+
+// ── Initialize team client dropdown (admin/super_admin/hr only) ──
+async function initTeamClientFilter() {
+  const isKC718       = user && user.employee_code === 'KC718';
+  const seeAll        = isKC718 || ['super_admin','hr','admin'].includes(user.role);
+  const teamClientWrap = document.getElementById('team-client-wrap');
+
+  if (!seeAll) {
+    if (teamClientWrap) teamClientWrap.style.display = 'none';
+  } else {
+    if (teamClientWrap) teamClientWrap.style.display = '';
+    // Load all clients and populate dropdown: KC Employees + one option per client
+    const clientRes = await api('GET', '/clients');
+    const sel = document.getElementById('team-client');
+    if (sel) {
+      (clientRes?.data || []).forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = `${c.name} Employees`;
+        sel.appendChild(o);
+      });
+    }
+  }
+
+  await loadTeamToday();
+}
+
+// ── Handle team client dropdown change ──
+async function onTeamClientChange() {
+  await loadTeamToday();
 }
 
 async function loadTeamODWFHPending() {
