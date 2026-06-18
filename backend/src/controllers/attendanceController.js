@@ -654,6 +654,8 @@ exports.getTeamToday = async (req, res) => {
   try {
     const userId = req.user.id;
     const role   = req.user.role;
+    const clientIdFilter = req.query.client_id;  // NEW: support client_id query param
+    
     // Use date from query param if provided, otherwise use today IST
     const today  = req.query.date || toLocalDateString(new Date());
 
@@ -704,6 +706,16 @@ exports.getTeamToday = async (req, res) => {
       // Employee sees only themselves
       empCond = `AND e.id = $2`;
       params.push(userId);
+    }
+
+    // NEW: Apply client_id filter if provided (for KC admin/HR dropdown)
+    if (clientIdFilter && ['super_admin', 'hr', 'admin'].includes(role)) {
+      if (clientIdFilter === 'kc') {
+        empCond += ` AND e.client_id IS NULL`;  // KC Employees (no client assigned)
+      } else {
+        empCond += ` AND e.client_id = $${params.length + 1}`;
+        params.push(parseInt(clientIdFilter));
+      }
     }
 
     const result = await db.query(
