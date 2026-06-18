@@ -702,8 +702,13 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
     const grp = isDeact ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
     const clientKeyP = e.client_id ? String(e.client_id) : 'kcms';
 
-    // ── Client section header ─────────────────────────────────────────────
+    // ── Gap row + Client section header ──────────────────────────────────
     if (clientKeyP !== lastClientPunch) {
+      if (lastClientPunch !== '__UNSET__') {
+        const gapRowP = ri + 4 + grpOffset;
+        grpOffset++;
+        ws.getRow(gapRowP).height = 8;
+      }
       const cRow = ri + 4 + grpOffset;
       grpOffset++;
       const cLabel = e.client_id
@@ -1154,8 +1159,14 @@ exports.exportMasterExcel = async (req, res) => {
       const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
       const clientKey = e.client_id ? String(e.client_id) : 'kcms';
 
-      // ── Client section header (HR/super_admin only) ───────────────────────
+      // ── Gap row + Client section header (HR/super_admin only) ─────────────
       if (!isClientAdminMaster && clientKey !== masterLastClient) {
+        if (masterLastClient !== '__UNSET__') {
+          // insert blank spacer row between sections
+          const gapRow = ri + 3 + masterGroupOffset;
+          masterGroupOffset++;
+          ws1.getRow(gapRow).height = 8;
+        }
         const cRow = ri + 3 + masterGroupOffset;
         masterGroupOffset++;
         const cLabel = e.client_id
@@ -1422,8 +1433,37 @@ exports.exportMasterExcel = async (req, res) => {
     ws2.getRow(3).height = 32;
 
     // Salary data rows
+    let salLastClient = '__UNSET__';
+    let salRowOffset = 0;
+    const isClientAdminSal = isClientAdmin;
+
     employees.forEach((e, ri) => {
-      const row = ri + 4;
+      const clientKeySal = e.client_id ? String(e.client_id) : 'kcms';
+
+      // ── Gap row + Client section header (HR/super_admin only) ────────────
+      if (!isClientAdminSal && clientKeySal !== salLastClient) {
+        // blank spacer row
+        if (salLastClient !== '__UNSET__') {
+          salRowOffset++;
+          ws2.getRow(ri + 4 + salRowOffset - 1).height = 8;
+        }
+        const cRowSal = ri + 4 + salRowOffset;
+        salRowOffset++;
+        const cLabelSal = e.client_id
+          ? `🏢 ${(e.client_name || 'CLIENT').toUpperCase()} EMPLOYEES`
+          : '🏢 KCMS EMPLOYEES';
+        const cBgSal = e.client_id ? 'FF0D47A1' : 'FF1B5E20';
+        try { ws2.mergeCells(cRowSal, 1, cRowSal, 34); } catch(_) {}
+        const ccSal = ws2.getCell(cRowSal, 1);
+        ccSal.value = cLabelSal;
+        ccSal.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        ccSal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cBgSal } };
+        ccSal.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws2.getRow(cRowSal).height = 20;
+        salLastClient = clientKeySal;
+      }
+
+      const row = ri + 4 + salRowOffset;
       const isAlt = ri % 2 === 1;
       const bgColor = isAlt ? 'FFE8EAF6' : 'FFFFFFFF';
 
@@ -1591,8 +1631,36 @@ exports.exportMasterExcel = async (req, res) => {
     });
     ws3.getRow(2).height = 22;
 
+    let dirLastClient = '__UNSET__';
+    let dirRowOffset = 0;
+    const isClientAdminDir = isClientAdmin;
+
     employees.forEach((e, ri) => {
-      const row = ri + 3;
+      const clientKeyDir = e.client_id ? String(e.client_id) : 'kcms';
+
+      // ── Gap row + Client section header (HR/super_admin only) ────────────
+      if (!isClientAdminDir && clientKeyDir !== dirLastClient) {
+        if (dirLastClient !== '__UNSET__') {
+          dirRowOffset++;
+          ws3.getRow(ri + 3 + dirRowOffset - 1).height = 8;
+        }
+        const cRowDir = ri + 3 + dirRowOffset;
+        dirRowOffset++;
+        const cLabelDir = e.client_id
+          ? `🏢 ${(e.client_name || 'CLIENT').toUpperCase()} EMPLOYEES`
+          : '🏢 KCMS EMPLOYEES';
+        const cBgDir = e.client_id ? 'FF0D47A1' : 'FF4E342E';
+        try { ws3.mergeCells(cRowDir, 1, cRowDir, 22); } catch(_) {}
+        const ccDir = ws3.getCell(cRowDir, 1);
+        ccDir.value = cLabelDir;
+        ccDir.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        ccDir.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cBgDir } };
+        ccDir.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws3.getRow(cRowDir).height = 20;
+        dirLastClient = clientKeyDir;
+      }
+
+      const row = ri + 3 + dirRowOffset;
       const isAlt = ri % 2 === 1;
       const vals = [
         e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(), e.email, e.phone||'',
@@ -1659,7 +1727,7 @@ exports.exportMasterExcel = async (req, res) => {
       else if (h.region==='north') masterHolsByRegion.north.add(h.date_str);
       else if (h.region==='south_west') masterHolsByRegion.south_west.add(h.date_str);
     }
-    // Build master employees list with is_active + saturday_policy fields
+    // Build master employees list with is_active + saturday_policy + client fields
     const masterEmpForPunch = empResult.rows.map(e => ({
       id: e.id, employee_code: e.employee_code,
       first_name: e.first_name, last_name: e.last_name,
@@ -1668,6 +1736,8 @@ exports.exportMasterExcel = async (req, res) => {
       is_active: e.is_active !== false,
       deactivation_remark: e.deactivation_remark || null,
       separation_date: e.separation_date || null,
+      client_id: e.client_id || null,
+      client_name: e.client_name || null,
     }));
     await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
 
@@ -1869,8 +1939,13 @@ exports.exportAttendanceRegister = async (req, res) => {
       const group = isDeactivated ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
       const clientKeyAtt = e.client_id ? String(e.client_id) : 'kcms';
 
-      // ── Client section header (HR/super_admin only) ───────────────────────
+      // ── Gap row + Client section header (HR/super_admin only) ─────────────
       if (!isClientAdmin && clientKeyAtt !== lastClientAtt) {
+        if (lastClientAtt !== '__UNSET__') {
+          const gapRowAtt = ri + 3 + groupRowOffset;
+          groupRowOffset++;
+          ws1.getRow(gapRowAtt).height = 8;
+        }
         const cRow = ri + 3 + groupRowOffset;
         groupRowOffset++;
         const cLabel = e.client_id
