@@ -1884,10 +1884,7 @@ async function loadTeamToday() {
 
   // Always use team-today endpoint — pass date & clientId as query params
   // This fixes the bug where past dates showed wrong/monthly data
-  let endpoint = `/attendance/team-today?date=${selectedDate}`;
-  if (clientId !== 'kc') {
-    endpoint += `&client_id=${clientId}`;
-  }
+  let endpoint = `/attendance/team-today?date=${selectedDate}&client_id=${clientId}`;
   
   const data = await api('GET', endpoint);
   if (data?.success) {
