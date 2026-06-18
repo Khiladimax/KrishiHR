@@ -691,7 +691,8 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   ws.getColumn(3+daysInMonth*2+2).width = 7;
   ws.getColumn(3+daysInMonth*2+3).width = 7;
 
-  // ── Group separator tracker (onsite → offsite → deactivated) ─────────────
+  // ── Group separator: client section → KCMS sub-groups only ─────────────
+  let lastClientPunch = '__UNSET__';
   let lastGrp = null;
   let grpOffset = 0;
 
@@ -699,21 +700,42 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
     const isDeact   = e.is_active === false;
     const isOffsite = !isDeact && e.saturday_policy === 'all_working';
     const grp = isDeact ? 'deactivated' : isOffsite ? 'offsite' : 'onsite';
+    const clientKeyP = e.client_id ? String(e.client_id) : 'kcms';
 
-    if (grp !== lastGrp) {
+    // ── Client section header ─────────────────────────────────────────────
+    if (clientKeyP !== lastClientPunch) {
+      const cRow = ri + 4 + grpOffset;
+      grpOffset++;
+      const cLabel = e.client_id
+        ? `🏢 ${(e.client_name || 'CLIENT').toUpperCase()} EMPLOYEES`
+        : '🏢 KCMS EMPLOYEES';
+      const cBg = e.client_id ? 'FF0D47A1' : 'FF1B5E20';
+      try { ws.mergeCells(cRow, 1, cRow, totalCols); } catch(ex){}
+      const cc = ws.getCell(cRow, 1);
+      cc.value=cLabel;
+      cc.font={bold:true,size:11,color:{argb:'FFFFFFFF'}};
+      cc.fill={type:'pattern',pattern:'solid',fgColor:{argb:cBg}};
+      cc.alignment={horizontal:'left',vertical:'middle',indent:1};
+      ws.getRow(cRow).height=20;
+      lastClientPunch = clientKeyP;
+      lastGrp = null; // reset sub-group for new client
+    }
+
+    // ── KCMS only: onsite / offsite / deactivated sub-groups ─────────────
+    if (!e.client_id && grp !== lastGrp) {
       const sepRow = ri + 4 + grpOffset;
       grpOffset++;
-      const grpLabel = grp==='onsite' ? '🏢 ONSITE EMPLOYEES'
-                     : grp==='offsite' ? '🌐 OFFSITE EMPLOYEES'
-                     : '❌ DEACTIVATED EMPLOYEES';
-      const grpBg = grp==='onsite' ? 'FF1B5E20' : grp==='offsite' ? 'FF0D47A1' : 'FF4A0000';
+      const grpLabel = grp==='onsite'  ? '  🏢 Onsite Employees'
+                     : grp==='offsite' ? '  🌐 Offsite Employees'
+                     :                   '  ❌ Deactivated Employees';
+      const grpBg = grp==='onsite' ? 'FF2E7D32' : grp==='offsite' ? 'FF1565C0' : 'FF6D1A1A';
       try { ws.mergeCells(sepRow, 1, sepRow, totalCols); } catch(ex){}
       const sc = ws.getCell(sepRow,1);
       sc.value=grpLabel;
-      sc.font={bold:true,size:10,color:{argb:'FFFFFFFF'}};
+      sc.font={bold:true,size:9,color:{argb:'FFFFFFFF'}};
       sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:grpBg}};
-      sc.alignment={horizontal:'left',vertical:'middle',indent:1};
-      ws.getRow(sepRow).height=18;
+      sc.alignment={horizontal:'left',vertical:'middle',indent:2};
+      ws.getRow(sepRow).height=16;
       lastGrp=grp;
     }
 
@@ -985,7 +1007,7 @@ exports.exportMasterExcel = async (req, res) => {
       )
       ORDER BY
         CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
-        COALESCE(cl.name,''),
+        COALESCE(cl2.name,''),
         CASE WHEN e.is_active = false THEN 2
              WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
