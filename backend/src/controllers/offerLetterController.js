@@ -361,10 +361,10 @@ function buildOfferLetterHTML(ol) {
   /* Top ~145px = letterhead header height; Bottom ~60px = footer height */
   .page-body {
     position: absolute;
-    top: 145px;
-    bottom: 60px;
+    top: 137px;
+    bottom: 73px;
     left: 0; right: 0;
-    padding: 0 18mm;
+    padding: 0 20mm;
     overflow: hidden;
   }
 
@@ -404,10 +404,10 @@ function buildOfferLetterHTML(ol) {
 
     .page-body {
       position: absolute;
-      top: 145px;
-      bottom: 60px;
+      top: 137px;
+      bottom: 73px;
       left: 0; right: 0;
-      padding: 0 18mm;
+      padding: 0 20mm;
       overflow: hidden;
     }
 
