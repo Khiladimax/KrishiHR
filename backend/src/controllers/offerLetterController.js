@@ -163,15 +163,17 @@ function buildOfferLetterHTML(ol) {
   // ── Shared page header and footer blocks ─────────────────────────────────
   const hdrHTML = `
   <div class="page-hdr">
-    <table class="hdr-tbl" cellpadding="0" cellspacing="0">
+    <table class="hdr-tbl" cellpadding="0" cellspacing="0" width="100%">
       <tr>
-        <td class="hdr-logo" rowspan="3"><img src="${LOGO_B64}" class="logo-img" alt=""></td>
-        <td class="hdr-name">Krishi Care &amp; Management Services Private Limited</td>
+        <td class="hdr-logo" rowspan="3" style="width:78px;padding-right:10px;vertical-align:middle;">
+          <img src="${LOGO_B64}" class="logo-img" alt="" style="width:68px;height:68px;display:block;">
+        </td>
+        <td class="hdr-name" style="vertical-align:bottom;padding-bottom:2px;">Krishi Care &amp; Management Services Private Limited</td>
       </tr>
-      <tr><td class="hdr-addr"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.</td></tr>
-      <tr><td class="hdr-con">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. - +91 22 68284109</td></tr>
+      <tr><td class="hdr-addr" style="text-align:center;"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.</td></tr>
+      <tr><td class="hdr-con" style="text-align:center;">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. - +91 22 68284109</td></tr>
     </table>
-    <div class="hdr-rule"></div>
+    <div class="hdr-rule" style="border-bottom:2px solid #1a6b1a;margin-top:5px;"></div>
     <div class="hdr-gap"></div>
   </div>`;
 
@@ -350,21 +352,25 @@ function buildOfferLetterHTML(ol) {
     display: flex;
     flex-direction: column;
     padding: 0;
+    overflow: hidden;
   }
 
-  /* ── Header ── */
+  /* ── Header — full width background, content padded ── */
   .page-hdr {
+    width: 100%;
     padding: 8px 22mm 0;
     flex-shrink: 0;
+    box-sizing: border-box;
+    background: #fff;
   }
-  .hdr-tbl { width: 100%; border-collapse: collapse; }
+  .hdr-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .hdr-logo { width: 78px; padding-right: 10px; vertical-align: middle; }
   .logo-img  { width: 68px; height: 68px; display: block; }
-  .hdr-name  { font-family: Arial, Helvetica, sans-serif; font-size: 14pt; font-weight: 900; color: #1a6b1a; vertical-align: bottom; padding-bottom: 2px; }
+  .hdr-name  { font-family: Arial, Helvetica, sans-serif; font-size: 14pt; font-weight: 900; color: #1a6b1a; vertical-align: middle; padding-bottom: 2px; }
   .hdr-addr  { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #111; line-height: 1.5; text-align: center; padding-top: 2px; }
   .hdr-con   { font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; color: #111; text-align: center; padding-top: 1px; }
-  .hdr-rule  { border-bottom: 2px solid #1a6b1a; margin-top: 5px; }
-  .hdr-gap   { height: 2em; } /* 2 blank lines after header */
+  .hdr-rule  { border-bottom: 2px solid #1a6b1a; margin-top: 5px; width: 100%; }
+  .hdr-gap   { height: 2em; }
 
   /* ── Content ── */
   .page-body {
@@ -372,12 +378,15 @@ function buildOfferLetterHTML(ol) {
     padding: 0 22mm;
   }
 
-  /* ── Footer ── */
-  .ftr-gap  { height: 1.5em; } /* 2 blank lines before footer */
+  /* ── Footer — full width background, pinned to bottom ── */
+  .ftr-gap  { height: 1.5em; }
   .page-ftr {
+    width: 100%;
     padding: 0 22mm 8px;
     flex-shrink: 0;
     margin-top: auto;
+    box-sizing: border-box;
+    background: #fff;
   }
   .ftr-rule { border-top: 1.5px solid #1a6b1a; margin-bottom: 3px; }
   .ftr-corp { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; }
