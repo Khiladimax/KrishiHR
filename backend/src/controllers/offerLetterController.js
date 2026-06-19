@@ -586,42 +586,6 @@ exports.update = async (req, res) => {
   }
 };
 
-// ── GET /offer-letters/:id/preview — HTML preview ───────────────────────────
-exports.preview = async (req, res) => {
-  try {
-    const result = await db.query('SELECT * FROM offer_letters WHERE id=$1', [req.params.id]);
-    if (!result.rows.length) return res.status(404).send('Not found');
-    const ol = result.rows[0];
-    let html = buildOfferLetterHTML(ol);
-    // Inject auto-print script before </body> so user can save as PDF
-    const printScript = `
-<style>
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-</style>
-<div id="pdf-bar" style="position:fixed;top:0;left:0;right:0;background:#1B5E20;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:9999;font-family:sans-serif;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);">
-  <span>📄 Offer Letter Preview</span>
-  <div style="display:flex;gap:10px;">
-    <button onclick="window.print()" style="background:#fff;color:#1B5E20;border:none;padding:8px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:14px;">⬇️ Download / Save as PDF</button>
-    <button onclick="document.getElementById('pdf-bar').style.display='none'" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;">✕ Hide Bar</button>
-  </div>
-</div>
-<div style="height:52px;"></div>
-<script>
-  // Auto-show print dialog after a short delay
-  window.addEventListener('load', () => {
-    document.title = 'Offer_Letter_${ol.candidate_name.replace(/'/g,"\'")}';
-  });
-<\/script>`;
-    html = html.replace('</body>', printScript + '</body>');
-    res.setHeader('Content-Type', 'text/html');
-    res.send(html);
-  } catch (err) {
-    res.status(500).send('Server error');
-  }
-};
-
 // ── POST /offer-letters/:id/send — email offer letter ───────────────────────
 exports.sendEmail = async (req, res) => {
   try {

@@ -869,7 +869,6 @@ router.post  ('/offer-letters',              authenticate, authorize('hr'), offe
 router.get   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.getOne);
 router.put   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.update);
 router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.remove);
-router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr'), offerCtrl.preview);
 router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
 
 // Bulk send — multipart Excel upload

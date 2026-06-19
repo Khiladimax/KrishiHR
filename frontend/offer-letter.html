@@ -63,8 +63,6 @@
     .btn-primary:hover { background:#1B5E20; }
     .btn-secondary { background:#f5f5f5; color:#333; border:1px solid #ddd; }
     .btn-secondary:hover { background:#e8e8e8; }
-    .btn-preview { background:#1565C0; color:#fff; }
-    .btn-preview:hover { background:#0D47A1; }
     .btn-send { background:#E65100; color:#fff; }
     .btn-send:hover { background:#BF360C; }
     .btn-bulk { background:#6A1B9A; color:#fff; }
@@ -310,7 +308,6 @@
           <!-- ACTIONS -->
           <div class="btn-row">
             <button class="btn btn-primary" onclick="saveOL()">💾 Save</button>
-            <button class="btn btn-preview" id="btn-preview" onclick="previewOL()">👁 Preview</button>
             <button class="btn btn-send"    id="btn-send"    onclick="sendOL()">📤 Send Email</button>
             <button class="btn btn-bulk"    onclick="openBulkModal()">📊 Bulk Send Excel</button>
             <button class="btn btn-secondary" onclick="resetForm()">✕ Clear</button>
@@ -511,8 +508,6 @@ async function loadForm(id) {
   else clearSig('sig2');
 
   calcGross();
-
-  document.getElementById('btn-preview').disabled = false;
   document.getElementById('btn-send').disabled    = !ol.candidate_email;
   document.getElementById('btn-delete').style.display = '';
 }
@@ -558,7 +553,6 @@ async function saveOL() {
   // If new, load the created record
   if (!id && res.data?.id) {
     document.getElementById('ol-id').value = res.data.id;
-    document.getElementById('btn-preview').disabled = false;
     document.getElementById('btn-send').disabled    = !body.candidate_email;
     document.getElementById('btn-delete').style.display = '';
     document.getElementById('form-title').textContent = `✏️ Edit — ${name}`;
@@ -568,24 +562,6 @@ async function saveOL() {
   loadList();
 }
 
-// ── Preview ───────────────────────────────────────────────────────────────────
-async function previewOL() {
-  // Auto-save first so latest changes are reflected
-  const id = document.getElementById('ol-id').value;
-  if (!id) {
-    // Need to save first
-    await saveOL();
-  } else {
-    await saveOL();
-  }
-  const savedId = document.getElementById('ol-id').value;
-  if (!savedId) return;
-  const token = Auth.getToken();
-  window.open(`${API_BASE}/offer-letters/${savedId}/preview?token=${token}`, '_blank');
-}
-
-// ── Send Email ────────────────────────────────────────────────────────────────
-// ── Signature helpers ─────────────────────────────────────────────────────────
 function loadSigPreview(input, key) {
   const file = input.files[0];
   if (!file) return;
@@ -684,7 +660,6 @@ function resetForm() {
   document.getElementById('ctc-summary').style.display = 'none';
   clearSig('sig1');
   clearSig('sig2');
-  document.getElementById('btn-preview').disabled = true;
   document.getElementById('btn-send').disabled    = true;
   document.getElementById('btn-delete').style.display = 'none';
 
