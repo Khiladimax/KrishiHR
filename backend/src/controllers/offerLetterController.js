@@ -351,7 +351,7 @@ function buildOfferLetterHTML(ol) {
     min-height: 297mm;
     height: 297mm;
     margin: 6mm auto;
-    background: #fff url('${LETTERHEAD_PLACEHOLDER}') no-repeat top center / 100% 100%;
+    background: #fff url('${LETTERHEAD_B64}') no-repeat top center / 100% 100%;
     box-shadow: 0 2px 12px rgba(0,0,0,0.25);
     position: relative;
     overflow: hidden;
@@ -383,7 +383,7 @@ function buildOfferLetterHTML(ol) {
       margin-bottom:  60px;
       margin-left:     0;
       margin-right:    0;
-      background: url('${LETTERHEAD_PLACEHOLDER}') no-repeat top center / 100% 100%;
+      background: url('${LETTERHEAD_B64}') no-repeat top center / 100% 100%;
     }
 
     body { background: #fff; }
@@ -479,7 +479,7 @@ function buildOfferLetterHTML(ol) {
 <body>
 ${mainLetter}
 </body>
-</html>`.replace(/\$\{LETTERHEAD_PLACEHOLDER\}/g, LETTERHEAD_B64);}
+</html>`;}
 
 
 // ── GET /offer-letters — list all ─────────────────────────────────────────────
