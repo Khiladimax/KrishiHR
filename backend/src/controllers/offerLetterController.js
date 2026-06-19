@@ -158,7 +158,7 @@ function buildOfferLetterHTML(ol) {
       width: 210mm;
       min-height: 297mm;
       margin: 8mm auto;
-      background: #fff url('${LH}') no-repeat top left / 100% 100%;
+      background: #fff url('${LH_B64}') no-repeat top left / 100% 100%;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
       overflow: visible;
     }
@@ -186,9 +186,7 @@ function buildOfferLetterHTML(ol) {
         margin: 0;
         box-shadow: none;
         /* Keep background so letterhead shows on each printed page */
-        background-size: 100% 100%;
-        background-repeat: no-repeat;
-        background-position: top left;
+        /* background repeats automatically from the element — no override needed */
       }
       .page-content {
         /* No padding needed — wkhtmltopdf CLI margins handle the safe zone */
@@ -423,7 +421,7 @@ ${addTermsHTML}
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style>${css.replace(/\${LH}/g, LH_B64)}</style>
+<style>${css}</style>
 </head>
 <body>
 <div class="page">
