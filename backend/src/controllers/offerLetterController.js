@@ -172,13 +172,8 @@ function buildOfferLetterHTML(ol) {
   </table>
   <div class="hdr-rule"></div>`;
 
-  // ── Shared footer ──────────────────────────────────────────────────────────
-  const ftrHTML = `
-  <div class="doc-footer">
-    <div class="ftr-rule"></div>
-    <p class="ftr-corp"><strong>Corporate Office:</strong> ${COMPANY.corpAddr}. Tel: 011-41039506.</p>
-    <p class="ftr-cin"><strong>CIN: ${COMPANY.cin}</strong></p>
-  </div>`;
+  // ── Shared footer — empty for body (wkhtmltopdf --footer-html handles it) ─
+  const ftrHTML = ``;
 
   // ── Single continuous doc-wrap ─────────────────────────────────────────────
   const mainLetter = `
@@ -228,14 +223,14 @@ function buildOfferLetterHTML(ol) {
     <p class="sec-hd">OTHER RULES AND REGULATION:</p>
     <p class="para">The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.</p>
     <ul class="rules">
-      <li>You will, in all respects, be governed by the company&rsquo;s rules and regulations</li>
-      <li>You will devote full time to the work of the Company and will not undertake any direct / indirect outside business or work, honorary or remunerative except with the prior written consent of the Management.</li>
-      <li>You will abide by Leave Rules of company.</li>
-      <li>You have been engaged on the presumption that the particulars furnished by you in your application are correct. In case the said particular are found to be incorrect or that you have concealed or withheld information or the relevant facts, the services can be terminated from the company without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of period.</li>
-      <li>You will not, either during the period of your services of thereafter, disclose divulge or communicate to any other person or group or company any strategic information of the organization or its clients.</li>
-      <li>All correspondence addressed to you by the company including press and other copies of such correspondence and all vouchers, books, records, including all note books containing notes or records of business or prices or other market data, samples and/or other papers belonging to the company, circulars and all other relevant papers and documents of any nature whatsoever relating to the company&rsquo;s business, which shall come into your possession in the course of your employment shall be the absolute property of the company and you shall, at any time during your employment or upon termination there for any reason whatsoever, deliver the same to the company and without claiming any lien thereon.</li>
-      <li>You will be responsible for the safe keeping and for returning in good condition and order, all on your own the company&rsquo;s property which may be in your use, custody, care or charge. The company shall have the right to deduct the monetary value of all such things from any amounts payable to you and to take such actions as may be deemed proper in the event of your failure to account for such property to the satisfaction of the management.</li>
-      <li>You will keep us informed of your residential (mailing &amp; permanent) address. Any change in the same should be notified in writing within one week. Failure to do so will be treated as willful withholding of information and appropriate action as deemed fit by management would be taken against you.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will, in all respects, be governed by the company&rsquo;s rules and regulations</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will devote full time to the work of the Company and will not undertake any direct / indirect outside business or work, honorary or remunerative except with the prior written consent of the Management.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will abide by Leave Rules of company.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You have been engaged on the presumption that the particulars furnished by you in your application are correct. In case the said particular are found to be incorrect or that you have concealed or withheld information or the relevant facts, the services can be terminated from the company without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of period.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will not, either during the period of your services of thereafter, disclose divulge or communicate to any other person or group or company any strategic information of the organization or its clients.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>All correspondence addressed to you by the company including press and other copies of such correspondence and all vouchers, books, records, including all note books containing notes or records of business or prices or other market data, samples and/or other papers belonging to the company, circulars and all other relevant papers and documents of any nature whatsoever relating to the company&rsquo;s business, which shall come into your possession in the course of your employment shall be the absolute property of the company and you shall, at any time during your employment or upon termination there for any reason whatsoever, deliver the same to the company and without claiming any lien thereon.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will be responsible for the safe keeping and for returning in good condition and order, all on your own the company&rsquo;s property which may be in your use, custody, care or charge. The company shall have the right to deduct the monetary value of all such things from any amounts payable to you and to take such actions as may be deemed proper in the event of your failure to account for such property to the satisfaction of the management.</li>
+      <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will keep us informed of your residential (mailing &amp; permanent) address. Any change in the same should be notified in writing within one week. Failure to do so will be treated as willful withholding of information and appropriate action as deemed fit by management would be taken against you.</li>
     </ul>
 
     <!-- Page 3 starts with 2 blank lines after header (last bullet wraps to pg3) -->
@@ -338,6 +333,7 @@ function buildOfferLetterHTML(ol) {
   body {
     font-family: 'Sitka Text', 'Sitka', Georgia, 'Times New Roman', serif;
     font-size: 11pt;
+    line-height: 1.5;
     color: #000;
     background: #d0d0d0;
     -webkit-print-color-adjust: exact;
@@ -378,7 +374,7 @@ function buildOfferLetterHTML(ol) {
   .ftr-cin    { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; }
 
   .doc-body   { margin-top: 10px; }
-  .page-spacer { display: block; height: 2.4em; }
+  .page-spacer { display: block; height: 28px; }
 
   .date-line  { text-align: right; font-size: 11pt; margin-bottom: 14px; }
   .cand-name  { font-size: 11pt; font-weight: bold; line-height: 1.65; }
@@ -389,7 +385,7 @@ function buildOfferLetterHTML(ol) {
 
   .salut     { font-size: 11pt; margin: 8px 0; line-height: 1.6; }
   .subj-line { font-size: 11pt; text-align: center; margin: 10px 0 10px; line-height: 1.6; }
-  .para      { font-size: 11pt; line-height: 1.65; text-align: justify; margin-bottom: 8px; }
+  .para      { font-size: 11pt; line-height: 1.6; text-align: justify; margin-bottom: 10px; }
   .accept-bold { font-weight: bold; }
 
   .sec-hd {
@@ -400,13 +396,8 @@ function buildOfferLetterHTML(ol) {
 
   ul.rules    { margin: 4px 0 10px 0; padding: 0; list-style: none; }
   ul.rules li {
-    font-size: 11pt; line-height: 1.65; margin-bottom: 6px;
-    text-align: justify; padding-left: 22px; position: relative;
-  }
-  ul.rules li::before {
-    content: '\\u25A1';
-    position: absolute; left: 0; top: 1px;
-    font-size: 9pt;
+    font-size: 11pt; line-height: 1.75; margin-bottom: 8px;
+    text-align: justify; padding-left: 0;
   }
 
   .ann-page-break { display: none; }
@@ -624,25 +615,46 @@ exports.sendEmail = async (req, res) => {
     let offerPdfBuffer = null;
     try {
       const tmpDir  = os.tmpdir();
-      const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
-      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
+      const stamp   = Date.now();
+      const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${stamp}.html`);
+      const tmpFtr  = path.join(tmpDir, `offer_ftr_${stamp}.html`);
+      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${stamp}.pdf`);
+
       fs.writeFileSync(tmpHtml, offerHTML);
+
+      // Footer HTML — matches the reference PDF footer style
+      const ftrHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 7.5pt; margin: 0; padding: 0 18mm; color: #111; }
+  .ftr-rule { border-top: 1.5px solid #1a6b1a; margin-bottom: 3px; }
+  .ftr-corp { text-align: center; line-height: 1.5; }
+  .ftr-cin  { text-align: center; }
+</style></head><body>
+<div class="ftr-rule"></div>
+<p class="ftr-corp"><strong>Corporate Office:</strong> ${COMPANY.corpAddr}. Tel: 011-41039506.</p>
+<p class="ftr-cin"><strong>CIN: ${COMPANY.cin}</strong></p>
+</body></html>`;
+      fs.writeFileSync(tmpFtr, ftrHtml);
+
       await new Promise((resolve, reject) => {
         execFile('wkhtmltopdf', [
           '--quiet',
           '--page-size', 'A4',
-          '--margin-top',    '0mm',
-          '--margin-bottom', '0mm',
+          '--margin-top',    '5mm',
+          '--margin-bottom', '18mm',
           '--margin-left',   '0mm',
           '--margin-right',  '0mm',
+          '--footer-html',   tmpFtr,
+          '--footer-spacing', '3',
           '--print-media-type',
           '--enable-local-file-access',
           '--disable-smart-shrinking',
+          '--encoding', 'utf-8',
           tmpHtml, tmpPdf
-        ], (err) => { if (err) return reject(err); resolve(); });
+        ], { maxBuffer: 20 * 1024 * 1024 }, (err) => { if (err) return reject(err); resolve(); });
       });
       offerPdfBuffer = fs.readFileSync(tmpPdf);
-      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
+      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpFtr); fs.unlinkSync(tmpPdf); } catch(_) {}
       console.log('[offerLetter.sendEmail] PDF generated successfully');
     } catch (pdfErr) {
       console.error('[offerLetter.sendEmail] PDF generation failed:', pdfErr.message);
