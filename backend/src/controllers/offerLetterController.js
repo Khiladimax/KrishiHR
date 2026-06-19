@@ -377,7 +377,6 @@ function buildOfferLetterHTML(ol) {
 
   .doc-wrap {
     width: 210mm;
-    min-height: 297mm;
     margin: 10mm auto;
     background: #fff;
     display: flex;
