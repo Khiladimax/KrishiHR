@@ -663,15 +663,17 @@ cron.schedule('0 8 * * *', async () => {
     const tomorrow  = new Date(istNow); tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowMD = `${String(tomorrow.getMonth()+1).padStart(2,'0')}${String(tomorrow.getDate()).padStart(2,'0')}`;
 
-    // TODAY birthdays
+    // TODAY birthdays — own employees only (client_id IS NULL excludes client employees like Priya Verma)
     const todayBdays = await db.query(
       `SELECT id, first_name, last_name, employee_code
        FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+       AND client_id IS NULL
        AND TO_CHAR(date_of_birth,'MMDD') = $1`, [todayMD]
     );
 
     for (const emp of todayBdays.rows) {
-      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND id != $1`, [emp.id]);
+      // Only notify own employees (client_id IS NULL), not client employees
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id IS NULL AND id != $1`, [emp.id]);
       for (const r of all.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, title, message, type)
@@ -688,14 +690,16 @@ cron.schedule('0 8 * * *', async () => {
       console.log(`[Birthday] Today: ${emp.first_name} ${emp.last_name}`);
     }
 
-    // TOMORROW birthdays — advance notice
+    // TOMORROW birthdays — own employees only (client_id IS NULL excludes client employees)
     const tomorrowBdays = await db.query(
       `SELECT id, first_name, last_name FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+       AND client_id IS NULL
        AND TO_CHAR(date_of_birth,'MMDD') = $1`, [tomorrowMD]
     );
 
     for (const emp of tomorrowBdays.rows) {
-      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND id != $1`, [emp.id]);
+      // Only notify own employees (client_id IS NULL)
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id IS NULL AND id != $1`, [emp.id]);
       for (const r of all.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, title, message, type)
@@ -709,6 +713,70 @@ cron.schedule('0 8 * * *', async () => {
     console.log(`✅ Birthday cron done. Today: ${todayBdays.rows.length}, Tomorrow: ${tomorrowBdays.rows.length}`);
   } catch (err) {
     console.error('❌ Birthday cron failed:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+// 5b. Client employee birthday notifications — runs at 08:01 AM IST every day
+//     Client employees only see birthdays of OTHER employees in the SAME client company
+cron.schedule('1 8 * * *', async () => {
+  console.log('⏰ Running CLIENT birthday notifications...');
+  try {
+    const istNow    = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayMD   = `${String(istNow.getMonth()+1).padStart(2,'0')}${String(istNow.getDate()).padStart(2,'0')}`;
+    const tomorrow  = new Date(istNow); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowMD = `${String(tomorrow.getMonth()+1).padStart(2,'0')}${String(tomorrow.getDate()).padStart(2,'0')}`;
+
+    // Get all distinct clients that have active employees
+    const clients = await db.query(`SELECT DISTINCT client_id FROM employees WHERE client_id IS NOT NULL AND is_active = TRUE`);
+
+    for (const { client_id } of clients.rows) {
+      // TODAY birthdays within this client
+      const todayBdays = await db.query(
+        `SELECT id, first_name, last_name FROM employees
+         WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+           AND client_id = $1
+           AND TO_CHAR(date_of_birth,'MMDD') = $2`, [client_id, todayMD]
+      );
+      for (const emp of todayBdays.rows) {
+        const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id=$1 AND id != $2`, [client_id, emp.id]);
+        for (const r of all.rows) {
+          await db.query(
+            `INSERT INTO notifications(employee_id, title, message, type)
+             VALUES($1,'🎂 Birthday Today!',$2,'birthday')`,
+            [r.id, `🎉 Today is ${emp.first_name} ${emp.last_name}'s birthday! Wish them well.`]
+          );
+        }
+        await db.query(
+          `INSERT INTO notifications(employee_id, title, message, type)
+           VALUES($1,'🎂 Happy Birthday!','Wishing you a very Happy Birthday! 🎉🎂','birthday')`,
+          [emp.id]
+        );
+        console.log(`[ClientBirthday] Today: ${emp.first_name} ${emp.last_name} (client_id=${client_id})`);
+      }
+
+      // TOMORROW birthdays within this client
+      const tomorrowBdays = await db.query(
+        `SELECT id, first_name, last_name FROM employees
+         WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+           AND client_id = $1
+           AND TO_CHAR(date_of_birth,'MMDD') = $2`, [client_id, tomorrowMD]
+      );
+      for (const emp of tomorrowBdays.rows) {
+        const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id=$1 AND id != $2`, [client_id, emp.id]);
+        for (const r of all.rows) {
+          await db.query(
+            `INSERT INTO notifications(employee_id, title, message, type)
+             VALUES($1,'🎂 Upcoming Birthday',$2,'birthday')`,
+            [r.id, `Tomorrow is ${emp.first_name} ${emp.last_name}'s birthday! Don't forget to wish them 🎉`]
+          );
+        }
+        console.log(`[ClientBirthday] Tomorrow: ${emp.first_name} ${emp.last_name} (client_id=${client_id})`);
+      }
+    }
+
+    console.log(`✅ Client birthday cron done for ${clients.rows.length} client(s)`);
+  } catch (err) {
+    console.error('❌ Client birthday cron failed:', err.message);
   }
 }, { timezone: 'Asia/Kolkata' });
 
