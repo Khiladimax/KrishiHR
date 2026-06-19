@@ -440,10 +440,10 @@ function buildOfferLetterHTML(ol) {
 
   @media print {
     body { margin: 0; background: #fff; }
-    .doc-wrap { width: 100%; margin: 0; box-shadow: none; padding: 0 18mm; }
-    /* Header and footer are handled by wkhtmltopdf --header-html/--footer-html */
-    .doc-header { display: none; }
-    .doc-footer { display: none; }
+    .doc-wrap { width: 100%; margin: 0; box-shadow: none; padding: 0; }
+    /* Hide in-body header/footer — wkhtmltopdf --header-html/--footer-html handles them */
+    .doc-header { display: none !important; }
+    .doc-footer { display: none !important; }
     .annexure-section { page-break-before: always; }
     .sec-hd     { page-break-after: avoid; }
     ul.rules li  { page-break-inside: avoid; }
@@ -668,14 +668,14 @@ exports.sendEmail = async (req, res) => {
         execFile('wkhtmltopdf', [
           '--quiet',
           '--page-size',      'A4',
-          '--margin-top',     '40mm',   // space for header
-          '--margin-bottom',  '22mm',   // space for footer
-          '--margin-left',    '18mm',
-          '--margin-right',   '18mm',
+          '--margin-top',     '42mm',
+          '--margin-bottom',  '22mm',
+          '--margin-left',    '22mm',
+          '--margin-right',   '22mm',
           '--header-html',    tmpHdr,
-          '--header-spacing', '3',
+          '--header-spacing', '5',
           '--footer-html',    tmpFtr,
-          '--footer-spacing', '3',
+          '--footer-spacing', '4',
           '--print-media-type',
           '--enable-local-file-access',
           '--disable-smart-shrinking',
