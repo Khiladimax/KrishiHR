@@ -799,3 +799,226 @@ exports.remove = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ── BULK SEND: POST /offer-letters/bulk-send ──────────────────────────────────
+// Accepts multipart Excel upload. Each row = one offer letter → PDF → email.
+// Returns progress report: { total, sent, failed, results[] }
+exports.bulkSend = async (req, res) => {
+  const XLSX = require('xlsx');
+
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No Excel file uploaded' });
+
+    // Parse Excel
+    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (!rows.length) return res.status(400).json({ success: false, message: 'Excel is empty' });
+
+    // CC / BCC from first data row (same for all)
+    const ccRaw  = String(rows[0]['CC']  || rows[0]['cc']  || '').split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+    const bccRaw = String(rows[0]['BCC'] || rows[0]['bcc'] || '').split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+
+    const results = [];
+    let sent = 0, failed = 0;
+
+    // Fetch signatures from DB (shared across all letters)
+    const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
+    const sig1   = sigRow.rows[0]?.sig1_image || null;
+    const sig2   = sigRow.rows[0]?.sig2_image || null;
+
+    const BREVO_KEY   = process.env.BREVO_API_KEY;
+    const emailEnabled = process.env.EMAIL_ENABLED === 'true';
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2; // Excel row number (1=header, 2=first data)
+
+      // ── Map Excel columns → offer letter object ────────────────────────────
+      const candidateName  = String(row['Candidate Name']  || row['candidate_name']  || '').trim();
+      const candidateEmail = String(row['Email']           || row['email']           || row['candidate_email'] || '').trim();
+      const designation    = String(row['Designation']     || row['designation']     || '').trim();
+      const location       = String(row['Location']        || row['location']        || 'Mumbai').trim();
+      const joiningDateRaw = row['Joining Date']           || row['joining_date']    || '';
+      const offerValidDays = parseInt(row['Offer Valid Days'] || row['offer_valid_days'] || 7) || 7;
+      const probation      = parseInt(row['Probation Months'] || row['probation_months'] || 6) || 6;
+      const noticePeriod   = parseInt(row['Notice Period Months'] || row['notice_period_months'] || 3) || 3;
+      const employeeCode   = String(row['Employee Code']   || row['employee_code']   || '').trim();
+      const candidateMobile= String(row['Mobile']          || row['mobile']          || row['candidate_mobile'] || '').trim();
+      const candidateAddr  = String(row['Address']         || row['address']         || '').trim();
+      const customClauses  = String(row['Custom Clauses']  || row['custom_clauses']  || '').trim();
+
+      // Salary fields
+      const ctcAnnual    = parseFloat(String(row['CTC Annual']         || row['ctc_annual']         || 0).replace(/,/g,'')) || 0;
+      const basic        = parseFloat(String(row['Basic Monthly']      || row['basic_monthly']      || 0).replace(/,/g,'')) || 0;
+      const hra          = parseFloat(String(row['HRA Monthly']        || row['hra_monthly']        || 0).replace(/,/g,'')) || 0;
+      const conveyance   = parseFloat(String(row['Conveyance Monthly'] || row['conveyance_monthly'] || 0).replace(/,/g,'')) || 0;
+      const otherAllow   = parseFloat(String(row['Other Allowance']    || row['other_allowance_monthly'] || 0).replace(/,/g,'')) || 0;
+      const gratuity     = parseFloat(String(row['Gratuity Monthly']   || row['gratuity_monthly']   || 0).replace(/,/g,'')) || 0;
+      const pfEmployee   = parseFloat(String(row['PF Employee']        || row['pf_employee_monthly'] || 0).replace(/,/g,'')) || 0;
+      const pfEmployer   = parseFloat(String(row['PF Employer']        || row['pf_employer_monthly'] || 0).replace(/,/g,'')) || 0;
+      const pfAdmin      = parseFloat(String(row['PF Admin']           || row['pf_admin_monthly']   || 0).replace(/,/g,'')) || 0;
+      const profTax      = parseFloat(String(row['Professional Tax']   || row['professional_tax_monthly'] || 0).replace(/,/g,'')) || 0;
+
+      // Validation
+      if (!candidateName || !candidateEmail || !designation) {
+        results.push({ row: rowNum, name: candidateName || '(empty)', email: candidateEmail || '(empty)', status: 'failed', reason: 'Missing required: Candidate Name, Email, or Designation' });
+        failed++;
+        continue;
+      }
+      if (!candidateEmail.includes('@')) {
+        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: 'Invalid email address' });
+        failed++;
+        continue;
+      }
+
+      // Parse joining date
+      let joiningDate = null;
+      if (joiningDateRaw) {
+        const d = joiningDateRaw instanceof Date ? joiningDateRaw : new Date(joiningDateRaw);
+        if (!isNaN(d)) joiningDate = d.toISOString().split('T')[0];
+      }
+
+      // Build offer letter object (same shape as DB row)
+      const ol = {
+        id: `bulk_${Date.now()}_${i}`,
+        candidate_name:          candidateName,
+        candidate_email:         candidateEmail,
+        candidate_address:       candidateAddr,
+        candidate_mobile:        candidateMobile,
+        designation,
+        location,
+        joining_date:            joiningDate,
+        offer_date:              new Date(),
+        offer_valid_days:        offerValidDays,
+        probation_months:        probation,
+        notice_period_months:    noticePeriod,
+        employee_code:           employeeCode,
+        ctc_annual:              ctcAnnual,
+        basic_monthly:           basic,
+        hra_monthly:             hra,
+        conveyance_monthly:      conveyance,
+        other_allowance_monthly: otherAllow,
+        gratuity_monthly:        gratuity,
+        pf_employee_monthly:     pfEmployee,
+        pf_employer_monthly:     pfEmployer,
+        pf_admin_monthly:        pfAdmin,
+        professional_tax_monthly: profTax,
+        custom_clauses:          customClauses || null,
+        sig1_image:              sig1,
+        sig2_image:              sig2,
+        status:                  'draft',
+      };
+
+      // Generate PDF
+      let offerPdfBuffer = null;
+      try {
+        const offerHTML = buildOfferLetterHTML(ol);
+        const tmpDir    = os.tmpdir();
+        const stamp     = Date.now();
+        const tmpHtml   = path.join(tmpDir, `bulk_offer_${i}_${stamp}.html`);
+        const tmpPdf    = path.join(tmpDir, `bulk_offer_${i}_${stamp}.pdf`);
+        fs.writeFileSync(tmpHtml, offerHTML);
+
+        await new Promise((resolve, reject) => {
+          execFile('wkhtmltopdf', [
+            '--quiet', '--page-size', 'A4',
+            '--margin-top', '0', '--margin-bottom', '0',
+            '--margin-left', '0', '--margin-right', '0',
+            '--encoding', 'utf-8', '--enable-local-file-access',
+            tmpHtml, tmpPdf
+          ], { maxBuffer: 20 * 1024 * 1024 }, (err) => { if (err) return reject(err); resolve(); });
+        });
+
+        offerPdfBuffer = fs.readFileSync(tmpPdf);
+        try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
+      } catch (pdfErr) {
+        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `PDF generation failed: ${pdfErr.message}` });
+        failed++;
+        continue;
+      }
+
+      // Build email payload
+      const firstName  = candidateName.split(' ').filter(w => !['Mr.','Ms.','Mrs.','Dr.'].includes(w))[0] || candidateName;
+      const coverHtml  = `
+        <div style="font-family:Arial,sans-serif;font-size:13px;color:#222;line-height:1.7;max-width:600px;">
+          <div style="background:#1B5E20;padding:16px 24px;border-radius:8px 8px 0 0;">
+            <span style="color:#fff;font-size:16px;font-weight:700;">KrishiHR</span>
+            <span style="color:#A5D6A7;font-size:12px;margin-left:8px;">Krishi Care &amp; Management Services</span>
+          </div>
+          <div style="border:1px solid #e0e0e0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+            <p>Dear ${firstName},</p>
+            <p>Please find attached your offer letter for the position of <strong>"${designation}"</strong> at Krishi Care &amp; Management Services Private Limited.</p>
+            <p>Kindly review the letter and revert back with your acceptance within <strong>${offerValidDays} days</strong>.</p>
+            <p>Please also find attached the Joining Form. Kindly fill it and submit upon joining.</p>
+            <p>For any queries, feel free to reach out to us.</p>
+            <p>Warm regards,<br>Human Resource Team<br>Krishi Care &amp; Management Services Pvt. Ltd.</p>
+          </div>
+        </div>`;
+
+      const attachments = [{
+        name:    `Offer_Letter_${candidateName.replace(/\s+/g,'_')}.pdf`,
+        content: offerPdfBuffer.toString('base64'),
+      }];
+
+      // Attach joining form if exists
+      const joiningFormPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.docx');
+      if (fs.existsSync(joiningFormPath)) {
+        attachments.push({ name: 'Joining_Form_Krishi_Care.docx', content: fs.readFileSync(joiningFormPath).toString('base64') });
+      }
+
+      const payload = {
+        sender:      { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+        to:          [{ email: candidateEmail, name: candidateName }],
+        subject:     `Offer Letter — ${designation} | Krishi Care & Management Services`,
+        htmlContent: coverHtml,
+        attachment:  attachments,
+      };
+      if (ccRaw.length)  payload.cc  = ccRaw.map(e => ({ email: e }));
+      if (bccRaw.length) payload.bcc = bccRaw.map(e => ({ email: e }));
+
+      // Send email
+      if (!BREVO_KEY || !emailEnabled) {
+        // Simulated send (dev mode)
+        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent (simulated)', reason: '' });
+        sent++;
+        continue;
+      }
+
+      try {
+        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `Email API error: ${errText.substring(0,120)}` });
+          failed++;
+        } else {
+          results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: '' });
+          sent++;
+        }
+      } catch (emailErr) {
+        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: emailErr.message });
+        failed++;
+      }
+
+      // Small delay to avoid Brevo rate limits
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    res.json({
+      success: true,
+      total:   rows.length,
+      sent,
+      failed,
+      results,
+    });
+
+  } catch (err) {
+    console.error('[offerLetter.bulkSend]', err.message);
+    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+  }
+};

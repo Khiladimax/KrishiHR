@@ -872,6 +872,10 @@ router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offe
 router.get   ('/offer-letters/:id/preview',  authenticate, authorize('hr'), offerCtrl.preview);
 router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
 
+// Bulk send — multipart Excel upload
+const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+router.post('/offer-letters/bulk-send', authenticate, authorize('hr'), xlsxUpload.single('file'), offerCtrl.bulkSend);
+
 // ── Test Email (debug only) ───────────────────────────────────────────────────
 router.get('/test-email', authenticate, async (req, res) => {
   try {
