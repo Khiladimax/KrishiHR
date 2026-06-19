@@ -48,7 +48,7 @@ exports.checkTrackingSilence = async () => {
   if (hour < 9 || hour >= 21) return { checked: 0, alerts: 0 };
 
   try {
-    // Get all employees who are punched in today and not yet punched out
+    // Get all OWN employees (client_id IS NULL) who are punched in today and not yet punched out
     // AND have approved tracking (employment_type = field/offsite OR have OD today)
     const activeEmps = await db.query(`
       SELECT DISTINCT
@@ -64,6 +64,7 @@ exports.checkTrackingSilence = async () => {
         AND a.punch_in IS NOT NULL
         AND a.punch_out IS NULL
         AND e.is_active = true
+        AND e.client_id IS NULL
         AND (
           e.employment_type NOT IN ('office','onsite','on_site','wfh','work_from_home','hybrid')
           OR EXISTS (

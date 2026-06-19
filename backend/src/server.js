@@ -663,15 +663,17 @@ cron.schedule('0 8 * * *', async () => {
     const tomorrow  = new Date(istNow); tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowMD = `${String(tomorrow.getMonth()+1).padStart(2,'0')}${String(tomorrow.getDate()).padStart(2,'0')}`;
 
-    // TODAY birthdays
+    // TODAY birthdays — own employees only (client_id IS NULL)
     const todayBdays = await db.query(
       `SELECT id, first_name, last_name, employee_code
        FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+       AND client_id IS NULL
        AND TO_CHAR(date_of_birth,'MMDD') = $1`, [todayMD]
     );
 
     for (const emp of todayBdays.rows) {
-      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND id != $1`, [emp.id]);
+      // Notify only own employees (client_id IS NULL), not client employees
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id IS NULL AND id != $1`, [emp.id]);
       for (const r of all.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, title, message, type)
@@ -688,14 +690,16 @@ cron.schedule('0 8 * * *', async () => {
       console.log(`[Birthday] Today: ${emp.first_name} ${emp.last_name}`);
     }
 
-    // TOMORROW birthdays — advance notice
+    // TOMORROW birthdays — advance notice, own employees only (client_id IS NULL)
     const tomorrowBdays = await db.query(
       `SELECT id, first_name, last_name FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
+       AND client_id IS NULL
        AND TO_CHAR(date_of_birth,'MMDD') = $1`, [tomorrowMD]
     );
 
     for (const emp of tomorrowBdays.rows) {
-      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND id != $1`, [emp.id]);
+      // Notify only own employees (client_id IS NULL), not client employees
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id IS NULL AND id != $1`, [emp.id]);
       for (const r of all.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, title, message, type)
