@@ -474,14 +474,60 @@ function buildOfferLetterHTML(ol) {
   .ack-item  { font-size: 11pt; }
   .ack-line  { display: inline-block; border-bottom: 1px solid #000; width: 140px; margin-left: 4px; vertical-align: bottom; }
 
+  /* ── PRINT / wkhtmltopdf fix ──
+     wkhtmltopdf renders as a continuous stream.
+     position:absolute inside .page only works in a browser (each .page
+     is its own positioned box). In wkhtmltopdf there is only ONE viewport
+     so only the very first header and very last footer get painted.
+
+     Fix: switch header & footer to position:fixed in print mode.
+     wkhtmltopdf stamps fixed elements on EVERY page.
+     @page margins carve out the space so body text never underlaps them.
+  */
   @media print {
-    body { margin: 0; background: #fff; }
+    @page {
+      size: A4;
+      margin-top:    145px;
+      margin-bottom:  55px;
+      margin-left:     0;
+      margin-right:    0;
+    }
+
+    body { background: #fff; }
+
     .page {
-      width: 100%; height: 297mm; margin: 0;
-      box-shadow: none; page-break-after: always;
-      position: relative; overflow: hidden;
+      width: auto; height: auto;
+      margin: 0; box-shadow: none;
+      position: static; overflow: visible;
+      page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
+
+    /* Header: fixed top — repeats on every PDF page */
+    .page-hdr {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 10px 18mm 0;
+      background: #fff;
+      z-index: 10;
+    }
+
+    /* Body: normal flow, no absolute positioning */
+    .page-body {
+      position: static;
+      padding: 8px 18mm 0;
+      overflow: visible;
+    }
+
+    /* Footer: fixed bottom — repeats on every PDF page */
+    .page-ftr {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 46px;
+      background: #fff;
+      padding: 4px 18mm 8px;
+      z-index: 10;
+    }
   }
 </style>
 </head>
