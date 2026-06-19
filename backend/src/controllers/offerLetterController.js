@@ -355,39 +355,39 @@ function buildOfferLetterHTML(ol) {
   }
 
   /* HEADER */
-  .page-hdr  { flex-shrink: 0; padding: 10px 18mm 0; }
+  .page-hdr  { flex-shrink: 0; padding: 8px 18mm 0; }
   .hdr-inner { display: table; width: 100%; border-collapse: collapse; }
   .hdr-logo-cell {
     display: table-cell;
-    width: 95px;
+    width: 85px;
     vertical-align: middle;
     padding-right: 10px;
   }
-  .logo-img  { width: 88px; height: 95px; display: block; }
+  .logo-img  { width: 78px; height: 78px; display: block; }
   .hdr-text-cell { display: table-cell; vertical-align: top; padding-top: 2px; }
   .hdr-name  {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 20pt; font-weight: 900; color: #1a6b1a;
-    line-height: 1.1; margin-bottom: 4px;
+    font-size: 18pt; font-weight: 900; color: #1a6b1a;
+    line-height: 1.15; margin-bottom: 3px;
   }
   .hdr-addr  {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 8.5pt; color: #111;
-    text-align: center; line-height: 1.65;
+    font-size: 8pt; color: #111;
+    text-align: center; line-height: 1.55;
   }
   .hdr-email {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 8.5pt; color: #111;
+    font-size: 8pt; color: #111;
     text-align: left; padding-left: 2px; margin-top: 1px;
   }
-  .hdr-rule  { border-bottom: 2.5px solid #1a6b1a; margin-top: 7px; }
+  .hdr-rule  { border-bottom: 2.5px solid #1a6b1a; margin-top: 6px; }
 
-  /* CONTENT — generous top padding matching reference ~30mm gap after header */
-  .page-body { flex: 1; padding: 22px 18mm 0; }
+  /* CONTENT */
+  .page-body { flex: 1; padding: 18px 18mm 0; }
 
-  /* FOOTER — pinned to bottom via margin-top:auto on flex column */
-  .page-ftr  { flex-shrink: 0; margin-top: auto; padding: 0 18mm 10px; }
-  .ftr-rule  { border-top: 1px solid #555; margin-bottom: 4px; }
+  /* FOOTER — pinned to bottom via margin-top:auto */
+  .page-ftr  { flex-shrink: 0; margin-top: auto; padding: 0 18mm 8px; }
+  .ftr-rule  { border-top: 1px solid #555; margin-bottom: 3px; }
   .ftr-corp  { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; font-weight: bold; }
   .ftr-cin   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; font-weight: bold; }
 
@@ -397,7 +397,7 @@ function buildOfferLetterHTML(ol) {
   .cand-addr  { font-size: 11pt; line-height: 1.6; }
   .cand-meta  { margin: 10px 0; }
   .cand-meta p { font-size: 11pt; font-weight: bold; line-height: 1.6; }
-  .elink      { color: #00f; text-decoration: underline; }
+  .elink      { color: #000; text-decoration: underline; }
   .salut      { font-size: 11pt; margin: 14px 0 6px; }
   .subj-line  {
     font-size: 11pt; font-weight: bold; text-decoration: underline;
