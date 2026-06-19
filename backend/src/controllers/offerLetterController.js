@@ -184,11 +184,12 @@ function buildOfferLetterHTML(ol) {
   </div>
   <div class="bottom-bar"></div>`;
 
-  // ── MAIN LETTER ───────────────────────────────────────────────────────────
+  // ── Single continuous doc-wrap — no artificial page splitting ─────────────
+  // Header/footer repeat on each printed page via @media print fixed positioning.
+  // The body flows naturally; browser/PDF handles pagination.
   const mainLetter = `
 <div class="doc-wrap">
   ${hdrHTML}
-
   <div class="doc-body">
     <p class="date-line"><strong>${formatDate(ol.offer_date || new Date())}</strong></p>
 
@@ -260,17 +261,11 @@ function buildOfferLetterHTML(ol) {
         </div>
       </div>
     </div>
-  </div><!-- /doc-body -->
 
-  ${ftrHTML}
-</div><!-- /doc-wrap -->`;
+    <!-- ── ANNEXURE — flows directly after letter, page-break on print ── -->
+    <div class="ann-page-break"></div>
+    ${hdrHTML}
 
-  // ── ANNEXURE I ────────────────────────────────────────────────────────────
-  const annexure = `
-<div class="doc-wrap page-break">
-  ${hdrHTML}
-
-  <div class="doc-body">
     <p class="ann-title">Annexure I &mdash; Annual Cost to Company &amp; Other Benefits</p>
 
     <div class="ann-meta-grid">
@@ -299,8 +294,8 @@ function buildOfferLetterHTML(ol) {
         <tr>
           <th class="c-sr">Sr. No.</th>
           <th>Particulars</th>
-          <th class="c-num">Monthly (₹)</th>
-          <th class="c-num">Yearly (₹)</th>
+          <th class="c-num">Monthly (&#8377;)</th>
+          <th class="c-num">Yearly (&#8377;)</th>
         </tr>
       </thead>
       <tbody>
@@ -339,9 +334,11 @@ function buildOfferLetterHTML(ol) {
       </table>
     </div>
   </div><!-- /doc-body -->
-
   ${ftrHTML}
-</div><!-- /doc-wrap annexure -->`;
+</div><!-- /doc-wrap -->`;
+
+  // annexure is now merged into mainLetter above — kept as empty string for compatibility
+  const annexure = ``;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -385,7 +382,8 @@ function buildOfferLetterHTML(ol) {
     box-shadow: 0 4px 32px rgba(0,0,0,0.18);
   }
 
-  .page-break { page-break-before: always; margin-top: 0; }
+  /* ann-page-break: invisible on screen, forces page break on print only */
+  .ann-page-break { display: none; }
 
   .accent-bar {
     height: 6px;
@@ -416,7 +414,7 @@ function buildOfferLetterHTML(ol) {
     background: linear-gradient(90deg, #1C355E 0%, #c8a84b 50%, #1C355E 100%);
   }
 
-  .doc-body { padding: 16px 32px 12px; flex: 1; position: relative; z-index: 1; }
+  .doc-body { padding: 16px 32px 12px; position: relative; z-index: 1; }
 
   .doc-footer { padding: 6px 32px 12px; margin-top: 6px; flex-shrink: 0; }
   .ftr-rule {
@@ -568,14 +566,16 @@ function buildOfferLetterHTML(ol) {
 
   @media print {
     body { margin: 0; background: #fff; }
-    .doc-wrap { width: 100%; margin: 0; box-shadow: none; min-height: 0; }
-    .page-break { page-break-before: always; }
+    .doc-wrap { width: 100%; margin: 0; box-shadow: none; }
+    .ann-page-break { display: block; page-break-before: always; }
     .sec-hd     { page-break-after: avoid; }
     ul.rules li  { page-break-inside: avoid; }
     .sig-section { page-break-inside: avoid; }
     .ann-tbl     { page-break-inside: avoid; }
     .ack-box     { page-break-inside: avoid; }
     .ann-meta-grid { page-break-inside: avoid; }
+    .doc-header  { page-break-after: avoid; }
+    .accent-bar  { page-break-after: avoid; }
   }
 </style>
 </head>
