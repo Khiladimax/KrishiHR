@@ -160,43 +160,47 @@ function buildOfferLetterHTML(ol) {
 
   const LOGO_B64 = `data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAE+AVADASIAAhEBAxEB/8QAHQAAAQQDAQEAAAAAAAAAAAAAAAEFBgcCAwQICf/EAFIQAAEDAwEEBAcLCQYDCAMAAAEAAgMEBREGBxIhMUFRYXETIjZygbHRFBcyM1V0kZOhssEIFSM1QkNSc5IIJDRiguFFU9IlJmNklKLw8URUg//EABsBAAEFAQEAAAAAAAAAAAAAAAABAwQFBgIH/8QAOREAAQMCBAMECAYBBQEAAAAAAQACAwQRBRIhMRMUQVFScZEGFSIyM2GBoSM0QrHB0RYkJTVD8PH/2gAMAwEAAhEDEQA/APGSELbTQS1M7III3SSvOGtaMklCFr6eCkendG3++4dR0bmw/wDOl8Rn09KsnQezSkoooq++NbUVJw4QniyPsPWVZEbGRsayNjWtbyAGAFU1OJtYcsepVbPiDW6M1VV2rZBT7rHXO6yOdzcyBoA+kqQxbMdKR86ad3nTEqaowFVvr6h36lXurZnblQ73tdI/J7/rXe1KNmmkfk531rvapjhCb5ybvlcc1N3iod72ukfk531rvaj3ttI/JzvrXe1TBHQjnJu+UczN3iof72ukPk9/1rvak97TSPyc/wCtd7VMslHRzRzc3fKOam7xUN97XSPye7613tS+9rpD5Pf9a72qYIRzk3fKOZm7xUP8Ae10h8nP+td7Ue9rpD5Pf9a72qYoRzk3fKOZl7xUP97XSH/wCg7613tR722kfk5/1rvapihJzk/fKOZl7xUPGzXSGf1c7613tS+9ppD5Od9a72qXhKjm5++UczN3iof72mkPk9/1rvakOzXSHyc/wCtd7VMUuA5ybvlHMy94qHDZrpD5Of9a72pRC4oTwOCEwf2qtwPxNX/Q3/AKll/ae34z4Gq/pb7Ucu9CfRgI4JiGpqA/uan+lvtSnUtCP3VT/S32peXehPgwEhAKYv7T0GM+Bqf6W+1dlNeKaePfayYd4HtQYHBCccBGAuIXGnJxuy/wBI9q2Csi/hf9AXPCchdLQlWj3SwD4JQKhpGcOSGNyCt+ULR7ob/C76VkJm54ByQsI3SLahYGTvRvcM8VxlRZZoWOUZRZFlkeSpXbXGG6ujeBxkpWEn0uH4K6DyTNfdNWG8VjKm6UHuicMDGvMjxhoJOODh1lWmE1baSo4jhpZR6mIysyheeMJR8FX1/YHSXyMz6+X/AKlj/YTSXyMz6+T/AKlpj6RU5GoKrfV7yNSt+zrhoq2DI+LP3ioPt2H/AGjbD/4LvvK0KGlprdQxUlJH4KniGI2ZJxxz0lcN809Zb3NG+6UQqXRAtYS9zcA+aQs7S1jYq0zna5U+WEugDAvOoSgZ/wDpXyNBaS5fmZn/AKiX/qSO0HpID9TN/wDUS/8AUtF/kUDtLFV5w9/astmULIND2/dwDIHPd0cS48VJhhQLVWu9NbPraymqLfcDTQZYyOmY1+BnP7bx0qm9Y/lVlvhKfS+mXNfybUXCUcP/AObP+pUseC1mJTOMLdCTqSP7VvG3hsDSvSt5ulvs1tmuN0rYKOkhbvSTTODWtHpXlDbr+UNU32Kp09op0tHbnZjmrycSTt4ghgxlrT18+5U5rvXuqdbV4qtRXWWqDSTHCPEii81g4Dv59qi63uCeiMNC4SznO/7D+0pcgkk5PEpEIWwXK//Z`;
 
-  // ── Shared header block (used on letter pages AND annexure page) ───────────
+  // ── Shared header block ──────────────────────────────────────────────────
   const hdrHTML = `
-  <table class="hdr-tbl" cellpadding="0" cellspacing="0">
-    <tr>
-      <td class="hdr-logo" rowspan="3"><img src="${LOGO_B64}" class="logo-img" alt=""></td>
-      <td class="hdr-name">Krishi Care &amp; Management Services Private Limited</td>
-    </tr>
-    <tr><td class="hdr-addr"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi,<br>Jogeshwari (East), Mumbai - 400060.</td></tr>
-    <tr><td class="hdr-contact">Email: ${COMPANY.email}, Website: http://www.krishicare.com, Tel. - ${COMPANY.tel}</td></tr>
-  </table>
-  <div class="hdr-rule"></div>`;
+  <div class="accent-bar"></div>
+  <div class="doc-header">
+    <table class="hdr-tbl" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="hdr-logo" rowspan="3"><img src="${LOGO_B64}" class="logo-img" alt="Krishi Care Logo"></td>
+        <td class="hdr-name">Krishi Care &amp; Management Services Private Limited</td>
+      </tr>
+      <tr><td class="hdr-addr"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.</td></tr>
+      <tr><td class="hdr-contact">Email: ${COMPANY.email}&nbsp;&nbsp;|&nbsp;&nbsp;Website: http://www.krishicare.com&nbsp;&nbsp;|&nbsp;&nbsp;Tel: ${COMPANY.tel}</td></tr>
+    </table>
+    <div class="hdr-rule"></div>
+  </div>`;
 
   // ── Shared footer block ────────────────────────────────────────────────────
   const ftrHTML = `
   <div class="doc-footer">
     <div class="ftr-rule"></div>
-    <p class="ftr-corp"><strong>Corporate Office:</strong> ${COMPANY.corpAddr}. Tel: 011-41039506.</p>
+    <p class="ftr-corp"><strong>Corporate Office:</strong> ${COMPANY.corpAddr}&nbsp;&nbsp;|&nbsp;&nbsp;Tel: 011-41039506.</p>
     <p class="ftr-cin"><strong>CIN: ${COMPANY.cin}</strong></p>
-  </div>`;
+  </div>
+  <div class="bottom-bar"></div>`;
 
-  // ── MAIN LETTER (flows naturally across pages 1 & 2) ──────────────────────
+  // ── MAIN LETTER ───────────────────────────────────────────────────────────
   const mainLetter = `
 <div class="doc-wrap">
-  <div class="doc-header">${hdrHTML}</div>
+  ${hdrHTML}
 
   <div class="doc-body">
     <p class="date-line"><strong>${formatDate(ol.offer_date || new Date())}</strong></p>
 
-    <div class="cand-block">
-      <p class="cand-name"><strong>${ol.candidate_name}</strong></p>
+    <div class="cand-panel">
+      <p class="cand-name">${ol.candidate_name}</p>
       ${ol.candidate_address ? `<p class="cand-addr">${ol.candidate_address.replace(/\n/g,'<br>')}</p>` : ''}
     </div>
 
     <div class="cand-meta">
-      ${ol.employee_code ? `<p><strong>Employee Code &ndash; ${ol.employee_code}</strong></p>` : ''}
-      ${ol.candidate_mobile ? `<p><strong>Mob &ndash; ${ol.candidate_mobile}</strong></p>` : ''}
-      ${ol.candidate_email  ? `<p><strong>Email &ndash; <span class="elink">${ol.candidate_email}</span></strong></p>` : ''}
+      ${ol.employee_code ? `<div class="cand-meta-row"><span class="cand-meta-label">Employee Code</span><span class="cand-meta-value">${ol.employee_code}</span></div>` : ''}
+      ${ol.candidate_mobile ? `<div class="cand-meta-row"><span class="cand-meta-label">Mobile</span><span class="cand-meta-value">${ol.candidate_mobile}</span></div>` : ''}
+      ${ol.candidate_email  ? `<div class="cand-meta-row"><span class="cand-meta-label">Email</span><span class="cand-meta-value"><span class="elink">${ol.candidate_email}</span></span></div>` : ''}
     </div>
 
     <p class="salut">Dear ${ol.candidate_name.split(' ').filter(w=>!['Mr.','Ms.','Mrs.','Dr.'].includes(w))[0] || ol.candidate_name},</p>
@@ -209,21 +213,21 @@ function buildOfferLetterHTML(ol) {
 
     <p class="para">We are pleased to issue this letter of offer on the following terms &amp; conditions:</p>
 
-    <p class="sec-hd"><strong><u>EMOLUMENTS:</u></strong></p>
+    <p class="sec-hd">1.&ensp;EMOLUMENTS</p>
     <p class="para">Your compensation on a cost to company basis will be <strong>Rs. ${Number(ctcAnnual).toLocaleString('en-IN')}/- PA (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong>. The remuneration has taken into consideration the status and responsibility of the appointment, and it is inclusive of all taxable and non-taxable emoluments, allowances and statutory contributions.</p>
 
-    <p class="sec-hd"><strong><u>RESPONSIBILITIES:</u></strong></p>
+    <p class="sec-hd">2.&ensp;RESPONSIBILITIES</p>
     <p class="para">You will work as <strong>&ldquo;<u>${ol.designation}</u>&rdquo;</strong> of the Company and will be responsible for carrying out the operations of the Company as directed to you by the management. A detailed responsibility statement will be provided to you upon your joining.</p>
 
-    <p class="sec-hd"><strong><u>PROBATION PERIOD:</u></strong></p>
+    <p class="sec-hd">3.&ensp;PROBATION PERIOD</p>
     <p class="para">You will be on a probationary period of <strong>${probStr} months</strong> during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.</p>
 
-    <p class="sec-hd"><strong><u>SEPERATION OF SERVICES:</u></strong></p>
+    <p class="sec-hd">4.&ensp;SEPARATION OF SERVICES</p>
     <p class="para">Severance of relationship can be done by giving <strong>${noticeStr} month</strong> written notice. If you are unable to complete this notice period you will be liable to compensate the company ${noticeStr} months of salary or for the period not served.</p>
 
-    ${ol.custom_clauses ? `<p class="sec-hd"><strong><u>ADDITIONAL TERMS:</u></strong></p><p class="para">${ol.custom_clauses}</p>` : ''}
+    ${ol.custom_clauses ? `<p class="sec-hd">5.&ensp;ADDITIONAL TERMS</p><p class="para">${ol.custom_clauses}</p>` : ''}
 
-    <p class="sec-hd"><strong><u>OTHER RULES AND REGULATION:</u></strong></p>
+    <p class="sec-hd">${ol.custom_clauses ? '6' : '5'}.&ensp;OTHER RULES &amp; REGULATIONS</p>
     <p class="para">The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.</p>
     <ul class="rules">
       <li>You will, in all respects, be governed by the company&rsquo;s rules and regulations</li>
@@ -240,17 +244,20 @@ function buildOfferLetterHTML(ol) {
 
     <p class="para">As a token of your acceptance and in confirmation of the terms and conditions of this offer, please sign the duplicate copy of this letter and return to us at the earliest duly intimating when you are going to join.</p>
 
-    <p class="para" style="margin-top:20px;">Yours truly,</p>
-    <p class="para">From <strong>Krishi Care &amp; Management Services Private Limited,</strong></p>
-
-    <div class="sig-row">
-      <div class="sig-col">
-        ${ol.sig1_image ? `<img src="${ol.sig1_image}" class="sig-img" alt="">` : '<div class="sig-blank"></div>'}
-        <p class="sig-lbl">Authorized Signatory</p>
-      </div>
-      <div class="sig-col">
-        ${ol.sig2_image ? `<img src="${ol.sig2_image}" class="sig-img" alt="">` : '<div class="sig-blank"></div>'}
-        <p class="sig-lbl">( Authorized Signatory)<br>Human Resource</p>
+    <div class="sig-section">
+      <p class="sig-from">Yours truly,</p>
+      <p class="sig-from">From <strong>Krishi Care &amp; Management Services Private Limited,</strong></p>
+      <div class="sig-row">
+        <div class="sig-col">
+          ${ol.sig1_image ? `<img src="${ol.sig1_image}" class="sig-img" alt="">` : '<div class="sig-blank"></div>'}
+          <div class="sig-line"></div>
+          <p class="sig-lbl">Authorized Signatory</p>
+        </div>
+        <div class="sig-col">
+          ${ol.sig2_image ? `<img src="${ol.sig2_image}" class="sig-img" alt="">` : '<div class="sig-blank"></div>'}
+          <div class="sig-line"></div>
+          <p class="sig-lbl">Authorized Signatory<br>Human Resource</p>
+        </div>
       </div>
     </div>
   </div><!-- /doc-body -->
@@ -258,28 +265,42 @@ function buildOfferLetterHTML(ol) {
   ${ftrHTML}
 </div><!-- /doc-wrap -->`;
 
-  // ── ANNEXURE I (forced page break, own header + footer) ───────────────────
+  // ── ANNEXURE I ────────────────────────────────────────────────────────────
   const annexure = `
 <div class="doc-wrap page-break">
-  <div class="doc-header">${hdrHTML}</div>
+  ${hdrHTML}
 
   <div class="doc-body">
-    <p class="ann-title"><strong>Annexure I (Annual Cost to Company and Other Benefits)</strong></p>
+    <p class="ann-title">Annexure I &mdash; Annual Cost to Company &amp; Other Benefits</p>
 
-    <div class="ann-meta">
-      <p><strong>Name:</strong> ${ol.candidate_name}</p>
-      <p><strong>Designation:</strong> ${ol.designation}</p>
-      <p><strong>Location:</strong> ${ol.location||'Mumbai'}</p>
-      <p><strong>Annual Cost to Company &ndash; Rs.${Number(ctcAnnual).toLocaleString('en-IN')} (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong></p>
+    <div class="ann-meta-grid">
+      <table class="ann-meta-table" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="ann-meta-lbl">Name</td>
+          <td class="ann-meta-val">${ol.candidate_name}</td>
+        </tr>
+        <tr>
+          <td class="ann-meta-lbl">Designation</td>
+          <td class="ann-meta-val">${ol.designation}</td>
+        </tr>
+        <tr>
+          <td class="ann-meta-lbl">Location</td>
+          <td class="ann-meta-val">${ol.location||'Mumbai'}</td>
+        </tr>
+        <tr>
+          <td class="ann-meta-lbl last">Annual CTC</td>
+          <td class="ann-meta-val last">Rs.${Number(ctcAnnual).toLocaleString('en-IN')} &nbsp;(Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</td>
+        </tr>
+      </table>
     </div>
 
     <table class="ann-tbl">
       <thead>
         <tr>
-          <th class="c-sr">Sr.<br>No.</th>
-          <th class="c-part">Particulars</th>
-          <th class="c-num">Monthly</th>
-          <th class="c-num">Yearly</th>
+          <th class="c-sr">Sr. No.</th>
+          <th>Particulars</th>
+          <th class="c-num">Monthly (₹)</th>
+          <th class="c-num">Yearly (₹)</th>
         </tr>
       </thead>
       <tbody>
@@ -289,19 +310,19 @@ function buildOfferLetterHTML(ol) {
         <tr><td class="c-sr">3</td><td>Other Allowances</td><td class="c-num">${fmtV(other)}</td><td class="c-num">${fmtV(other*12)}</td></tr>
         <tr><td class="c-sr">4</td><td>Gratuity</td><td class="c-num">${fmtV(gratuity)}</td><td class="c-num">${fmtV(gratuity*12)}</td></tr>
         <tr class="r-sub"><td class="c-sr"><strong>5</strong></td><td><strong>Gross Pay</strong></td><td class="c-num"><strong>${fmtV(gross)}</strong></td><td class="c-num"><strong>${fmtV(gross*12)}</strong></td></tr>
-        <tr><td class="c-sr">6</td><td>Provident Fund</td><td class="c-num">${pfEmp>0?fmtV(pfEmp):'&ndash;'}</td><td class="c-num">${pfEmp>0?fmtV(pfEmp*12):'&ndash;'}</td></tr>
+        <tr><td class="c-sr">6</td><td>Provident Fund (Employee)</td><td class="c-num">${pfEmp>0?fmtV(pfEmp):'&ndash;'}</td><td class="c-num">${pfEmp>0?fmtV(pfEmp*12):'&ndash;'}</td></tr>
         <tr><td class="c-sr">7</td><td>Professional Tax</td><td class="c-num">${pt>0?fmtV(pt):'&ndash;'}</td><td class="c-num">${pt>0?fmtV(pt*12):'&ndash;'}</td></tr>
-        <tr class="r-sub"><td class="c-sr"><strong>8</strong></td><td><strong>Total Deduction</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed):'&ndash;'}</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed*12):'&ndash;'}</strong></td></tr>
-        <tr class="r-net"><td class="c-sr"><strong>9</strong></td><td><strong>Net Salary (Gross - Total Deduction)</strong></td><td class="c-num"><strong>${fmtV(netSalary)}</strong></td><td class="c-num"><strong>${fmtV(netSalary*12)}</strong></td></tr>
-        <tr><td class="c-sr">10</td><td>Employer PF contribution</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr):'&ndash;'}</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr*12):'&ndash;'}</td></tr>
-        <tr><td class="c-sr">11</td><td>Employer PF contribution Admin charges</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin):'&ndash;'}</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin*12):'&ndash;'}</td></tr>
-        <tr class="r-ctc"><td class="c-sr"><strong>12</strong></td><td><strong>Total Compensation Package</strong></td><td class="c-num"><strong>${fmtV(ctcMonthly)}</strong></td><td class="c-num"><strong>${fmtV(ctcAnnual)}</strong></td></tr>
+        <tr class="r-sub"><td class="c-sr"><strong>8</strong></td><td><strong>Total Deductions</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed):'&ndash;'}</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed*12):'&ndash;'}</strong></td></tr>
+        <tr class="r-net"><td class="c-sr"><strong>9</strong></td><td><strong>Net Salary (Gross &minus; Total Deductions)</strong></td><td class="c-num"><strong>${fmtV(netSalary)}</strong></td><td class="c-num"><strong>${fmtV(netSalary*12)}</strong></td></tr>
+        <tr><td class="c-sr">10</td><td>Employer PF Contribution</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr):'&ndash;'}</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr*12):'&ndash;'}</td></tr>
+        <tr><td class="c-sr">11</td><td>Employer PF Contribution Admin Charges</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin):'&ndash;'}</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin*12):'&ndash;'}</td></tr>
+        <tr class="r-ctc"><td class="c-sr"><strong>12</strong></td><td><strong>Total Compensation Package (CTC)</strong></td><td class="c-num"><strong>${fmtV(ctcMonthly)}</strong></td><td class="c-num"><strong>${fmtV(ctcAnnual)}</strong></td></tr>
       </tbody>
     </table>
 
     <div class="ack-box">
-      <p class="ack-title"><strong><u>Acknowledgement &amp; Acceptance</u></strong></p>
-      <p class="ack-para">I have read understood, agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
+      <p class="ack-title">Acknowledgement &amp; Acceptance</p>
+      <p class="ack-para">I have read, understood, and agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
       <table class="ack-tbl" cellpadding="0" cellspacing="0">
         <tr>
           <td class="ack-lbl">Signature:</td>
@@ -310,10 +331,10 @@ function buildOfferLetterHTML(ol) {
           <td class="ack-line"></td>
         </tr>
         <tr>
-          <td class="ack-lbl" style="padding-top:18px;">Name:</td>
-          <td class="ack-line" style="padding-top:18px;"></td>
-          <td class="ack-lbl ack-gap" style="padding-top:18px;">Location:</td>
-          <td class="ack-line" style="padding-top:18px;"></td>
+          <td class="ack-lbl" style="padding-top:20px;">Name:</td>
+          <td class="ack-line" style="padding-top:20px;"></td>
+          <td class="ack-lbl ack-gap" style="padding-top:20px;">Location:</td>
+          <td class="ack-line" style="padding-top:20px;"></td>
         </tr>
       </table>
     </div>
@@ -323,105 +344,239 @@ function buildOfferLetterHTML(ol) {
 </div><!-- /doc-wrap annexure -->`;
 
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Times New Roman', Times, serif;
     font-size: 11pt;
-    color: #111;
-    background: #fff;
+    color: #1a1a1a;
+    background: #e8e8e8;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* ── WRAPPER ── no fixed height, content flows naturally ── */
+  body::before {
+    content: 'CONFIDENTIAL';
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 72pt;
+    font-family: Arial, sans-serif;
+    font-weight: 900;
+    color: rgba(28, 53, 94, 0.042);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+    letter-spacing: 0.15em;
+  }
+
   .doc-wrap {
     width: 210mm;
-    margin: 0 auto;
-    padding: 0;
+    min-height: 297mm;
+    margin: 10mm auto;
     background: #fff;
-    /* Use flex column so footer sits at natural bottom of content */
     display: flex;
     flex-direction: column;
+    position: relative;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.18);
   }
 
-  /* ── PAGE BREAK: only for Annexure, not between letter pages ── */
-  .page-break { page-break-before: always; }
+  .page-break { page-break-before: always; margin-top: 0; }
 
-  /* ── HEADER ── */
-  .doc-header { padding: 14px 28px 0; }
+  .accent-bar {
+    height: 6px;
+    background: linear-gradient(90deg, #1C355E 0%, #2a5298 60%, #1C355E 100%);
+    flex-shrink: 0;
+  }
+
+  .doc-header { padding: 16px 28px 0; flex-shrink: 0; }
+
   .hdr-tbl { width: 100%; border-collapse: collapse; }
-  .hdr-logo { width: 78px; padding-right: 10px; vertical-align: middle; }
-  .logo-img { width: 72px; height: 72px; object-fit: contain; display: block; }
-  .hdr-name { font-size: 17.5pt; font-weight: 900; color: #1B5E20; vertical-align: bottom; padding-bottom: 2px; }
-  .hdr-addr { font-size: 9pt; color: #222; line-height: 1.55; text-align: center; padding-top: 2px; }
-  .hdr-contact { font-size: 8.5pt; color: #222; text-align: center; padding-top: 3px; }
-  .hdr-rule { border-bottom: 2px solid #1B5E20; margin: 8px 28px 0; }
+  .hdr-logo { width: 80px; padding-right: 14px; vertical-align: middle; }
+  .logo-img { width: 68px; height: 68px; object-fit: contain; display: block; }
+  .hdr-name {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14.5pt; font-weight: 800; color: #1C355E;
+    vertical-align: bottom; padding-bottom: 3px; letter-spacing: 0.01em;
+  }
+  .hdr-addr {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8pt; color: #444; line-height: 1.6; text-align: center; padding-top: 3px;
+  }
+  .hdr-contact {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 7.5pt; color: #555; text-align: center; padding-top: 2px;
+  }
+  .hdr-rule {
+    margin: 10px 28px 0; height: 2px;
+    background: linear-gradient(90deg, #1C355E 0%, #c8a84b 50%, #1C355E 100%);
+  }
 
-  /* ── BODY ── */
-  .doc-body { padding: 14px 28px 10px; flex: 1; }
+  .doc-body { padding: 16px 32px 12px; flex: 1; position: relative; z-index: 1; }
 
-  /* ── FOOTER — sits naturally after body content ── */
-  .doc-footer { padding: 6px 28px 14px; margin-top: 10px; }
-  .ftr-rule { border-top: 1.5px solid #1B5E20; margin-bottom: 5px; }
-  .ftr-corp { font-size: 8.5pt; text-align: center; color: #111; line-height: 1.7; }
-  .ftr-cin  { font-size: 8.5pt; text-align: center; color: #111; }
+  .doc-footer { padding: 6px 32px 12px; margin-top: 6px; flex-shrink: 0; }
+  .ftr-rule {
+    height: 1.5px;
+    background: linear-gradient(90deg, #1C355E 0%, #c8a84b 50%, #1C355E 100%);
+    margin-bottom: 6px;
+  }
+  .ftr-corp {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 7.5pt; text-align: center; color: #444; line-height: 1.65;
+  }
+  .ftr-cin {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 7.5pt; text-align: center; color: #555; margin-top: 1px; letter-spacing: 0.04em;
+  }
+  .bottom-bar {
+    height: 4px;
+    background: linear-gradient(90deg, #1C355E 0%, #2a5298 60%, #1C355E 100%);
+    flex-shrink: 0;
+  }
 
-  /* ── LETTER ELEMENTS ── */
-  .date-line  { text-align: right; font-size: 10.5pt; margin-bottom: 14px; }
-  .cand-block { margin-bottom: 4px; }
-  .cand-name  { font-size: 11pt; line-height: 1.7; }
-  .cand-addr  { font-size: 10.5pt; line-height: 1.65; }
-  .cand-meta  { margin: 8px 0 12px; line-height: 1.75; font-size: 10.5pt; }
-  .elink      { color: #1565C0; text-decoration: underline; }
-  .salut      { font-size: 10.5pt; margin-bottom: 12px; }
-  .subj-line  { font-size: 10.5pt; text-align: center; margin: 10px 0 12px; }
-  .para       { font-size: 10.5pt; line-height: 1.75; text-align: justify; margin-bottom: 9px; }
-  .accept-bold{ font-weight: bold; }
-  .sec-hd     { font-size: 10.5pt; margin: 13px 0 5px; }
+  .date-line {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt; text-align: right; color: #1C355E;
+    margin-bottom: 16px; font-weight: 600;
+  }
 
-  ul.rules    { margin: 5px 0 10px 22px; }
-  ul.rules li { font-size: 10.5pt; line-height: 1.75; margin-bottom: 7px; text-align: justify; }
+  .cand-panel {
+    background: #f7f9fc; border-left: 4px solid #1C355E;
+    border-radius: 0 4px 4px 0; padding: 10px 16px;
+    margin-bottom: 14px; display: inline-block; min-width: 55%;
+  }
+  .cand-name {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11.5pt; font-weight: 700; color: #1C355E;
+    line-height: 1.5; letter-spacing: 0.02em;
+  }
+  .cand-addr {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 10pt; line-height: 1.6; color: #333; margin-top: 2px;
+  }
 
-  /* ── SIGNATURES ── */
-  .sig-row    { display: flex; justify-content: space-between; margin-top: 28px; }
-  .sig-col    { width: 42%; }
-  .sig-img    { height: 44px; max-width: 180px; object-fit: contain; display: block; margin-bottom: 4px; }
-  .sig-blank  { height: 50px; }
-  .sig-lbl    { font-size: 10pt; line-height: 1.65; }
+  .cand-meta { margin: 6px 0 14px; }
+  .cand-meta-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; font-size: 10pt; line-height: 1.6; }
+  .cand-meta-label {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8.5pt; font-weight: 700; color: #1C355E;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    white-space: nowrap; min-width: 110px;
+  }
+  .cand-meta-value {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt; color: #1a1a1a; font-weight: 600;
+  }
+  .elink { color: #1C355E; text-decoration: underline; }
 
-  /* ── ANNEXURE ── */
-  .ann-title  { text-align: center; font-size: 11pt; font-weight: bold; margin: 12px 0 12px; }
-  .ann-meta   { margin-bottom: 12px; font-size: 10.5pt; line-height: 1.75; }
-  .ann-tbl    { width: 72%; margin: 0 auto 18px; border-collapse: collapse; font-size: 10pt; }
-  .ann-tbl th { border: 1px solid #444; padding: 6px 10px; text-align: left; font-weight: bold; background: #fff; }
-  .ann-tbl td { border: 1px solid #555; padding: 5px 10px; }
-  .c-sr       { text-align: center; width: 52px; }
-  .c-num      { text-align: right; width: 88px; }
-  .r-sub td   { font-weight: bold; }
-  .r-net td   { font-weight: bold; }
-  .r-ctc td   { font-weight: bold; }
+  .salut { font-size: 10.5pt; margin-bottom: 10px; line-height: 1.7; }
+  .subj-line { font-size: 10.5pt; text-align: center; margin: 12px 0 14px; line-height: 1.6; }
 
-  /* ── ACKNOWLEDGEMENT ── */
-  .ack-box    { margin-top: 22px; }
-  .ack-title  { font-size: 10.5pt; margin-bottom: 10px; }
-  .ack-para   { font-size: 10.5pt; line-height: 1.75; margin-bottom: 16px; }
-  .ack-tbl    { width: 100%; border-collapse: collapse; }
-  .ack-lbl    { font-size: 10.5pt; white-space: nowrap; padding-right: 6px; width: 90px; }
-  .ack-line   { border-bottom: 1px solid #555; width: auto; }
-  .ack-gap    { padding-left: 28px; }
+  .para { font-size: 10.5pt; line-height: 1.8; text-align: justify; margin-bottom: 9px; color: #1a1a1a; }
+  .accept-bold { font-weight: bold; }
 
-  /* ── PRINT ── */
+  .sec-hd {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt; font-weight: 800; color: #1C355E;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin: 16px 0 7px; padding: 5px 10px 5px 12px;
+    border-left: 3px solid #c8a84b; background: #f7f9fc;
+    page-break-after: avoid;
+  }
+
+  .dyn { font-family: 'Courier New', Courier, monospace; font-weight: 700; color: #1a1a1a; }
+
+  ul.rules { margin: 6px 0 12px 20px; padding: 0; }
+  ul.rules li { font-size: 10.5pt; line-height: 1.8; margin-bottom: 8px; text-align: justify; color: #1a1a1a; }
+
+  .sig-section { margin-top: 22px; page-break-inside: avoid; }
+  .sig-from { font-size: 10.5pt; margin-bottom: 4px; line-height: 1.7; }
+  .sig-row { display: flex; justify-content: space-between; margin-top: 6px; gap: 20px; }
+  .sig-col { width: 44%; }
+  .sig-img { height: 44px; max-width: 180px; object-fit: contain; display: block; margin-bottom: 2px; }
+  .sig-blank { height: 44px; }
+  .sig-line { border-top: 1px solid #555; margin-top: 2px; margin-bottom: 4px; }
+  .sig-lbl { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; color: #333; line-height: 1.6; }
+
+  .ann-title {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11pt; font-weight: 800; text-align: center; color: #1C355E;
+    margin: 14px 0; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+
+  .ann-meta-grid {
+    width: 100%; margin-bottom: 16px;
+    background: #f7f9fc; border: 1px solid #dde3ed;
+    border-radius: 4px; border-top: 3px solid #1C355E;
+    overflow: hidden;
+  }
+  .ann-meta-table { width: 100%; border-collapse: collapse; }
+  .ann-meta-lbl {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8.5pt; font-weight: 700; color: #1C355E;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 7px 14px; border-bottom: 1px solid #dde3ed;
+    white-space: nowrap; width: 36%; background: #eef1f7;
+    vertical-align: top;
+  }
+  .ann-meta-val {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt; font-weight: 600; color: #1a1a1a;
+    padding: 7px 14px; border-bottom: 1px solid #dde3ed; vertical-align: top;
+  }
+  .ann-meta-lbl.last, .ann-meta-val.last { border-bottom: none; }
+
+  .ann-tbl { width: 76%; margin: 0 auto 20px; border-collapse: collapse; font-size: 10pt; }
+  .ann-tbl thead tr { background: #1C355E; color: #fff; }
+  .ann-tbl th {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8.5pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 11px; text-align: left; border: 1px solid #1C355E;
+  }
+  .ann-tbl td { border: 1px solid #c8cfd8; padding: 5px 11px; font-size: 10pt; color: #1a1a1a; }
+  .ann-tbl tbody tr:nth-child(even) { background: #f7f9fc; }
+  .ann-tbl tbody tr:nth-child(odd)  { background: #fff; }
+  .c-sr  { text-align: center; width: 46px; color: #555; }
+  .c-num { text-align: right; width: 90px; font-family: 'Courier New', Courier, monospace; font-size: 9.5pt; }
+  .r-sub td { background: #eaf0f7 !important; font-weight: 700; font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; border-top: 1.5px solid #1C355E; }
+  .r-net td { background: #1C355E !important; color: #fff !important; font-weight: 700; font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; border-color: #1C355E; }
+  .r-ctc td { background: #c8a84b !important; color: #fff !important; font-weight: 700; font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; border-color: #b8983b; }
+
+  .ack-box {
+    margin-top: 22px; page-break-inside: avoid;
+    border: 1px solid #dde3ed; border-top: 3px solid #1C355E;
+    border-radius: 0 0 4px 4px; padding: 14px 16px; background: #f7f9fc;
+  }
+  .ack-title {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9.5pt; font-weight: 800; color: #1C355E;
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+  }
+  .ack-para { font-size: 10.5pt; line-height: 1.75; margin-bottom: 16px; color: #333; }
+  .ack-tbl  { width: 100%; border-collapse: collapse; }
+  .ack-lbl  {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt; font-weight: 700; color: #1C355E;
+    white-space: nowrap; padding-right: 8px; width: 90px; vertical-align: bottom;
+  }
+  .ack-line { border-bottom: 1.5px solid #555; width: auto; vertical-align: bottom; }
+  .ack-gap  { padding-left: 30px; }
+
   @media print {
-    body { margin: 0; }
-    .doc-wrap { width: 100%; }
+    body { margin: 0; background: #fff; }
+    .doc-wrap { width: 100%; margin: 0; box-shadow: none; min-height: 0; }
     .page-break { page-break-before: always; }
-    /* Prevent orphaned section headers */
-    .sec-hd { page-break-after: avoid; }
-    ul.rules li { page-break-inside: avoid; }
-    .sig-row { page-break-inside: avoid; }
-    .ann-tbl { page-break-inside: avoid; }
+    .sec-hd     { page-break-after: avoid; }
+    ul.rules li  { page-break-inside: avoid; }
+    .sig-section { page-break-inside: avoid; }
+    .ann-tbl     { page-break-inside: avoid; }
+    .ack-box     { page-break-inside: avoid; }
+    .ann-meta-grid { page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -429,8 +584,7 @@ function buildOfferLetterHTML(ol) {
 ${mainLetter}
 ${annexure}
 </body>
-</html>`;
-}
+</html>`;}
 
 
 // ── GET /offer-letters — list all ─────────────────────────────────────────────
