@@ -352,21 +352,34 @@ function buildOfferLetterHTML(ol) {
   }
   .hdr-rule { border-bottom: 2px solid #1a6b1a; margin: 6px 0 0; }
 
-  /* Annexure always on new page */
-  .annexure-section { page-break-before: always; }
+  /* ── FIXED HEADER & FOOTER — wkhtmltopdf repeats position:fixed on every page ── */
+  .doc-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #fff;
+    padding: 8px 0 0;
+    z-index: 1000;
+  }
 
-  /* 2 blank lines after header */
-  .doc-header { padding-bottom: 2.4em; }
+  /* Body needs top padding to push below fixed header */
+  .doc-body { margin-top: 110px; }
 
-  /* 2 blank lines before footer */
-  .doc-footer { margin-top: 2.4em; }
+  .doc-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #fff;
+    padding: 0 0 6px;
+    z-index: 1000;
+  }
   .ftr-rule   { border-top: 1.5px solid #1a6b1a; margin-bottom: 4px; }
   .ftr-corp   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.65; }
   .ftr-cin    { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; }
 
-  .doc-body   { margin-top: 0; }
   .ann-page-break { display: none; }
   .page-spacer    { display: none; }
+
+  /* Annexure always on new page */
+  .annexure-section { page-break-before: always; }
 
   .date-line  { text-align: right; font-size: 11pt; margin-bottom: 14px; }
   .cand-name  { font-size: 11pt; font-weight: bold; line-height: 1.65; }
@@ -441,9 +454,6 @@ function buildOfferLetterHTML(ol) {
   @media print {
     body { margin: 0; background: #fff; }
     .doc-wrap { width: 100%; margin: 0; box-shadow: none; padding: 0; }
-    /* Hide in-body header/footer — wkhtmltopdf --header-html/--footer-html handles them */
-    .doc-header { display: none !important; }
-    .doc-footer { display: none !important; }
     .annexure-section { page-break-before: always; }
     .sec-hd     { page-break-after: avoid; }
     ul.rules li  { page-break-inside: avoid; }
@@ -614,69 +624,18 @@ exports.sendEmail = async (req, res) => {
       const tmpDir  = os.tmpdir();
       const stamp   = Date.now();
       const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${stamp}.html`);
-      const tmpHdr  = path.join(tmpDir, `offer_hdr_${stamp}.html`);
-      const tmpFtr  = path.join(tmpDir, `offer_ftr_${stamp}.html`);
       const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${stamp}.pdf`);
 
       fs.writeFileSync(tmpHtml, offerHTML);
-
-      // Logo as base64 for the header HTML
-      let logoDataUri = '';
-      try {
-        const logoPath = path.join(__dirname, '..', '..', '..', 'frontend', 'Logo_kcms.png');
-        logoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
-      } catch(_) {}
-
-      // Header HTML — repeats on every page via --header-html
-      const hdrHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-        *{box-sizing:border-box;margin:0;padding:0;}
-        body{font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;color:#111;padding:5px 18mm 0;}
-        table{width:100%;border-collapse:collapse;}
-        .logo{width:72px;padding-right:10px;vertical-align:middle;}
-        .logo img{width:65px;height:65px;display:block;}
-        .name{font-size:13pt;font-weight:900;color:#1a6b1a;vertical-align:bottom;padding-bottom:2px;}
-        .addr{font-size:7.5pt;text-align:center;line-height:1.5;padding-top:2px;}
-        .contact{font-size:7pt;text-align:center;padding-top:1px;}
-        .rule{border-bottom:2px solid #1a6b1a;margin-top:5px;}
-      </style></head><body>
-      <table cellpadding="0" cellspacing="0"><tr>
-        <td class="logo" rowspan="3">${logoDataUri ? `<img src="${logoDataUri}">` : ''}</td>
-        <td class="name">Krishi Care &amp; Management Services Private Limited</td>
-      </tr>
-      <tr><td class="addr"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.</td></tr>
-      <tr><td class="contact">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. - +91 22 68284109</td></tr>
-      </table>
-      <div class="rule"></div>
-      </body></html>`;
-
-      // Footer HTML — repeats on every page via --footer-html
-      const ftrHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-        *{box-sizing:border-box;margin:0;padding:0;}
-        body{font-family:Arial,sans-serif;font-size:7.5pt;color:#111;padding:0 18mm;}
-        .rule{border-top:1.5px solid #1a6b1a;margin-bottom:3px;}
-        p{text-align:center;line-height:1.6;}
-      </style></head><body>
-      <div class="rule"></div>
-      <p><strong>Corporate Office:</strong> ${COMPANY.corpAddr}. Tel: 011-41039506.</p>
-      <p><strong>CIN: ${COMPANY.cin}</strong></p>
-      </body></html>`;
-
-      fs.writeFileSync(tmpHdr, hdrHtml);
-      fs.writeFileSync(tmpFtr, ftrHtml);
 
       await new Promise((resolve, reject) => {
         execFile('wkhtmltopdf', [
           '--quiet',
           '--page-size',      'A4',
-          '--margin-top',     '42mm',
-          '--margin-bottom',  '22mm',
+          '--margin-top',     '8mm',
+          '--margin-bottom',  '8mm',
           '--margin-left',    '22mm',
           '--margin-right',   '22mm',
-          '--header-html',    tmpHdr,
-          '--header-spacing', '5',
-          '--footer-html',    tmpFtr,
-          '--footer-spacing', '4',
-          '--print-media-type',
           '--enable-local-file-access',
           '--disable-smart-shrinking',
           '--encoding',       'utf-8',
@@ -685,7 +644,7 @@ exports.sendEmail = async (req, res) => {
       });
 
       offerPdfBuffer = fs.readFileSync(tmpPdf);
-      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpHdr); fs.unlinkSync(tmpFtr); fs.unlinkSync(tmpPdf); } catch(_) {}
+      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
       console.log('[offerLetter.sendEmail] PDF generated, size:', offerPdfBuffer.length);
     } catch (pdfErr) {
       console.error('[offerLetter.sendEmail] PDF generation failed:', pdfErr.message);
