@@ -342,53 +342,54 @@ function buildOfferLetterHTML(ol) {
     print-color-adjust: exact;
   }
 
-  /* One A4 page */
+  /* One A4 page — exact height so flex pins footer to bottom */
   .page {
     width: 210mm;
-    min-height: 297mm;
+    height: 297mm;
     margin: 6mm auto;
     background: #fff;
     box-shadow: 0 2px 12px rgba(0,0,0,0.25);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   /* HEADER */
-  .page-hdr  { flex-shrink: 0; padding: 8px 18mm 0; }
+  .page-hdr  { flex-shrink: 0; padding: 10px 18mm 0; }
   .hdr-inner { display: table; width: 100%; border-collapse: collapse; }
   .hdr-logo-cell {
     display: table-cell;
-    width: 82px;
+    width: 95px;
     vertical-align: middle;
-    padding-right: 8px;
+    padding-right: 10px;
   }
-  .logo-img  { width: 76px; height: 82px; display: block; }
-  .hdr-text-cell { display: table-cell; vertical-align: top; }
+  .logo-img  { width: 88px; height: 95px; display: block; }
+  .hdr-text-cell { display: table-cell; vertical-align: top; padding-top: 2px; }
   .hdr-name  {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 18pt; font-weight: 900; color: #1a6b1a;
-    line-height: 1.1; margin-bottom: 3px;
+    font-size: 20pt; font-weight: 900; color: #1a6b1a;
+    line-height: 1.1; margin-bottom: 4px;
   }
   .hdr-addr  {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 8.5pt; color: #111;
-    text-align: center; line-height: 1.6;
+    text-align: center; line-height: 1.65;
   }
   .hdr-email {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 8.5pt; color: #111;
-    text-align: left; padding-left: 2px;
+    text-align: left; padding-left: 2px; margin-top: 1px;
   }
-  .hdr-rule  { border-bottom: 2.5px solid #1a6b1a; margin-top: 6px; }
+  .hdr-rule  { border-bottom: 2.5px solid #1a6b1a; margin-top: 7px; }
 
-  /* CONTENT */
-  .page-body { flex: 1; padding: 16px 18mm 0; }
+  /* CONTENT — generous top padding matching reference ~30mm gap after header */
+  .page-body { flex: 1; padding: 22px 18mm 0; }
 
-  /* FOOTER — pinned to bottom */
-  .page-ftr  { flex-shrink: 0; margin-top: auto; padding: 6px 18mm 8px; }
+  /* FOOTER — pinned to bottom via margin-top:auto on flex column */
+  .page-ftr  { flex-shrink: 0; margin-top: auto; padding: 0 18mm 10px; }
   .ftr-rule  { border-top: 1px solid #555; margin-bottom: 4px; }
-  .ftr-corp  { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; }
-  .ftr-cin   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; }
+  .ftr-corp  { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; font-weight: bold; }
+  .ftr-cin   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; font-weight: bold; }
 
   /* CONTENT STYLES — matching reference */
   .date-line  { text-align: right; font-size: 11pt; font-weight: bold; margin-bottom: 14px; }
@@ -462,8 +463,8 @@ function buildOfferLetterHTML(ol) {
   @media print {
     body { margin: 0; background: #fff; }
     .page {
-      width: 100%; min-height: 297mm; margin: 0;
-      box-shadow: none; page-break-after: always;
+      width: 100%; height: 297mm; margin: 0;
+      box-shadow: none; page-break-after: always; overflow: hidden;
     }
     .page:last-child { page-break-after: auto; }
   }
