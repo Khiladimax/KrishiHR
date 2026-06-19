@@ -377,31 +377,38 @@ function buildOfferLetterHTML(ol) {
      letterhead header/footer heights so body text does not overlap them.
   */
   @media print {
+    /* NOTE: wkhtmltopdf's Qt engine does NOT support the @page { background }
+       rule — it's silently ignored. That's why the letterhead showed up in
+       the plain HTML/browser preview but vanished from the generated PDF.
+       Instead we keep the SAME per-.page element background (which is a
+       normal element background, and that DOES render in wkhtmltopdf) for
+       print too, just like the screen view. */
     @page {
       size: A4;
-      margin-top:    145px;
-      margin-bottom:  60px;
-      margin-left:     0;
-      margin-right:    0;
-      background: url('${LETTERHEAD_B64}') no-repeat top center / 100% 100%;
+      margin: 0;
     }
 
     body { background: #fff; }
 
     .page {
-      width: auto; height: auto;
-      min-height: 0;
+      width: 210mm;
+      height: 297mm;
+      min-height: 297mm;
       margin: 0; box-shadow: none;
-      background: none;
-      position: static; overflow: visible;
+      background: #fff url('${LETTERHEAD_B64}') no-repeat top center / 100% 100%;
+      position: relative; overflow: hidden;
       page-break-after: always;
+      page-break-inside: avoid;
     }
     .page:last-child { page-break-after: auto; }
 
     .page-body {
-      position: static;
+      position: absolute;
+      top: 145px;
+      bottom: 60px;
+      left: 0; right: 0;
       padding: 0 18mm;
-      overflow: visible;
+      overflow: hidden;
     }
 
     .page-hdr, .page-ftr { display: none; }
