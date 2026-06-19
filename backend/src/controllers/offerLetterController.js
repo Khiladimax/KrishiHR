@@ -361,8 +361,8 @@ function buildOfferLetterHTML(ol) {
   /* Top ~145px = letterhead header height; Bottom ~60px = footer height */
   .page-body {
     position: absolute;
-    top: 145px;
-    bottom: 60px;
+    top: 112px;     /* 29.5mm header */
+    bottom: 63px;   /* 16.5mm footer */
     left: 0; right: 0;
     padding: 0 18mm;
     overflow: hidden;
@@ -404,8 +404,8 @@ function buildOfferLetterHTML(ol) {
 
     .page-body {
       position: absolute;
-      top: 145px;
-      bottom: 60px;
+      top: 112px;     /* 29.5mm header */
+      bottom: 63px;   /* 16.5mm footer */
       left: 0; right: 0;
       padding: 0 18mm;
       overflow: hidden;
@@ -652,10 +652,10 @@ exports.sendEmail = async (req, res) => {
         execFile('wkhtmltopdf', [
           '--quiet',
           '--page-size',   'A4',
-          '--margin-top',  '0',
-          '--margin-bottom','0',
-          '--margin-left', '0',
-          '--margin-right','0',
+          '--margin-top',   '29.5mm',
+          '--margin-bottom', '16.5mm',
+          '--margin-left',  '18mm',
+          '--margin-right',  '18mm',
           '--encoding',    'utf-8',
           '--enable-local-file-access',
           tmpHtml, tmpPdf
@@ -925,8 +925,8 @@ exports.bulkSend = async (req, res) => {
         await new Promise((resolve, reject) => {
           execFile('wkhtmltopdf', [
             '--quiet', '--page-size', 'A4',
-            '--margin-top', '0', '--margin-bottom', '0',
-            '--margin-left', '0', '--margin-right', '0',
+            '--margin-top', '29.5mm', '--margin-bottom', '16.5mm',
+            '--margin-left', '18mm', '--margin-right', '18mm',
             '--encoding', 'utf-8', '--enable-local-file-access',
             tmpHtml, tmpPdf
           ], { maxBuffer: 20 * 1024 * 1024 }, (err) => { if (err) return reject(err); resolve(); });
