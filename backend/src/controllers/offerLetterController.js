@@ -352,33 +352,15 @@ function buildOfferLetterHTML(ol) {
   }
   .hdr-rule { border-bottom: 2px solid #1a6b1a; margin: 6px 0 0; }
 
-  /* ── FIXED HEADER & FOOTER — wkhtmltopdf repeats position:fixed on every page ── */
-  .doc-header {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    background: #fff;
-    padding: 8px 0 0;
-    z-index: 1000;
-  }
-
-  /* Body needs top padding to push below fixed header */
-  .doc-body { margin-top: 110px; }
-
-  .doc-footer {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: #fff;
-    padding: 0 0 6px;
-    z-index: 1000;
-  }
+  /* ── Header/footer visible in browser, hidden in PDF (--header-html handles it) ── */
+  .doc-header { padding-bottom: 2.4em; }
+  .doc-footer { margin-top: 2.4em; }
   .ftr-rule   { border-top: 1.5px solid #1a6b1a; margin-bottom: 4px; }
   .ftr-corp   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.65; }
   .ftr-cin    { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; }
-
+  .doc-body   { margin-top: 0; }
   .ann-page-break { display: none; }
   .page-spacer    { display: none; }
-
-  /* Annexure always on new page */
   .annexure-section { page-break-before: always; }
 
   .date-line  { text-align: right; font-size: 11pt; margin-bottom: 14px; }
@@ -404,8 +386,6 @@ function buildOfferLetterHTML(ol) {
     font-size: 11pt; line-height: 1.75; margin-bottom: 8px;
     text-align: justify; padding-left: 0;
   }
-
-  .ann-page-break { display: none; }
 
   .sig-section { margin-top: 20px; page-break-inside: avoid; }
   .sig-from    { font-size: 11pt; margin-bottom: 4px; line-height: 1.6; }
@@ -454,6 +434,9 @@ function buildOfferLetterHTML(ol) {
   @media print {
     body { margin: 0; background: #fff; }
     .doc-wrap { width: 100%; margin: 0; box-shadow: none; padding: 0; }
+    /* Hide body header/footer — wkhtmltopdf --header-html/--footer-html handles them */
+    .doc-header { display: none !important; }
+    .doc-footer { display: none !important; }
     .annexure-section { page-break-before: always; }
     .sec-hd     { page-break-after: avoid; }
     ul.rules li  { page-break-inside: avoid; }
@@ -624,27 +607,74 @@ exports.sendEmail = async (req, res) => {
       const tmpDir  = os.tmpdir();
       const stamp   = Date.now();
       const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${stamp}.html`);
+      const tmpHdr  = path.join(tmpDir, `offer_hdr_${stamp}.html`);
+      const tmpFtr  = path.join(tmpDir, `offer_ftr_${stamp}.html`);
       const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${stamp}.pdf`);
 
       fs.writeFileSync(tmpHtml, offerHTML);
 
+      // Logo as base64 for header
+      let logoTag = '';
+      try {
+        const logoPath = path.join(__dirname, '..', '..', '..', 'frontend', 'Logo_kcms.png');
+        const logoB64 = fs.readFileSync(logoPath).toString('base64');
+        logoTag = `<img src="data:image/png;base64,${logoB64}" style="width:60px;height:60px;display:block;">`;
+      } catch(_) {}
+
+      // Header — repeats on every page via wkhtmltopdf --header-html
+      fs.writeFileSync(tmpHdr, `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;color:#111;padding:4px 0 0;}
+        table{width:100%;border-collapse:collapse;}
+        .td-logo{width:70px;padding-right:8px;vertical-align:middle;}
+        .td-name{font-size:13pt;font-weight:900;color:#1a6b1a;vertical-align:bottom;padding-bottom:1px;}
+        .td-addr{font-size:7.5pt;text-align:center;color:#111;line-height:1.5;padding-top:1px;}
+        .td-con{font-size:7pt;text-align:center;color:#111;padding-top:1px;}
+        .rule{border-bottom:2px solid #1a6b1a;margin-top:4px;}
+      </style></head><body>
+      <table cellpadding="0" cellspacing="0"><tr>
+        <td class="td-logo" rowspan="3">${logoTag}</td>
+        <td class="td-name">Krishi Care &amp; Management Services Private Limited</td>
+      </tr>
+      <tr><td class="td-addr"><b>Regd. &amp; Head Office:</b> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.</td></tr>
+      <tr><td class="td-con">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. - +91 22 68284109</td></tr>
+      </table><div class="rule"></div>
+      </body></html>`);
+
+      // Footer — repeats on every page via wkhtmltopdf --footer-html
+      fs.writeFileSync(tmpFtr, `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:Arial,sans-serif;font-size:7.5pt;color:#111;padding:0;}
+        .rule{border-top:1.5px solid #1a6b1a;margin-bottom:3px;}
+        p{text-align:center;line-height:1.5;}
+      </style></head><body>
+      <div class="rule"></div>
+      <p><b>Corporate Office:</b> ${COMPANY.corpAddr}. Tel: 011-41039506.</p>
+      <p><b>CIN: ${COMPANY.cin}</b></p>
+      </body></html>`);
+
       await new Promise((resolve, reject) => {
         execFile('wkhtmltopdf', [
           '--quiet',
-          '--page-size',      'A4',
-          '--margin-top',     '8mm',
-          '--margin-bottom',  '8mm',
-          '--margin-left',    '22mm',
-          '--margin-right',   '22mm',
+          '--page-size',       'A4',
+          '--margin-top',      '40mm',
+          '--margin-bottom',   '20mm',
+          '--margin-left',     '22mm',
+          '--margin-right',    '22mm',
+          '--header-html',     tmpHdr,
+          '--header-spacing',  '4',
+          '--footer-html',     tmpFtr,
+          '--footer-spacing',  '3',
+          '--print-media-type',
           '--enable-local-file-access',
           '--disable-smart-shrinking',
-          '--encoding',       'utf-8',
+          '--encoding',        'utf-8',
           tmpHtml, tmpPdf
         ], { maxBuffer: 20 * 1024 * 1024 }, (err) => { if (err) return reject(err); resolve(); });
       });
 
       offerPdfBuffer = fs.readFileSync(tmpPdf);
-      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
+      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpHdr); fs.unlinkSync(tmpFtr); fs.unlinkSync(tmpPdf); } catch(_) {}
       console.log('[offerLetter.sendEmail] PDF generated, size:', offerPdfBuffer.length);
     } catch (pdfErr) {
       console.error('[offerLetter.sendEmail] PDF generation failed:', pdfErr.message);
