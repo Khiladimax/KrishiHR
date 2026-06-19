@@ -146,55 +146,64 @@ function buildOfferLetterHTML(ol) {
       font-size: 11pt;
       line-height: 1.75;
       color: #000;
-      /* SCREEN: grey background so each page box is visible */
       background: #ccc;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
 
-    /* ── SCREEN PREVIEW: each .page is an A4 box with the letterhead as bg ── */
+    /* ── SCREEN: fixed A4 page box, letterhead as background ──
+       IMPORTANT: height is fixed at 297mm so background always covers exactly one page.
+       Content is clipped at page boundary and continued in next .page div.
+       For SCREEN we render multiple .page divs (one per page).
+       For PDF we let wkhtmltopdf handle pagination with CLI margins.
+    ── */
     .page {
       position: relative;
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
       margin: 8mm auto;
       background: #fff url('${LH_B64}') no-repeat top left / 100% 100%;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-      overflow: visible;
-    }
-    /* Content sits inside the safe zone — padding matches wkhtmltopdf margins */
-    .page-content {
-      padding: 35mm 18mm 20mm 18mm;
-    }
-    /* Force page break BETWEEN pages (not inside content) */
-    .page-break {
+      overflow: hidden;          /* clip to exactly one page */
       page-break-after: always;
     }
+    .page:last-child { page-break-after: auto; }
 
-    /* ── PRINT / wkhtmltopdf ──────────────────────────────────────────────
-       wkhtmltopdf renders as a continuous stream.
-       Margins (35mm top, 20mm bottom) are passed as CLI args — they create
-       the safe zone automatically.
-       The .page div background repeats the letterhead on every printed page.
-       We remove screen-only decorations.
+    /* Safe content zone — measured from letterhead.png:
+       Header green line at 31.2mm + 5mm gap = 36mm from top
+       Footer line at 15.2mm from bottom + 4mm gap = 19mm from bottom  */
+    .page-content {
+      position: absolute;
+      top:    36mm;
+      bottom: 19mm;
+      left:   18mm;
+      right:  18mm;
+      overflow: hidden;
+    }
+
+    /* ── PRINT / wkhtmltopdf ────────────────────────────────────────────
+       Single .page div, natural flow. CLI margins = safe zone.
+       Background on .page repeats on every printed page automatically.
     ── */
     @media print {
       body { background: #fff; }
       .page {
         width: auto;
-        min-height: 0;
+        height: auto;
         margin: 0;
         box-shadow: none;
-        /* Keep background so letterhead shows on each printed page */
-        /* background repeats automatically from the element — no override needed */
+        overflow: visible;
+        page-break-after: auto;
       }
       .page-content {
-        /* No padding needed — wkhtmltopdf CLI margins handle the safe zone */
+        position: static;
+        top: auto; bottom: auto; left: auto; right: auto;
+        overflow: visible;
         padding: 0;
       }
     }
 
-    /* ── CONTENT STYLES ─────────────────────────────────────────────────── */
+    /* ── CONTENT STYLES ─────────────────────────────────────────────── */
     .date-line  { text-align: right; margin-bottom: 14px; }
     .cand-name  { font-weight: bold; line-height: 1.6; }
     .cand-meta  { margin: 10px 0; }
@@ -223,17 +232,13 @@ function buildOfferLetterHTML(ol) {
     .sig-img     { height: 44px; display: block; margin-bottom: 2px; }
     .sig-blank   { height: 44px; }
 
-    /* ANNEXURE */
     .ann-title { font-weight: bold; text-align: center; margin: 14px 0 16px; }
     .ann-meta  { margin-bottom: 14px; }
     .ann-meta p { font-weight: bold; line-height: 1.7; }
     .ann-ctc   { font-weight: bold; margin-bottom: 12px; }
 
     .ann-tbl { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    .ann-tbl th {
-      font-weight: bold; padding: 8px 10px;
-      text-align: center; border: 1px solid #000;
-    }
+    .ann-tbl th { font-weight: bold; padding: 8px 10px; text-align: center; border: 1px solid #000; }
     .ann-tbl td { border: 1px solid #000; padding: 7px 10px; }
     .c-sr  { text-align: center; width: 60px; }
     .c-num { text-align: center; width: 110px; }
@@ -244,7 +249,7 @@ function buildOfferLetterHTML(ol) {
     .ack-para  { line-height: 1.6; margin-bottom: 28px; }
     .ack-row   { display: flex; justify-content: space-between; margin-bottom: 24px; }
     .ack-line  { display: inline-block; border-bottom: 1px solid #000; width: 140px; margin-left: 4px; vertical-align: bottom; }
-  `;
+  `
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const fmtV = v => Number(Math.round(v)).toLocaleString('en-IN');
@@ -412,24 +417,36 @@ ${addTermsHTML}
 </div>
 `;
 
-  // ── Assemble final HTML ───────────────────────────────────────────────────
-  // ONE .page div wrapping all content.
-  // The background image tiles on each printed page automatically because
-  // wkhtmltopdf repeats element backgrounds across page breaks.
-  // CLI margins (35mm top, 20mm bottom) keep content in the safe zone.
+  // ── Assemble final HTML ──────────────────────────────────────────────────
+  // SCREEN PREVIEW: 3 fixed .page divs (297mm each, overflow:hidden)
+  //   wkhtmltopdf ignores the fixed height and uses CLI margins instead
+  // PDF (wkhtmltopdf): content flows naturally, CLI margins = safe zone
+
   const finalHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style>${css}</style>
+<style>${css.replace(/\${LH_B64}/g, LH_B64)}</style>
 </head>
 <body>
+
+<!-- PAGE 1 (screen preview) + start of PDF content -->
 <div class="page">
   <div class="page-content">
     ${letterBody}
-    ${annexure}
   </div>
 </div>
+
+<!-- PAGE 2 (screen preview only — PDF flows naturally from above) -->
+<div class="page" style="display:none;" aria-hidden="true"></div>
+
+<!-- PAGE 3 / ANNEXURE — always new page in PDF via page-break-before -->
+<div class="page">
+  <div class="page-content">
+    ${annexure.replace('<div style="page-break-before: always;">', '<div>')}
+  </div>
+</div>
+
 </body>
 </html>`;
 
