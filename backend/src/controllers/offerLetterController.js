@@ -342,20 +342,19 @@ function buildOfferLetterHTML(ol) {
     print-color-adjust: exact;
   }
 
-  /* One A4 page — exact height so flex pins footer to bottom */
+  /* One A4 page — position:relative so header/footer can be position:absolute */
   .page {
     width: 210mm;
     height: 297mm;
     margin: 6mm auto;
     background: #fff;
     box-shadow: 0 2px 12px rgba(0,0,0,0.25);
-    display: flex;
-    flex-direction: column;
+    position: relative;
     overflow: hidden;
   }
 
-  /* HEADER */
-  .page-hdr  { flex-shrink: 0; padding: 8px 18mm 0; }
+  /* HEADER — absolutely positioned at top */
+  .page-hdr  { position: absolute; top: 0; left: 0; right: 0; padding: 10px 18mm 0; background: #fff; }
   .hdr-inner { display: table; width: 100%; border-collapse: collapse; }
   .hdr-logo-cell {
     display: table-cell;
@@ -382,11 +381,23 @@ function buildOfferLetterHTML(ol) {
   }
   .hdr-rule  { border-bottom: 2.5px solid #1a6b1a; margin-top: 6px; }
 
-  /* CONTENT */
-  .page-body { flex: 1; padding: 18px 18mm 0; }
+  /* CONTENT — sits between header bottom and footer top */
+  .page-body {
+    position: absolute;
+    top: 112px;    /* below header — adjust if header height changes */
+    bottom: 48px;  /* above footer */
+    left: 0; right: 0;
+    padding: 0 18mm;
+    overflow: hidden;
+  }
 
-  /* FOOTER — pinned to bottom via margin-top:auto */
-  .page-ftr  { flex-shrink: 0; margin-top: auto; padding: 0 18mm 8px; }
+  /* FOOTER — ALWAYS at page bottom, regardless of content length */
+  .page-ftr {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0 18mm 8px;
+    background: #fff;
+  }
   .ftr-rule  { border-top: 1px solid #555; margin-bottom: 3px; }
   .ftr-corp  { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; font-weight: bold; }
   .ftr-cin   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; font-weight: bold; }
@@ -464,7 +475,8 @@ function buildOfferLetterHTML(ol) {
     body { margin: 0; background: #fff; }
     .page {
       width: 100%; height: 297mm; margin: 0;
-      box-shadow: none; page-break-after: always; overflow: hidden;
+      box-shadow: none; page-break-after: always;
+      position: relative; overflow: hidden;
     }
     .page:last-child { page-break-after: auto; }
   }
