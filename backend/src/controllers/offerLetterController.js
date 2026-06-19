@@ -381,22 +381,24 @@ function buildOfferLetterHTML(ol) {
   }
   .hdr-rule  { border-bottom: 2.5px solid #1a6b1a; margin-top: 6px; }
 
-  /* CONTENT — sits between header bottom and footer top */
+  /* CONTENT — sits between header and footer (values verified by testing) */
   .page-body {
     position: absolute;
-    top: 112px;    /* below header — adjust if header height changes */
-    bottom: 48px;  /* above footer */
+    top: 136px;   /* header height 128px + 8px gap — tested and verified */
+    bottom: 46px; /* footer height — tested and verified */
     left: 0; right: 0;
     padding: 0 18mm;
     overflow: hidden;
   }
 
-  /* FOOTER — ALWAYS at page bottom, regardless of content length */
+  /* FOOTER — ALWAYS pinned to page bottom regardless of content length */
   .page-ftr {
     position: absolute;
     bottom: 0; left: 0; right: 0;
-    padding: 0 18mm 8px;
+    height: 46px;
     background: #fff;
+    padding: 4px 18mm 8px;
+    box-sizing: border-box;
   }
   .ftr-rule  { border-top: 1px solid #555; margin-bottom: 3px; }
   .ftr-corp  { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; font-weight: bold; }
