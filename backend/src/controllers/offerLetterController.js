@@ -335,7 +335,7 @@ function buildOfferLetterHTML(ol) {
   body {
     font-family: 'Times New Roman', Times, serif;
     font-size: 11pt;
-    line-height: 1.5;
+    line-height: 1.75;
     color: #000;
     background: #bbb;
     -webkit-print-color-adjust: exact;
@@ -354,7 +354,7 @@ function buildOfferLetterHTML(ol) {
   }
 
   /* HEADER — absolutely positioned at top */
-  .page-hdr  { position: absolute; top: 0; left: 0; right: 0; padding: 10px 18mm 0; background: #fff; }
+  .page-hdr  { position: absolute; top: 0; left: 0; right: 0; padding: 10px 18mm 0; background: #fff; z-index: 10; }
   .hdr-inner { display: table; width: 100%; border-collapse: collapse; }
   .hdr-logo-cell {
     display: table-cell;
@@ -399,6 +399,7 @@ function buildOfferLetterHTML(ol) {
     background: #fff;
     padding: 4px 18mm 8px;
     box-sizing: border-box;
+    z-index: 10;
   }
   .ftr-rule  { border-top: 1px solid #555; margin-bottom: 3px; }
   .ftr-corp  { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.6; font-weight: bold; }
@@ -416,13 +417,13 @@ function buildOfferLetterHTML(ol) {
     font-size: 11pt; font-weight: bold; text-decoration: underline;
     text-align: center; margin: 14px 40px 14px; line-height: 1.5;
   }
-  .para { font-size: 11pt; line-height: 1.6; text-align: justify; margin-bottom: 10px; }
+  .para { font-size: 11pt; line-height: 1.75; text-align: justify; margin-bottom: 14px; }
   .accept-bold { font-weight: bold; }
 
   .sec-hd {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 11pt; font-weight: bold; text-decoration: underline;
-    margin: 12px 0 5px; padding-left: 6px; color: #000;
+    margin: 16px 0 6px; padding-left: 6px; color: #000;
   }
 
   ul.rules {
