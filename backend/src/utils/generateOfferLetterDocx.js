@@ -55,7 +55,6 @@ function run(text, sz = 20, opts = {}) {
 
 // Paragraph — default align is "both" (justified) to match the reference
 function para(children, opts = {}) {
-  // Default to justified unless explicitly overridden
   const alignVal = opts.align || 'both';
   const jc       = `<w:jc w:val="${alignVal}"/>`;
   const spacing  = opts.spacing
@@ -146,7 +145,6 @@ function buildBodyXml(ol) {
 
   const offerDateStr = formatDate(ol.offer_date || new Date());
 
-  // Joining date with superscript ordinal
   let joiningRuns = '';
   if (ol.joining_date) {
     const dt  = new Date(ol.joining_date);
@@ -160,15 +158,18 @@ function buildBodyXml(ol) {
       + run(` ${mos[dt.getMonth()]} ${dt.getFullYear()}`, 20, {bold:true});
   }
 
-  // Candidate first name (strip titles)
   const firstName = ol.candidate_name.split(' ')
     .filter(w => !['Mr.','Ms.','Mrs.','Dr.'].includes(w))[0] || ol.candidate_name;
 
-  const SP = {before:0, after:80, line:276};   // standard paragraph spacing
-  const S0 = {before:0, after:0,  line:276};   // tight spacing
-  const SH = {before:120,after:40,line:276};   // section heading spacing
+  const SP = {before:0, after:80, line:276};
+  const S0 = {before:0, after:0,  line:276};
+  const SH = {before:120,after:40,line:276};
 
   const parts = [];
+
+  // ── Top spacing (Strict 2-line gap after header/black line) ───────────────
+  parts.push(emptyPara(0, 0));
+  parts.push(emptyPara(0, 0));
 
   // ── Date line (right-aligned) ─────────────────────────────────────────────
   parts.push(para(run(offerDateStr, 20, {bold:true}),
@@ -185,7 +186,6 @@ function buildBodyXml(ol) {
   }
   parts.push(emptyPara(40, 40));
 
-  // Employee code / mob / email (left-aligned, not justified)
   if (ol.employee_code)
     parts.push(para(run(`Employee Code ${DASH} ${ol.employee_code}`, 20, {bold:true}),
       {align:'left', spacing:S0}));
@@ -200,14 +200,14 @@ function buildBodyXml(ol) {
   parts.push(para(run(`Dear ${firstName},`, 20),
     {align:'left', spacing:{before:80,after:80,line:276}}));
 
-  // ── Subject line — indented center like reference ─────────────────────────
+  // ── Subject line ──────────────────────────────────────────────────────────
   parts.push(para(
     run(`Sub: Letter of offer/Appointment for the position of \u201C${ol.designation}\u201D`,
         20, {bold:true, underline:true}),
     {align:'center', spacing:{before:40,after:100,line:276}}
   ));
 
-  // ── Body paragraphs (all justified) ───────────────────────────────────────
+  // ── Body paragraphs ───────────────────────────────────────────────────────
   parts.push(para(
     run('In reference to our discussions, we are pleased to offer you the position of ', 20)
     + run(`\u201C${ol.designation}\u201D`, 20, {bold:true})
@@ -230,13 +230,11 @@ function buildBodyXml(ol) {
     {spacing:SP}
   ));
 
-  // Helper: section heading + body paragraph
   function section(heading, body) {
     parts.push(para(run(heading, 20, {bold:true, underline:true}), {align:'left', spacing:SH}));
     parts.push(para(run(body, 20), {spacing:SP}));
   }
 
-  // EMOLUMENTS
   parts.push(para(run('EMOLUMENTS:', 20, {bold:true, underline:true}), {align:'left', spacing:SH}));
   parts.push(para(
     run('Your compensation on a cost to company basis will be ', 20)
@@ -262,10 +260,10 @@ function buildBodyXml(ol) {
     parts.push(para(run(ol.custom_clauses, 20), {spacing:SP}));
   }
 
-  // OTHER RULES — pageBreakBefore forces new page; spacing.before=828 adds 3-line gap under header
+  // OTHER RULES — pageBreakBefore forces new page; spacing.before=552 is exactly 2-lines (2x276)
   parts.push('<w:p><w:pPr>' +
     '<w:pageBreakBefore/>' +
-    '<w:spacing w:before="828" w:after="40" w:line="276" w:lineRule="auto"/>' +
+    '<w:spacing w:before="552" w:after="40" w:line="276" w:lineRule="auto"/>' +
     '<w:jc w:val="left"/>' +
     '</w:pPr>' +
     run('OTHER RULES AND REGULATION:', 20, {bold:true, underline:true}) +
@@ -275,7 +273,6 @@ function buildBodyXml(ol) {
     {spacing:{before:0,after:60,line:276}}
   ));
 
-  // Bullet items — justified text, proper indent
   const bulletItems = [
     'You will, in all respects, be governed by the company\u2019s rules and regulations',
     'You will devote full time to the work of the Company and will not undertake any direct / indirect outside business or work, honorary or remunerative except with the prior written consent of the Management.',
@@ -292,7 +289,6 @@ function buildBodyXml(ol) {
       run(item, 20),
       {
         numId: 1,
-        // Justified — bullets in reference are also justified
         align: 'both',
         indent: {left:360, hanging:180},
         spacing: {before:0, after:80, line:276}
@@ -302,7 +298,6 @@ function buildBodyXml(ol) {
 
   parts.push(emptyPara(60, 40));
 
-  // Acceptance paragraph (bold, justified)
   parts.push(para(
     run('If you are willing to accept this offer for the said position, we request you to submit 3 copies of your latest coloured Passport Size photograph, Self-attested Copy of your academic qualification, Self-attested copy of your PAN Card, Self-attested copy of your Aadhar Card, Self-attested Copy of Address Proof, and last 3 month Pay Slip / Form 16 from your previous employer. In addition, upon joining, you will have to submit a copy of your relieving letter from your previous employer.', 20, {bold:true}),
     {spacing:SP}
@@ -317,7 +312,6 @@ function buildBodyXml(ol) {
 
   parts.push(emptyPara(40,40));
 
-  // Sign-off (left-aligned like reference)
   parts.push(para(run('Yours truly,', 20), {align:'left', spacing:{before:0,after:40,line:276}}));
   parts.push(para(
     run('From ', 20) + run('Krishi Care & Management Services Private Limited,', 20, {bold:true}),
@@ -326,7 +320,6 @@ function buildBodyXml(ol) {
 
   parts.push(emptyPara(200, 0));
 
-  // ── Signature row (2-column, no borders, left-aligned) ───────────────────
   const sigLeft  = cell(
     emptyPara(480, 0)
     + para(run('Authorized Signatory', 20), {align:'left', spacing:{before:40,after:0,line:276}}),
@@ -348,18 +341,15 @@ function buildBodyXml(ol) {
   // ════════════════════════════════════════════════════════════════
   parts.push(PAGE_BREAK);
 
-  // 3 blank lines after page break (space below header)
-  parts.push(emptyPara(0,0));
+  // 2 blank lines strictly matching the other gaps
   parts.push(emptyPara(0,0));
   parts.push(emptyPara(0,0));
 
-  // Annexure title
   parts.push(para(
     run('Annexure I (Annual Cost to Company and Other Benefits)', 20, {bold:true}),
     {align:'center', spacing:{before:60,after:100,line:276}}
   ));
 
-  // Annexure meta — plain text, left-aligned, like reference
   parts.push(para(run(`Name: ${ol.candidate_name}`, 20),
     {align:'left', spacing:{before:0,after:0,line:276}}));
   parts.push(para(run(`Designation: ${ol.designation}`, 20),
@@ -372,13 +362,11 @@ function buildBodyXml(ol) {
     {align:'left', spacing:{before:0,after:100,line:276}}
   ));
 
-  // ── Salary table — full content width, matching reference proportions ──────
-  // Content width for A4 with 1" margins = 11906 - 2×1440 = 9026 twips
   const TW = 9026;
-  const W_SR   = 720;          // Sr. No.
-  const W_PART = TW - 720 - 1440 - 1440;  // Particulars (fills middle)
-  const W_MON  = 1440;         // Monthly
-  const W_YR   = 1440;         // Yearly
+  const W_SR   = 720;          
+  const W_PART = TW - 720 - 1440 - 1440;  
+  const W_MON  = 1440;         
+  const W_YR   = 1440;         
   const annWids = [W_SR, W_PART, W_MON, W_YR];
 
   const TH  = (txt, w) => cell(
@@ -418,7 +406,6 @@ function buildBodyXml(ol) {
   parts.push(table(tblRows, annWids, {align:'left'}));
   parts.push(emptyPara(80,80));
 
-  // ── Acknowledgement ───────────────────────────────────────────────────────
   parts.push(para(run('Acknowledgement & Acceptance', 20, {bold:true, underline:true}),
     {align:'left', spacing:{before:60,after:60,line:276}}));
   parts.push(para(
@@ -426,13 +413,10 @@ function buildBodyXml(ol) {
     {align:'left', spacing:{before:0,after:100,line:276}}
   ));
 
-  // Ack table — 4 columns: label | underline-field | label | underline-field
-  // Fixed widths so "Location:" never wraps
-  const A_LBL1 = 1300;  // "Signature:" label
-  const A_FLD1 = 2500;  // first field
-  const A_LBL2 = 1300;  // "Date:" / "Location:" label
-  const A_FLD2 = 3926;  // second field (fills rest)
-  const ackTotal = A_LBL1 + A_FLD1 + A_LBL2 + A_FLD2;  // = 9026
+  const A_LBL1 = 1300;  
+  const A_FLD1 = 2500;  
+  const A_LBL2 = 1300;  
+  const A_FLD2 = 3926;  
 
   const lblCell  = (txt, w) => `<w:tc>
     <w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>
@@ -489,25 +473,24 @@ async function generateOfferLetterDocx(ol) {
 
   const bodyContent = buildBodyXml(ol);
 
-  const SECTION_PR = `<w:sectPr w:rsidR="008F08D6" w:rsidRPr="003245E9" w:rsidSect="003245E9">
-      <w:headerReference w:type="default" r:id="rId9"/>
-      <w:footerReference w:type="default" r:id="rId10"/>
-      <w:pgSz w:w="11906" w:h="16838" w:code="9"/>
-      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="397" w:footer="113" w:gutter="0"/>
-      <w:cols w:space="708"/>
-      <w:docGrid w:linePitch="360"/>
-    </w:sectPr>`;
-
   const origDocEntry = zip.getEntry('word/document.xml');
   const origDocXml   = origDocEntry.getData().toString('utf8');
-  const docOpenMatch = origDocXml.match(/^(<w:document[^>]*>)/);
-  const docOpen = docOpenMatch ? docOpenMatch[1]
-    : '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
 
-  const newDocXml = `<?xml version="1.0" encoding="UTF-8"?>${docOpen}
+  // 1. Extract the actual document XML declaration & opening tag
+  const docOpenMatch = origDocXml.match(/^(<\?xml[^>]*>\s*)?(<w:document[^>]*>)/);
+  const xmlDecl = docOpenMatch && docOpenMatch[1] ? docOpenMatch[1].trim() : '<?xml version="1.0" encoding="UTF-8"?>';
+  const docOpen = docOpenMatch && docOpenMatch[2] ? docOpenMatch[2] : '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+
+  // 2. Extract the ORIGINAL <w:sectPr> so headers/footers align perfectly
+  // The old code hardcoded rId9 and rId10, which destroys the footer if the template uses different relationship IDs!
+  const sectPrMatch = origDocXml.match(/(<w:sectPr[^>]*>[\s\S]*?<\/w:sectPr>)/);
+  const fallbackSectPr = `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>`;
+  const actualSectPr = sectPrMatch ? sectPrMatch[1] : fallbackSectPr;
+
+  const newDocXml = `${xmlDecl}\n${docOpen}
   <w:body>
 ${bodyContent}
-    ${SECTION_PR}
+    ${actualSectPr}
   </w:body>
 </w:document>`;
 
