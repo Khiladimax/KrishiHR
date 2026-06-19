@@ -617,35 +617,17 @@ exports.sendEmail = async (req, res) => {
     const ol = result.rows[0];
     if (!ol.candidate_email) return res.status(400).json({ success: false, message: 'No email on this offer letter' });
 
-    // ── Build the offer letter HTML ─────────────────────────────────────────
+    // ── Build the offer letter HTML (for preview/fallback) ─────────────────
     const offerHTML = buildOfferLetterHTML(ol);
 
-    // ── Always generate PDF via wkhtmltopdf — never send DOCX ───────────────
-    let offerPdfBuffer = null;
+    // ── Try to generate real letterhead DOCX ────────────────────────────────
+    // Uses Letterhead_New.docx as template so header/footer are pixel-perfect
+    let offerDocxBuffer = null;
     try {
-      const tmpDir  = os.tmpdir();
-      const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
-      const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
-      fs.writeFileSync(tmpHtml, offerHTML);
-      await new Promise((resolve, reject) => {
-        execFile('wkhtmltopdf', [
-          '--quiet',
-          '--page-size', 'A4',
-          '--margin-top',    '0mm',
-          '--margin-bottom', '0mm',
-          '--margin-left',   '0mm',
-          '--margin-right',  '0mm',
-          '--print-media-type',
-          '--enable-local-file-access',
-          '--disable-smart-shrinking',
-          tmpHtml, tmpPdf
-        ], (err) => { if (err) return reject(err); resolve(); });
-      });
-      offerPdfBuffer = fs.readFileSync(tmpPdf);
-      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
-      console.log('[offerLetter.sendEmail] PDF generated successfully');
-    } catch (pdfErr) {
-      console.error('[offerLetter.sendEmail] PDF generation failed:', pdfErr.message);
+      const { generateOfferLetterDocx } = require('../utils/generateOfferLetterDocx');
+      offerDocxBuffer = await generateOfferLetterDocx(ol);
+    } catch (docxErr) {
+      console.warn('[offerLetter.sendEmail] DOCX generation failed, falling back to PDF:', docxErr.message);
     }
 
     // ── Cover email body ────────────────────────────────────────────────────
@@ -663,7 +645,7 @@ exports.sendEmail = async (req, res) => {
           <p>${coverText}</p>
           <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
           <p style="font-size:11px;color:#999;"><strong>Attachments:</strong><br>
-            &#128196; Offer Letter (PDF)<br>
+            &#128196; Offer Letter (DOCX — with official letterhead)<br>
             &#128203; Joining Form (DOCX &amp; PDF) — Please fill and submit on joining day
           </p>
         </div>
@@ -672,18 +654,42 @@ exports.sendEmail = async (req, res) => {
     // ── Build attachments array ──────────────────────────────────────────────
     const attachments = [];
 
-    // 1. Offer Letter — always as PDF
-    if (offerPdfBuffer) {
+    // 1. Offer Letter — prefer DOCX (real letterhead), fall back to PDF/HTML
+    if (offerDocxBuffer) {
+      // ✅ PRIMARY: Real letterhead DOCX
       attachments.push({
-        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`,
-        content: offerPdfBuffer.toString('base64'),
+        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.docx`,
+        content: offerDocxBuffer.toString('base64'),
       });
     } else {
-      // Last resort fallback: send HTML file
-      attachments.push({
-        name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
-        content: Buffer.from(offerHTML).toString('base64'),
-      });
+      // Fallback: try wkhtmltopdf PDF, then HTML
+      try {
+        const tmpDir  = os.tmpdir();
+        const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.html`);
+        const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${Date.now()}.pdf`);
+        fs.writeFileSync(tmpHtml, offerHTML);
+        await new Promise((resolve, reject) => {
+          execFile('wkhtmltopdf', [
+            '--quiet', '--page-size', 'A4',
+            '--margin-top', '10mm', '--margin-bottom', '10mm',
+            '--margin-left', '10mm', '--margin-right', '10mm',
+            '--print-media-type', '--enable-local-file-access',
+            tmpHtml, tmpPdf
+          ], (err) => { if (err) return reject(err); resolve(); });
+        });
+        const pdfBuffer = fs.readFileSync(tmpPdf);
+        try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpPdf); } catch(_) {}
+        attachments.push({
+          name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.pdf`,
+          content: pdfBuffer.toString('base64'),
+        });
+      } catch (pdfErr) {
+        console.error('PDF fallback failed, using HTML:', pdfErr.message);
+        attachments.push({
+          name:    `Offer_Letter_${ol.candidate_name.replace(/\s+/g,'_')}.html`,
+          content: Buffer.from(offerHTML).toString('base64'),
+        });
+      }
     }
 
     // 2. Joining Form DOCX — always attach if file exists
