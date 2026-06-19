@@ -175,16 +175,17 @@ function buildOfferLetterHTML(ol) {
   // ── Shared footer — empty for body (wkhtmltopdf --footer-html handles it) ─
   const ftrHTML = ``;
 
-  // ── Single continuous doc-wrap ─────────────────────────────────────────────
+  // ── Single doc-wrap — NO manual page breaks in body ─────────────────────
+  // wkhtmltopdf --header-html handles header on every page automatically.
+  // Only the Annexure gets a forced page-break-before via CSS class.
   const mainLetter = `
 <div class="doc-wrap">
-  ${hdrHTML}
   <div class="doc-body">
     <p class="date-line"><strong>${formatDate(ol.offer_date || new Date())}</strong></p>
 
     <p class="cand-name">${ol.candidate_name}</p>
     ${ol.candidate_address ? `<p class="cand-addr">${ol.candidate_address.replace(/\n/g,'<br>')}</p>` : ''}
-
+    <br>
     <div class="cand-meta">
       ${ol.employee_code ? `<p><strong>Employee Code &ndash; ${ol.employee_code}</strong></p>` : ''}
       ${ol.candidate_mobile ? `<p><strong>Mob &ndash; ${ol.candidate_mobile}</strong></p>` : ''}
@@ -210,11 +211,6 @@ function buildOfferLetterHTML(ol) {
     <p class="sec-hd">PROBATION PERIOD:</p>
     <p class="para">You will be on a probationary period of <strong>${probStr} months</strong> during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.</p>
 
-    <!-- Page 1 ends here — page 2 starts with 2 blank lines after header -->
-    <div class="ann-page-break"></div>
-    ${hdrHTML}
-    <span class="page-spacer"></span>
-
     <p class="sec-hd">SEPERATION OF SERVICES:</p>
     <p class="para">Severance of relationship can be done by giving <strong>${noticeStr} month</strong> written notice. If you are unable to complete this notice period you will be liable to compensate the company ${noticeStr} months of salary or for the period not served.</p>
 
@@ -232,11 +228,6 @@ function buildOfferLetterHTML(ol) {
       <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will be responsible for the safe keeping and for returning in good condition and order, all on your own the company&rsquo;s property which may be in your use, custody, care or charge. The company shall have the right to deduct the monetary value of all such things from any amounts payable to you and to take such actions as may be deemed proper in the event of your failure to account for such property to the satisfaction of the management.</li>
       <li><span style="font-family:Arial;font-size:9pt;margin-right:6px;">&#9633;</span>You will keep us informed of your residential (mailing &amp; permanent) address. Any change in the same should be notified in writing within one week. Failure to do so will be treated as willful withholding of information and appropriate action as deemed fit by management would be taken against you.</li>
     </ul>
-
-    <!-- Page 3 starts with 2 blank lines after header (last bullet wraps to pg3) -->
-    <div class="ann-page-break"></div>
-    ${hdrHTML}
-    <span class="page-spacer"></span>
 
     <p class="para accept-bold">If you are willing to accept this offer for the said position, we request you to submit 3 copies of your latest coloured Passport Size photograph, Self-attested Copy of your academic qualification, Self-attested copy of your PAN Card, Self-attested copy of your Aadhar Card, Self-attested Copy of Address Proof, and last 3 month Pay Slip / Form 16 from your previous employer. In addition, upon joining, you will have to submit a copy of your relieving letter from your previous employer.</p>
 
@@ -257,68 +248,64 @@ function buildOfferLetterHTML(ol) {
       </div>
     </div>
 
-    <!-- Annexure I — page 4 -->
-    <div class="ann-page-break"></div>
-    ${hdrHTML}
-    <span class="page-spacer"></span>
+    <!-- Annexure — forced new page via CSS class -->
+    <div class="annexure-section">
+      <p class="ann-title">Annexure I (Annual Cost to Company and Other Benefits)</p>
 
-    <p class="ann-title">Annexure I (Annual Cost to Company and Other Benefits)</p>
+      <div class="ann-meta">
+        <p><strong>Name:</strong> ${ol.candidate_name}</p>
+        <p><strong>Designation:</strong> ${ol.designation}</p>
+        <p><strong>Location:</strong> ${ol.location||'Mumbai'}</p>
+      </div>
 
-    <div class="ann-meta">
-      <p><strong>Name:</strong> ${ol.candidate_name}</p>
-      <p><strong>Designation:</strong> ${ol.designation}</p>
-      <p><strong>Location:</strong> ${ol.location||'Mumbai'}</p>
-    </div>
-
-    <p class="para"><strong>Annual Cost to Company &ndash; Rs.${Number(ctcAnnual).toLocaleString('en-IN')} (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong></p>
-
-    <br>
-    <table class="ann-tbl">
-      <thead>
-        <tr>
-          <th class="c-sr">Sr.<br>No.</th>
-          <th class="c-part">Particulars</th>
-          <th class="c-num">Monthly</th>
-          <th class="c-num">Yearly</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td class="c-sr">1</td><td>Fixed Basic</td><td class="c-num">${fmtV(basic)}</td><td class="c-num">${fmtV(basic*12)}</td></tr>
-        <tr><td class="c-sr">2</td><td>HRA</td><td class="c-num">${fmtV(hra)}</td><td class="c-num">${fmtV(hra*12)}</td></tr>
-        ${conv>0?`<tr><td class="c-sr">2a</td><td>Conveyance Allowances</td><td class="c-num">${fmtV(conv)}</td><td class="c-num">${fmtV(conv*12)}</td></tr>`:''}
-        <tr><td class="c-sr">3</td><td>Other Allowances</td><td class="c-num">${fmtV(other)}</td><td class="c-num">${fmtV(other*12)}</td></tr>
-        <tr><td class="c-sr">4</td><td>Gratuity</td><td class="c-num">${fmtV(gratuity)}</td><td class="c-num">${fmtV(gratuity*12)}</td></tr>
-        <tr class="r-sub"><td class="c-sr"><strong>5</strong></td><td><strong>Gross Pay</strong></td><td class="c-num"><strong>${fmtV(gross)}</strong></td><td class="c-num"><strong>${fmtV(gross*12)}</strong></td></tr>
-        <tr><td class="c-sr">6</td><td>Provident Fund</td><td class="c-num">${pfEmp>0?fmtV(pfEmp):'&ndash;'}</td><td class="c-num">${pfEmp>0?fmtV(pfEmp*12):'&ndash;'}</td></tr>
-        <tr><td class="c-sr">7</td><td>Professional Tax</td><td class="c-num">${pt>0?fmtV(pt):'&ndash;'}</td><td class="c-num">${pt>0?fmtV(pt*12):'&ndash;'}</td></tr>
-        <tr class="r-sub"><td class="c-sr"><strong>8</strong></td><td><strong>Total Deduction</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed):'&ndash;'}</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed*12):'&ndash;'}</strong></td></tr>
-        <tr class="r-net"><td class="c-sr"><strong>9</strong></td><td><strong>Net Salary (Gross - Total Deduction)</strong></td><td class="c-num"><strong>${fmtV(netSalary)}</strong></td><td class="c-num"><strong>${fmtV(netSalary*12)}</strong></td></tr>
-        <tr><td class="c-sr">10</td><td>Employer PF contribution</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr):'&ndash;'}</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr*12):'&ndash;'}</td></tr>
-        <tr><td class="c-sr">11</td><td>Employer PF contribution Admin charges</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin):'&ndash;'}</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin*12):'&ndash;'}</td></tr>
-        <tr class="r-ctc"><td class="c-sr"><strong>12</strong></td><td><strong>Total Compensation Package</strong></td><td class="c-num"><strong>${fmtV(ctcMonthly)}</strong></td><td class="c-num"><strong>${fmtV(ctcAnnual)}</strong></td></tr>
-      </tbody>
-    </table>
-
-    <div class="ack-box">
-      <p class="ack-title">Acknowledgement &amp; Acceptance</p>
-      <p class="ack-para">I have read understood, agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
-      <table class="ack-tbl" cellpadding="0" cellspacing="0">
-        <tr>
-          <td class="ack-lbl">Signature:</td>
-          <td class="ack-line"></td>
-          <td class="ack-lbl ack-gap">Date:</td>
-          <td class="ack-line"></td>
-        </tr>
-        <tr>
-          <td class="ack-lbl" style="padding-top:20px;">Name:</td>
-          <td class="ack-line" style="padding-top:20px;"></td>
-          <td class="ack-lbl ack-gap" style="padding-top:20px;">Location:</td>
-          <td class="ack-line" style="padding-top:20px;"></td>
-        </tr>
+      <p class="para"><strong>Annual Cost to Company &ndash; Rs.${Number(ctcAnnual).toLocaleString('en-IN')} (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong></p>
+      <br>
+      <table class="ann-tbl">
+        <thead>
+          <tr>
+            <th class="c-sr">Sr.<br>No.</th>
+            <th class="c-part">Particulars</th>
+            <th class="c-num">Monthly (&#8377;)</th>
+            <th class="c-num">Yearly (&#8377;)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="c-sr">1</td><td>Fixed Basic</td><td class="c-num">${fmtV(basic)}</td><td class="c-num">${fmtV(basic*12)}</td></tr>
+          <tr><td class="c-sr">2</td><td>HRA</td><td class="c-num">${fmtV(hra)}</td><td class="c-num">${fmtV(hra*12)}</td></tr>
+          ${conv>0?`<tr><td class="c-sr">2a</td><td>Conveyance Allowances</td><td class="c-num">${fmtV(conv)}</td><td class="c-num">${fmtV(conv*12)}</td></tr>`:''}
+          <tr><td class="c-sr">3</td><td>Other Allowances</td><td class="c-num">${fmtV(other)}</td><td class="c-num">${fmtV(other*12)}</td></tr>
+          <tr><td class="c-sr">4</td><td>Gratuity</td><td class="c-num">${fmtV(gratuity)}</td><td class="c-num">${fmtV(gratuity*12)}</td></tr>
+          <tr class="r-sub"><td class="c-sr"><strong>5</strong></td><td><strong>Gross Pay</strong></td><td class="c-num"><strong>${fmtV(gross)}</strong></td><td class="c-num"><strong>${fmtV(gross*12)}</strong></td></tr>
+          <tr><td class="c-sr">6</td><td>Provident Fund</td><td class="c-num">${pfEmp>0?fmtV(pfEmp):'&ndash;'}</td><td class="c-num">${pfEmp>0?fmtV(pfEmp*12):'&ndash;'}</td></tr>
+          <tr><td class="c-sr">7</td><td>Professional Tax</td><td class="c-num">${pt>0?fmtV(pt):'&ndash;'}</td><td class="c-num">${pt>0?fmtV(pt*12):'&ndash;'}</td></tr>
+          <tr class="r-sub"><td class="c-sr"><strong>8</strong></td><td><strong>Total Deduction</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed):'&ndash;'}</strong></td><td class="c-num"><strong>${totalDed>0?fmtV(totalDed*12):'&ndash;'}</strong></td></tr>
+          <tr class="r-net"><td class="c-sr"><strong>9</strong></td><td><strong>Net Salary (Gross - Total Deduction)</strong></td><td class="c-num"><strong>${fmtV(netSalary)}</strong></td><td class="c-num"><strong>${fmtV(netSalary*12)}</strong></td></tr>
+          <tr><td class="c-sr">10</td><td>Employer PF contribution</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr):'&ndash;'}</td><td class="c-num">${pfEmpr>0?fmtV(pfEmpr*12):'&ndash;'}</td></tr>
+          <tr><td class="c-sr">11</td><td>Employer PF contribution Admin charges</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin):'&ndash;'}</td><td class="c-num">${pfAdmin>0?fmtV(pfAdmin*12):'&ndash;'}</td></tr>
+          <tr class="r-ctc"><td class="c-sr"><strong>12</strong></td><td><strong>Total Compensation Package</strong></td><td class="c-num"><strong>${fmtV(ctcMonthly)}</strong></td><td class="c-num"><strong>${fmtV(ctcAnnual)}</strong></td></tr>
+        </tbody>
       </table>
-    </div>
+
+      <div class="ack-box">
+        <p class="ack-title">Acknowledgement &amp; Acceptance</p>
+        <p class="ack-para">I have read understood, agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
+        <table class="ack-tbl" cellpadding="0" cellspacing="0">
+          <tr>
+            <td class="ack-lbl">Signature:</td>
+            <td class="ack-line"></td>
+            <td class="ack-lbl ack-gap">Date:</td>
+            <td class="ack-line"></td>
+          </tr>
+          <tr>
+            <td class="ack-lbl" style="padding-top:20px;">Name:</td>
+            <td class="ack-line" style="padding-top:20px;"></td>
+            <td class="ack-lbl ack-gap" style="padding-top:20px;">Location:</td>
+            <td class="ack-line" style="padding-top:20px;"></td>
+          </tr>
+        </table>
+      </div>
+    </div><!-- /annexure-section -->
   </div><!-- /doc-body -->
-  ${ftrHTML}
 </div><!-- /doc-wrap -->`;
 
   const annexure = ``;
@@ -344,7 +331,7 @@ function buildOfferLetterHTML(ol) {
     width: 210mm;
     margin: 8mm auto;
     background: #fff;
-    padding: 18mm 20mm 14mm 20mm;
+    padding: 6mm 0 4mm 0;
     position: relative;
     box-shadow: 0 2px 16px rgba(0,0,0,0.22);
   }
@@ -373,8 +360,11 @@ function buildOfferLetterHTML(ol) {
   .ftr-corp   { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; line-height: 1.65; }
   .ftr-cin    { font-family: Arial, sans-serif; font-size: 7.5pt; text-align: center; color: #111; }
 
-  .doc-body   { margin-top: 10px; }
-  .page-spacer { display: block; height: 28px; }
+  .doc-body   { padding: 0; }
+  /* Annexure always starts on a new page */
+  .annexure-section { page-break-before: always; }
+  .ann-page-break   { display: none; }
+  .page-spacer      { display: none; }
 
   .date-line  { text-align: right; font-size: 11pt; margin-bottom: 14px; }
   .cand-name  { font-size: 11pt; font-weight: bold; line-height: 1.65; }
@@ -449,8 +439,7 @@ function buildOfferLetterHTML(ol) {
   @media print {
     body { margin: 0; background: #fff; }
     .doc-wrap { width: 100%; margin: 0; box-shadow: none; padding: 12mm 18mm 10mm 18mm; }
-    .ann-page-break { display: block; page-break-before: always; height: 0; }
-    .page-spacer    { display: block; }
+    .annexure-section { page-break-before: always; }
     .sec-hd         { page-break-after: avoid; }
     ul.rules li     { page-break-inside: avoid; }
     .sig-section    { page-break-inside: avoid; }
@@ -617,12 +606,38 @@ exports.sendEmail = async (req, res) => {
       const tmpDir  = os.tmpdir();
       const stamp   = Date.now();
       const tmpHtml = path.join(tmpDir, `offer_${ol.id}_${stamp}.html`);
+      const tmpHdr  = path.join(tmpDir, `offer_hdr_${stamp}.html`);
       const tmpFtr  = path.join(tmpDir, `offer_ftr_${stamp}.html`);
       const tmpPdf  = path.join(tmpDir, `offer_${ol.id}_${stamp}.pdf`);
 
       fs.writeFileSync(tmpHtml, offerHTML);
 
-      // Footer HTML — matches the reference PDF footer style
+      // Header HTML — repeats on every page automatically
+      const hdrHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 8.5pt; margin: 0; padding: 4mm 18mm 0; color: #111; background: #fff; }
+  .hdr-tbl { width: 100%; border-collapse: collapse; }
+  .hdr-logo { width: 80px; padding-right: 10px; vertical-align: middle; }
+  .logo-img  { width: 72px; height: 72px; display: block; }
+  .hdr-name  { font-size: 16pt; font-weight: 900; color: #1a6b1a; vertical-align: middle; }
+  .hdr-addr  { font-size: 8pt; color: #111; line-height: 1.5; text-align: center; padding-top: 2px; }
+  .hdr-contact { font-size: 7.5pt; color: #111; text-align: center; padding-top: 1px; }
+  .hdr-rule  { border-bottom: 2px solid #1a6b1a; margin-top: 5px; }
+</style></head><body>
+<table class="hdr-tbl" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="hdr-logo" rowspan="3"><img src="${LOGO_B64}" class="logo-img" alt=""></td>
+    <td class="hdr-name">Krishi Care &amp; Management Services Private Limited</td>
+  </tr>
+  <tr><td class="hdr-addr"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway, Shankarwadi, Jogeshwari (East), Mumbai - 400060.</td></tr>
+  <tr><td class="hdr-contact">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. - +91 22 68284109</td></tr>
+</table>
+<div class="hdr-rule"></div>
+</body></html>`;
+      fs.writeFileSync(tmpHdr, hdrHtml);
+
+      // Footer HTML — repeats on every page
       const ftrHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>
   body { font-family: Arial, sans-serif; font-size: 7.5pt; margin: 0; padding: 0 18mm; color: #111; }
@@ -639,22 +654,24 @@ exports.sendEmail = async (req, res) => {
       await new Promise((resolve, reject) => {
         execFile('wkhtmltopdf', [
           '--quiet',
-          '--page-size', 'A4',
-          '--margin-top',    '5mm',
-          '--margin-bottom', '18mm',
-          '--margin-left',   '0mm',
-          '--margin-right',  '0mm',
-          '--footer-html',   tmpFtr,
+          '--page-size',      'A4',
+          '--margin-top',     '38mm',
+          '--margin-bottom',  '20mm',
+          '--margin-left',    '18mm',
+          '--margin-right',   '18mm',
+          '--header-html',    tmpHdr,
+          '--header-spacing', '3',
+          '--footer-html',    tmpFtr,
           '--footer-spacing', '3',
           '--print-media-type',
           '--enable-local-file-access',
           '--disable-smart-shrinking',
-          '--encoding', 'utf-8',
+          '--encoding',       'utf-8',
           tmpHtml, tmpPdf
         ], { maxBuffer: 20 * 1024 * 1024 }, (err) => { if (err) return reject(err); resolve(); });
       });
       offerPdfBuffer = fs.readFileSync(tmpPdf);
-      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpFtr); fs.unlinkSync(tmpPdf); } catch(_) {}
+      try { fs.unlinkSync(tmpHtml); fs.unlinkSync(tmpHdr); fs.unlinkSync(tmpFtr); fs.unlinkSync(tmpPdf); } catch(_) {}
       console.log('[offerLetter.sendEmail] PDF generated successfully');
     } catch (pdfErr) {
       console.error('[offerLetter.sendEmail] PDF generation failed:', pdfErr.message);
