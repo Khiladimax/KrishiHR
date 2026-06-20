@@ -343,6 +343,7 @@
 </div>
 
 <script src="app.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
 const ccEmails  = [];
@@ -821,25 +822,44 @@ document.getElementById('bulk-file')?.addEventListener('change', function() {
 });
 
 function downloadBulkTemplate() {
-  // Build CSV template
   const headers = [
     'Candidate Name','Email','Mobile','Address','Designation','Location',
     'Joining Date','Offer Valid Days','Probation Months','Notice Period Months',
-    'Employee Code','CTC Annual','Basic Monthly','HRA Monthly','Conveyance Monthly',
+    'Employee Code','Employment Type','Contract Months',
+    'CTC Annual','Basic Monthly','HRA Monthly','Conveyance Monthly',
     'Other Allowance','Gratuity Monthly','PF Employee','PF Employer','PF Admin',
     'Professional Tax','Custom Clauses','CC','BCC'
   ];
-  const sample = [
-    'Akshay Rai','akshay@example.com','9876543210','Mumbai',
-    'Remote Sensing Analyst','Mumbai','2026-07-01','7','6','3',
-    'KC001','1250000','25000','12500','0','63515','1202','1800','1800','150','0','','hr@krishicare.com','records@krishicare.com'
+  const sample1 = [
+    'Rahul Sharma','rahul@example.com','9876543210','B-12, Andheri West, Mumbai',
+    'Senior GIS Analyst','Mumbai','2026-08-01',7,6,3,
+    'KCMS-001','permanent',0,
+    1500000,30000,15000,0,76818,1442,1800,1800,150,200,
+    '','hr@krishicare.in',''
   ];
-  const csv = [headers.join(','), sample.join(',')].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'Offer_Letter_Bulk_Template.csv';
-  a.click();
+  const sample2 = [
+    'Amit Kumar','amit@example.com','8877665544','D-78, Jogeshwari East, Mumbai',
+    'Field Survey Executive','Mumbai','2026-07-15',7,0,1,
+    'KCMS-002','contract',12,
+    600000,12000,6000,0,30350,577,1080,1080,90,0,
+    '','hr@krishicare.in',''
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample1, sample2]);
+
+  // Auto-width columns
+  ws['!cols'] = headers.map((h, i) => {
+    let maxLen = h.length;
+    [sample1, sample2].forEach(row => {
+      const val = String(row[i] || '');
+      if (val.length > maxLen) maxLen = val.length;
+    });
+    return { wch: Math.min(maxLen + 4, 35) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Offer Letters');
+  XLSX.writeFile(wb, 'Offer_Letter_Bulk_Template.xlsx');
 }
 
 async function startBulkSend() {
