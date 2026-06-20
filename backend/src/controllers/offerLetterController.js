@@ -204,7 +204,14 @@ function buildOfferLetterHTML(ol) {
     return day + '<sup>' + sup + '</sup> ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
   }
 
-  const LOGO_B64 = 'data:image/png;
+  const LOGO_PATH = path.join(__dirname, '../../../frontend/Logo_kcms.png');
+let LOGO_B64 = '';
+try {
+  const logoBuf = fs.readFileSync(LOGO_PATH);
+  LOGO_B64 = 'data:image/png;base64,' + logoBuf.toString('base64');
+} catch (e) {
+  console.error('Logo file not found at', LOGO_PATH, e.message);
+}
   // ── Signature images ──────────────────────────────────────────────────────
   const sig1HTML = ol.sig1_image
     ? '<img src="' + ol.sig1_image + '" style="height:44px;display:block;margin-bottom:4px;" alt="">'
