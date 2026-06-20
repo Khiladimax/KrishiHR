@@ -74,6 +74,7 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
   const heOrShe = gender === 'female' ? 'She' : 'He';
   const hisOrHer = gender === 'female' ? 'her' : 'his';
   const mrOrMs = gender === 'female' ? 'Ms.' : 'Mr.';
+  const st = emp.separation_type || emp.sep_type || 'resignation';
 
   const hdr = `
     <table class="header-table">
@@ -146,15 +147,21 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
 
   <p style="text-align:center;font-weight:bold;font-size:14px;margin:20px 0;text-decoration:underline;">To Whomsoever It May Concern,</p>
 
-  <p>This is to certify that <strong>${mrOrMs} ${fullName}</strong> (Employee Code: <strong>${emp.employee_code || 'N/A'}</strong>) was employed with <strong>Krishi Care &amp; Management Services Private Limited</strong> from <strong>${joiningDate}</strong> to <strong>${relievingDate}</strong> as <strong>&ldquo;${designation}&rdquo;</strong> in the <strong>${department}</strong> department.</p>
+  <p style="text-align:center;font-weight:bold;font-size:13px;margin-bottom:16px;">Sub: Relieving Letter &ndash; ${mrOrMs} ${fullName} (${emp.employee_code || 'N/A'})</p>
 
-  <p>${heOrShe} has been relieved from ${hisOrHer} duties and responsibilities with effect from <strong>${relievingDate}</strong>.</p>
+  <p>This is to certify that <strong>${mrOrMs} ${fullName}</strong> (Employee Code: <strong>${emp.employee_code || 'N/A'}</strong>) was employed with <strong>Krishi Care &amp; Management Services Private Limited</strong> from <strong>${joiningDate}</strong> to <strong>${relievingDate}</strong>. ${heOrShe} was designated as <strong>&ldquo;${designation}&rdquo;</strong> in the <strong>${department}</strong> department, based at our <strong>${emp.city || emp.location || 'Mumbai'}</strong> office.</p>
 
-  <p>During ${hisOrHer} tenure with us, ${mrOrMs} ${fullName} has performed ${hisOrHer} duties sincerely and to the best of ${hisOrHer} abilities. ${heOrShe} has no outstanding dues or liabilities towards the company as on the date of relieving.</p>
+  <p>${heOrShe} has been relieved from ${hisOrHer} duties and responsibilities with effect from <strong>${relievingDate}</strong>, consequent upon ${hisOrHer} ${(st || 'resignation').toLowerCase()} from the services of the company.</p>
 
-  <p>We wish ${mrOrMs} ${fullName} all the very best in ${hisOrHer} future endeavours.</p>
+  <p>During ${hisOrHer} tenure with the organization, ${mrOrMs} ${fullName} has discharged ${hisOrHer} duties with sincerity, integrity and dedication. ${heOrShe} has demonstrated a high standard of professional conduct and has been a valued member of the team.</p>
 
-  <p>This letter is being issued on ${hisOrHer} request for official purposes.</p>
+  <p>${heOrShe} has completed all necessary formalities including handing over of company assets, documents, and any other materials entrusted to ${hisOrHer} during the course of employment. ${heOrShe} has no outstanding dues, liabilities or obligations towards the company as on the date of relieving.</p>
+
+  <p>The full and final settlement of ${hisOrHer} account shall be processed as per the company&rsquo;s policies and applicable statutory requirements.</p>
+
+  <p>We appreciate ${hisOrHer} contributions during ${hisOrHer} association with the company and wish ${mrOrMs} ${fullName} all the very best in ${hisOrHer} future professional endeavours.</p>
+
+  <p>This certificate is being issued at ${hisOrHer} request and for any legitimate purpose it may serve. It does not constitute a recommendation.</p>
 
   <div class="sig-block">
     <p>Yours truly,</p>
