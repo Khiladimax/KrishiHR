@@ -251,7 +251,35 @@
               </div>
             </div>
 
-            <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+            <!-- Template Selector -->
+            <div style="margin-top:16px;">
+              <label style="font-size:.8rem;font-weight:600;color:#1B5E20;display:block;margin-bottom:4px;">Invoice Style Template</label>
+              <select id="f-template" style="width:100%;padding:8px 10px;border:1px solid #a5d6a7;border-radius:8px;font-size:.88rem;background:#fafff9;">
+                <option value="0">Style 1 — Classic Centered (Helvetica)</option>
+                <option value="1">Style 2 — Left-Aligned Bold (Helvetica)</option>
+                <option value="2">Style 3 — Boxed Header (Courier)</option>
+                <option value="3">Style 4 — Minimalist (Helvetica)</option>
+                <option value="4">Style 5 — Dotted Lines (Times)</option>
+                <option value="5">Style 6 — Large Title (Helvetica)</option>
+                <option value="6">Style 7 — Compact Table (Courier)</option>
+                <option value="7">Style 8 — Right-Aligned Meta (Times)</option>
+                <option value="8">Style 9 — Double Border (Helvetica)</option>
+                <option value="9">Style 10 — Spacious Layout (Times)</option>
+                <option value="10">Style 11 — Side-by-Side (Courier)</option>
+                <option value="11">Style 12 — Bold Caps (Helvetica)</option>
+                <option value="12">Style 13 — Thin Lines (Times)</option>
+                <option value="13">Style 14 — Heavy Border (Courier)</option>
+                <option value="14">Style 15 — Clean Modern (Helvetica)</option>
+                <option value="15">Style 16 — Italic Header (Times)</option>
+                <option value="16">Style 17 — Mono Receipt (Courier)</option>
+                <option value="17">Style 18 — Wide Margins (Helvetica)</option>
+                <option value="18">Style 19 — Dense Layout (Times)</option>
+                <option value="19">Style 20 — Elegant Serif (Times)</option>
+                <option value="random">🎲 Random (auto-pick)</option>
+              </select>
+            </div>
+
+            <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="downloadSinglePDF()" style="flex:1">
                 ⬇ Download Invoice PDF
               </button>
@@ -1709,7 +1737,10 @@ async function downloadSinglePDF() {
     const dt = new Date(d.date);
     d.date = dt.toLocaleDateString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric'});
   }
-  const doc = await buildPDF(d);
+  // Get selected template
+  const tplVal = document.getElementById('f-template').value;
+  const tplIdx = tplVal === 'random' ? Math.floor(Math.random() * 20) : parseInt(tplVal);
+  const doc = await buildPDF(d, tplIdx);
   doc.save(`Invoice_${d.invoiceNo.replace(/\//g,'_')}_${d.name.replace(/\s+/g,'_')}.pdf`);
   toast('Invoice PDF downloaded!', 'success');
   addToHistory(d);
