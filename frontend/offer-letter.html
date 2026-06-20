@@ -211,38 +211,34 @@
           <div class="form-grid">
             <div class="form-group">
               <label>Annual CTC (₹) *</label>
-              <input type="number" id="ol-ctc" placeholder="1250004" oninput="autoCalcSalary()">
+              <input type="number" id="ol-ctc" placeholder="1250004">
             </div>
             <div class="form-group">
               <label>Basic (monthly) ₹</label>
               <input type="number" id="ol-basic" placeholder="25000" oninput="calcGross()">
             </div>
             <div class="form-group">
-              <label>HRA (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <label>HRA (monthly) ₹</label>
               <input type="number" id="ol-hra" placeholder="12500" oninput="calcGross()">
-              <span class="calc-note">Auto = 50% of Basic</span>
             </div>
             <div class="form-group">
               <label>Conveyance (monthly) ₹</label>
               <input type="number" id="ol-conv" value="0" oninput="calcGross()">
             </div>
             <div class="form-group">
-              <label>Other Allowance (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <label>Other Allowance (monthly) ₹</label>
               <input type="number" id="ol-other" placeholder="63515" oninput="calcGross()">
-              <span class="calc-note">Auto = CTC monthly − Basic − HRA − Conv − Gratuity − PF</span>
             </div>
             <div class="form-group">
-              <label>Gratuity (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <label>Gratuity (monthly) ₹</label>
               <input type="number" id="ol-gratuity" placeholder="1202" oninput="calcGross()">
-              <span class="calc-note">Auto = Basic × 4.81%</span>
             </div>
             <div class="form-group">
-              <label>PF Employee (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <label>PF Employee (monthly) ₹</label>
               <input type="number" id="ol-pf-emp" placeholder="1800" oninput="calcGross()">
-              <span class="calc-note">Auto = 12% of Basic (max 1800)</span>
             </div>
             <div class="form-group">
-              <label>PF Employer (monthly) ₹ <span class="auto-tag">auto</span></label>
+              <label>PF Employer (monthly) ₹</label>
               <input type="number" id="ol-pf-er" placeholder="1800" oninput="calcGross()">
             </div>
             <div class="form-group">
@@ -396,31 +392,8 @@ function removeChip(btn, type, val) {
   btn.parentElement.remove();
 }
 
-// ── Auto salary calc ──────────────────────────────────────────────────────────
-function autoCalcSalary() {
-  const ctc = parseFloat(document.getElementById('ol-ctc').value) || 0;
-  if (!ctc) return;
-  // From actual offer letter: basic=25000 from ctc=1250004
-  // Ratio: basic ~ 24% of CTC annually
-  const ctcM = ctc / 12;
-  const basic = Math.round(ctc * 0.24 / 12);
-  const hra   = Math.round(basic * 0.5);
-  const pfEmp = Math.min(Math.round(basic * 0.12), 1800);
-  const pfEr  = pfEmp;
-  const pfAdm = Math.round(pfEr * 0.083) || 150;
-  const grat  = Math.round(basic * 0.0481);
-  const gross = ctcM - pfEr - pfAdm;
-  const other = Math.round(gross - basic - hra - grat);
-
-  document.getElementById('ol-basic').value   = basic;
-  document.getElementById('ol-hra').value     = hra;
-  document.getElementById('ol-gratuity').value = grat;
-  document.getElementById('ol-pf-emp').value  = pfEmp;
-  document.getElementById('ol-pf-er').value   = pfEr;
-  document.getElementById('ol-pf-admin').value = pfAdm;
-  document.getElementById('ol-other').value   = Math.max(0, other);
-  calcGross();
-}
+// ── Auto salary calc (disabled) ───────────────────────────────────────────────
+function autoCalcSalary() { /* disabled — all fields are manual */ }
 
 function calcGross() {
   const n = id => parseFloat(document.getElementById(id).value) || 0;
