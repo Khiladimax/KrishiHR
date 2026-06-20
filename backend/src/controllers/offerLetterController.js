@@ -274,12 +274,12 @@ try {
     width: 210mm; height: 297mm; position: relative;
     margin: 0 auto 20px auto; background: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,.5);
-    padding: 9mm 15mm 30mm 15mm;
+    padding: 6mm 15mm 30mm 15mm;
     page-break-after: always; overflow: hidden;
   }
   .header-table {
     width: 100%; border-bottom: 2px solid #000;
-    padding-bottom: 16px; margin-bottom: 20px;
+    padding-bottom: 23px; margin-bottom: 20px;
     border-collapse: collapse;
   }
   .footer {
