@@ -719,6 +719,8 @@ exports.bulkSend = async (req, res) => {
       const candidateMobile= String(row['Mobile']          || row['mobile']          || row['candidate_mobile'] || '').trim();
       const candidateAddr  = String(row['Address']         || row['address']         || '').trim();
       const customClauses  = String(row['Custom Clauses']  || row['custom_clauses']  || '').trim();
+      const employmentType = String(row['Employment Type'] || row['employment_type'] || 'permanent').trim().toLowerCase();
+      const contractMon    = parseInt(row['Contract Months'] || row['contract_months'] || 0) || 0;
 
       // Salary fields
       const ctcAnnual    = parseFloat(String(row['CTC Annual']         || row['ctc_annual']         || 0).replace(/,/g,'')) || 0;
@@ -777,6 +779,8 @@ exports.bulkSend = async (req, res) => {
         pf_admin_monthly:        pfAdmin,
         professional_tax_monthly: profTax,
         custom_clauses:          customClauses || null,
+        employment_type:         employmentType,
+        contract_months:         contractMon,
         sig1_image:              sig1,
         sig2_image:              sig2,
         status:                  'draft',
