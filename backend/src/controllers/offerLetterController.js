@@ -576,11 +576,11 @@ exports.sendEmail = async (req, res) => {
     }
 
     // 2. Joining Form DOCX — always attach if file exists
-    const joiningFormPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.docx');
+    const joiningFormPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.pdf');
     if (fs.existsSync(joiningFormPath)) {
       const docxBuffer = fs.readFileSync(joiningFormPath);
       attachments.push({
-        name:    'Joining_Form_Krishi_Care.docx',
+        name:    'Joining_Form_Krishi_Care.pdf',
         content: docxBuffer.toString('base64'),
       });
 
@@ -815,9 +815,9 @@ exports.bulkSend = async (req, res) => {
       }];
 
       // Attach joining form if exists
-      const joiningFormPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.docx');
+      const joiningFormPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.pdf');
       if (fs.existsSync(joiningFormPath)) {
-        attachments.push({ name: 'Joining_Form_Krishi_Care.docx', content: fs.readFileSync(joiningFormPath).toString('base64') });
+        attachments.push({ name: 'Joining_Form_Krishi_Care.pdf', content: fs.readFileSync(joiningFormPath).toString('base64') });
       }
 
       const payload = {
