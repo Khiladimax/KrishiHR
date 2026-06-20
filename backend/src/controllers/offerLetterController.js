@@ -352,7 +352,7 @@ try {
 <!-- PAGE 2 -->
 <div class="page">
   ${hdr}
-  <ul style="margin-top:83px;">
+  <ul style="margin-top:40px;">
     <li>You have been engaged on the presumption that the particulars furnished by you in your application are correct. In case the said particular are found to be incorrect or that you have concealed or withheld information or the relevant facts, the services can be terminated from the company without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of period.</li>
     <li>You will not, either during the period of your services of thereafter, disclose divulge or communicate to any other person or group or company any strategic information of the organization or its clients.</li>
     <li>All correspondence addressed to you by the company including press and other copies of such correspondence and all vouchers, books, records, including all note books containing notes or records of business or prices or other market data, samples and/or other papers belonging to the company, circulars and all other relevant papers and documents of any nature whatsoever relating to the company&rsquo;s business, which shall come into your possession in the course of your employment shall be the absolute property of the company and you shall, at any time during your employment or upon termination there for any reason whatsoever, deliver the same to the company and without claiming any lien thereon.</li>
@@ -375,7 +375,7 @@ try {
 <!-- PAGE 3: ANNEXURE -->
 <div class="page">
   ${hdr}
-  <h3 style="text-align:center;text-decoration:underline;margin-top:73px;font-size:16px;">Annexure I (Annual Cost to Company and Other Benefits)</h3>
+  <h3 style="text-align:center;text-decoration:underline;margin-top:35px;font-size:16px;">Annexure I (Annual Cost to Company and Other Benefits)</h3>
   <p style="margin-top:10px;font-size:13px;">
     <strong>Name:</strong> ${ol.candidate_name||''}<br>
     <strong>Designation:</strong> ${ol.designation||''}<br>
