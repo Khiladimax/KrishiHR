@@ -190,7 +190,8 @@ function buildOfferLetterHTML(ol) {
   } else if (empType === 'provision') {
     empTypeLabel = ' on a <strong>Provisional basis</strong>';
   } else {
-    empTypeLabel = ' on a <strong>Permanent basis</strong>';
+    // Permanent is the default/implied employment type — no need to call it out.
+    empTypeLabel = '';
   }
 
   function joiningDateHTML(d) {
@@ -282,7 +283,7 @@ function buildOfferLetterHTML(ol) {
     border-top: 1px solid #000; padding-top: 5px;
     font-family: 'Arial',sans-serif; font-weight: bold;
   }
-  .date-row { text-align: right; font-weight: bold; font-size: 13.5px; margin-bottom: 15px; }
+  .date-row { text-align: right; font-weight: bold; font-size: 13.5px; margin-top: 40px; margin-bottom: 15px; }
   .candidate-info { margin-bottom: 15px; font-size: 14px; line-height: 1.3; }
   .subject-line { text-align: center; font-weight: bold; text-decoration: underline; margin: 15px 0; font-size: 14.5px; }
   p { margin: 8px 0; text-align: justify; font-size: 13px; }
