@@ -116,7 +116,7 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
   }
   .header-table {
     width: 100%; border-bottom: 2px solid #000;
-    padding-bottom: 10px; margin-bottom: 20px;
+    padding-bottom: 22px; margin-bottom: 20px;
     border-collapse: collapse;
   }
   .footer {
