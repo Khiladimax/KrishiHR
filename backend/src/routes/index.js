@@ -878,8 +878,11 @@ router.post('/offer-letters/bulk-send', authenticate, authorize('hr'), xlsxUploa
 
 // ── Relieving Letters ─────────────────────────────────────────────────────
 router.get ('/relieving-letters/eligible',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.getEligible);
+router.get ('/relieving-letters/preview/:id',  authenticate, authorize('hr','admin','super_admin'), relievingCtrl.preview);
+router.put ('/relieving-letters/update-email/:id', authenticate, authorize('hr','admin','super_admin'), relievingCtrl.updateEmail);
 router.post('/relieving-letters/send/:id',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.sendRelievingLetter);
 router.post('/relieving-letters/bulk-send',    authenticate, authorize('hr','admin','super_admin'), relievingCtrl.bulkSend);
+router.post('/relieving-letters/bulk-send-excel', authenticate, authorize('hr','admin','super_admin'), xlsxUpload.single('file'), relievingCtrl.bulkSendExcel);
 
 // ── Test Email (debug only) ───────────────────────────────────────────────────
 router.get('/test-email', authenticate, async (req, res) => {

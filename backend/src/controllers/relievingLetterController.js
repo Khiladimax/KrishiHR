@@ -180,6 +180,60 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
 </html>`;
 }
 
+// ── GET /api/relieving-letters/preview/:id ───────────────────────────────────
+// Generate and return PDF for preview (no email sent)
+exports.preview = async (req, res) => {
+  try {
+    const empId = parseInt(req.params.id);
+    const result = await db.query(`
+      SELECT e.*, d.name AS department_name, des.title AS designation_title,
+             s.last_working_date
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN separations s ON s.employee_id = e.id AND s.status = 'completed'
+      WHERE e.id = $1 AND e.is_active = false
+    `, [empId]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Employee not found or still active' });
+    }
+
+    const emp = result.rows[0];
+    const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
+    const sig1 = sigRow.rows[0]?.sig1_image || null;
+    const sig2 = sigRow.rows[0]?.sig2_image || null;
+
+    const html = buildRelievingLetterHTML(emp, sig1, sig2);
+    const pdfBuffer = await htmlToPdf(html);
+
+    const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Relieving_Letter_${fullName.replace(/\s+/g, '_')}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[relievingLetter.preview]', err.message);
+    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+  }
+};
+
+// ── PUT /api/relieving-letters/update-email/:id ─────────────────────────────
+// Update alternate_email for an employee
+exports.updateEmail = async (req, res) => {
+  try {
+    const empId = parseInt(req.params.id);
+    const { alternate_email } = req.body;
+    if (!alternate_email || !alternate_email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Valid email required' });
+    }
+    await db.query('UPDATE employees SET alternate_email = $1 WHERE id = $2', [alternate_email.trim(), empId]);
+    res.json({ success: true, message: 'Email updated' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 // ── GET /api/relieving-letters/eligible ──────────────────────────────────────
 // List all inactive employees eligible for relieving letter
 exports.getEligible = async (req, res) => {
@@ -225,6 +279,7 @@ exports.sendRelievingLetter = async (req, res) => {
     }
 
     const emp = result.rows[0];
+    const { cc = [], bcc = [] } = req.body;
     const personalEmail = emp.alternate_email;
 
     if (!personalEmail || !personalEmail.includes('@')) {
@@ -273,6 +328,12 @@ exports.sendRelievingLetter = async (req, res) => {
         content: pdfBuffer.toString('base64'),
       }],
     };
+
+    // Add CC/BCC if provided
+    const ccList = (Array.isArray(cc) ? cc : []).map(e => typeof e === 'string' ? { email: e.trim() } : e).filter(e => e.email);
+    const bccList = (Array.isArray(bcc) ? bcc : []).map(e => typeof e === 'string' ? { email: e.trim() } : e).filter(e => e.email);
+    if (ccList.length) payload.cc = ccList;
+    if (bccList.length) payload.bcc = bccList;
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (!BREVO_KEY || process.env.EMAIL_ENABLED !== 'true') {
@@ -418,6 +479,160 @@ exports.bulkSend = async (req, res) => {
 
   } catch (err) {
     console.error('[relievingLetter.bulkSend]', err.message);
+    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+  }
+};
+
+
+// ── POST /api/relieving-letters/bulk-send-excel ─────────────────────────────
+// Upload Excel with employee IDs/codes → send relieving letters
+exports.bulkSendExcel = async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (!rows.length) return res.status(400).json({ success: false, message: 'Excel is empty' });
+
+    const ccRaw  = String(rows[0]['CC']  || rows[0]['cc']  || '').split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+    const bccRaw = String(rows[0]['BCC'] || rows[0]['bcc'] || '').split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+
+    const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
+    const sig1 = sigRow.rows[0]?.sig1_image || null;
+    const sig2 = sigRow.rows[0]?.sig2_image || null;
+
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    const emailEnabled = process.env.EMAIL_ENABLED === 'true';
+
+    const browser = await launchBrowser();
+    const results = [];
+    let sent = 0, failed = 0;
+
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 2;
+        const empCode = String(row['Employee Code'] || row['employee_code'] || '').trim();
+        const empEmail = String(row['Personal Email'] || row['Email'] || row['alternate_email'] || '').trim();
+
+        if (!empCode && !empEmail) {
+          results.push({ row: rowNum, name: '', email: '', status: 'failed', reason: 'No employee code or email' });
+          failed++;
+          continue;
+        }
+
+        // Find employee by code or email
+        let empResult;
+        if (empCode) {
+          empResult = await db.query(`
+            SELECT e.*, d.name AS department_name, des.title AS designation_title, s.last_working_date
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN designations des ON e.designation_id = des.id
+            LEFT JOIN separations s ON s.employee_id = e.id AND s.status = 'completed'
+            WHERE e.employee_code = $1 AND e.is_active = false
+          `, [empCode]);
+        } else {
+          empResult = await db.query(`
+            SELECT e.*, d.name AS department_name, des.title AS designation_title, s.last_working_date
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN designations des ON e.designation_id = des.id
+            LEFT JOIN separations s ON s.employee_id = e.id AND s.status = 'completed'
+            WHERE e.alternate_email = $1 AND e.is_active = false
+          `, [empEmail]);
+        }
+
+        if (!empResult.rows.length) {
+          results.push({ row: rowNum, name: empCode, email: empEmail, status: 'failed', reason: 'Employee not found or still active' });
+          failed++;
+          continue;
+        }
+
+        const emp = empResult.rows[0];
+        const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim();
+
+        // Use email from Excel if provided, otherwise use alternate_email from DB
+        const targetEmail = empEmail || emp.alternate_email;
+        if (!targetEmail || !targetEmail.includes('@')) {
+          results.push({ row: rowNum, name: fullName, email: '', status: 'failed', reason: 'No personal email' });
+          failed++;
+          continue;
+        }
+        if (targetEmail.toLowerCase().includes('@krishicare.in')) {
+          results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'failed', reason: 'Company email — need personal' });
+          failed++;
+          continue;
+        }
+
+        // Update alternate_email in DB if provided from Excel
+        if (empEmail && empEmail !== emp.alternate_email) {
+          await db.query('UPDATE employees SET alternate_email = $1 WHERE id = $2', [empEmail, emp.id]);
+        }
+
+        try {
+          const html = buildRelievingLetterHTML(emp, sig1, sig2);
+          const pdfBuffer = await htmlToPdf(html, browser);
+
+          const coverHtml = `<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;line-height:1.7;max-width:600px;">
+            <div style="background:#1B5E20;padding:16px 24px;border-radius:8px 8px 0 0;">
+              <span style="color:#fff;font-size:16px;font-weight:700;">KrishiHR</span>
+              <span style="color:#A5D6A7;font-size:12px;margin-left:8px;">Krishi Care &amp; Management Services</span>
+            </div>
+            <div style="border:1px solid #e0e0e0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+              <p>Dear ${emp.first_name},</p>
+              <p>Please find attached your <strong>Relieving Letter</strong>.</p>
+              <p>We wish you all the very best in your future endeavours.</p>
+              <p>Warm regards,<br>Human Resource Team<br>Krishi Care &amp; Management Services Pvt. Ltd.</p>
+            </div></div>`;
+
+          const payload = {
+            sender: { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+            to: [{ email: targetEmail, name: fullName }],
+            subject: `Relieving Letter — ${fullName} | Krishi Care & Management Services`,
+            htmlContent: coverHtml,
+            attachment: [{ name: `Relieving_Letter_${fullName.replace(/\s+/g,'_')}.pdf`, content: pdfBuffer.toString('base64') }],
+          };
+          if (ccRaw.length) payload.cc = ccRaw.map(e => ({ email: e }));
+          if (bccRaw.length) payload.bcc = bccRaw.map(e => ({ email: e }));
+
+          if (!BREVO_KEY || !emailEnabled) {
+            await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
+            results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'sent', reason: '[Simulated]' });
+            sent++;
+          } else {
+            const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+              body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+              await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
+              results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'sent', reason: '' });
+              sent++;
+            } else {
+              const errText = await resp.text();
+              results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'failed', reason: errText.substring(0, 120) });
+              failed++;
+            }
+          }
+          await new Promise(r => setTimeout(r, 300));
+        } catch (innerErr) {
+          results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'failed', reason: innerErr.message });
+          failed++;
+        }
+      }
+    } finally {
+      await browser.close();
+    }
+
+    res.json({ success: true, total: rows.length, sent, failed, results });
+  } catch (err) {
+    console.error('[relievingLetter.bulkSendExcel]', err.message);
     res.status(500).json({ success: false, message: `Server error: ${err.message}` });
   }
 };

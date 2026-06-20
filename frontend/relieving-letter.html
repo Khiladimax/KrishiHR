@@ -8,35 +8,52 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <style>
-    .rl-container { max-width:1100px; margin:0 auto; padding:24px 16px; }
-    .rl-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+    .rl-container { max-width:1200px; margin:0 auto; padding:20px 16px; }
+    .rl-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
     .rl-header h2 { font-size:20px; font-weight:700; color:#1B5E20; margin:0; }
-    .rl-stats { display:flex; gap:12px; flex-wrap:wrap; }
-    .rl-stat { background:#f0fdf4; border:1px solid #c8e6c9; border-radius:8px; padding:10px 18px; text-align:center; }
-    .rl-stat .num { font-size:20px; font-weight:700; color:#1B5E20; }
-    .rl-stat .lbl { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
-    .rl-toolbar { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-    .rl-toolbar input { padding:8px 14px; border:1px solid #ccc; border-radius:6px; font-size:13px; min-width:220px; }
-    .btn-bulk { background:#E65100; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
-    .btn-bulk:disabled { opacity:.5; cursor:not-allowed; }
+    .rl-stats { display:flex; gap:10px; flex-wrap:wrap; }
+    .rl-stat { background:#f0fdf4; border:1px solid #c8e6c9; border-radius:8px; padding:8px 16px; text-align:center; }
+    .rl-stat .num { font-size:18px; font-weight:700; color:#1B5E20; }
+    .rl-stat .lbl { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
+    .rl-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+    .rl-toolbar input[type="text"] { padding:8px 14px; border:1px solid #ccc; border-radius:6px; font-size:13px; min-width:200px; }
+    .btn { border:none; border-radius:6px; padding:7px 16px; font-size:12px; font-weight:600; cursor:pointer; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-green { background:#1B5E20; color:#fff; }
+    .btn-green:hover:not(:disabled) { background:#2E7D32; }
+    .btn-orange { background:#E65100; color:#fff; }
+    .btn-purple { background:#6A1B9A; color:#fff; }
+    .btn-blue { background:#1565C0; color:#fff; }
+    .btn-sm { padding:5px 12px; font-size:11px; }
     .rl-table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.08); }
-    .rl-table th { background:#1B5E20; color:#fff; padding:10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; text-align:left; }
-    .rl-table td { padding:10px 12px; font-size:13px; border-bottom:1px solid #eee; vertical-align:middle; }
+    .rl-table th { background:#1B5E20; color:#fff; padding:9px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; text-align:left; white-space:nowrap; }
+    .rl-table td { padding:8px 10px; font-size:12px; border-bottom:1px solid #eee; vertical-align:middle; }
     .rl-table tr:hover td { background:#f0fdf4; }
-    .rl-table .chk { width:18px; height:18px; cursor:pointer; }
-    .badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+    .rl-table .chk { width:16px; height:16px; cursor:pointer; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:600; }
     .badge-sent { background:#c8e6c9; color:#1B5E20; }
     .badge-pending { background:#fff3e0; color:#E65100; }
     .badge-no-email { background:#ffcdd2; color:#b71c1c; }
-    .btn-send { background:#1B5E20; color:#fff; border:none; border-radius:5px; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; }
-    .btn-send:disabled { opacity:.5; cursor:not-allowed; }
-    .btn-send:hover:not(:disabled) { background:#2E7D32; }
-    .empty-state { text-align:center; padding:60px 20px; color:#888; }
-    .empty-state h3 { font-size:18px; margin-bottom:8px; }
-    @media (max-width:768px) {
-      .rl-table { font-size:12px; }
-      .rl-table th, .rl-table td { padding:8px 6px; }
-    }
+    .email-cell { display:flex; align-items:center; gap:4px; }
+    .email-cell input { border:1px solid #ccc; border-radius:4px; padding:3px 6px; font-size:11px; width:160px; }
+    .email-cell .save-email { background:#1B5E20; color:#fff; border:none; border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer; }
+    .empty-state { text-align:center; padding:50px 20px; color:#888; }
+    /* Modal */
+    .modal-bg { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:999; justify-content:center; align-items:center; }
+    .modal-bg.active { display:flex; }
+    .modal { background:#fff; border-radius:12px; padding:24px; max-width:550px; width:95%; max-height:85vh; overflow-y:auto; position:relative; }
+    .modal h3 { margin:0 0 4px; font-size:17px; color:#1B5E20; }
+    .modal .sub { color:#666; font-size:12px; margin-bottom:16px; }
+    .modal .close-btn { position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#666; }
+    .modal label { display:block; font-size:12px; font-weight:600; margin:10px 0 4px; color:#333; }
+    .modal input, .modal select { width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; box-sizing:border-box; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .progress-bar { width:100%; height:4px; background:#eee; border-radius:2px; margin-top:12px; }
+    .progress-fill { height:100%; background:#1B5E20; border-radius:2px; transition:width .3s; }
+    .result-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:12px; }
+    .result-table th { background:#f5f5f5; padding:6px 8px; text-align:left; }
+    .result-table td { padding:6px 8px; border-bottom:1px solid #eee; }
+    @media (max-width:768px) { .rl-table { font-size:11px; } .rl-table th,.rl-table td { padding:6px 5px; } .form-row { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -47,9 +64,7 @@
     <div class="logo-mark" id="sidebar-logo-mark">
       <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
-    <div>
-      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div>
-    </div>
+    <div><div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div></div>
   </div>
   <nav id="sidebar-nav"></nav>
   <div class="sidebar-footer">
@@ -78,23 +93,63 @@
       <h2>📄 Relieving Letters</h2>
       <div class="rl-stats">
         <div class="rl-stat"><div class="num" id="stat-total">0</div><div class="lbl">Total Separated</div></div>
-        <div class="rl-stat"><div class="num" id="stat-sent">0</div><div class="lbl">Letters Sent</div></div>
+        <div class="rl-stat"><div class="num" id="stat-sent">0</div><div class="lbl">Sent</div></div>
         <div class="rl-stat"><div class="num" id="stat-pending">0</div><div class="lbl">Pending</div></div>
       </div>
     </div>
 
     <div class="rl-toolbar">
       <input type="text" id="search-input" placeholder="Search name, code, email…" oninput="renderTable()">
-      <button class="btn-bulk" id="btn-bulk-send" disabled onclick="bulkSend()">📤 Send Selected (<span id="selected-count">0</span>)</button>
+      <button class="btn btn-green" id="btn-bulk-send" disabled onclick="bulkSendSelected()">📤 Send Selected (<span id="selected-count">0</span>)</button>
+      <button class="btn btn-purple" onclick="openBulkExcelModal()">📊 Bulk by Excel</button>
     </div>
 
-    <div id="table-wrap">
-      <div class="empty-state"><h3>Loading…</h3></div>
+    <!-- CC/BCC row -->
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;">
+        <label style="font-size:11px;font-weight:600;color:#555;">CC (comma separated)</label>
+        <input type="text" id="cc-input" placeholder="hr@krishicare.in" style="width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:5px;font-size:12px;">
+      </div>
+      <div style="flex:1;min-width:180px;">
+        <label style="font-size:11px;font-weight:600;color:#555;">BCC (comma separated)</label>
+        <input type="text" id="bcc-input" placeholder="records@krishicare.in" style="width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:5px;font-size:12px;">
+      </div>
     </div>
+
+    <div id="table-wrap"><div class="empty-state"><h3>Loading…</h3></div></div>
+  </div>
+</div>
+
+<!-- Bulk Excel Modal -->
+<div class="modal-bg" id="bulk-excel-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeBulkExcelModal()">×</button>
+    <h3>📊 Bulk Send Relieving Letters</h3>
+    <p class="sub">Upload Excel → Generate PDF → Send individually to each employee's personal email</p>
+
+    <div style="background:#f3e5f5;border-radius:8px;padding:14px;margin-bottom:14px;">
+      <strong style="font-size:13px;">Step 1 — Download Excel Template</strong>
+      <p style="font-size:12px;color:#555;margin:4px 0;">Fill employee codes + personal emails. CC and BCC in the first row apply to all.</p>
+      <button class="btn btn-purple btn-sm" onclick="downloadBulkTemplate()">⬇ Download Template</button>
+    </div>
+
+    <div>
+      <strong style="font-size:13px;">Step 2 — Upload Filled Excel</strong>
+      <input type="file" id="bulk-file" accept=".xlsx,.xls" style="display:block;width:100%;padding:10px;border:2px dashed #6A1B9A;border-radius:8px;cursor:pointer;font-size:12px;box-sizing:border-box;margin-top:6px;">
+    </div>
+
+    <button class="btn btn-orange" id="bulk-excel-btn" style="width:100%;margin-top:14px;padding:12px;" onclick="startBulkExcelSend()">📤 Generate PDFs & Send All</button>
+
+    <div id="bulk-progress" style="display:none;">
+      <p style="font-size:12px;margin-top:10px;"><strong>Progress</strong> <span id="bulk-status" style="float:right;color:#666;">Uploading…</span></p>
+      <div class="progress-bar"><div class="progress-fill" id="bulk-fill" style="width:0%"></div></div>
+    </div>
+    <div id="bulk-results"></div>
   </div>
 </div>
 
 <script src="app.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 Auth.guard();
 buildSidebar('relieving-letter.html');
@@ -103,8 +158,8 @@ let employees = [];
 
 async function loadData() {
   const data = await api('GET', '/relieving-letters/eligible');
-  if (!data || !data.success) {
-    document.getElementById('table-wrap').innerHTML = '<div class="empty-state"><h3>Failed to load</h3><p>' + (data?.message || 'Server error') + '</p></div>';
+  if (!data?.success) {
+    document.getElementById('table-wrap').innerHTML = '<div class="empty-state"><h3>Failed to load</h3></div>';
     return;
   }
   employees = data.data || [];
@@ -123,52 +178,51 @@ function updateStats() {
 function renderTable() {
   const q = (document.getElementById('search-input').value || '').toLowerCase();
   const filtered = employees.filter(e => {
-    const name = ((e.first_name || '') + ' ' + (e.last_name || '')).toLowerCase();
-    const code = (e.employee_code || '').toLowerCase();
-    const email = (e.alternate_email || '').toLowerCase();
-    return !q || name.includes(q) || code.includes(q) || email.includes(q);
+    const name = ((e.first_name||'') + ' ' + (e.last_name||'')).toLowerCase();
+    return !q || name.includes(q) || (e.employee_code||'').toLowerCase().includes(q) || (e.alternate_email||'').toLowerCase().includes(q);
   });
 
   if (!filtered.length) {
-    document.getElementById('table-wrap').innerHTML = '<div class="empty-state"><h3>No separated employees found</h3><p>Employees who are terminated, resigned, or separated will appear here.</p></div>';
+    document.getElementById('table-wrap').innerHTML = '<div class="empty-state"><h3>No separated employees found</h3></div>';
     return;
   }
 
-  let html = `<table class="rl-table">
-    <thead><tr>
-      <th><input type="checkbox" class="chk" id="select-all" onchange="toggleAll(this)"></th>
-      <th>Employee</th>
-      <th>Designation</th>
-      <th>Joining Date</th>
-      <th>Relieving Date</th>
-      <th>Personal Email</th>
-      <th>Status</th>
-      <th>Action</th>
-    </tr></thead><tbody>`;
+  let html = `<table class="rl-table"><thead><tr>
+    <th><input type="checkbox" class="chk" onchange="toggleAll(this)"></th>
+    <th>Employee</th><th>Designation</th><th>Joining</th><th>Relieving</th>
+    <th>Personal Email</th><th>Status</th><th>Actions</th>
+  </tr></thead><tbody>`;
 
   for (const e of filtered) {
-    const name = ((e.first_name || '') + ' ' + (e.last_name || '')).trim();
-    const personalEmail = e.alternate_email || '';
-    const hasEmail = personalEmail && personalEmail.includes('@') && !personalEmail.toLowerCase().includes('@krishicare.in');
+    const name = ((e.first_name||'') + ' ' + (e.last_name||'')).trim();
+    const pe = e.alternate_email || '';
+    const hasEmail = pe && pe.includes('@') && !pe.toLowerCase().includes('@krishicare.in');
     const isSent = !!e.relieving_letter_sent_at;
-    const joinDate = e.joining_date ? new Date(e.joining_date).toLocaleDateString('en-IN') : '—';
-    const relDate = (e.separation_date || e.last_working_date) ? new Date(e.separation_date || e.last_working_date).toLocaleDateString('en-IN') : '—';
-    const sepType = e.separation_type || e.sep_type || '';
+    const jd = e.joining_date ? new Date(e.joining_date).toLocaleDateString('en-IN') : '—';
+    const rd = (e.separation_date||e.last_working_date) ? new Date(e.separation_date||e.last_working_date).toLocaleDateString('en-IN') : '—';
+    const st = e.separation_type||e.sep_type||'';
 
-    let badge = '';
-    if (isSent) badge = '<span class="badge badge-sent">✓ Sent</span>';
-    else if (!hasEmail) badge = '<span class="badge badge-no-email">No Email</span>';
-    else badge = '<span class="badge badge-pending">Pending</span>';
+    let badge = isSent ? '<span class="badge badge-sent">✓ Sent</span>'
+      : !hasEmail ? '<span class="badge badge-no-email">No Email</span>'
+      : '<span class="badge badge-pending">Pending</span>';
 
     html += `<tr>
-      <td><input type="checkbox" class="chk row-chk" data-id="${e.id}" ${!hasEmail ? 'disabled' : ''} onchange="updateSelected()"></td>
-      <td><strong>${name}</strong><br><span style="color:#888;font-size:11px;">${e.employee_code || ''}</span></td>
-      <td>${e.designation_title || '—'}<br><span style="color:#888;font-size:11px;">${e.department_name || ''}</span></td>
-      <td>${joinDate}</td>
-      <td>${relDate}${sepType ? '<br><span style="color:#888;font-size:11px;">'+sepType+'</span>' : ''}</td>
-      <td style="font-size:12px;">${personalEmail || '<em style="color:#c62828;">Not set</em>'}</td>
+      <td><input type="checkbox" class="chk row-chk" data-id="${e.id}" ${!hasEmail?'disabled':''} onchange="updateSelected()"></td>
+      <td><strong>${name}</strong><br><span style="color:#888;font-size:10px">${e.employee_code||''}</span></td>
+      <td style="font-size:11px">${e.designation_title||'—'}<br><span style="color:#888">${e.department_name||''}</span></td>
+      <td style="font-size:11px">${jd}</td>
+      <td style="font-size:11px">${rd}${st?'<br><span style="color:#888">'+st+'</span>':''}</td>
+      <td>
+        <div class="email-cell">
+          <input value="${pe}" id="email-${e.id}" placeholder="personal@gmail.com">
+          <button class="save-email" onclick="saveEmail(${e.id})">✓</button>
+        </div>
+      </td>
       <td>${badge}</td>
-      <td><button class="btn-send" ${!hasEmail ? 'disabled title="Set personal email first"' : ''} onclick="sendOne(${e.id}, this)">📤 Send</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-blue btn-sm" onclick="previewLetter(${e.id})" title="Preview PDF">👁</button>
+        <button class="btn btn-green btn-sm" ${!hasEmail?'disabled':''} onclick="sendOne(${e.id},this)">📤</button>
+      </td>
     </tr>`;
   }
 
@@ -177,74 +231,119 @@ function renderTable() {
   updateSelected();
 }
 
-function toggleAll(el) {
-  document.querySelectorAll('.row-chk:not(:disabled)').forEach(c => c.checked = el.checked);
-  updateSelected();
-}
+function toggleAll(el) { document.querySelectorAll('.row-chk:not(:disabled)').forEach(c=>c.checked=el.checked); updateSelected(); }
 
 function updateSelected() {
-  const checked = document.querySelectorAll('.row-chk:checked');
-  document.getElementById('selected-count').textContent = checked.length;
-  document.getElementById('btn-bulk-send').disabled = checked.length === 0;
+  const n = document.querySelectorAll('.row-chk:checked').length;
+  document.getElementById('selected-count').textContent = n;
+  document.getElementById('btn-bulk-send').disabled = n === 0;
+}
+
+async function saveEmail(empId) {
+  const email = document.getElementById('email-' + empId).value.trim();
+  if (!email || !email.includes('@')) { toast('Enter a valid email', 'error'); return; }
+  const data = await api('PUT', `/relieving-letters/update-email/${empId}`, { alternate_email: email });
+  if (data?.success) { toast('Email saved', 'success'); loadData(); }
+  else toast(data?.message || 'Failed', 'error');
+}
+
+function previewLetter(empId) {
+  window.open(API_BASE + `/relieving-letters/preview/${empId}?token=${Auth.getToken()}`, '_blank');
+}
+
+function getCcBcc() {
+  const cc = document.getElementById('cc-input').value.split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+  const bcc = document.getElementById('bcc-input').value.split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+  return { cc, bcc };
 }
 
 async function sendOne(empId, btn) {
-  btn.disabled = true;
-  btn.textContent = '⏳…';
-  try {
-    const data = await api('POST', `/relieving-letters/send/${empId}`);
-    if (data?.success) {
-      toast(data.message, 'success');
-      loadData();
-    } else {
-      toast(data?.message || 'Failed', 'error');
-      btn.disabled = false;
-      btn.textContent = '📤 Send';
-    }
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-    btn.disabled = false;
-    btn.textContent = '📤 Send';
-  }
+  btn.disabled = true; btn.textContent = '⏳';
+  const { cc, bcc } = getCcBcc();
+  const data = await api('POST', `/relieving-letters/send/${empId}`, { cc, bcc });
+  if (data?.success) { toast(data.message, 'success'); loadData(); }
+  else { toast(data?.message || 'Failed', 'error'); btn.disabled = false; btn.textContent = '📤'; }
 }
 
-async function bulkSend() {
-  const ids = Array.from(document.querySelectorAll('.row-chk:checked')).map(c => parseInt(c.dataset.id));
+async function bulkSendSelected() {
+  const ids = Array.from(document.querySelectorAll('.row-chk:checked')).map(c=>parseInt(c.dataset.id));
   if (!ids.length) return;
   if (!confirm(`Send relieving letters to ${ids.length} employee(s)?`)) return;
 
   const btn = document.getElementById('btn-bulk-send');
-  btn.disabled = true;
-  btn.innerHTML = '⏳ Processing…';
+  btn.disabled = true; btn.innerHTML = '⏳ Processing…';
+
+  const resp = await fetch(API_BASE + '/relieving-letters/bulk-send', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+Auth.getToken()},
+    body:JSON.stringify({ employee_ids:ids })
+  });
+  const data = await resp.json();
+
+  if (data?.success) {
+    toast(`Done — ${data.sent} sent, ${data.failed} failed`, data.failed?'error':'success');
+    if (data.failed) alert('Failed:\n' + data.results.filter(r=>r.status==='failed').map(r=>`${r.name}: ${r.reason}`).join('\n'));
+    loadData();
+  } else toast(data?.message||'Failed','error');
+
+  btn.innerHTML = '📤 Send Selected (<span id="selected-count">0</span>)'; updateSelected();
+}
+
+// ── Bulk by Excel ─────────────────────────────────────────────────
+function openBulkExcelModal() { document.getElementById('bulk-excel-modal').classList.add('active'); }
+function closeBulkExcelModal() { document.getElementById('bulk-excel-modal').classList.remove('active'); document.getElementById('bulk-results').innerHTML = ''; }
+
+function downloadBulkTemplate() {
+  const headers = ['Employee Code','Personal Email','CC','BCC'];
+  const sample = ['KCMS-2024-018','akshay.rai@gmail.com','hr@krishicare.in','records@krishicare.in'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 20) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Relieving Letters');
+  XLSX.writeFile(wb, 'Relieving_Letter_Bulk_Template.xlsx');
+}
+
+async function startBulkExcelSend() {
+  const fileInput = document.getElementById('bulk-file');
+  if (!fileInput.files.length) { toast('Select an Excel file', 'error'); return; }
+
+  const btn = document.getElementById('bulk-excel-btn');
+  btn.disabled = true; btn.textContent = '⏳ Processing…';
+  document.getElementById('bulk-progress').style.display = 'block';
+  document.getElementById('bulk-fill').style.width = '30%';
+  document.getElementById('bulk-status').textContent = 'Uploading & processing…';
+
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
 
   try {
-    const token = Auth.getToken();
-    const resp = await fetch(API_BASE + '/relieving-letters/bulk-send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ employee_ids: ids })
+    const resp = await fetch(API_BASE + '/relieving-letters/bulk-send-excel', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+Auth.getToken()},
+      body:fd
     });
     const data = await resp.json();
+    document.getElementById('bulk-fill').style.width = '100%';
+    document.getElementById('bulk-status').textContent = 'Complete';
 
     if (data?.success) {
-      let msg = `Sent: ${data.sent}, Failed: ${data.failed}`;
-      if (data.failed > 0) {
-        const failedList = data.results.filter(r => r.status === 'failed').map(r => `${r.name}: ${r.reason}`).join('\n');
-        msg += '\n\nFailed:\n' + failedList;
+      let rhtml = `<p style="margin-top:10px;font-weight:600;">✅ Sent: ${data.sent} | ❌ Failed: ${data.failed}</p>`;
+      rhtml += '<table class="result-table"><thead><tr><th>Row</th><th>Name</th><th>Email</th><th>Status</th><th>Reason</th></tr></thead><tbody>';
+      for (const r of data.results) {
+        const color = r.status === 'sent' ? '#1B5E20' : '#c62828';
+        rhtml += `<tr><td>${r.row}</td><td>${r.name}</td><td>${r.email}</td><td style="color:${color};font-weight:600">${r.status}</td><td style="font-size:11px">${r.reason||'—'}</td></tr>`;
       }
-      toast(`Bulk send complete — ${data.sent} sent, ${data.failed} failed`, data.failed ? 'error' : 'success');
-      if (data.failed > 0) alert(msg);
+      rhtml += '</tbody></table>';
+      document.getElementById('bulk-results').innerHTML = rhtml;
       loadData();
     } else {
-      toast(data?.message || 'Failed', 'error');
+      document.getElementById('bulk-results').innerHTML = `<p style="color:#c62828">Error: ${data?.message||'Unknown error'}</p>`;
     }
   } catch (err) {
-    toast('Error: ' + err.message, 'error');
+    document.getElementById('bulk-results').innerHTML = `<p style="color:#c62828">Error: ${err.message}</p>`;
   }
 
-  btn.disabled = false;
-  btn.innerHTML = '📤 Send Selected (<span id="selected-count">0</span>)';
-  updateSelected();
+  btn.disabled = false; btn.textContent = '📤 Generate PDFs & Send All';
 }
 
 loadData();
