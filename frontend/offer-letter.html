@@ -880,7 +880,7 @@ async function startBulkSend() {
   fd.append('file', fileInput.files[0]);
 
   try {
-    const resp = await fetch('/api/offer-letters/bulk-send', {
+    const resp = await fetch(API_BASE + '/offer-letters/bulk-send', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       body: fd,
