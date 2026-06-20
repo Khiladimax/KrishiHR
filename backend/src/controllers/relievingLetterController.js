@@ -55,7 +55,7 @@ function formatDatePlain(d) {
 }
 
 // ── Build Relieving Letter HTML ─────────────────────────────────────────────
-function buildRelievingLetterHTML(emp) {
+function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
   const LOGO_PATH = path.join(__dirname, '../../../frontend/Logo_kcms.png');
   let LOGO_B64 = '';
   try {
@@ -161,8 +161,15 @@ function buildRelievingLetterHTML(emp) {
   <div class="sig-block">
     <p>Yours truly,</p>
     <p>For <strong>Krishi Care &amp; Management Services Private Limited,</strong></p>
-    <div style="margin-top:50px;">
-      <p>Authorized Signatory<br>Human Resource Department</p>
+    <div class="dual-signature">
+      <div class="sig-left">
+        ${sig1Image ? '<img src="' + sig1Image + '" style="height:44px;display:block;margin-bottom:4px;">' : '<div style="height:44px;"></div>'}
+        <p>Authorized Signatory</p>
+      </div>
+      <div class="sig-right">
+        ${sig2Image ? '<img src="' + sig2Image + '" style="height:44px;display:block;margin-left:auto;margin-bottom:4px;">' : '<div style="height:44px;"></div>'}
+        <p>(Authorized Signatory)<br><br>Human Resource</p>
+      </div>
     </div>
   </div>
 
@@ -229,8 +236,13 @@ exports.sendRelievingLetter = async (req, res) => {
       return res.status(400).json({ success: false, message: `Personal email must not be a company email (@krishicare.in). Please set a personal email (Gmail, Yahoo, etc.) in the alternate email field.` });
     }
 
+    // Fetch signatures from DB
+    const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
+    const sig1 = sigRow.rows[0]?.sig1_image || null;
+    const sig2 = sigRow.rows[0]?.sig2_image || null;
+
     // Generate PDF
-    const html = buildRelievingLetterHTML(emp);
+    const html = buildRelievingLetterHTML(emp, sig1, sig2);
     const pdfBuffer = await htmlToPdf(html);
 
     const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim();
@@ -314,6 +326,11 @@ exports.bulkSend = async (req, res) => {
     const BREVO_KEY = process.env.BREVO_API_KEY;
     const emailEnabled = process.env.EMAIL_ENABLED === 'true';
 
+    // Fetch signatures from DB (shared across all letters)
+    const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
+    const sig1 = sigRow.rows[0]?.sig1_image || null;
+    const sig2 = sigRow.rows[0]?.sig2_image || null;
+
     const browser = await launchBrowser();
     const results = [];
     let sent = 0, failed = 0;
@@ -336,7 +353,7 @@ exports.bulkSend = async (req, res) => {
         }
 
         try {
-          const html = buildRelievingLetterHTML(emp);
+          const html = buildRelievingLetterHTML(emp, sig1, sig2);
           const pdfBuffer = await htmlToPdf(html, browser);
 
           const coverHtml = `
