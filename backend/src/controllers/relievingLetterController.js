@@ -111,7 +111,7 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
     width: 210mm; height: 297mm; position: relative;
     margin: 0 auto 20px auto; background: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,.5);
-    padding: 15mm 15mm 30mm 15mm;
+    padding: 8mm 15mm 30mm 15mm;
     page-break-after: always; overflow: hidden;
   }
   .header-table {
