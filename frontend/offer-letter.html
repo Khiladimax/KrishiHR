@@ -193,6 +193,18 @@
               <label>Notice Period (months)</label>
               <input type="number" id="ol-notice" value="3" min="0">
             </div>
+            <div class="form-group">
+              <label>Employment Type</label>
+              <select id="ol-emp-type">
+                <option value="permanent">Permanent</option>
+                <option value="contract">Contract</option>
+                <option value="provision">Provisional</option>
+              </select>
+            </div>
+            <div class="form-group" id="contract-months-group" style="display:none;">
+              <label>Contract Duration (months)</label>
+              <input type="number" id="ol-contract-months" value="0" min="0">
+            </div>
           </div>
 
           <!-- SALARY STRUCTURE -->
@@ -490,6 +502,9 @@ async function loadForm(id) {
   document.getElementById('ol-valid-days').value   = ol.offer_valid_days || 7;
   document.getElementById('ol-probation').value    = ol.probation_months || 6;
   document.getElementById('ol-notice').value       = ol.notice_period_months || 3;
+  document.getElementById('ol-emp-type').value       = ol.employment_type || 'permanent';
+  document.getElementById('ol-contract-months').value = ol.contract_months || 0;
+  toggleContractMonths();
   document.getElementById('ol-ctc').value          = ol.ctc_annual || '';
   document.getElementById('ol-basic').value        = ol.basic_monthly || '';
   document.getElementById('ol-hra').value          = ol.hra_monthly || '';
@@ -531,6 +546,8 @@ async function saveOL() {
     offer_valid_days:         parseInt(document.getElementById('ol-valid-days').value) || 7,
     probation_months:         parseInt(document.getElementById('ol-probation').value) || 6,
     notice_period_months:     parseInt(document.getElementById('ol-notice').value) || 3,
+    employment_type:          document.getElementById('ol-emp-type').value || 'permanent',
+    contract_months:          parseInt(document.getElementById('ol-contract-months').value) || 0,
     ctc_annual:               parseFloat(document.getElementById('ol-ctc').value) || 0,
     basic_monthly:            parseFloat(document.getElementById('ol-basic').value) || 0,
     hra_monthly:              parseFloat(document.getElementById('ol-hra').value) || 0,
@@ -647,7 +664,7 @@ async function deleteOL() {
 function resetForm() {
   document.getElementById('ol-id').value = '';
   document.getElementById('form-title').textContent = '📝 Create Offer Letter';
-  ['ol-name','ol-email','ol-mobile','ol-address','ol-designation','ol-joining-date','ol-clauses','ol-email-msg',
+  ['ol-name','ol-email','ol-mobile','ol-address','ol-designation','ol-joining-date','ol-clauses','ol-email-msg','ol-contract-months',
    'ol-ctc','ol-basic','ol-hra','ol-other','ol-gratuity','ol-pf-emp','ol-pf-er','ol-pf-admin'].forEach(id => {
     document.getElementById(id).value = '';
   });
@@ -656,6 +673,9 @@ function resetForm() {
   document.getElementById('ol-valid-days').value = 7;
   document.getElementById('ol-probation').value  = 6;
   document.getElementById('ol-notice').value     = 3;
+  document.getElementById('ol-emp-type').value     = 'permanent';
+  document.getElementById('ol-contract-months').value = 0;
+  toggleContractMonths();
   document.getElementById('ol-conv').value       = 0;
   document.getElementById('ctc-summary').style.display = 'none';
   clearSig('sig1');
@@ -898,6 +918,14 @@ function downloadBulkReport() {
   a.download = `Bulk_Offer_Report_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
 }
+
+// Show/hide contract months based on employment type
+function toggleContractMonths() {
+  const empType = document.getElementById('ol-emp-type').value;
+  document.getElementById('contract-months-group').style.display = empType === 'contract' ? '' : 'none';
+}
+document.getElementById('ol-emp-type').addEventListener('change', toggleContractMonths);
+
 </script>
 
 </body>

@@ -9,6 +9,7 @@
     "migrate": "node src/config/migrate_all.js"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^149.0.0",
     "adm-zip": "^0.5.10",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -22,7 +23,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.13",
     "pg": "^8.11.0",
-    "puppeteer": "^25.1.0",
+    "puppeteer-core": "^25.1.0",
     "socket.io": "^4.7.5",
     "xlsx": "^0.18.5"
   },
