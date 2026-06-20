@@ -111,12 +111,12 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
     width: 210mm; height: 297mm; position: relative;
     margin: 0 auto 20px auto; background: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,.5);
-    padding: 8mm 15mm 30mm 15mm;
-    page-break-after: always; overflow: hidden;
+    padding: 5mm 15mm 25mm 15mm;
+    overflow: hidden;
   }
   .header-table {
     width: 100%; border-bottom: 2px solid #000;
-    padding-bottom: 22px; margin-bottom: 20px;
+    padding-bottom: 22px; margin-bottom: 14px;
     border-collapse: collapse;
   }
   .footer {
