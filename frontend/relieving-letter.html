@@ -165,7 +165,7 @@ function renderTable() {
 
   let h = `<table><thead><tr>
     <th style="width:36px"><input type="checkbox" onchange="toggleAll(this)"></th>
-    <th>Employee</th><th>Designation</th><th>Joining</th><th>Relieving</th>
+    <th>Employee</th><th>Designation</th><th>Joining Date</th><th>Relieving Date</th>
     <th>Personal Email</th><th>Status</th><th style="width:90px">Actions</th>
   </tr></thead><tbody>`;
 
@@ -174,8 +174,9 @@ function renderTable() {
     const pe = e.alternate_email||'';
     const ok = pe && pe.includes('@') && !pe.toLowerCase().includes('@krishicare.in');
     const sent = !!e.relieving_letter_sent_at;
-    const jd = e.joining_date ? new Date(e.joining_date).toLocaleDateString('en-IN') : '—';
-    const rd = (e.separation_date||e.last_working_date) ? new Date(e.separation_date||e.last_working_date).toLocaleDateString('en-IN') : '—';
+    const jdVal = e.joining_date ? new Date(e.joining_date).toISOString().split('T')[0] : '';
+    const rdRaw = e.separation_date||e.last_working_date||'';
+    const rdVal = rdRaw ? new Date(rdRaw).toISOString().split('T')[0] : '';
     const st = e.separation_type||e.sep_type||'';
     const badge = sent ? '<span class="badge badge-sent">✓ Sent</span>' : !ok ? '<span class="badge badge-no-email">No Email</span>' : '<span class="badge badge-pending">Pending</span>';
 
@@ -183,8 +184,8 @@ function renderTable() {
       <td><input type="checkbox" class="row-chk" data-id="${e.id}" ${!ok?'disabled':''} onchange="updateSelected()"></td>
       <td><strong>${name}</strong><br><span class="text-muted" style="font-size:10px">${e.employee_code||''}</span></td>
       <td style="font-size:12px">${e.designation_title||'—'}<br><span class="text-muted">${e.department_name||''}</span></td>
-      <td style="font-size:12px">${jd}</td>
-      <td style="font-size:12px">${rd}${st?'<br><span class="text-muted">'+st+'</span>':''}</td>
+      <td><div class="email-wrap"><input type="date" value="${jdVal}" id="jd-${e.id}" style="width:125px"><button class="sv" onclick="saveDates(${e.id})">✓</button></div></td>
+      <td><div class="email-wrap"><input type="date" value="${rdVal}" id="rd-${e.id}" style="width:125px"><button class="sv" onclick="saveDates(${e.id})">✓</button></div>${st?'<br><span class="text-muted" style="font-size:10px">'+st+'</span>':''}</td>
       <td>
         <div class="email-wrap">
           <input value="${pe}" id="em-${e.id}" placeholder="personal@gmail.com">
@@ -215,6 +216,17 @@ async function saveEmail(id) {
   if (!email||!email.includes('@')) { toast('Enter a valid email','error'); return; }
   const d = await api('PUT', `/relieving-letters/update-email/${id}`, { alternate_email: email });
   if (d?.success) { toast('Email saved','success'); loadData(); } else toast(d?.message||'Failed','error');
+}
+
+async function saveDates(id) {
+  const jd = document.getElementById('jd-'+id).value;
+  const rd = document.getElementById('rd-'+id).value;
+  const body = {};
+  if (jd) body.joining_date = jd;
+  if (rd) body.separation_date = rd;
+  if (!Object.keys(body).length) { toast('No date to save','error'); return; }
+  const d = await api('PUT', `/relieving-letters/update-dates/${id}`, body);
+  if (d?.success) { toast('Dates updated','success'); loadData(); } else toast(d?.message||'Failed','error');
 }
 
 function previewLetter(id) {

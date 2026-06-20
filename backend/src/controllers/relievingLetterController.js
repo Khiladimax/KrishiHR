@@ -116,7 +116,7 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
   }
   .header-table {
     width: 100%; border-bottom: 2px solid #000;
-    padding-bottom: 22px; margin-bottom: 14px;
+    padding-bottom: 22px; margin-bottom: 65px;
     border-collapse: collapse;
   }
   .footer {
@@ -228,6 +228,41 @@ exports.updateEmail = async (req, res) => {
     }
     await db.query('UPDATE employees SET alternate_email = $1 WHERE id = $2', [alternate_email.trim(), empId]);
     res.json({ success: true, message: 'Email updated' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── PUT /api/relieving-letters/update-dates/:id ─────────────────────────────
+// Update joining_date and/or separation_date for corrections
+exports.updateDates = async (req, res) => {
+  try {
+    const empId = parseInt(req.params.id);
+    const { joining_date, separation_date } = req.body;
+    const sets = [];
+    const vals = [];
+    let idx = 1;
+
+    if (joining_date) {
+      sets.push(`joining_date = $${idx++}`);
+      vals.push(joining_date);
+    }
+    if (separation_date) {
+      sets.push(`separation_date = $${idx++}`);
+      vals.push(separation_date);
+    }
+
+    if (!sets.length) return res.json({ success: true, message: 'Nothing to update' });
+
+    vals.push(empId);
+    await db.query(`UPDATE employees SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+
+    // Also update last_working_date in separations if separation_date changed
+    if (separation_date) {
+      await db.query(`UPDATE separations SET last_working_date = $1 WHERE employee_id = $2`, [separation_date, empId]);
+    }
+
+    res.json({ success: true, message: 'Dates updated' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

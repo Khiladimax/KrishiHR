@@ -880,6 +880,7 @@ router.post('/offer-letters/bulk-send', authenticate, authorize('hr'), xlsxUploa
 router.get ('/relieving-letters/eligible',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.getEligible);
 router.get ('/relieving-letters/preview/:id',  authenticate, authorize('hr','admin','super_admin'), relievingCtrl.preview);
 router.put ('/relieving-letters/update-email/:id', authenticate, authorize('hr','admin','super_admin'), relievingCtrl.updateEmail);
+router.put ('/relieving-letters/update-dates/:id', authenticate, authorize('hr','admin','super_admin'), relievingCtrl.updateDates);
 router.post('/relieving-letters/send/:id',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.sendRelievingLetter);
 router.post('/relieving-letters/bulk-send',    authenticate, authorize('hr','admin','super_admin'), relievingCtrl.bulkSend);
 router.post('/relieving-letters/bulk-send-excel', authenticate, authorize('hr','admin','super_admin'), xlsxUpload.single('file'), relievingCtrl.bulkSendExcel);
