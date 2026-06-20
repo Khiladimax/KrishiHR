@@ -131,13 +131,19 @@ function formatDate(d) {
 // Letterhead PNG (from assets/letterhead.png) — embedded as base64
 // ── Convert HTML string to PDF buffer using Puppeteer + @sparticuz/chromium ──
 // Works on Render.com / serverless / container environments
-async function htmlToPdf(htmlString) {
+// If `browser` is passed, reuses it (caller must close). Otherwise launches+closes its own.
+async function launchBrowser() {
   const execPath = await chromium.executablePath();
-  const browser = await puppeteerCore.launch({
+  return puppeteerCore.launch({
     args: chromium.args,
     executablePath: execPath,
     headless: true,
   });
+}
+
+async function htmlToPdf(htmlString, browser) {
+  const ownBrowser = !browser;
+  if (ownBrowser) browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setContent(htmlString, { waitUntil: 'networkidle0' });
@@ -146,9 +152,10 @@ async function htmlToPdf(htmlString) {
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 }
     });
+    await page.close();
     return Buffer.from(pdfBuffer);
   } finally {
-    await browser.close();
+    if (ownBrowser) await browser.close();
   }
 }
 
@@ -702,6 +709,11 @@ exports.bulkSend = async (req, res) => {
     const BREVO_KEY   = process.env.BREVO_API_KEY;
     const emailEnabled = process.env.EMAIL_ENABLED === 'true';
 
+    // Launch browser ONCE for all PDFs (avoids timeout on Render)
+    const browser = await launchBrowser();
+    console.log('[bulkSend] Browser launched for PDF generation');
+
+    try {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2; // Excel row number (1=header, 2=first data)
@@ -790,7 +802,7 @@ exports.bulkSend = async (req, res) => {
       let offerPdfBuffer = null;
       try {
         const offerHTML = buildOfferLetterHTML(ol);
-        offerPdfBuffer = await htmlToPdf(offerHTML);
+        offerPdfBuffer = await htmlToPdf(offerHTML, browser);
       } catch (pdfErr) {
         results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `PDF generation failed: ${pdfErr.message}` });
         failed++;
@@ -865,6 +877,10 @@ exports.bulkSend = async (req, res) => {
 
       // Small delay to avoid Brevo rate limits
       await new Promise(r => setTimeout(r, 300));
+    }
+    } finally {
+      await browser.close();
+      console.log('[bulkSend] Browser closed');
     }
 
     res.json({
