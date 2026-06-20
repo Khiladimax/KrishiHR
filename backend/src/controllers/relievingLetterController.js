@@ -144,9 +144,7 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
 
   <div class="date-row">${todayDate}</div>
 
-  <div class="subject-line">RELIEVING LETTER</div>
-
-  <p>To Whomsoever It May Concern,</p>
+  <p style="text-align:center;font-weight:bold;font-size:14px;margin:20px 0;text-decoration:underline;">To Whomsoever It May Concern,</p>
 
   <p>This is to certify that <strong>${mrOrMs} ${fullName}</strong> (Employee Code: <strong>${emp.employee_code || 'N/A'}</strong>) was employed with <strong>Krishi Care &amp; Management Services Private Limited</strong> from <strong>${joiningDate}</strong> to <strong>${relievingDate}</strong> as <strong>&ldquo;${designation}&rdquo;</strong> in the <strong>${department}</strong> department.</p>
 
