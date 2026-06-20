@@ -523,6 +523,7 @@ async function runAllMigrations() {
     await addCol('leave_requests', 'half_day_type',       "VARCHAR(10) CHECK (half_day_type IN ('first','second'))");
     await addCol('separations', 'noc_issued',             'BOOLEAN DEFAULT FALSE');
     await addCol('separations', 'experience_letter_issued','BOOLEAN DEFAULT FALSE');
+    await addCol('separations', 'relieving_letter_sent_at','TIMESTAMPTZ DEFAULT NULL');
     await addCol('employees',   'saturday_policy',         "VARCHAR(20) DEFAULT '2nd_4th_off' CHECK (saturday_policy IN ('2nd_4th_off','all_working'))");
 
     // ── Fix 3: Single-device login ────────────────────────────────────────────

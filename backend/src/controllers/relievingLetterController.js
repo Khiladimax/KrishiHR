@@ -1,0 +1,406 @@
+// Relieving Letter Controller
+const db = require('../config/db');
+const path = require('path');
+const fs = require('fs');
+const puppeteerCore = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium').default;
+
+// ── Browser helpers (shared with offerLetterController pattern) ──────────────
+async function launchBrowser() {
+  const execPath = await chromium.executablePath();
+  return puppeteerCore.launch({
+    args: chromium.args,
+    executablePath: execPath,
+    headless: true,
+  });
+}
+
+async function htmlToPdf(htmlString, browser) {
+  const ownBrowser = !browser;
+  if (ownBrowser) browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(htmlString, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 }
+    });
+    await page.close();
+    return Buffer.from(pdfBuffer);
+  } finally {
+    if (ownBrowser) await browser.close();
+  }
+}
+
+// ── Date formatter ──────────────────────────────────────────────────────────
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt)) return '';
+  const day = dt.getDate();
+  const sup = [, 'st', 'nd', 'rd'][day] || 'th';
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  return day + '<sup>' + sup + '</sup> ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+}
+
+function formatDatePlain(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt)) return '';
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  return dt.getDate() + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+}
+
+// ── Build Relieving Letter HTML ─────────────────────────────────────────────
+function buildRelievingLetterHTML(emp) {
+  const LOGO_PATH = path.join(__dirname, '../../../frontend/Logo_kcms.png');
+  let LOGO_B64 = '';
+  try {
+    LOGO_B64 = 'data:image/png;base64,' + fs.readFileSync(LOGO_PATH).toString('base64');
+  } catch (e) {
+    console.error('Logo not found:', e.message);
+  }
+
+  const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim();
+  const designation = emp.designation_title || emp.designation || 'Employee';
+  const department = emp.department_name || emp.department || 'Operations';
+  const joiningDate = formatDate(emp.joining_date);
+  const relievingDate = formatDate(emp.separation_date || emp.last_working_date);
+  const todayDate = formatDate(new Date());
+  const gender = (emp.gender || '').toLowerCase();
+  const heOrShe = gender === 'female' ? 'She' : 'He';
+  const hisOrHer = gender === 'female' ? 'her' : 'his';
+  const mrOrMs = gender === 'female' ? 'Ms.' : 'Mr.';
+
+  const hdr = `
+    <table class="header-table">
+      <tr>
+        <td style="width:110px;vertical-align:middle;">
+          <img src="${LOGO_B64}" style="width:100px;height:auto;display:block;">
+        </td>
+        <td style="text-align:center;vertical-align:middle;">
+          <div style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#000;margin-bottom:4px;">Krishi Care &amp; Management Services Private Limited</div>
+          <div style="font-family:Arial,sans-serif;font-size:11px;color:#444;"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway,<br>Shankarwadi, Jogeshwari (East), Mumbai - 400060.</div>
+          <div style="font-family:Arial,sans-serif;font-size:11px;color:#444;margin-top:2px;">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. +91 22 68284109</div>
+        </td>
+      </tr>
+    </table>`;
+
+  const ftr = `
+    <div class="footer">
+      Corporate Office: H-12, Green Park Extension, New Delhi -110016. Tel: 011-41039506.<br>
+      CIN: U01403MH2015PTC261465
+    </div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Georgia','Times New Roman',Times,serif;
+    color: #000; line-height: 1.4; margin: 0;
+    background-color: #525659; padding: 20px 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .page {
+    width: 210mm; height: 297mm; position: relative;
+    margin: 0 auto 20px auto; background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,.5);
+    padding: 15mm 15mm 30mm 15mm;
+    page-break-after: always; overflow: hidden;
+  }
+  .header-table {
+    width: 100%; border-bottom: 2px solid #000;
+    padding-bottom: 10px; margin-bottom: 20px;
+    border-collapse: collapse;
+  }
+  .footer {
+    position: absolute; bottom: 10mm; left: 15mm; right: 15mm;
+    text-align: center; font-size: 10px; color: #000;
+    border-top: 1px solid #000; padding-top: 5px;
+    font-family: 'Arial',sans-serif; font-weight: bold;
+  }
+  .date-row { text-align: right; font-weight: bold; font-size: 13.5px; margin-bottom: 15px; }
+  p { margin: 8px 0; text-align: justify; font-size: 13px; line-height: 1.7; }
+  .subject-line { text-align: center; font-weight: bold; text-decoration: underline; margin: 20px 0; font-size: 15px; }
+  .sig-block { margin-top: 60px; font-size: 14px; }
+  @media print {
+    @page { size: A4; margin: 0 !important; }
+    html, body { background-color: #fff; padding: 0 !important; margin: 0 !important; }
+    .page { box-shadow: none !important; margin: 0 !important; }
+    .page:last-of-type { page-break-after: avoid !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  ${hdr}
+
+  <div class="date-row">${todayDate}</div>
+
+  <div class="subject-line">RELIEVING LETTER</div>
+
+  <p>To Whomsoever It May Concern,</p>
+
+  <p>This is to certify that <strong>${mrOrMs} ${fullName}</strong> (Employee Code: <strong>${emp.employee_code || 'N/A'}</strong>) was employed with <strong>Krishi Care &amp; Management Services Private Limited</strong> from <strong>${joiningDate}</strong> to <strong>${relievingDate}</strong> as <strong>&ldquo;${designation}&rdquo;</strong> in the <strong>${department}</strong> department.</p>
+
+  <p>${heOrShe} has been relieved from ${hisOrHer} duties and responsibilities with effect from <strong>${relievingDate}</strong>.</p>
+
+  <p>During ${hisOrHer} tenure with us, ${mrOrMs} ${fullName} has performed ${hisOrHer} duties sincerely and to the best of ${hisOrHer} abilities. ${heOrShe} has no outstanding dues or liabilities towards the company as on the date of relieving.</p>
+
+  <p>We wish ${mrOrMs} ${fullName} all the very best in ${hisOrHer} future endeavours.</p>
+
+  <p>This letter is being issued on ${hisOrHer} request for official purposes.</p>
+
+  <div class="sig-block">
+    <p>Yours truly,</p>
+    <p>For <strong>Krishi Care &amp; Management Services Private Limited,</strong></p>
+    <div style="margin-top:50px;">
+      <p>Authorized Signatory<br>Human Resource Department</p>
+    </div>
+  </div>
+
+  ${ftr}
+</div>
+
+</body>
+</html>`;
+}
+
+// ── GET /api/relieving-letters/eligible ──────────────────────────────────────
+// List all inactive employees eligible for relieving letter
+exports.getEligible = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email,
+             e.alternate_email, e.phone, e.gender, e.joining_date,
+             e.separation_date, e.separation_type, e.separation_reason,
+             d.name AS department_name, des.title AS designation_title,
+             s.last_working_date, s.type AS sep_type, s.status AS sep_status,
+             s.relieving_letter_sent_at
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN separations s ON s.employee_id = e.id AND s.status = 'completed'
+      WHERE e.is_active = false
+      ORDER BY COALESCE(e.separation_date, s.last_working_date) DESC NULLS LAST
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('[relievingLetter.getEligible]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── POST /api/relieving-letters/send/:id ────────────────────────────────────
+// Send relieving letter to one employee's personal email
+exports.sendRelievingLetter = async (req, res) => {
+  try {
+    const empId = parseInt(req.params.id);
+    const result = await db.query(`
+      SELECT e.*, d.name AS department_name, des.title AS designation_title,
+             s.last_working_date
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN separations s ON s.employee_id = e.id AND s.status = 'completed'
+      WHERE e.id = $1 AND e.is_active = false
+    `, [empId]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Employee not found or still active' });
+    }
+
+    const emp = result.rows[0];
+    const personalEmail = emp.alternate_email;
+
+    if (!personalEmail || !personalEmail.includes('@')) {
+      return res.status(400).json({ success: false, message: `No personal email (alternate_email) found for ${emp.first_name} ${emp.last_name}. Please update their profile first.` });
+    }
+
+    // Don't send to company email
+    if (personalEmail.toLowerCase().includes('@krishicare.in')) {
+      return res.status(400).json({ success: false, message: `Personal email must not be a company email (@krishicare.in). Please set a personal email (Gmail, Yahoo, etc.) in the alternate email field.` });
+    }
+
+    // Generate PDF
+    const html = buildRelievingLetterHTML(emp);
+    const pdfBuffer = await htmlToPdf(html);
+
+    const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim();
+
+    // Cover email
+    const coverHtml = `
+      <div style="font-family:Arial,sans-serif;font-size:13px;color:#222;line-height:1.7;max-width:600px;">
+        <div style="background:#1B5E20;padding:16px 24px;border-radius:8px 8px 0 0;">
+          <span style="color:#fff;font-size:16px;font-weight:700;">KrishiHR</span>
+          <span style="color:#A5D6A7;font-size:12px;margin-left:8px;">Krishi Care &amp; Management Services</span>
+        </div>
+        <div style="border:1px solid #e0e0e0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+          <p>Dear ${emp.first_name},</p>
+          <p>Please find attached your <strong>Relieving Letter</strong> from Krishi Care &amp; Management Services Private Limited.</p>
+          <p>We thank you for your contributions during your tenure and wish you all the very best in your future endeavours.</p>
+          <p>For any queries, feel free to reach out to us.</p>
+          <p>Warm regards,<br>Human Resource Team<br>Krishi Care &amp; Management Services Pvt. Ltd.</p>
+        </div>
+      </div>`;
+
+    const payload = {
+      sender: { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+      to: [{ email: personalEmail, name: fullName }],
+      subject: `Relieving Letter — ${fullName} | Krishi Care & Management Services`,
+      htmlContent: coverHtml,
+      attachment: [{
+        name: `Relieving_Letter_${fullName.replace(/\s+/g, '_')}.pdf`,
+        content: pdfBuffer.toString('base64'),
+      }],
+    };
+
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_KEY || process.env.EMAIL_ENABLED !== 'true') {
+      await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [empId]);
+      return res.json({ success: true, message: `[Simulated] Relieving letter sent to ${personalEmail}` });
+    }
+
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+      body: JSON.stringify(payload)
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      return res.status(500).json({ success: false, message: `Email failed: ${err}` });
+    }
+
+    await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [empId]);
+    res.json({ success: true, message: `Relieving letter sent to ${personalEmail}` });
+
+  } catch (err) {
+    console.error('[relievingLetter.send]', err.message);
+    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+  }
+};
+
+// ── POST /api/relieving-letters/bulk-send ───────────────────────────────────
+// Send relieving letters to multiple employees at once
+exports.bulkSend = async (req, res) => {
+  try {
+    const { employee_ids } = req.body;
+    if (!Array.isArray(employee_ids) || !employee_ids.length) {
+      return res.status(400).json({ success: false, message: 'No employees selected' });
+    }
+
+    const result = await db.query(`
+      SELECT e.*, d.name AS department_name, des.title AS designation_title,
+             s.last_working_date
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN separations s ON s.employee_id = e.id AND s.status = 'completed'
+      WHERE e.id = ANY($1) AND e.is_active = false
+    `, [employee_ids]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'No eligible employees found' });
+    }
+
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    const emailEnabled = process.env.EMAIL_ENABLED === 'true';
+
+    const browser = await launchBrowser();
+    const results = [];
+    let sent = 0, failed = 0;
+
+    try {
+      for (const emp of result.rows) {
+        const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim();
+        const personalEmail = emp.alternate_email;
+
+        if (!personalEmail || !personalEmail.includes('@')) {
+          results.push({ id: emp.id, name: fullName, email: '', status: 'failed', reason: 'No personal email set' });
+          failed++;
+          continue;
+        }
+
+        if (personalEmail.toLowerCase().includes('@krishicare.in')) {
+          results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'failed', reason: 'Company email — need personal email' });
+          failed++;
+          continue;
+        }
+
+        try {
+          const html = buildRelievingLetterHTML(emp);
+          const pdfBuffer = await htmlToPdf(html, browser);
+
+          const coverHtml = `
+            <div style="font-family:Arial,sans-serif;font-size:13px;color:#222;line-height:1.7;max-width:600px;">
+              <div style="background:#1B5E20;padding:16px 24px;border-radius:8px 8px 0 0;">
+                <span style="color:#fff;font-size:16px;font-weight:700;">KrishiHR</span>
+                <span style="color:#A5D6A7;font-size:12px;margin-left:8px;">Krishi Care &amp; Management Services</span>
+              </div>
+              <div style="border:1px solid #e0e0e0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+                <p>Dear ${emp.first_name},</p>
+                <p>Please find attached your <strong>Relieving Letter</strong> from Krishi Care &amp; Management Services Private Limited.</p>
+                <p>We wish you all the very best in your future endeavours.</p>
+                <p>Warm regards,<br>Human Resource Team<br>Krishi Care &amp; Management Services Pvt. Ltd.</p>
+              </div>
+            </div>`;
+
+          const payload = {
+            sender: { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+            to: [{ email: personalEmail, name: fullName }],
+            subject: `Relieving Letter — ${fullName} | Krishi Care & Management Services`,
+            htmlContent: coverHtml,
+            attachment: [{
+              name: `Relieving_Letter_${fullName.replace(/\s+/g, '_')}.pdf`,
+              content: pdfBuffer.toString('base64'),
+            }],
+          };
+
+          if (!BREVO_KEY || !emailEnabled) {
+            await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
+            results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'sent', reason: '[Simulated]' });
+            sent++;
+          } else {
+            const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+              body: JSON.stringify(payload)
+            });
+
+            if (resp.ok) {
+              await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
+              results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'sent', reason: '' });
+              sent++;
+            } else {
+              const errText = await resp.text();
+              results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'failed', reason: `Email API: ${errText.substring(0, 120)}` });
+              failed++;
+            }
+          }
+
+          await new Promise(r => setTimeout(r, 300));
+
+        } catch (innerErr) {
+          results.push({ id: emp.id, name: fullName, email: personalEmail || '', status: 'failed', reason: innerErr.message });
+          failed++;
+        }
+      }
+    } finally {
+      await browser.close();
+    }
+
+    res.json({ success: true, total: result.rows.length, sent, failed, results });
+
+  } catch (err) {
+    console.error('[relievingLetter.bulkSend]', err.message);
+    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+  }
+};

@@ -147,6 +147,7 @@ const NAV_GROUPS = [
       { href:'clients.html',        icon: '🏭',               label:'Clients',          roles:['admin','super_admin'] },
       { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr'] },
       { href:'separation.html',     icon: ICONS.separation,   label:'Separation',       always:true },
+      { href:'relieving-letter.html', icon: '📄',               label:'Relieving Letter', roles:['hr','admin','super_admin'] },
     ]
   },
   {

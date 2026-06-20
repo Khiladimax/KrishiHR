@@ -23,6 +23,7 @@ const annCtrl        = require('../controllers/announcementController');
 const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
 const offerCtrl      = require('../controllers/offerLetterController');
+const relievingCtrl  = require('../controllers/relievingLetterController');
 const itDeclCtrl     = require('../controllers/itDeclarationController');
 const compoffCtrl    = require('../controllers/compoffController');
 const clientCtrl     = require('../controllers/clientController');
@@ -874,6 +875,11 @@ router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offe
 // Bulk send — multipart Excel upload
 const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 router.post('/offer-letters/bulk-send', authenticate, authorize('hr'), xlsxUpload.single('file'), offerCtrl.bulkSend);
+
+// ── Relieving Letters ─────────────────────────────────────────────────────
+router.get ('/relieving-letters/eligible',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.getEligible);
+router.post('/relieving-letters/send/:id',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.sendRelievingLetter);
+router.post('/relieving-letters/bulk-send',    authenticate, authorize('hr','admin','super_admin'), relievingCtrl.bulkSend);
 
 // ── Test Email (debug only) ───────────────────────────────────────────────────
 router.get('/test-email', authenticate, async (req, res) => {
