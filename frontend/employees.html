@@ -556,6 +556,7 @@
             <div class="form-group" style="margin:0"><label class="form-label">Email *</label><input id="edit-email" class="form-control" type="email"></div>
             <div class="form-group" style="margin:0"><label class="form-label">Phone</label><input id="edit-phone" class="form-control" type="text"></div>
             <div class="form-group" style="margin:0"><label class="form-label">Alt Phone</label><input id="edit-altphone" class="form-control" type="text"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Alt Email</label><input id="edit-altemail" class="form-control" type="email"></div>
             <div class="form-group" style="margin:0"><label class="form-label">Gender</label>
               <select id="edit-gender" class="form-control">
                 <option value="">Select…</option>
@@ -2252,6 +2253,7 @@ async function openEditEmp(id) {
   document.getElementById('edit-email').value    = e.email      || '';
   document.getElementById('edit-phone').value    = e.phone      || '';
   document.getElementById('edit-altphone').value = e.alternate_phone || '';
+  document.getElementById('edit-altemail').value = e.alternate_email || '';
   document.getElementById('edit-gender').value   = e.gender     || '';
   document.getElementById('edit-dob').value      = e.date_of_birth ? e.date_of_birth.split('T')[0] : '';
   document.getElementById('edit-blood').value    = e.blood_group || '';
@@ -2380,6 +2382,7 @@ async function saveEmployeeEdit() {
     email:               document.getElementById('edit-email').value.trim(),
     phone:               document.getElementById('edit-phone').value.trim()      || null,
     alternate_phone:     document.getElementById('edit-altphone').value.trim()   || null,
+    alternate_email:     document.getElementById('edit-altemail').value.trim()   || null,
     gender:              document.getElementById('edit-gender').value            || null,
     date_of_birth:       document.getElementById('edit-dob').value               || null,
     blood_group:         document.getElementById('edit-blood').value             || null,

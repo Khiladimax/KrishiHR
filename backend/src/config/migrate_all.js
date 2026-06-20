@@ -693,6 +693,9 @@ async function runAllMigrations() {
     await client.query(`
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS fcm_token TEXT
     `);
+    await client.query(`
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS alternate_email VARCHAR(150)
+    `);
 
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_attendance_emp_date    ON attendance(employee_id, date)',

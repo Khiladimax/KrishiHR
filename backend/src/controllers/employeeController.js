@@ -408,7 +408,7 @@ exports.update = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const allowed = [
-      'first_name','last_name','email','phone','alternate_phone',
+      'first_name','last_name','email','phone','alternate_phone','alternate_email',
       'gender','date_of_birth','blood_group','marital_status',
       'joining_date','department_id','designation_id','reporting_manager_id','team_leader_id',
       'role','employment_type','employee_category','provision_end_date','confirmed_date',
