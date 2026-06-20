@@ -328,10 +328,9 @@ function buildOfferLetterHTML(ol) {
   Your compensation on a cost to company basis will be <strong>Rs. ${Number(ctcAnnual).toLocaleString('en-IN')}/- PA (Rupees ${numberToWords(Math.round(ctcAnnual))} Only)</strong>. The remuneration has taken into consideration the status and responsibility of the appointment, and it is inclusive of all taxable and non-taxable emoluments, allowances and statutory contributions.</p>
   <p><u><strong>RESPONSIBILITIES:</strong></u><br>
   You will work as &ldquo;${ol.designation||''}&rdquo; of the Company and will be responsible for carrying out the operations of the Company as directed to you by the management. A detailed responsibility statement will be provided to you upon your joining.</p>
-  <p><u><strong>PROBATION PERIOD:</strong></u><br>
-  You will be on a probationary period of <strong>${probStr} months</strong> during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.</p>
+  ${empType !== 'contract' ? '<p><u><strong>PROBATION PERIOD:</strong></u><br>You will be on a probationary period of <strong>' + probStr + ' months</strong> during which the services can be terminated from employer without giving any reason and any time for notice of termination of services. The company may regularize your services subject to satisfactory completion of probationary period.</p>' : ''}
   <p><u><strong>SEPERATION OF SERVICES:</strong></u><br>
-  Severance of relationship can be done by giving <strong>${noticeStr} month</strong> written notice. If you are unable to complete this notice period you will be liable to compensate the company three months of salary or for the period not served.</p>
+  Severance of relationship can be done by giving <strong>${noticeStr} month</strong> written notice. If you are unable to complete this notice period you will be liable to compensate the company <strong>${noticeStr} month${parseInt(ol.notice_period_months||3) > 1 ? "s" : ""}</strong> of salary or for the period not served.</p>
   <p><u><strong>OTHER RULES AND REGULATION:</strong></u></p>
   <ul>
     <li>The company will expect you to work in the Section / Department in which you are placed with a high standard of initiative, morality and economy.</li>
