@@ -10,15 +10,15 @@
   <style>
     .rl-container { max-width:1100px; margin:0 auto; padding:24px 16px; }
     .rl-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
-    .rl-header h2 { font-size:22px; font-weight:700; color:#1B5E20; margin:0; }
-    .rl-stats { display:flex; gap:16px; flex-wrap:wrap; }
-    .rl-stat { background:#f0fdf4; border:1px solid #bbdefb; border-radius:8px; padding:10px 18px; text-align:center; }
+    .rl-header h2 { font-size:20px; font-weight:700; color:#1B5E20; margin:0; }
+    .rl-stats { display:flex; gap:12px; flex-wrap:wrap; }
+    .rl-stat { background:#f0fdf4; border:1px solid #c8e6c9; border-radius:8px; padding:10px 18px; text-align:center; }
     .rl-stat .num { font-size:20px; font-weight:700; color:#1B5E20; }
     .rl-stat .lbl { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
     .rl-toolbar { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
     .rl-toolbar input { padding:8px 14px; border:1px solid #ccc; border-radius:6px; font-size:13px; min-width:220px; }
-    .rl-toolbar .btn-bulk { background:#E65100; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
-    .rl-toolbar .btn-bulk:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-bulk { background:#E65100; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+    .btn-bulk:disabled { opacity:.5; cursor:not-allowed; }
     .rl-table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.08); }
     .rl-table th { background:#1B5E20; color:#fff; padding:10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; text-align:left; }
     .rl-table td { padding:10px 12px; font-size:13px; border-bottom:1px solid #eee; vertical-align:middle; }
@@ -31,9 +31,6 @@
     .btn-send { background:#1B5E20; color:#fff; border:none; border-radius:5px; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; }
     .btn-send:disabled { opacity:.5; cursor:not-allowed; }
     .btn-send:hover:not(:disabled) { background:#2E7D32; }
-    .toast { position:fixed; bottom:24px; right:24px; padding:14px 24px; border-radius:8px; color:#fff; font-size:13px; font-weight:600; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,.2); transition:opacity .3s; }
-    .toast-success { background:#2E7D32; }
-    .toast-error { background:#c62828; }
     .empty-state { text-align:center; padding:60px 20px; color:#888; }
     .empty-state h3 { font-size:18px; margin-bottom:8px; }
     @media (max-width:768px) {
@@ -43,41 +40,64 @@
   </style>
 </head>
 <body>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-mark" id="sidebar-logo-mark"></div>
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div>
+    </div>
   </div>
   <nav id="sidebar-nav"></nav>
-  <div class="sidebar-footer"><div id="sidebar-user"></div></div>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
 </aside>
 
-<main class="main-content">
-<div class="rl-container">
-
-  <div class="rl-header">
-    <h2>📄 Relieving Letters</h2>
-    <div class="rl-stats">
-      <div class="rl-stat"><div class="num" id="stat-total">0</div><div class="lbl">Total Separated</div></div>
-      <div class="rl-stat"><div class="num" id="stat-sent">0</div><div class="lbl">Letters Sent</div></div>
-      <div class="rl-stat"><div class="num" id="stat-pending">0</div><div class="lbl">Pending</div></div>
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">Relieving Letters</div>
+    </div>
+    <div class="topbar-right">
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
     </div>
   </div>
 
-  <div class="rl-toolbar">
-    <input type="text" id="search-input" placeholder="Search name, code, email…" oninput="renderTable()">
-    <button class="btn-bulk" id="btn-bulk-send" disabled onclick="bulkSend()">📤 Send Selected (<span id="selected-count">0</span>)</button>
-  </div>
+  <div class="rl-container">
+    <div class="rl-header">
+      <h2>📄 Relieving Letters</h2>
+      <div class="rl-stats">
+        <div class="rl-stat"><div class="num" id="stat-total">0</div><div class="lbl">Total Separated</div></div>
+        <div class="rl-stat"><div class="num" id="stat-sent">0</div><div class="lbl">Letters Sent</div></div>
+        <div class="rl-stat"><div class="num" id="stat-pending">0</div><div class="lbl">Pending</div></div>
+      </div>
+    </div>
 
-  <div id="table-wrap">
-    <div class="empty-state"><h3>Loading…</h3></div>
-  </div>
+    <div class="rl-toolbar">
+      <input type="text" id="search-input" placeholder="Search name, code, email…" oninput="renderTable()">
+      <button class="btn-bulk" id="btn-bulk-send" disabled onclick="bulkSend()">📤 Send Selected (<span id="selected-count">0</span>)</button>
+    </div>
 
+    <div id="table-wrap">
+      <div class="empty-state"><h3>Loading…</h3></div>
+    </div>
+  </div>
 </div>
-</main>
 
 <script src="app.js"></script>
 <script>
-if (!Auth.guard()) location.href = 'login.html';
+Auth.guard();
+buildSidebar('relieving-letter.html');
 
 let employees = [];
 
@@ -133,7 +153,7 @@ function renderTable() {
     const isSent = !!e.relieving_letter_sent_at;
     const joinDate = e.joining_date ? new Date(e.joining_date).toLocaleDateString('en-IN') : '—';
     const relDate = (e.separation_date || e.last_working_date) ? new Date(e.separation_date || e.last_working_date).toLocaleDateString('en-IN') : '—';
-    const sepType = e.separation_type || e.sep_type || '—';
+    const sepType = e.separation_type || e.sep_type || '';
 
     let badge = '';
     if (isSent) badge = '<span class="badge badge-sent">✓ Sent</span>';
@@ -145,7 +165,7 @@ function renderTable() {
       <td><strong>${name}</strong><br><span style="color:#888;font-size:11px;">${e.employee_code || ''}</span></td>
       <td>${e.designation_title || '—'}<br><span style="color:#888;font-size:11px;">${e.department_name || ''}</span></td>
       <td>${joinDate}</td>
-      <td>${relDate}<br><span style="color:#888;font-size:11px;">${sepType}</span></td>
+      <td>${relDate}${sepType ? '<br><span style="color:#888;font-size:11px;">'+sepType+'</span>' : ''}</td>
       <td style="font-size:12px;">${personalEmail || '<em style="color:#c62828;">Not set</em>'}</td>
       <td>${badge}</td>
       <td><button class="btn-send" ${!hasEmail ? 'disabled title="Set personal email first"' : ''} onclick="sendOne(${e.id}, this)">📤 Send</button></td>
@@ -174,15 +194,15 @@ async function sendOne(empId, btn) {
   try {
     const data = await api('POST', `/relieving-letters/send/${empId}`);
     if (data?.success) {
-      showToast(data.message, 'success');
+      toast(data.message, 'success');
       loadData();
     } else {
-      showToast(data?.message || 'Failed', 'error');
+      toast(data?.message || 'Failed', 'error');
       btn.disabled = false;
       btn.textContent = '📤 Send';
     }
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    toast('Error: ' + err.message, 'error');
     btn.disabled = false;
     btn.textContent = '📤 Send';
   }
@@ -195,16 +215,13 @@ async function bulkSend() {
 
   const btn = document.getElementById('btn-bulk-send');
   btn.disabled = true;
-  btn.textContent = '⏳ Processing…';
+  btn.innerHTML = '⏳ Processing…';
 
   try {
     const token = Auth.getToken();
     const resp = await fetch(API_BASE + '/relieving-letters/bulk-send', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ employee_ids: ids })
     });
     const data = await resp.json();
@@ -215,29 +232,19 @@ async function bulkSend() {
         const failedList = data.results.filter(r => r.status === 'failed').map(r => `${r.name}: ${r.reason}`).join('\n');
         msg += '\n\nFailed:\n' + failedList;
       }
-      showToast(`Bulk send complete — ${data.sent} sent, ${data.failed} failed`, data.failed ? 'error' : 'success');
+      toast(`Bulk send complete — ${data.sent} sent, ${data.failed} failed`, data.failed ? 'error' : 'success');
       if (data.failed > 0) alert(msg);
       loadData();
     } else {
-      showToast(data?.message || 'Failed', 'error');
+      toast(data?.message || 'Failed', 'error');
     }
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    toast('Error: ' + err.message, 'error');
   }
 
   btn.disabled = false;
-  btn.textContent = '📤 Send Selected (<span id="selected-count">0</span>)';
-  // Fix innerHTML
-  document.getElementById('btn-bulk-send').innerHTML = '📤 Send Selected (<span id="selected-count">0</span>)';
+  btn.innerHTML = '📤 Send Selected (<span id="selected-count">0</span>)';
   updateSelected();
-}
-
-function showToast(msg, type) {
-  const t = document.createElement('div');
-  t.className = 'toast toast-' + type;
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 4000);
 }
 
 loadData();
