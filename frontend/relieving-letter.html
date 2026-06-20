@@ -1,60 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Relieving Letters | KrishiHR</title>
-  <link rel="icon" type="image/x-icon" href="Logo_kcms.png">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <style>
-    .rl-container { max-width:1200px; margin:0 auto; padding:20px 16px; }
-    .rl-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
-    .rl-header h2 { font-size:20px; font-weight:700; color:#1B5E20; margin:0; }
-    .rl-stats { display:flex; gap:10px; flex-wrap:wrap; }
-    .rl-stat { background:#f0fdf4; border:1px solid #c8e6c9; border-radius:8px; padding:8px 16px; text-align:center; }
-    .rl-stat .num { font-size:18px; font-weight:700; color:#1B5E20; }
-    .rl-stat .lbl { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
-    .rl-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
-    .rl-toolbar input[type="text"] { padding:8px 14px; border:1px solid #ccc; border-radius:6px; font-size:13px; min-width:200px; }
-    .btn { border:none; border-radius:6px; padding:7px 16px; font-size:12px; font-weight:600; cursor:pointer; }
-    .btn:disabled { opacity:.5; cursor:not-allowed; }
-    .btn-green { background:#1B5E20; color:#fff; }
-    .btn-green:hover:not(:disabled) { background:#2E7D32; }
-    .btn-orange { background:#E65100; color:#fff; }
-    .btn-purple { background:#6A1B9A; color:#fff; }
-    .btn-blue { background:#1565C0; color:#fff; }
-    .btn-sm { padding:5px 12px; font-size:11px; }
-    .rl-table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.08); }
-    .rl-table th { background:#1B5E20; color:#fff; padding:9px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; text-align:left; white-space:nowrap; }
-    .rl-table td { padding:8px 10px; font-size:12px; border-bottom:1px solid #eee; vertical-align:middle; }
-    .rl-table tr:hover td { background:#f0fdf4; }
-    .rl-table .chk { width:16px; height:16px; cursor:pointer; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:600; }
-    .badge-sent { background:#c8e6c9; color:#1B5E20; }
-    .badge-pending { background:#fff3e0; color:#E65100; }
-    .badge-no-email { background:#ffcdd2; color:#b71c1c; }
-    .email-cell { display:flex; align-items:center; gap:4px; }
-    .email-cell input { border:1px solid #ccc; border-radius:4px; padding:3px 6px; font-size:11px; width:160px; }
-    .email-cell .save-email { background:#1B5E20; color:#fff; border:none; border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer; }
-    .empty-state { text-align:center; padding:50px 20px; color:#888; }
-    /* Modal */
-    .modal-bg { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:999; justify-content:center; align-items:center; }
-    .modal-bg.active { display:flex; }
-    .modal { background:#fff; border-radius:12px; padding:24px; max-width:550px; width:95%; max-height:85vh; overflow-y:auto; position:relative; }
-    .modal h3 { margin:0 0 4px; font-size:17px; color:#1B5E20; }
-    .modal .sub { color:#666; font-size:12px; margin-bottom:16px; }
-    .modal .close-btn { position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#666; }
-    .modal label { display:block; font-size:12px; font-weight:600; margin:10px 0 4px; color:#333; }
-    .modal input, .modal select { width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; box-sizing:border-box; }
-    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .progress-bar { width:100%; height:4px; background:#eee; border-radius:2px; margin-top:12px; }
-    .progress-fill { height:100%; background:#1B5E20; border-radius:2px; transition:width .3s; }
-    .result-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:12px; }
-    .result-table th { background:#f5f5f5; padding:6px 8px; text-align:left; }
-    .result-table td { padding:6px 8px; border-bottom:1px solid #eee; }
-    @media (max-width:768px) { .rl-table { font-size:11px; } .rl-table th,.rl-table td { padding:6px 5px; } .form-row { grid-template-columns:1fr; } }
-  </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR - Relieving Letters</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .stat-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .stat-card { background:#f0fdf4; border:1px solid #c8e6c9; border-radius:10px; padding:12px 20px; text-align:center; min-width:100px; }
+  .stat-card .num { font-size:22px; font-weight:700; color:#1B5E20; }
+  .stat-card .lbl { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .cc-row { display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .cc-row > div { flex:1; min-width:180px; }
+  .cc-row label { font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px; }
+  .cc-row input { width:100%; padding:7px 10px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:10px; font-weight:600; }
+  .badge-sent { background:#c8e6c9; color:#1B5E20; }
+  .badge-pending { background:#fff3e0; color:#E65100; }
+  .badge-no-email { background:#ffcdd2; color:#b71c1c; }
+  .email-wrap { display:flex; align-items:center; gap:4px; }
+  .email-wrap input { border:1px solid #ddd; border-radius:4px; padding:4px 6px; font-size:11px; width:155px; }
+  .email-wrap .sv { background:#1B5E20; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:10px; cursor:pointer; }
+  .btn-icon { border:none; border-radius:5px; padding:5px 10px; font-size:11px; cursor:pointer; font-weight:600; color:#fff; }
+  .btn-icon:disabled { opacity:.4; cursor:not-allowed; }
+  .btn-preview { background:#1565C0; }
+  .btn-send { background:#1B5E20; }
+  .btn-send:hover:not(:disabled) { background:#2E7D32; }
+  /* Modal */
+  .modal-bg { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:999; justify-content:center; align-items:center; }
+  .modal-bg.active { display:flex; }
+  .modal-box { background:#fff; border-radius:12px; padding:24px; max-width:560px; width:95%; max-height:85vh; overflow-y:auto; position:relative; }
+  .modal-box h3 { margin:0 0 4px; font-size:16px; color:#6A1B9A; }
+  .modal-box .sub { color:#666; font-size:12px; margin-bottom:14px; }
+  .modal-box .close-x { position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#888; }
+  .result-tbl { width:100%; border-collapse:collapse; margin-top:12px; font-size:12px; }
+  .result-tbl th { background:#f5f5f5; padding:6px 8px; text-align:left; font-size:11px; }
+  .result-tbl td { padding:6px 8px; border-bottom:1px solid #eee; }
+</style>
 </head>
 <body>
 
@@ -88,61 +71,62 @@
     </div>
   </div>
 
-  <div class="rl-container">
-    <div class="rl-header">
-      <h2>📄 Relieving Letters</h2>
-      <div class="rl-stats">
-        <div class="rl-stat"><div class="num" id="stat-total">0</div><div class="lbl">Total Separated</div></div>
-        <div class="rl-stat"><div class="num" id="stat-sent">0</div><div class="lbl">Sent</div></div>
-        <div class="rl-stat"><div class="num" id="stat-pending">0</div><div class="lbl">Pending</div></div>
+  <div class="content fade-in">
+
+    <!-- Stats -->
+    <div class="stat-row">
+      <div class="stat-card"><div class="num" id="stat-total">0</div><div class="lbl">Total Separated</div></div>
+      <div class="stat-card"><div class="num" id="stat-sent">0</div><div class="lbl">Letters Sent</div></div>
+      <div class="stat-card"><div class="num" id="stat-pending">0</div><div class="lbl">Pending</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="card" style="padding:14px 18px;margin-bottom:14px;">
+      <div class="toolbar">
+        <div class="input-with-icon" style="flex:1;min-width:200px;max-width:280px;">
+          <span class="input-icon">🔍</span>
+          <input id="search-input" class="form-control" placeholder="Search name, code, email…" oninput="renderTable()">
+        </div>
+        <button class="btn btn-success" id="btn-bulk-send" disabled onclick="bulkSendSelected()" style="font-size:12px;">📤 Send Selected (<span id="selected-count">0</span>)</button>
+        <button class="btn" onclick="openBulkExcelModal()" style="background:#6A1B9A;color:#fff;font-size:12px;">📊 Bulk by Excel</button>
+      </div>
+      <div class="cc-row">
+        <div><label>CC (comma separated)</label><input type="text" id="cc-input" placeholder="hr@krishicare.in"></div>
+        <div><label>BCC (comma separated)</label><input type="text" id="bcc-input" placeholder="records@krishicare.in"></div>
       </div>
     </div>
 
-    <div class="rl-toolbar">
-      <input type="text" id="search-input" placeholder="Search name, code, email…" oninput="renderTable()">
-      <button class="btn btn-green" id="btn-bulk-send" disabled onclick="bulkSendSelected()">📤 Send Selected (<span id="selected-count">0</span>)</button>
-      <button class="btn btn-purple" onclick="openBulkExcelModal()">📊 Bulk by Excel</button>
-    </div>
-
-    <!-- CC/BCC row -->
-    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:180px;">
-        <label style="font-size:11px;font-weight:600;color:#555;">CC (comma separated)</label>
-        <input type="text" id="cc-input" placeholder="hr@krishicare.in" style="width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:5px;font-size:12px;">
-      </div>
-      <div style="flex:1;min-width:180px;">
-        <label style="font-size:11px;font-weight:600;color:#555;">BCC (comma separated)</label>
-        <input type="text" id="bcc-input" placeholder="records@krishicare.in" style="width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:5px;font-size:12px;">
+    <!-- Table -->
+    <div class="card" style="padding:0;overflow-x:auto;">
+      <div id="table-wrap">
+        <div style="text-align:center;padding:50px;color:#888;">Loading…</div>
       </div>
     </div>
 
-    <div id="table-wrap"><div class="empty-state"><h3>Loading…</h3></div></div>
   </div>
 </div>
 
 <!-- Bulk Excel Modal -->
 <div class="modal-bg" id="bulk-excel-modal">
-  <div class="modal">
-    <button class="close-btn" onclick="closeBulkExcelModal()">×</button>
+  <div class="modal-box">
+    <button class="close-x" onclick="closeBulkExcelModal()">×</button>
     <h3>📊 Bulk Send Relieving Letters</h3>
     <p class="sub">Upload Excel → Generate PDF → Send individually to each employee's personal email</p>
 
     <div style="background:#f3e5f5;border-radius:8px;padding:14px;margin-bottom:14px;">
       <strong style="font-size:13px;">Step 1 — Download Excel Template</strong>
-      <p style="font-size:12px;color:#555;margin:4px 0;">Fill employee codes + personal emails. CC and BCC in the first row apply to all.</p>
-      <button class="btn btn-purple btn-sm" onclick="downloadBulkTemplate()">⬇ Download Template</button>
+      <p style="font-size:12px;color:#555;margin:4px 0;">Fill employee codes + personal emails. CC and BCC in first row apply to all.</p>
+      <button class="btn" onclick="downloadBulkTemplate()" style="background:#6A1B9A;color:#fff;font-size:12px;">⬇ Download Template</button>
     </div>
 
-    <div>
-      <strong style="font-size:13px;">Step 2 — Upload Filled Excel</strong>
-      <input type="file" id="bulk-file" accept=".xlsx,.xls" style="display:block;width:100%;padding:10px;border:2px dashed #6A1B9A;border-radius:8px;cursor:pointer;font-size:12px;box-sizing:border-box;margin-top:6px;">
-    </div>
+    <strong style="font-size:13px;">Step 2 — Upload Filled Excel</strong>
+    <input type="file" id="bulk-file" accept=".xlsx,.xls" style="display:block;width:100%;padding:10px;border:2px dashed #6A1B9A;border-radius:8px;cursor:pointer;font-size:12px;box-sizing:border-box;margin:6px 0 0;">
 
-    <button class="btn btn-orange" id="bulk-excel-btn" style="width:100%;margin-top:14px;padding:12px;" onclick="startBulkExcelSend()">📤 Generate PDFs & Send All</button>
+    <button class="btn" id="bulk-excel-btn" onclick="startBulkExcelSend()" style="width:100%;margin-top:14px;padding:12px;background:#E65100;color:#fff;font-size:13px;font-weight:700;">📤 Generate PDFs & Send All</button>
 
     <div id="bulk-progress" style="display:none;">
-      <p style="font-size:12px;margin-top:10px;"><strong>Progress</strong> <span id="bulk-status" style="float:right;color:#666;">Uploading…</span></p>
-      <div class="progress-bar"><div class="progress-fill" id="bulk-fill" style="width:0%"></div></div>
+      <p style="font-size:12px;margin-top:10px;"><strong>Progress</strong> <span id="bulk-status" style="float:right;color:#666;font-size:11px;">Uploading…</span></p>
+      <div style="width:100%;height:4px;background:#eee;border-radius:2px;margin-top:4px;"><div id="bulk-fill" style="height:100%;background:#1B5E20;border-radius:2px;transition:width .3s;width:0%"></div></div>
     </div>
     <div id="bulk-results"></div>
   </div>
@@ -158,192 +142,159 @@ let employees = [];
 
 async function loadData() {
   const data = await api('GET', '/relieving-letters/eligible');
-  if (!data?.success) {
-    document.getElementById('table-wrap').innerHTML = '<div class="empty-state"><h3>Failed to load</h3></div>';
-    return;
-  }
+  if (!data?.success) { document.getElementById('table-wrap').innerHTML = '<div style="text-align:center;padding:50px;color:#c62828;">Failed to load</div>'; return; }
   employees = data.data || [];
   updateStats();
   renderTable();
 }
 
 function updateStats() {
-  const total = employees.length;
-  const sent = employees.filter(e => e.relieving_letter_sent_at).length;
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-sent').textContent = sent;
-  document.getElementById('stat-pending').textContent = total - sent;
+  const t = employees.length, s = employees.filter(e => e.relieving_letter_sent_at).length;
+  document.getElementById('stat-total').textContent = t;
+  document.getElementById('stat-sent').textContent = s;
+  document.getElementById('stat-pending').textContent = t - s;
 }
 
 function renderTable() {
   const q = (document.getElementById('search-input').value || '').toLowerCase();
-  const filtered = employees.filter(e => {
-    const name = ((e.first_name||'') + ' ' + (e.last_name||'')).toLowerCase();
-    return !q || name.includes(q) || (e.employee_code||'').toLowerCase().includes(q) || (e.alternate_email||'').toLowerCase().includes(q);
+  const list = employees.filter(e => {
+    const n = ((e.first_name||'')+(e.last_name||'')).toLowerCase();
+    return !q || n.includes(q) || (e.employee_code||'').toLowerCase().includes(q) || (e.alternate_email||'').toLowerCase().includes(q);
   });
+  if (!list.length) { document.getElementById('table-wrap').innerHTML = '<div style="text-align:center;padding:50px;color:#888;">No separated employees found</div>'; return; }
 
-  if (!filtered.length) {
-    document.getElementById('table-wrap').innerHTML = '<div class="empty-state"><h3>No separated employees found</h3></div>';
-    return;
-  }
-
-  let html = `<table class="rl-table"><thead><tr>
-    <th><input type="checkbox" class="chk" onchange="toggleAll(this)"></th>
+  let h = `<table><thead><tr>
+    <th style="width:36px"><input type="checkbox" onchange="toggleAll(this)"></th>
     <th>Employee</th><th>Designation</th><th>Joining</th><th>Relieving</th>
-    <th>Personal Email</th><th>Status</th><th>Actions</th>
+    <th>Personal Email</th><th>Status</th><th style="width:90px">Actions</th>
   </tr></thead><tbody>`;
 
-  for (const e of filtered) {
-    const name = ((e.first_name||'') + ' ' + (e.last_name||'')).trim();
-    const pe = e.alternate_email || '';
-    const hasEmail = pe && pe.includes('@') && !pe.toLowerCase().includes('@krishicare.in');
-    const isSent = !!e.relieving_letter_sent_at;
+  for (const e of list) {
+    const name = ((e.first_name||'')+' '+(e.last_name||'')).trim();
+    const pe = e.alternate_email||'';
+    const ok = pe && pe.includes('@') && !pe.toLowerCase().includes('@krishicare.in');
+    const sent = !!e.relieving_letter_sent_at;
     const jd = e.joining_date ? new Date(e.joining_date).toLocaleDateString('en-IN') : '—';
     const rd = (e.separation_date||e.last_working_date) ? new Date(e.separation_date||e.last_working_date).toLocaleDateString('en-IN') : '—';
     const st = e.separation_type||e.sep_type||'';
+    const badge = sent ? '<span class="badge badge-sent">✓ Sent</span>' : !ok ? '<span class="badge badge-no-email">No Email</span>' : '<span class="badge badge-pending">Pending</span>';
 
-    let badge = isSent ? '<span class="badge badge-sent">✓ Sent</span>'
-      : !hasEmail ? '<span class="badge badge-no-email">No Email</span>'
-      : '<span class="badge badge-pending">Pending</span>';
-
-    html += `<tr>
-      <td><input type="checkbox" class="chk row-chk" data-id="${e.id}" ${!hasEmail?'disabled':''} onchange="updateSelected()"></td>
-      <td><strong>${name}</strong><br><span style="color:#888;font-size:10px">${e.employee_code||''}</span></td>
-      <td style="font-size:11px">${e.designation_title||'—'}<br><span style="color:#888">${e.department_name||''}</span></td>
-      <td style="font-size:11px">${jd}</td>
-      <td style="font-size:11px">${rd}${st?'<br><span style="color:#888">'+st+'</span>':''}</td>
+    h += `<tr>
+      <td><input type="checkbox" class="row-chk" data-id="${e.id}" ${!ok?'disabled':''} onchange="updateSelected()"></td>
+      <td><strong>${name}</strong><br><span class="text-muted" style="font-size:10px">${e.employee_code||''}</span></td>
+      <td style="font-size:12px">${e.designation_title||'—'}<br><span class="text-muted">${e.department_name||''}</span></td>
+      <td style="font-size:12px">${jd}</td>
+      <td style="font-size:12px">${rd}${st?'<br><span class="text-muted">'+st+'</span>':''}</td>
       <td>
-        <div class="email-cell">
-          <input value="${pe}" id="email-${e.id}" placeholder="personal@gmail.com">
-          <button class="save-email" onclick="saveEmail(${e.id})">✓</button>
+        <div class="email-wrap">
+          <input value="${pe}" id="em-${e.id}" placeholder="personal@gmail.com">
+          <button class="sv" onclick="saveEmail(${e.id})">✓</button>
         </div>
       </td>
       <td>${badge}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-blue btn-sm" onclick="previewLetter(${e.id})" title="Preview PDF">👁</button>
-        <button class="btn btn-green btn-sm" ${!hasEmail?'disabled':''} onclick="sendOne(${e.id},this)">📤</button>
+        <button class="btn-icon btn-preview" onclick="previewLetter(${e.id})" title="Preview">👁</button>
+        <button class="btn-icon btn-send" ${!ok?'disabled':''} onclick="sendOne(${e.id},this)" title="Send">📤</button>
       </td>
     </tr>`;
   }
-
-  html += '</tbody></table>';
-  document.getElementById('table-wrap').innerHTML = html;
+  h += '</tbody></table>';
+  document.getElementById('table-wrap').innerHTML = h;
   updateSelected();
 }
 
 function toggleAll(el) { document.querySelectorAll('.row-chk:not(:disabled)').forEach(c=>c.checked=el.checked); updateSelected(); }
-
 function updateSelected() {
   const n = document.querySelectorAll('.row-chk:checked').length;
   document.getElementById('selected-count').textContent = n;
-  document.getElementById('btn-bulk-send').disabled = n === 0;
+  document.getElementById('btn-bulk-send').disabled = n===0;
 }
 
-async function saveEmail(empId) {
-  const email = document.getElementById('email-' + empId).value.trim();
-  if (!email || !email.includes('@')) { toast('Enter a valid email', 'error'); return; }
-  const data = await api('PUT', `/relieving-letters/update-email/${empId}`, { alternate_email: email });
-  if (data?.success) { toast('Email saved', 'success'); loadData(); }
-  else toast(data?.message || 'Failed', 'error');
+async function saveEmail(id) {
+  const email = document.getElementById('em-'+id).value.trim();
+  if (!email||!email.includes('@')) { toast('Enter a valid email','error'); return; }
+  const d = await api('PUT', `/relieving-letters/update-email/${id}`, { alternate_email: email });
+  if (d?.success) { toast('Email saved','success'); loadData(); } else toast(d?.message||'Failed','error');
 }
 
-function previewLetter(empId) {
-  window.open(API_BASE + `/relieving-letters/preview/${empId}?token=${Auth.getToken()}`, '_blank');
+function previewLetter(id) {
+  window.open(API_BASE + `/relieving-letters/preview/${id}?token=${Auth.getToken()}`, '_blank');
 }
 
 function getCcBcc() {
-  const cc = document.getElementById('cc-input').value.split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
-  const bcc = document.getElementById('bcc-input').value.split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
-  return { cc, bcc };
+  return {
+    cc: document.getElementById('cc-input').value.split(',').map(e=>e.trim()).filter(e=>e.includes('@')),
+    bcc: document.getElementById('bcc-input').value.split(',').map(e=>e.trim()).filter(e=>e.includes('@'))
+  };
 }
 
-async function sendOne(empId, btn) {
-  btn.disabled = true; btn.textContent = '⏳';
-  const { cc, bcc } = getCcBcc();
-  const data = await api('POST', `/relieving-letters/send/${empId}`, { cc, bcc });
-  if (data?.success) { toast(data.message, 'success'); loadData(); }
-  else { toast(data?.message || 'Failed', 'error'); btn.disabled = false; btn.textContent = '📤'; }
+async function sendOne(id, btn) {
+  btn.disabled=true; btn.textContent='⏳';
+  const d = await api('POST', `/relieving-letters/send/${id}`, getCcBcc());
+  if (d?.success) { toast(d.message,'success'); loadData(); }
+  else { toast(d?.message||'Failed','error'); btn.disabled=false; btn.textContent='📤'; }
 }
 
 async function bulkSendSelected() {
   const ids = Array.from(document.querySelectorAll('.row-chk:checked')).map(c=>parseInt(c.dataset.id));
   if (!ids.length) return;
   if (!confirm(`Send relieving letters to ${ids.length} employee(s)?`)) return;
-
   const btn = document.getElementById('btn-bulk-send');
-  btn.disabled = true; btn.innerHTML = '⏳ Processing…';
-
-  const resp = await fetch(API_BASE + '/relieving-letters/bulk-send', {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+Auth.getToken()},
-    body:JSON.stringify({ employee_ids:ids })
+  btn.disabled=true; btn.innerHTML='⏳ Processing…';
+  const resp = await fetch(API_BASE+'/relieving-letters/bulk-send', {
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+Auth.getToken()},
+    body:JSON.stringify({employee_ids:ids})
   });
-  const data = await resp.json();
-
-  if (data?.success) {
-    toast(`Done — ${data.sent} sent, ${data.failed} failed`, data.failed?'error':'success');
-    if (data.failed) alert('Failed:\n' + data.results.filter(r=>r.status==='failed').map(r=>`${r.name}: ${r.reason}`).join('\n'));
+  const d = await resp.json();
+  if (d?.success) {
+    toast(`Done — ${d.sent} sent, ${d.failed} failed`, d.failed?'error':'success');
+    if (d.failed) alert('Failed:\n'+d.results.filter(r=>r.status==='failed').map(r=>`${r.name}: ${r.reason}`).join('\n'));
     loadData();
-  } else toast(data?.message||'Failed','error');
-
-  btn.innerHTML = '📤 Send Selected (<span id="selected-count">0</span>)'; updateSelected();
+  } else toast(d?.message||'Failed','error');
+  btn.innerHTML='📤 Send Selected (<span id="selected-count">0</span>)'; updateSelected();
 }
 
-// ── Bulk by Excel ─────────────────────────────────────────────────
+// ── Bulk Excel ──
 function openBulkExcelModal() { document.getElementById('bulk-excel-modal').classList.add('active'); }
-function closeBulkExcelModal() { document.getElementById('bulk-excel-modal').classList.remove('active'); document.getElementById('bulk-results').innerHTML = ''; }
+function closeBulkExcelModal() { document.getElementById('bulk-excel-modal').classList.remove('active'); document.getElementById('bulk-results').innerHTML=''; }
 
 function downloadBulkTemplate() {
-  const headers = ['Employee Code','Personal Email','CC','BCC'];
-  const sample = ['KCMS-2024-018','akshay.rai@gmail.com','hr@krishicare.in','records@krishicare.in'];
-  const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
-  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 20) }));
+  const hd = ['Employee Code','Personal Email','CC','BCC'];
+  const s1 = ['KCMS-2024-018','akshay.rai@gmail.com','hr@krishicare.in','records@krishicare.in'];
+  const ws = XLSX.utils.aoa_to_sheet([hd,s1]);
+  ws['!cols'] = hd.map(h=>({wch:Math.max(h.length+4,20)}));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Relieving Letters');
-  XLSX.writeFile(wb, 'Relieving_Letter_Bulk_Template.xlsx');
+  XLSX.utils.book_append_sheet(wb,ws,'Relieving Letters');
+  XLSX.writeFile(wb,'Relieving_Letter_Bulk_Template.xlsx');
 }
 
 async function startBulkExcelSend() {
-  const fileInput = document.getElementById('bulk-file');
-  if (!fileInput.files.length) { toast('Select an Excel file', 'error'); return; }
-
+  const fi = document.getElementById('bulk-file');
+  if (!fi.files.length) { toast('Select an Excel file','error'); return; }
   const btn = document.getElementById('bulk-excel-btn');
-  btn.disabled = true; btn.textContent = '⏳ Processing…';
-  document.getElementById('bulk-progress').style.display = 'block';
-  document.getElementById('bulk-fill').style.width = '30%';
-  document.getElementById('bulk-status').textContent = 'Uploading & processing…';
+  btn.disabled=true; btn.textContent='⏳ Processing…';
+  document.getElementById('bulk-progress').style.display='block';
+  document.getElementById('bulk-fill').style.width='30%';
+  document.getElementById('bulk-status').textContent='Uploading & processing…';
 
-  const fd = new FormData();
-  fd.append('file', fileInput.files[0]);
-
+  const fd = new FormData(); fd.append('file',fi.files[0]);
   try {
-    const resp = await fetch(API_BASE + '/relieving-letters/bulk-send-excel', {
-      method:'POST',
-      headers:{'Authorization':'Bearer '+Auth.getToken()},
-      body:fd
+    const resp = await fetch(API_BASE+'/relieving-letters/bulk-send-excel', {
+      method:'POST', headers:{'Authorization':'Bearer '+Auth.getToken()}, body:fd
     });
-    const data = await resp.json();
-    document.getElementById('bulk-fill').style.width = '100%';
-    document.getElementById('bulk-status').textContent = 'Complete';
-
-    if (data?.success) {
-      let rhtml = `<p style="margin-top:10px;font-weight:600;">✅ Sent: ${data.sent} | ❌ Failed: ${data.failed}</p>`;
-      rhtml += '<table class="result-table"><thead><tr><th>Row</th><th>Name</th><th>Email</th><th>Status</th><th>Reason</th></tr></thead><tbody>';
-      for (const r of data.results) {
-        const color = r.status === 'sent' ? '#1B5E20' : '#c62828';
-        rhtml += `<tr><td>${r.row}</td><td>${r.name}</td><td>${r.email}</td><td style="color:${color};font-weight:600">${r.status}</td><td style="font-size:11px">${r.reason||'—'}</td></tr>`;
-      }
-      rhtml += '</tbody></table>';
-      document.getElementById('bulk-results').innerHTML = rhtml;
+    const d = await resp.json();
+    document.getElementById('bulk-fill').style.width='100%';
+    document.getElementById('bulk-status').textContent='Complete';
+    if (d?.success) {
+      let r=`<p style="margin-top:10px;font-weight:600">✅ Sent: ${d.sent} | ❌ Failed: ${d.failed}</p>`;
+      r+='<table class="result-tbl"><thead><tr><th>Row</th><th>Name</th><th>Email</th><th>Status</th><th>Reason</th></tr></thead><tbody>';
+      for (const x of d.results) { const c=x.status==='sent'?'#1B5E20':'#c62828'; r+=`<tr><td>${x.row}</td><td>${x.name}</td><td>${x.email}</td><td style="color:${c};font-weight:600">${x.status}</td><td style="font-size:11px">${x.reason||'—'}</td></tr>`; }
+      r+='</tbody></table>';
+      document.getElementById('bulk-results').innerHTML=r;
       loadData();
-    } else {
-      document.getElementById('bulk-results').innerHTML = `<p style="color:#c62828">Error: ${data?.message||'Unknown error'}</p>`;
-    }
-  } catch (err) {
-    document.getElementById('bulk-results').innerHTML = `<p style="color:#c62828">Error: ${err.message}</p>`;
-  }
-
-  btn.disabled = false; btn.textContent = '📤 Generate PDFs & Send All';
+    } else document.getElementById('bulk-results').innerHTML=`<p style="color:#c62828">Error: ${d?.message||'Unknown'}</p>`;
+  } catch(err) { document.getElementById('bulk-results').innerHTML=`<p style="color:#c62828">Error: ${err.message}</p>`; }
+  btn.disabled=false; btn.textContent='📤 Generate PDFs & Send All';
 }
 
 loadData();
