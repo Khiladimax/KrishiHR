@@ -78,8 +78,8 @@ function buildRelievingLetterHTML(emp, sig1Image, sig2Image) {
   const hdr = `
     <table class="header-table">
       <tr>
-        <td style="width:110px;vertical-align:middle;">
-          <img src="${LOGO_B64}" style="width:100px;height:auto;display:block;">
+        <td style="width:80px;vertical-align:middle;">
+          <img src="${LOGO_B64}" style="width:72px;height:auto;display:block;">
         </td>
         <td style="text-align:center;vertical-align:middle;">
           <div style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#000;margin-bottom:4px;">Krishi Care &amp; Management Services Private Limited</div>
