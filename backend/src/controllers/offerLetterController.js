@@ -224,12 +224,14 @@ try {
     <table class="header-table">
       <tr>
         <td style="width:110px;vertical-align:middle;">
-          <img src="${LOGO_B64}" style="width:100px;height:auto;display:block;">
+          <img src="${LOGO_B64}" style="width:100px;height:auto;display:block;position:relative;top:-10px;">
         </td>
         <td style="text-align:center;vertical-align:middle;">
-          <div style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#000;margin-bottom:4px;">Krishi Care &amp; Management Services Private Limited</div>
-          <div style="font-family:Arial,sans-serif;font-size:11px;color:#444;"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway,<br>Shankarwadi, Jogeshwari (East), Mumbai - 400060.</div>
-          <div style="font-family:Arial,sans-serif;font-size:11px;color:#444;margin-top:2px;">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. +91 22 68284109</div>
+          <div style="position:relative;top:-10px;">
+            <div style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#000;margin-bottom:4px;">Krishi Care &amp; Management Services Private Limited</div>
+            <div style="font-family:Arial,sans-serif;font-size:11px;color:#444;"><strong>Regd. &amp; Head Office:</strong> 617, 6th Floor, Hubtown Viva, Western Express Highway,<br>Shankarwadi, Jogeshwari (East), Mumbai - 400060.</div>
+            <div style="font-family:Arial,sans-serif;font-size:11px;color:#444;margin-top:2px;">Email: administrator@krishicare.in, Website: http://www.krishicare.com, Tel. +91 22 68284109</div>
+          </div>
         </td>
       </tr>
     </table>`;
@@ -274,12 +276,12 @@ try {
     width: 210mm; height: 297mm; position: relative;
     margin: 0 auto 20px auto; background: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,.5);
-    padding: 12mm 15mm 30mm 15mm;
+    padding: 15mm 15mm 30mm 15mm;
     page-break-after: always; overflow: hidden;
   }
   .header-table {
     width: 100%; border-bottom: 2px solid #000;
-    padding-bottom: 6px; margin-bottom: 20px;
+    padding-bottom: 10px; margin-bottom: 20px;
     border-collapse: collapse;
   }
   .footer {
