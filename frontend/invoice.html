@@ -598,1118 +598,794 @@ function _wtext(doc, txt, x, y, maxW, lineH=4.5){
 }
 
 // ── TEMPLATE BUILDERS (1-20) ─────────────────────────────────
+// 20 STRUCTURALLY UNIQUE invoice layouts — different headers, tables,
+// fonts, borders, spacing, section ordering, and amount display.
 
-function _tpl1(doc, d, M, W, CW) {
-  // Classic centered header, double top border
-  let y = M;
-  _rule(doc,M,y,W-M,0.8,60); y+=2;
-  _rule(doc,M,y,W-M,0.3,60); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(30,30,30);
-  doc.text('INVOICE', W/2, y+5, {align:'center'}); y+=10;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80,80,80);
-  doc.text(COMPANY.name, W/2, y, {align:'center'}); y+=5;
-  _rule(doc,M,y,W-M,0.3,60); y+=2;
-  _rule(doc,M,y,W-M,0.8,60); y+=8;
-  // Meta row
-  doc.setFontSize(8); doc.setTextColor(100,100,100);
-  doc.text('Invoice No:', M, y); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20); doc.text(d.invoiceNo||'—', M+22, y);
-  doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
-  doc.text('Date:', W-M-35, y); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20); doc.text(d.date||'—', W-M-23, y);
-  y+=7;
-  _rule(doc,M,y,W-M,0.3,200); y+=6;
-  // FROM / TO columns
-  doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80);
-  doc.text('FROM', M, y); doc.text('TO', W/2+5, y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
-  doc.text(d.name||'—', M, y); doc.text(COMPANY.name.split('Pvt')[0].trim(), W/2+5, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(70,70,70);
-  if(d.mob) { doc.text('Mob: '+d.mob, M, y); y+=4; }
-  if(d.aadhar) { doc.text('Aadhar: '+d.aadhar, M, y); y+=4; }
-  if(d.pan) { doc.text('PAN: '+d.pan, M, y); y+=4; }
-  y = _wtext(doc,d.address,M,y,85); y+=2;
-  doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  doc.text('Pvt. Ltd., '+COMPANY.addr.slice(0,50), W/2+5, y-12, {maxWidth:80});
-  doc.text('GSTIN: '+COMPANY.gst, W/2+5, y-4);
-  doc.text('PAN: '+COMPANY.pan, W/2+5, y);
-  y+=6;
-  _rule(doc,M,y,W-M,0.4,160); y+=6;
-  // Table
+// ── Shared rendering helpers ────────────────────────────────
+function _from(doc, d, x, y, fs1=10, fs2=8) {
+  doc.setFont('helvetica','bold'); doc.setFontSize(fs1); doc.setTextColor(20,20,20);
+  doc.text(d.name||'—', x, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(fs2); doc.setTextColor(60,60,60);
+  if(d.mob){doc.text('Mob: '+d.mob,x,y);y+=4;}
+  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,x,y);y+=4;}
+  if(d.pan){doc.text('PAN: '+d.pan,x,y);y+=4;}
+  if(d.address){y=_wtext(doc,d.address,x,y,80);}
+  return y;
+}
+function _to(doc, x, y, fs1=10, fs2=8) {
+  doc.setFont('helvetica','bold'); doc.setFontSize(fs1); doc.setTextColor(20,20,20);
+  doc.text(COMPANY.name, x, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(fs2); doc.setTextColor(60,60,60);
+  y=_wtext(doc,COMPANY.addr,x,y,80); y+=1;
+  doc.text('GSTIN: '+COMPANY.gst, x, y); y+=4;
+  doc.text('PAN: '+COMPANY.pan, x, y); y+=4;
+  return y;
+}
+function _bank(doc, d, x, y, w) {
   doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(40,40,40);
-  doc.text('SL', M+2, y+5); doc.text('PARTICULARS', M+14, y+5); doc.text('AMOUNT (RS.)', W-M-3, y+5, {align:'right'});
-  _rule(doc,M,y+6.5,W-M,0.5,80); y+=8;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('1', M+2, y+4);
-  const dl = doc.splitTextToSize(d.description||'—',110);
-  doc.text(dl, M+14, y+4);
-  doc.setFont('helvetica','bold');
-  doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'), W-M-3, y+4, {align:'right'});
-  y += Math.max(10, dl.length*4.5+4);
-  _rule(doc,M,y,W-M,0.4,160); y+=5;
-  doc.setFontSize(9); doc.setFont('helvetica','bold');
-  doc.text('Total', W-M-42, y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'), W-M-3, y, {align:'right'}); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50,50,50);
-  doc.text('Amount in Words: Rupees '+numToWords(Number(d.amount)||0)+' Only', M, y); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=6;
-  // Bank
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  doc.text('BANK / PAYMENT DETAILS', M, y); y+=4;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  const br=[['Account Name',d.name||'—'],['Bank',d.bankName||'—'],['Account No',d.accountNo||'—'],['IFSC',d.ifsc||'—']];
-  doc.setFontSize(8.5);
-  for(let i=0;i<br.length;i++){
-    const cx=i%2===0?M:W/2+5, cy=y+Math.floor(i/2)*6;
-    doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100); doc.text(br[i][0]+': ',cx,cy);
-    doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20); doc.text(br[i][1],cx+25,cy);
-  }
-  y+=Math.ceil(br.length/2)*6+6;
-  _rule(doc,M,y,W-M,0.6,80); y+=4;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(120,120,120);
-  doc.text('Computer generated invoice — Krishi Care & Management Services Pvt. Ltd.', W/2, y, {align:'center'});
-  return doc;
-}
-
-function _tpl2(doc, d, M, W, CW) {
-  // Right-aligned header, clean minimal
-  let y = M;
-  doc.setFont('helvetica','bold'); doc.setFontSize(26); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', W-M, y+8, {align:'right'}); y+=12;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100);
-  doc.text(COMPANY.name, W-M, y, {align:'right'}); y+=6;
-  _rule(doc,M,y,W-M,0.5,40); y+=8;
-  // Two columns: sender left, invoice info right
-  const rCol=W-M-55;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-  doc.text(d.name||'—', M, y);
-  doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-  if(d.mob){ doc.text('M: '+d.mob, M, y+5); }
-  if(d.aadhar){ doc.text('Aadhar: '+d.aadhar, M, y+10); }
-  if(d.pan){ doc.text('PAN: '+d.pan, M, y+15); }
-  const al=doc.splitTextToSize(d.address||'',80); doc.text(al, M, y+20);
-  // Right box
-  _box(doc,rCol,y-2,55,24,0.5,150);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100);
-  doc.text('Invoice No', rCol+3, y+3); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(d.invoiceNo||'—', rCol+3, y+8);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100);
-  doc.text('Date', rCol+3, y+14); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(20,20,20);
-  doc.text(d.date||'—', rCol+3, y+19);
-  y+=32;
-  _rule(doc,M,y,W-M,0.4,180); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  doc.text('BILL TO', M, y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name, M, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  y=_wtext(doc,COMPANY.addr,M,y,CW,4); y+=2;
-  doc.text('GSTIN: '+COMPANY.gst+'   PAN: '+COMPANY.pan, M, y); y+=8;
-  // Table header with thick bottom border
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(20,20,20);
-  doc.text('NO.', M, y+5); doc.text('DESCRIPTION', M+14, y+5); doc.text('TOTAL (RS.)', W-M-3, y+5,{align:'right'});
-  _rule(doc,M,y+6,W-M,0.8,40); y+=9;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('01', M, y+4);
-  const dl=doc.splitTextToSize(d.description||'—',108); doc.text(dl,M+14,y+4);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.5+4);
-  _rule(doc,M,y,W-M,0.4,160); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(10);
-  doc.text('TOTAL', W-M-42, y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=8;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only', M, y); y+=8;
-  _rule(doc,M,y,W-M,0.5,160); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(60,60,60);
-  doc.text('PAYMENT DETAILS', M, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(30,30,30);
-  doc.text('Account Holder: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.name||'—', M+32, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.text('Bank: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.bankName||'—', M+32, y);
-  doc.setFont('helvetica','normal'); doc.text('A/C No: ', M+90, y); doc.setFont('helvetica','bold'); doc.text(d.accountNo||'—', M+105, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.text('IFSC: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.ifsc||'—', M+32, y); y+=8;
-  _rule(doc,M,y,W-M,0.5,40);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(130,130,130);
-  doc.text('This is a system-generated invoice | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
-}
-
-function _tpl3(doc, d, M, W, CW) {
-  // Left sidebar accent line, large invoice number top-right
-  let y=M;
-  // Thick left margin line
-  doc.setDrawColor(40,40,40); doc.setLineWidth(3);
-  doc.line(M, M, M, 280);
-  const lx=M+6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', lx, y+8);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100);
-  doc.text(COMPANY.name, lx, y+14); y+=22;
-  // Invoice number box top-right
-  _box(doc,W-M-60,M,60,18,0.6,80);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90,90,90);
-  doc.text('INVOICE NUMBER', W-M-57, M+5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
-  doc.text(d.invoiceNo||'—', W-M-57, M+12);
-  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
-  doc.text('DATE: '+(d.date||'—'), W-M-57, M+17);
-  _rule(doc,lx,y,W-M,0.4,180); y+=6;
-  // Billed by / to
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(100,100,100);
-  doc.text('BILLED BY', lx, y); doc.text('BILLED TO', W/2+5, y); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
-  doc.text(d.name||'—', lx, y);
-  const bto=COMPANY.name; doc.setFontSize(9); doc.text(bto, W/2+5, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(70,70,70);
-  const infoL=[]; if(d.mob) infoL.push('Mob: '+d.mob); if(d.aadhar) infoL.push('Aadhar: '+d.aadhar); if(d.pan) infoL.push('PAN: '+d.pan);
-  infoL.forEach(t=>{doc.text(t,lx,y);y+=4.5;});
-  const al=doc.splitTextToSize(d.address||'',80); doc.text(al,lx,y); y+=al.length*4.5;
-  doc.setFontSize(7.5);
-  doc.text(COMPANY.addr.slice(0,55), W/2+5, y-al.length*4.5+0);
-  doc.text('GSTIN: '+COMPANY.gst, W/2+5, y-al.length*4.5+5);
-  doc.text('PAN: '+COMPANY.pan, W/2+5, y-al.length*4.5+10);
-  y+=5;
-  _rule(doc,lx,y,W-M,0.5,80); y+=7;
-  // Table
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(40,40,40);
-  doc.text('#', lx+1, y+4); doc.text('PARTICULARS / DESCRIPTION', lx+10, y+4); doc.text('AMOUNT', W-M-3, y+4, {align:'right'});
-  _rule(doc,lx,y+5,W-M,0.5,80); y+=9;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-  doc.text('1', lx+1, y+4);
-  const dl=doc.splitTextToSize(d.description||'—',106); doc.text(dl,lx+10,y+4);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.8+4);
-  _rule(doc,lx,y,W-M,0.3,200); y+=5;
-  doc.setFontSize(10); doc.text('Total Amount', W-M-55, y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=8;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only', lx, y); y+=8;
-  _rule(doc,lx,y,W-M,0.5,80); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(60,60,60);
-  doc.text('BANK DETAILS', lx, y); y+=5;
-  const br=[['Name',d.name||'—'],['Bank',d.bankName||'—'],['Branch',d.branch||'—'],['A/C',d.accountNo||'—'],['IFSC',d.ifsc||'—']];
-  doc.setFontSize(8.5);
-  br.forEach((row,i)=>{
-    const cx=i%2===0?lx:W/2+5, cy=y+Math.floor(i/2)*6;
-    doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110); doc.text(row[0]+': ',cx,cy);
-    doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20); doc.text(row[1],cx+22,cy);
-  });
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('Computer-generated document | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
-}
-
-function _tpl4(doc, d, M, W, CW) {
-  // Boxed layout — everything in bordered sections
-  let y=M;
-  // Full top box for header
-  _box(doc,M,y,CW,16,0.8,40);
-  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(20,20,20);
-  doc.text('TAX INVOICE', W/2, y+7, {align:'center'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  doc.text(COMPANY.name, W/2, y+13, {align:'center'}); y+=22;
-  // Meta box right
-  _box(doc,W-M-65,y,65,20,0.5,150);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
-  doc.text('Invoice No:', W-M-62, y+5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(d.invoiceNo||'—', W-M-62, y+10);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
-  doc.text('Date: '+(d.date||'—'), W-M-62, y+17);
-  // From box left
-  _box(doc,M,y,CW-70,20,0.5,150);
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  doc.text('FROM', M+3, y+5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(d.name||'—', M+3, y+11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  if(d.mob) doc.text('Mob: '+d.mob+  (d.pan?' | PAN: '+d.pan:''), M+3, y+17);
-  y+=26;
-  // Bill To box
-  _box(doc,M,y,CW,22,0.5,150);
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  doc.text('BILL TO', M+3, y+5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name, M+3, y+11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  const ta=doc.splitTextToSize(COMPANY.addr+' | GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan, CW-6);
-  doc.text(ta, M+3, y+16);
-  y+=28;
-  // Table box
-  _box(doc,M,y,CW,10,0.5,100);
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(30,30,30);
-  doc.text('SR', M+3, y+6.5); doc.text('PARTICULARS', M+15, y+6.5); doc.text('AMOUNT (RS.)', W-M-3, y+6.5, {align:'right'});
-  y+=10;
-  _box(doc,M,y,CW,16,0.4,180);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('1', M+3, y+6);
-  const dl=doc.splitTextToSize(d.description||'—',110); doc.text(dl,M+15,y+5);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+6,{align:'right'});
-  y+=Math.max(16,dl.length*4.5+4);
-  _rule(doc,M+CW-65,y,W-M,0.8,80);
-  y+=4; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
-  doc.text('TOTAL: Rs.'+Number(d.amount||0).toLocaleString('en-IN'), W-M-3, y+4, {align:'right'}); y+=10;
-  // Words + bank in box
-  _box(doc,M,y,CW,10,0.4,200);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50,50,50);
-  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only', M+3, y+6.5); y+=14;
-  _box(doc,M,y,CW,26,0.5,150);
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  doc.text('BANK DETAILS', M+3, y+5);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('Name: ', M+3, y+11); doc.setFont('helvetica','bold'); doc.text(d.name||'—', M+18, y+11);
-  doc.setFont('helvetica','normal'); doc.text('Bank: ', W/2, y+11); doc.setFont('helvetica','bold'); doc.text(d.bankName||'—', W/2+14, y+11);
-  doc.setFont('helvetica','normal'); doc.text('A/C No: ', M+3, y+18); doc.setFont('helvetica','bold'); doc.text(d.accountNo||'—', M+22, y+18);
-  doc.setFont('helvetica','normal'); doc.text('IFSC: ', W/2, y+18); doc.setFont('helvetica','bold'); doc.text(d.ifsc||'—', W/2+14, y+18);
-  y+=32;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('System Generated Invoice — Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
-}
-
-function _tpl5(doc, d, M, W, CW) {
-  // Large bold invoice no, minimal lines
-  let y=M;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name.toUpperCase(), M, y+5);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100);
-  doc.text(COMPANY.addr.slice(0,60), M, y+10);
-  doc.text('GSTIN: '+COMPANY.gst+'  |  PAN: '+COMPANY.pan, M, y+15);
-  doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(30,30,30);
-  doc.text(d.invoiceNo||'INV', W-M, y+8, {align:'right'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100);
-  doc.text('INVOICE', W-M, y+14, {align:'right'});
-  doc.text(d.date||'—', W-M, y+19, {align:'right'});
-  y+=25; _rule(doc,M,y,W-M,1,30); y+=8;
-  // From section
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(100,100,100); doc.text('INVOICED BY',M,y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20,20,20); doc.text(d.name||'—',M,y); y+=6;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(70,70,70);
-  const inL=[]; if(d.mob) inL.push('Mob: '+d.mob); if(d.aadhar) inL.push('Aadhar: '+d.aadhar); if(d.pan) inL.push('PAN: '+d.pan);
-  if(inL.length){doc.text(inL.join('   '),M,y);y+=5;}
-  y=_wtext(doc,d.address,M,y,120,4.5); y+=5;
-  _rule(doc,M,y,W-M,0.4,180); y+=6;
-  // Table – no fill, just lines
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(40,40,40);
-  doc.text('DESCRIPTION', M, y+4); doc.text('AMOUNT (RS.)', W-M-3, y+4, {align:'right'});
-  y+=5; _rule(doc,M,y,W-M,0.6,60); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-  const dl=doc.splitTextToSize(d.description||'—',CW-30); doc.text(dl,M,y+4);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*5+4); _rule(doc,M,y,W-M,0.4,160); y+=5;
-  doc.setFontSize(11); doc.text('GRAND TOTAL',M,y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=6;
-  _rule(doc,M,y,W-M,1,30); y+=6;
+  doc.text('BANK DETAILS', x, y); y+=5;
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
-  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only', M, y); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80); doc.text('PAYMENT INFORMATION',M,y); y+=5;
-  doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(30,30,30);
-  doc.text('Account Holder: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.name||'—', M+34, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.text('Bank Name: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.bankName||'—', M+26, y);
-  doc.setFont('helvetica','normal'); doc.text('Branch: ', M+75, y); doc.setFont('helvetica','bold'); doc.text(d.branch||'—', M+92, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.text('Account No: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.accountNo||'—', M+26, y);
-  doc.setFont('helvetica','normal'); doc.text('IFSC: ', M+75, y); doc.setFont('helvetica','bold'); doc.text(d.ifsc||'—', M+89, y); y+=10;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('This is a computer-generated invoice | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
+  const bk=[['A/C Name',d.name],['Bank',d.bankName],['Branch',d.branch],['A/C No',d.accountNo],['IFSC',d.ifsc]];
+  bk.forEach(([l,v])=>{if(v){doc.text(l+': ',x,y);doc.setFont('helvetica','bold');doc.text(v||'—',x+22,y);doc.setFont('helvetica','normal');y+=4;}});
+  return y;
+}
+function _bankGrid(doc, d, x, y, w) {
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(40,40,40);
+  doc.text('Payment Details', x, y); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(50,50,50);
+  const col2=x+w/2;
+  doc.text('Account: '+(d.name||'—'), x, y); doc.text('Bank: '+(d.bankName||'—'), col2, y); y+=4;
+  doc.text('A/C No: '+(d.accountNo||'—'), x, y); doc.text('IFSC: '+(d.ifsc||'—'), col2, y); y+=4;
+  if(d.branch){doc.text('Branch: '+d.branch, x, y); y+=4;}
+  return y;
+}
+function _desc(doc, d, x, y, maxW=120) {
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  return _wtext(doc, d.description||'—', x, y, maxW);
+}
+function _footer(doc, y, M, W) {
+  doc.setFontSize(7); doc.setTextColor(150,150,150);
+  doc.text('This is a computer-generated invoice.', W/2, Math.max(y+10, 275), {align:'center'});
   return doc;
 }
 
-function _tpl6(doc, d, M, W, CW) {
-  // Centered formal — like a certificate
+function _tpl1(doc,d,M,W,CW){
   let y=M;
-  _rule(doc,M,y,W-M,1.2,30); y+=3; _rule(doc,M,y,W-M,0.4,80); y+=8;
-  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', W/2, y+6, {align:'center'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(70,70,70);
-  doc.text(COMPANY.name, W/2, y+13, {align:'center'});
-  doc.setFontSize(7.5); doc.text('GSTIN: '+COMPANY.gst+'  |  PAN: '+COMPANY.pan, W/2, y+18, {align:'center'}); y+=24;
-  _rule(doc,M,y,W-M,0.4,80); y+=3; _rule(doc,M,y,W-M,1.2,30); y+=10;
-  // Invoice ref row
-  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('Invoice No: ', M, y); doc.setFont('helvetica','normal'); doc.text(d.invoiceNo||'—', M+24, y);
-  doc.setFont('helvetica','bold'); doc.text('Date: ', W-M-38, y); doc.setFont('helvetica','normal'); doc.text(d.date||'—', W-M-24, y); y+=8;
-  _rule(doc,M,y,W-M,0.4,180); y+=6;
-  // Sender
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80); doc.text('FROM',M,y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20); doc.text(d.name||'—',M,y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(70,70,70);
-  const inL=[]; if(d.mob) inL.push('Mob: '+d.mob); if(d.aadhar) inL.push('Aadhar: '+d.aadhar); if(d.pan) inL.push('PAN: '+d.pan);
-  if(inL.length){doc.text(inL.join('   '),M,y);y+=5;}
-  y=_wtext(doc,d.address,M,y,CW,4.5); y+=5;
-  // TO block centered
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80); doc.text('TO',M,y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20); doc.text(COMPANY.name,M,y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  y=_wtext(doc,COMPANY.addr,M,y,CW,4); y+=2;
-  doc.text('GSTIN: '+COMPANY.gst+'   PAN: '+COMPANY.pan,M,y); y+=7;
-  // Particulars
-  _rule(doc,M,y,W-M,0.6,80); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(30,30,30);
-  doc.text('Sl.',M+1,y+4); doc.text('Particulars',M+12,y+4); doc.text('Amount (Rs.)',W-M-3,y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.6,80); y+=10;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('1',M+1,y+4);
-  const dl=doc.splitTextToSize(d.description||'—',108); doc.text(dl,M+12,y+4);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.5+4);
-  _rule(doc,M,y,W-M,0.6,80); y+=5;
-  doc.setFontSize(10); doc.text('Total',W-M-42,y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=8;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50,50,50);
-  doc.text('Amount in Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=8;
-  _rule(doc,M,y,W-M,0.4,180); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(60,60,60); doc.text('BANK / PAYMENT',M,y); y+=5;
-  doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(30,30,30);
-  const br2=[['Account Name',d.name||'—'],['Bank Name',d.bankName||'—'],['Account No',d.accountNo||'—'],['IFSC Code',d.ifsc||'—']];
-  br2.forEach((row,i)=>{const cx=i%2===0?M:W/2; const cy=y+Math.floor(i/2)*6; doc.setFont('helvetica','normal');doc.setTextColor(110,110,110);doc.text(row[0]+': ',cx,cy);doc.setFont('helvetica','bold');doc.setTextColor(20,20,20);doc.text(row[1],cx+28,cy);});
-  y+=Math.ceil(br2.length/2)*6+4;
-  _rule(doc,M,y,W-M,0.4,80); y+=3; _rule(doc,M,y,W-M,1.2,30);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('Computer Generated Invoice | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
+  doc.setFont('times','bold'); doc.setFontSize(22); doc.setTextColor(0);
+  doc.text('INVOICE', W/2, y+8, {align:'center'}); y+=12;
+  doc.setFont('times','normal'); doc.setFontSize(9);
+  doc.text(COMPANY.name, W/2, y, {align:'center'}); y+=6;
+  _rule(doc,M,y,W-M,1,0); y+=8;
+  // Meta
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80);
+  doc.text('Invoice #: '+(d.invoiceNo||'—'),M,y);
+  doc.text('Date: '+(d.date||'—'),W-M,y,{align:'right'}); y+=8;
+  _rule(doc,M,y,W-M,0.3,180); y+=6;
+  // From / To side by side
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('BILL FROM',M,y); doc.text('BILL TO',W/2+10,y); y+=5;
+  const yf=_from(doc,d,M,y); const yt=_to(doc,W/2+10,y);
+  y=Math.max(yf,yt)+6;
+  _rule(doc,M,y,W-M,0.5,100); y+=6;
+  // Table with full borders
+  _box(doc,M,y,CW,8); doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(40);
+  doc.text('Sl',M+3,y+5.5); doc.text('Description',M+15,y+5.5); doc.text('Amount (Rs.)',W-M-3,y+5.5,{align:'right'}); y+=8;
+  const descH=Math.max(10,(doc.splitTextToSize(d.description||'—',CW-40).length)*4.5+4);
+  _box(doc,M,y,CW,descH);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  doc.text('1',M+3,y+5); _wtext(doc,d.description||'—',M+15,y+5,CW-40);
+  doc.setFont('helvetica','bold'); doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+5,{align:'right'}); y+=descH;
+  _box(doc,M,y,CW,8); doc.setFontSize(9);
+  doc.text('TOTAL',M+15,y+5.5); doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+5.5,{align:'right'}); y+=12;
+  // Amount in words
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(60);
+  doc.text('Amount in words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=10;
+  _rule(doc,M,y,W-M,0.3,180); y+=6;
+  y=_bank(doc,d,M,y,CW); y+=8;
+  // Signature
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Authorized Signatory',W-M,y+15,{align:'right'});
+  _rule(doc,W-M-45,y+10,W-M,0.3,150);
+  return _footer(doc,y+20,M,W);
 }
 
-function _tpl7(doc, d, M, W, CW) {
-  // Tabular dense format, smaller font, packed
-  let y=M;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', M, y+6);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100);
-  doc.text(d.date||'—', W-M, y+4, {align:'right'});
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(d.invoiceNo||'—', W-M, y+10, {align:'right'}); y+=14;
-  _rule(doc,M,y,W-M,0.7,40); y+=6;
-  // Full-width table for party info
-  const hw=(CW)/2;
-  _box(doc,M,y,hw,30,0.4,160);
-  _box(doc,M+hw,y,hw,30,0.4,160);
-  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(80,80,80);
-  doc.text('INVOICE FROM', M+2, y+4);
-  doc.text('INVOICE TO', M+hw+2, y+4);
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
-  doc.text(d.name||'—', M+2, y+9);
-  doc.text(COMPANY.name.split('Pvt')[0]+'Pvt. Ltd.', M+hw+2, y+9);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  if(d.mob) doc.text('Mob: '+d.mob, M+2, y+15);
-  if(d.pan) doc.text('PAN: '+d.pan, M+2, y+20);
-  if(d.aadhar) doc.text('Aadhaar: '+d.aadhar, M+2, y+25);
-  const ta2=doc.splitTextToSize(COMPANY.addr.slice(0,60),hw-4); doc.text(ta2, M+hw+2, y+14);
-  doc.text('GSTIN: '+COMPANY.gst, M+hw+2, y+26);
-  y+=36;
-  // Items table
-  const cols=[12,110,58]; // x offsets
-  _box(doc,M,y,CW,8,0.5,100);
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(30,30,30);
-  doc.text('NO', M+2, y+5.5); doc.text('DESCRIPTION OF SERVICE', M+cols[0]+2, y+5.5); doc.text('AMOUNT (RS.)', W-M-2, y+5.5,{align:'right'}); y+=8;
-  _box(doc,M,y,CW,14,0.4,200);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(30,30,30);
-  doc.text('01', M+2, y+6);
-  const dl=doc.splitTextToSize(d.description||'—',cols[1]-4); doc.text(dl, M+cols[0]+2, y+5);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'), W-M-2, y+6,{align:'right'});
-  y+=Math.max(14,dl.length*4+4);
-  _box(doc,M+cols[0],y,CW-cols[0],9,0.5,100);
-  doc.setFontSize(9); doc.text('TOTAL', M+cols[0]+2, y+6); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'), W-M-2, y+6,{align:'right'}); y+=15;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(60,60,60);
-  doc.text('Amount in Words: Rupees '+numToWords(Number(d.amount)||0)+' Only', M, y); y+=7;
-  _rule(doc,M,y,W-M,0.4,180); y+=5;
-  _box(doc,M,y,CW,26,0.4,180);
-  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(80,80,80);
-  doc.text('PAYMENT / BANK DETAILS', M+2, y+4);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(30,30,30);
-  doc.text('Account: ', M+2, y+10); doc.setFont('helvetica','bold'); doc.text(d.name||'—', M+22, y+10);
-  doc.setFont('helvetica','normal'); doc.text('Bank: ', M+2, y+16); doc.setFont('helvetica','bold'); doc.text(d.bankName||'—', M+18, y+16);
-  doc.setFont('helvetica','normal'); doc.text('A/C No: ', M+2, y+22); doc.setFont('helvetica','bold'); doc.text(d.accountNo||'—', M+20, y+22);
-  doc.setFont('helvetica','normal'); doc.text('IFSC: ', W/2, y+16); doc.setFont('helvetica','bold'); doc.text(d.ifsc||'—', W/2+14, y+16);
-  if(d.branch){doc.setFont('helvetica','normal'); doc.text('Branch: ', W/2, y+22); doc.setFont('helvetica','bold'); doc.text(d.branch, W/2+18, y+22);}
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('System Generated | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
-}
-
-function _tpl8(doc, d, M, W, CW) {
-  // Landscape-inspired wide layout on portrait, very open spacing
+function _tpl2(doc,d,M,W,CW){
   let y=M+5;
-  // Company at top left, meta at top right with vertical divider
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-  doc.text(COMPANY.name, M, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
-  doc.text(COMPANY.addr.slice(0,60), M, y+5);
-  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan, M, y+10);
-  doc.setDrawColor(160,160,160); doc.setLineWidth(0.5); doc.line(W-M-45, y-2, W-M-45, y+14);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
-  doc.text('Invoice No', W-M-42, y+1);
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
-  doc.text(d.invoiceNo||'—', W-M-42, y+7);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
-  doc.text('Dated: '+(d.date||'—'), W-M-42, y+13);
-  y+=22; _rule(doc,M,y,W-M,0.8,40); y+=8;
-  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', M, y+7);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,90,90);
-  doc.text('Billed by: '+( d.name||'—'), M, y+14); y+=20;
+  doc.setFont('courier','bold'); doc.setFontSize(14); doc.setTextColor(0);
+  doc.text('RENT RECEIPT / INVOICE',M,y); y+=6;
+  doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('No: '+(d.invoiceNo||'—')+'  |  Date: '+(d.date||'—'),M,y); y+=4;
+  _rule(doc,M,y,W-M,0.8,80); y+=8;
+  doc.setFont('courier','bold'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Received From:',M,y); y+=5;
+  y=_from(doc,d,M,y,9,8); y+=6;
+  doc.setFont('courier','bold'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Received By:',M,y); y+=5;
+  y=_to(doc,M,y,9,8); y+=8;
   _rule(doc,M,y,W-M,0.3,200); y+=6;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  if(d.mob) {doc.text('Mob: '+d.mob, M, y); y+=4.5;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar, M, y); y+=4.5;}
-  if(d.pan){doc.text('PAN: '+d.pan, M, y); y+=4.5;}
-  y=_wtext(doc,d.address,M,y,CW,4); y+=5;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(70,70,70); doc.text('DESCRIPTION OF WORK / SERVICES',M,y); y+=5;
-  const dl=doc.splitTextToSize(d.description||'—',CW);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-  doc.text(dl,M,y); y+=dl.length*5+4;
-  _rule(doc,M,y,W-M,0.4,160); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20,20,20);
-  doc.text('Amount: Rs. '+Number(d.amount||0).toLocaleString('en-IN'), M, y); y+=6;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)', M, y); y+=8;
-  _rule(doc,M,y,W-M,0.8,40); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(60,60,60); doc.text('BANK DETAILS FOR PAYMENT', M, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
-  doc.text('Account Holder: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.name||'—', M+32, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.text('Bank: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.bankName||'—', M+14, y);
-  if(d.branch){doc.setFont('helvetica','normal'); doc.text(' | Branch: ', M+14+(d.bankName||'').length*2, y);}
-  doc.setFont('helvetica','normal'); doc.text('A/C No: ', M+80, y); doc.setFont('helvetica','bold'); doc.text(d.accountNo||'—', M+97, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.text('IFSC Code: ', M, y); doc.setFont('helvetica','bold'); doc.text(d.ifsc||'—', M+22, y); y+=8;
-  _rule(doc,M,y,W-M,0.5,160);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('Computer Generated Invoice | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
+  doc.setFont('courier','bold'); doc.setFontSize(8); doc.setTextColor(60);
+  doc.text('PARTICULARS',M,y); doc.text('AMOUNT',W-M,y,{align:'right'}); y+=2;
+  _rule(doc,M,y,W-M,0.3,180); y+=5;
+  doc.setFont('courier','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  y=_wtext(doc,d.description||'—',M,y,CW-35);
+  doc.setFont('courier','bold'); doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y-4,{align:'right'}); y+=4;
+  _rule(doc,M,y,W-M,0.3,180); y+=5;
+  doc.setFont('courier','bold'); doc.setFontSize(10);
+  doc.text('TOTAL: Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y,{align:'right'}); y+=8;
+  doc.setFont('courier','italic'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',M,y); y+=10;
+  _rule(doc,M,y,W-M,0.5,120); y+=6;
+  y=_bankGrid(doc,d,M,y,CW); y+=12;
+  doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('Signature: ____________________',W-M-55,y);
+  return _footer(doc,y+10,M,W);
 }
 
-function _tpl9(doc, d, M, W, CW) {
-  // Top-right company block, left side payee
+function _tpl3(doc,d,M,W,CW){
   let y=M;
-  // Top-right company info block
-  _box(doc,W-M-85,y,85,28,0.5,130);
-  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name.split('Pvt')[0], W-M-82, y+5);
-  doc.text('Pvt. Ltd.', W-M-82, y+10);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80);
-  const ta3=doc.splitTextToSize(COMPANY.addr.slice(0,65),82); doc.text(ta3,W-M-82,y+14);
-  doc.text('GSTIN: '+COMPANY.gst, W-M-82, y+24);
-  // Left: big INVOICE title
-  doc.setFont('helvetica','bold'); doc.setFontSize(30); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', M, y+16);
-  y+=35; _rule(doc,M,y,W-M,0.6,60); y+=6;
-  // 3-column meta
-  const c3=CW/3;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100,100,100);
-  doc.text('INVOICE NO', M, y); doc.text('DATE', M+c3, y); doc.text('FROM', M+c3*2, y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20,20,20);
-  doc.text(d.invoiceNo||'—', M, y);
-  doc.setFontSize(8.5); doc.text(d.date||'—', M+c3, y);
-  doc.setFontSize(9); doc.text(d.name||'—', M+c3*2, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
-  if(d.mob) doc.text('Mob: '+d.mob, M+c3*2, y);
-  if(d.pan) doc.text('PAN: '+d.pan, M+c3*2, y+5);
-  y+=12; _rule(doc,M,y,W-M,0.4,180); y+=6;
-  // Table
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(40,40,40);
-  doc.text('SL', M+1, y+4); doc.text('PARTICULARS', M+12, y+4); doc.text('RS.', W-M-3, y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.5,100); y+=9;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-  doc.text('1', M+1, y+4);
-  const dl=doc.splitTextToSize(d.description||'—',105); doc.text(dl,M+12,y+4);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.8+4); _rule(doc,M,y,W-M,0.3,200); y+=4;
-  doc.setFontSize(10); doc.text('TOTAL', W-M-45, y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=7;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
-  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only', M, y); y+=8;
-  _rule(doc,M,y,W-M,0.5,80); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(60,60,60); doc.text('REMITTANCE DETAILS',M,y); y+=5;
-  const brs=[['Account Name',d.name||'—'],['Bank',d.bankName||'—'],['Account No',d.accountNo||'—'],['IFSC',d.ifsc||'—']];
-  doc.setFontSize(8.5);
-  brs.forEach((row,i)=>{const cx=i%2===0?M:W/2+5,cy=y+Math.floor(i/2)*6; doc.setFont('helvetica','normal');doc.setTextColor(110,110,110);doc.text(row[0]+':',cx,cy);doc.setFont('helvetica','bold');doc.setTextColor(20,20,20);doc.text(row[1],cx+28,cy);});
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('Auto-generated invoice | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
+  _box(doc,M,y,CW,18,0.8,60);
+  doc.setFont('times','bold'); doc.setFontSize(20); doc.setTextColor(0);
+  doc.text('INVOICE',W/2,y+12,{align:'center'}); y+=22;
+  // Invoice meta in box
+  _box(doc,M,y,CW/2-2,10); _box(doc,W/2+2,y,CW/2-2,10);
+  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(60);
+  doc.text('Invoice No: '+(d.invoiceNo||'—'),M+4,y+6.5);
+  doc.text('Date: '+(d.date||'—'),W/2+6,y+6.5); y+=14;
+  // From box
+  _box(doc,M,y,CW/2-2,40,0.4,150); doc.setFont('times','bold'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('FROM',M+4,y+5); _from(doc,d,M+4,y+10,9,7.5);
+  // To box
+  _box(doc,W/2+2,y,CW/2-2,40,0.4,150); doc.text('TO',W/2+6,y+5); _to(doc,W/2+6,y+10,9,7.5);
+  y+=44;
+  // Description box
+  _box(doc,M,y,CW,30,0.4,150);
+  doc.setFont('times','bold'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('PARTICULARS',M+4,y+5);
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  _wtext(doc,d.description||'—',M+4,y+10,CW-10);
+  doc.setFont('times','bold'); doc.setFontSize(11);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M-4,y+25,{align:'right'}); y+=34;
+  // Total box
+  _box(doc,M,y,CW,10,0.6,80);
+  doc.setFont('times','bold'); doc.setFontSize(10); doc.setTextColor(0);
+  doc.text('TOTAL AMOUNT',M+4,y+7); doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M-4,y+7,{align:'right'}); y+=14;
+  doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=10;
+  // Bank box
+  _box(doc,M,y,CW,24,0.3,180);
+  y=_bank(doc,d,M+4,y+5,CW-8); y+=8;
+  doc.setFont('times','normal'); doc.setFontSize(8);
+  doc.text('For '+COMPANY.name,W-M-4,y+10,{align:'right'});
+  doc.text('Authorized Signatory',W-M-4,y+18,{align:'right'});
+  return _footer(doc,y+25,M,W);
 }
 
-function _tpl10(doc, d, M, W, CW) {
-  // Newspaper column style, compact header
-  let y=M;
-  // Triple rule header
-  _rule(doc,M,y,W-M,1.5,20); y+=3;
-  _rule(doc,M,y,W-M,0.4,80); y+=3;
-  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20,20,20);
-  doc.text('INVOICE', W/2, y+5, {align:'center'});
-  y+=8; _rule(doc,M,y,W-M,0.4,80); y+=2; _rule(doc,M,y,W-M,1.5,20); y+=7;
-  // Meta strip
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(30,30,30);
-  doc.text('Ref: '+( d.invoiceNo||'—'), M, y);
-  doc.text('Dated: '+(d.date||'—'), W/2, y);
-  y+=7; _rule(doc,M,y,W-M,0.3,180); y+=6;
-  // Two-col: left content area, right sidebar
-  const mainW=CW*0.62, sideW=CW*0.34, sideX=W-M-sideW;
-  _rule(doc,sideX-3,y,sideX-3,160,0.3,180);
-  // Main col
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80); doc.text('BILLED BY', M, y); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20); doc.text(d.name||'—', M, y); y+=5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M,y);y+=4.5;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,M,y);y+=4.5;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=4.5;}
-  y=_wtext(doc,d.address,M,y,mainW-5,4); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80); doc.text('BILLED TO',M,y); y+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20); doc.text(COMPANY.name.split('Pvt')[0].trim(),M,y); y+=4;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(70,70,70);
-  y=_wtext(doc,COMPANY.addr,M,y,mainW-5,4); y+=2;
-  doc.text('GSTIN: '+COMPANY.gst,M,y); y+=5;
-  // Right sidebar
-  let sy=y-60;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80); doc.text('SUMMARY', sideX, sy); sy+=4;
-  _rule(doc,sideX,sy,W-M,0.4,160); sy+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,20,20);
-  doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'), sideX, sy+5); sy+=10;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80);
-  doc.text('Rupees', sideX, sy); sy+=4;
-  doc.text(numToWords(Number(d.amount)||0), sideX, sy, {maxWidth:sideW}); sy+=12;
-  _rule(doc,sideX,sy,W-M,0.4,160); sy+=4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.text('BANK', sideX, sy); sy+=4;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-  doc.text('Name: ', sideX, sy); doc.setFont('helvetica','bold'); doc.text(d.name||'—', sideX+14, sy); sy+=4;
-  doc.setFont('helvetica','normal'); doc.text('Bank: ', sideX, sy); doc.setFont('helvetica','bold'); doc.text(d.bankName||'—', sideX+12, sy); sy+=4;
-  doc.setFont('helvetica','normal'); doc.text('A/C: ', sideX, sy); doc.setFont('helvetica','bold'); doc.text(d.accountNo||'—', sideX+10, sy); sy+=4;
-  doc.setFont('helvetica','normal'); doc.text('IFSC: ', sideX, sy); doc.setFont('helvetica','bold'); doc.text(d.ifsc||'—', sideX+12, sy);
-  // Table below
-  y+=4; _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(40,40,40);
-  doc.text('PARTICULARS', M, y+4); doc.text('RS.', W-M-3, y+4, {align:'right'});
-  _rule(doc,M,y+5,W-M,0.5,100); y+=9;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-  const dl=doc.splitTextToSize(d.description||'—',CW-25); doc.text(dl,M,y+4);
-  doc.setFont('helvetica','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.8+4); _rule(doc,M,y,W-M,0.4,160); y+=4;
-  doc.setFontSize(9); doc.text('TOTAL', W-M-38, y); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
-  doc.text('Computer Generated | Krishi Care & Management Services Pvt. Ltd.', W/2, 290, {align:'center'});
-  return doc;
+function _tpl4(doc,d,M,W,CW){
+  const m=25; const w=W-m*2; let y=m;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(160);
+  doc.text('INVOICE',m,y); y+=4;
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(120);
+  doc.text(d.invoiceNo||'—',m,y);
+  doc.text(d.date||'—',W-m,y,{align:'right'}); y+=8;
+  _rule(doc,m,y,W-m,0.2,200); y+=12;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150);
+  doc.text('From',m,y); y+=4;
+  y=_from(doc,d,m,y,10,8); y+=10;
+  doc.setTextColor(150); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('To',m,y); y+=4;
+  y=_to(doc,m,y,10,8); y+=14;
+  _rule(doc,m,y,W-m,0.15,210); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(170);
+  doc.text('Description',m,y); doc.text('Amount',W-m,y,{align:'right'}); y+=6;
+  _rule(doc,m,y,W-m,0.15,210); y+=5;
+  doc.setFontSize(9); doc.setTextColor(40);
+  y=_wtext(doc,d.description||'—',m,y,w-40);
+  doc.setFont('helvetica','bold'); doc.text(Number(d.amount||0).toLocaleString('en-IN'),W-m,y-4,{align:'right'}); y+=8;
+  _rule(doc,m,y,W-m,0.15,210); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-m,y,{align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120);
+  doc.text('Total Due',W-m-doc.getTextWidth('Rs. '+Number(d.amount||0).toLocaleString('en-IN'))-3,y); y+=5;
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(130);
+  doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',m,y); y+=14;
+  _rule(doc,m,y,W-m,0.15,210); y+=6;
+  y=_bankGrid(doc,d,m,y,w); y+=15;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(160);
+  doc.text('Signature',W-m,y,{align:'right'});
+  return _footer(doc,y+8,m,W);
 }
 
-// Templates 11-20: further structural variations
-function _tpl11(doc,d,M,W,CW){
-  // Underline-only, no boxes
+function _tpl5(doc,d,M,W,CW){
   let y=M;
-  doc.setFont('helvetica','bold');doc.setFontSize(24);doc.setTextColor(20,20,20);
-  doc.text('TAX INVOICE',M,y+8); y+=14;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(90,90,90);
-  doc.text(COMPANY.name+' | GSTIN: '+COMPANY.gst,M,y); y+=5;
-  doc.text(COMPANY.addr.slice(0,70),M,y); y+=8;
-  _rule(doc,M,y,W-M,0.8,40); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(30,30,30);
-  doc.text('Invoice No: ',M,y);doc.setFont('helvetica','normal');doc.text(d.invoiceNo||'—',M+25,y);
-  doc.setFont('helvetica','bold');doc.text('Date: ',W-M-44,y);doc.setFont('helvetica','normal');doc.text(d.date||'—',W-M-30,y); y+=8;
-  _rule(doc,M,y,W-M,0.4,160); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('FROM',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(20,20,20);doc.text(d.name||'—',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,M,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=4;}
-  y=_wtext(doc,d.address,M,y,CW,4); y+=4;
-  _rule(doc,M,y,W-M,0.4,160); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('TO',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(20,20,20);doc.text(COMPANY.name,M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  y=_wtext(doc,COMPANY.addr,M,y,CW,4); y+=2;
-  doc.text('GSTIN: '+COMPANY.gst+'  PAN: '+COMPANY.pan,M,y); y+=7;
-  _rule(doc,M,y,W-M,0.6,60); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('Description',M,y+4);doc.text('Amount (Rs.)',W-M-3,y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.4,160); y+=9;
-  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(30,30,30);
-  const dl=doc.splitTextToSize(d.description||'—',CW-25);doc.text(dl,M,y+4);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.8+4); _rule(doc,M,y,W-M,0.6,60); y+=5;
-  doc.setFontSize(11);doc.text('Total (Rs.)',W-M-50,y);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=7;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
-  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=8;
+  doc.setFont('courier','bold'); doc.setFontSize(12); doc.setTextColor(0);
+  doc.text('STATEMENT OF ACCOUNT / INVOICE',M,y+5); y+=8;
   _rule(doc,M,y,W-M,0.6,60); y+=6;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(60,60,60);doc.text('BANK DETAILS',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Name: ',M,y);doc.setFont('helvetica','bold');doc.text(d.name||'—',M+14,y);
-  doc.setFont('helvetica','normal');doc.text('  |  Bank: ',M+14+(d.name||'').length*2.2,y);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',M+14+(d.name||'').length*2.2+16,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('A/C: ',M,y);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',M+12,y);
-  doc.setFont('helvetica','normal');doc.text('  |  IFSC: ',M+12+(d.accountNo||'').length*2.2,y);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',M+12+(d.accountNo||'').length*2.2+16,y); y+=8;
-  _rule(doc,M,y,W-M,0.8,40);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(140,140,140);
-  doc.text('Auto-generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  // Info grid
+  const labels=[['Invoice No',d.invoiceNo],['Date',d.date],['From',d.name],['PAN',d.pan],['Mobile',d.mob]];
+  doc.setFont('courier','normal'); doc.setFontSize(8);
+  labels.forEach(([l,v],i)=>{
+    const col=i%2===0?M:W/2; const row=Math.floor(i/2)*5+y;
+    doc.setTextColor(100); doc.text(l+':',col,row);
+    doc.setTextColor(20); doc.setFont('courier','bold'); doc.text(' '+(v||'—'),col+25,row);
+    doc.setFont('courier','normal');
+  }); y+=Math.ceil(labels.length/2)*5+4;
+  _rule(doc,M,y,W-M,0.3,160); y+=4;
+  doc.setTextColor(100); doc.setFontSize(7); doc.text('Bill To: '+COMPANY.name+' | GSTIN: '+COMPANY.gst,M,y); y+=6;
+  _rule(doc,M,y,W-M,0.3,160); y+=2;
+  // Full grid table
+  const tw=CW, cols=[12,tw-62,25,25]; let cx=M;
+  const hdr=['SL','PARTICULARS','QTY','AMOUNT'];
+  _box(doc,M,y,tw,8,0.5,80);
+  doc.setFont('courier','bold'); doc.setFontSize(7.5); doc.setTextColor(40);
+  hdr.forEach((h,i)=>{doc.text(h,cx+2,y+5.5);cx+=cols[i];}); y+=8;
+  const dh=Math.max(12,doc.splitTextToSize(d.description||'—',cols[1]-4).length*4+6);
+  _box(doc,M,y,tw,dh,0.3,160); cx=M;
+  doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(20);
+  doc.text('1',cx+2,y+5); cx+=cols[0];
+  _wtext(doc,d.description||'—',cx+2,y+5,cols[1]-4); cx+=cols[1];
+  doc.text('1',cx+2,y+5); cx+=cols[2];
+  doc.setFont('courier','bold'); doc.text(Number(d.amount||0).toLocaleString('en-IN'),cx+2,y+5); y+=dh;
+  _box(doc,M,y,tw,8,0.5,80);
+  doc.setFont('courier','bold'); doc.setFontSize(9);
+  doc.text('GRAND TOTAL',M+cols[0]+2,y+5.5); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),M+cols[0]+cols[1]+cols[2]+2,y+5.5); y+=12;
+  doc.setFont('courier','italic'); doc.setFontSize(7.5); doc.setTextColor(80);
+  doc.text('('+numToWords(Number(d.amount)||0)+' Rupees Only)',M,y); y+=10;
+  _rule(doc,M,y,W-M,0.4,160); y+=6;
+  y=_bank(doc,d,M,y,CW); y+=10;
+  _rule(doc,W-M-50,y+8,W-M,0.3,160);
+  doc.setFont('courier','normal'); doc.setFontSize(7); doc.setTextColor(100);
+  doc.text('Authorized Signatory',W-M-50,y+12);
+  return _footer(doc,y+18,M,W);
+}
+
+function _tpl6(doc,d,M,W,CW){
+  let y=M;
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(30);
+  doc.text(COMPANY.name,W/2,y+7,{align:'center'}); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100);
+  doc.text(COMPANY.addr.replace(/\n/g,', '),W/2,y,{align:'center'}); y+=4;
+  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,W/2,y,{align:'center'}); y+=4;
+  _rule(doc,M,y,W-M,0.8,40); y+=3; _rule(doc,M,y,W-M,0.3,40); y+=8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('TAX INVOICE',W/2,y,{align:'center'}); y+=8;
+  // Two column meta
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Invoice: '+(d.invoiceNo||'—'),M,y); doc.text('Date: '+(d.date||'—'),W-M,y,{align:'right'}); y+=8;
+  _rule(doc,M,y,W-M,0.3,180); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('BILLED FROM:',M,y); y+=5;
+  y=_from(doc,d,M,y,10,8); y+=8;
+  _rule(doc,M,y,W-M,0.3,200); y+=6;
+  // Description & amount
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(40);
+  doc.text('Particulars',M,y); doc.text('Amount',W-M,y,{align:'right'}); y+=2;
+  _rule(doc,M,y,W-M,0.5,120); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  y=_wtext(doc,d.description||'—',M,y,CW-35);
+  doc.setFont('helvetica','bold'); doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y-4,{align:'right'}); y+=6;
+  _rule(doc,M,y,W-M,0.5,120); y+=2; _rule(doc,M,y,W-M,0.5,120); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('Total: Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y,{align:'right'}); y+=7;
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',M,y); y+=10;
+  _rule(doc,M,y,W-M,0.3,180); y+=6;
+  y=_bank(doc,d,M,y,CW); y+=12;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('For '+COMPANY.name,W-M,y+5,{align:'right'});
+  _rule(doc,W-M-45,y+10,W-M,0.3,150);
+  doc.text('Authorized Signatory',W-M,y+14,{align:'right'});
+  return _footer(doc,y+20,M,W);
+}
+
+function _tpl7(doc,d,M,W,CW){
+  let y=M+5;
+  doc.setFont('times','bold'); doc.setFontSize(18); doc.setTextColor(0);
+  doc.text('Invoice',W-M,y,{align:'right'}); y+=6;
+  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('No: '+(d.invoiceNo||'—'),W-M,y,{align:'right'}); y+=4;
+  doc.text('Date: '+(d.date||'—'),W-M,y,{align:'right'}); y+=8;
+  _rule(doc,M,y,W-M,0.5,100); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('BILL FROM:',M,y); doc.text('BILL TO:',W/2+5,y); y+=5;
+  const yf=_from(doc,d,M,y,10,8); const yt=_to(doc,W/2+5,y,10,8);
+  y=Math.max(yf,yt)+8;
+  // Dotted separator
+  doc.setLineDashPattern([1,1],0); _rule(doc,M,y,W-M,0.3,150); doc.setLineDashPattern([],0); y+=6;
+  // Table header only border
+  doc.setFont('times','bold'); doc.setFontSize(8.5); doc.setTextColor(50);
+  doc.text('#',M,y); doc.text('Description',M+10,y); doc.text('Amount (Rs.)',W-M,y,{align:'right'}); y+=2;
+  _rule(doc,M,y,W-M,0.4,100); y+=6;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  doc.text('1.',M,y); y=_wtext(doc,d.description||'—',M+10,y,CW-30);
+  doc.setFont('times','bold'); doc.text(Number(d.amount||0).toLocaleString('en-IN'),W-M,y-4,{align:'right'}); y+=4;
+  _rule(doc,M,y,W-M,0.4,100); y+=6;
+  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(0);
+  doc.text('Total: Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y,{align:'right'}); y+=7;
+  doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Amount in Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=12;
+  doc.setLineDashPattern([1,1],0); _rule(doc,M,y,W-M,0.3,150); doc.setLineDashPattern([],0); y+=6;
+  y=_bank(doc,d,M,y,CW); y+=15;
+  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  _rule(doc,W-M-45,y,W-M,0.3,150);
+  doc.text('Authorized Signatory',W-M,y+4,{align:'right'});
+  return _footer(doc,y+10,M,W);
+}
+
+function _tpl8(doc,d,M,W,CW){
+  let y=M;
+  _rule(doc,M,y,W-M,1,0); y+=4;
+  doc.setFont('courier','bold'); doc.setFontSize(10); doc.setTextColor(0);
+  doc.text('INVOICE',M,y+3); doc.setFont('courier','normal'); doc.setFontSize(7);
+  doc.text('#'+(d.invoiceNo||'—')+' | '+(d.date||'—'),W-M,y+3,{align:'right'}); y+=6;
+  _rule(doc,M,y,W-M,0.5,0); y+=5;
+  doc.setFont('courier','bold'); doc.setFontSize(7); doc.setTextColor(80);
+  doc.text('FROM:',M,y); doc.text('TO:',W/2+5,y); y+=4;
+  doc.setFont('courier','normal'); doc.setFontSize(7); doc.setTextColor(40);
+  doc.text(d.name||'—',M,y); doc.text(COMPANY.name,W/2+5,y); y+=3.5;
+  if(d.mob)doc.text('M:'+d.mob,M,y); doc.text('GSTIN:'+COMPANY.gst,W/2+5,y); y+=3.5;
+  if(d.pan)doc.text('PAN:'+d.pan,M,y); doc.text('PAN:'+COMPANY.pan,W/2+5,y); y+=3.5;
+  if(d.aadhar)doc.text('Aadhar:'+d.aadhar,M,y); y+=3.5;
+  if(d.address){y=_wtext(doc,d.address,M,y,80,3.5);} y+=4;
+  _rule(doc,M,y,W-M,0.3,150); y+=4;
+  doc.setFont('courier','bold'); doc.setFontSize(7); doc.setTextColor(60);
+  doc.text('ITEM',M,y); doc.text('AMT',W-M,y,{align:'right'}); y+=1.5;
+  _rule(doc,M,y,W-M,0.2,180); y+=4;
+  doc.setFont('courier','normal'); doc.setFontSize(7.5); doc.setTextColor(20);
+  y=_wtext(doc,d.description||'—',M,y,CW-30,3.5);
+  doc.setFont('courier','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M,y-3.5,{align:'right'}); y+=3;
+  _rule(doc,M,y,W-M,0.2,180); y+=4;
+  doc.setFont('courier','bold'); doc.setFontSize(9); doc.text('TOTAL Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M,y,{align:'right'}); y+=5;
+  doc.setFont('courier','italic'); doc.setFontSize(7); doc.setTextColor(100);
+  doc.text('('+numToWords(Number(d.amount)||0)+' Rupees Only)',M,y); y+=8;
+  _rule(doc,M,y,W-M,0.3,150); y+=4;
+  y=_bankGrid(doc,d,M,y,CW); y+=10;
+  _rule(doc,M,y,W-M,1,0);
+  doc.setFont('courier','normal'); doc.setFontSize(6); doc.setTextColor(140);
+  doc.text('Signature: ____________________',W-M,y+6,{align:'right'});
+  return _footer(doc,y+12,M,W);
+}
+
+function _tpl9(doc,d,M,W,CW){
+  let y=M;
+  _box(doc,M-2,M-2,CW+4,277-M,0.8,80); _box(doc,M,M,CW,275-M,0.4,120);
+  y=M+8;
+  doc.setFont('times','bold'); doc.setFontSize(16); doc.setTextColor(0);
+  doc.text('INVOICE',W/2,y,{align:'center'}); y+=8;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(60);
+  doc.text('No: '+(d.invoiceNo||'—')+' | Date: '+(d.date||'—'),W/2,y,{align:'center'}); y+=10;
+  _rule(doc,M+5,y,W-M-5,0.3,160); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('FROM',M+5,y); y+=5;
+  y=_from(doc,d,M+5,y,10,8); y+=6;
+  doc.setFont('times','bold'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('TO',M+5,y); y+=5;
+  y=_to(doc,M+5,y,10,8); y+=8;
+  _rule(doc,M+5,y,W-M-5,0.3,160); y+=6;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  doc.text('Description:',M+5,y); y+=5;
+  y=_wtext(doc,d.description||'—',M+5,y,CW-12); y+=6;
+  _box(doc,W/2-30,y,60,14,0.5,80);
+  doc.setFont('times','bold'); doc.setFontSize(12); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W/2,y+9.5,{align:'center'}); y+=20;
+  doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',W/2,y,{align:'center'}); y+=12;
+  _rule(doc,M+5,y,W-M-5,0.3,160); y+=6;
+  y=_bank(doc,d,M+5,y,CW-10); y+=15;
+  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('Authorized Signatory',W-M-5,y+5,{align:'right'});
+  return _footer(doc,y+15,M,W);
+}
+
+function _tpl10(doc,d,M,W,CW){
+  const m=20; let y=m+5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(30);
+  doc.text('Invoice',m,y); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
+  doc.text('#'+(d.invoiceNo||'—'),m,y); y+=5;
+  doc.text('Date: '+(d.date||'—'),m,y); y+=12;
+  _rule(doc,m,y,W-m,0.3,200); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(140);
+  doc.text('Bill From',m,y); y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20);
+  doc.text(d.name||'—',m,y); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
+  if(d.mob)doc.text(d.mob,m,y), y+=5;
+  if(d.pan)doc.text('PAN: '+d.pan,m,y), y+=5;
+  if(d.aadhar)doc.text('Aadhar: '+d.aadhar,m,y), y+=5;
+  if(d.address)y=_wtext(doc,d.address,m,y,W-m*2); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(140);
+  doc.text('Bill To',m,y); y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20);
+  doc.text(COMPANY.name,m,y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('GSTIN: '+COMPANY.gst,m,y); y+=12;
+  _rule(doc,m,y,W-m,0.3,200); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(30);
+  y=_wtext(doc,d.description||'—',m,y,W-m*2-30,5);
+  y+=8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-m,y,{align:'right'}); y+=8;
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(100);
+  doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',m,y); y+=14;
+  _rule(doc,m,y,W-m,0.3,200); y+=8;
+  y=_bankGrid(doc,d,m,y,W-m*2); y+=20;
+  _rule(doc,W-m-50,y,W-m,0.3,160);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('Signature',W-m,y+4,{align:'right'});
+  return _footer(doc,y+10,m,W);
+}
+
+function _tpl11(doc,d,M,W,CW){
+  let y=M+3;
+  doc.setFont('times','italic'); doc.setFontSize(10); doc.setTextColor(120);
+  doc.text('Invoice',M,y); y+=6;
+  doc.setFont('times','bold'); doc.setFontSize(8); doc.setTextColor(60);
+  doc.text('Ref: '+(d.invoiceNo||'—')+' dated '+(d.date||'—'),M,y); y+=6;
+  doc.setLineDashPattern([2,2],0); _rule(doc,M,y,W-M,0.3,160); doc.setLineDashPattern([],0); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Received From:',M,y); y+=5;
+  y=_from(doc,d,M,y); y+=8;
+  doc.setLineDashPattern([2,2],0); _rule(doc,M,y,W-M,0.3,160); doc.setLineDashPattern([],0); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('In Favour Of:',M,y); y+=5;
+  y=_to(doc,M,y); y+=8;
+  doc.setLineDashPattern([2,2],0); _rule(doc,M,y,W-M,0.3,160); doc.setLineDashPattern([],0); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.text('Towards:',M,y); y+=5;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(30);
+  y=_wtext(doc,d.description||'—',M,y,CW); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(14); doc.setTextColor(0);
+  doc.text('Amount: Rs. '+Number(d.amount||0).toLocaleString('en-IN')+'/-',M,y); y+=8;
+  doc.setFont('times','italic'); doc.setFontSize(8.5); doc.setTextColor(80);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',M,y); y+=10;
+  doc.setLineDashPattern([2,2],0); _rule(doc,M,y,W-M,0.3,160); doc.setLineDashPattern([],0); y+=8;
+  y=_bank(doc,d,M,y,CW); y+=15;
+  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('Signature ___________________',W-M-55,y);
+  return _footer(doc,y+10,M,W);
 }
 
 function _tpl12(doc,d,M,W,CW){
-  // Minimalist — only data, max whitespace, signature line
-  let y=M+8;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(120,120,120);
-  doc.text('INVOICE',M,y);
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text(d.invoiceNo||'—',M+18,y);doc.text(d.date||'—',W-M,y,{align:'right'}); y+=12;
-  _rule(doc,M,y,W-M,0.3,200); y+=7;
-  doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(20,20,20);
-  doc.text(d.name||'—',M,y); y+=7;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(80,80,80);
-  if(d.mob){doc.text(d.mob,M,y);y+=5;}
-  if(d.aadhar){doc.text('Aadhaar: '+d.aadhar,M,y);y+=5;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=5;}
-  y=_wtext(doc,d.address,M,y,CW,4); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=7;
-  doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(20,20,20);
-  doc.text('Bill To',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
-  doc.text(COMPANY.name,M,y); y+=5;
-  y=_wtext(doc,COMPANY.addr,M,y,CW,4); y+=2;
-  doc.text('GSTIN: '+COMPANY.gst+'  PAN: '+COMPANY.pan,M,y); y+=10;
-  _rule(doc,M,y,W-M,0.3,200); y+=7;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(60,60,60);
-  y=_wtext(doc,d.description||'—',M,y,CW,4.5); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(20,20,20);
-  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),M,y); y+=6;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(80,80,80);
-  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',M,y); y+=10;
-  _rule(doc,M,y,W-M,0.3,200); y+=7;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(80,80,80);doc.text('Payment Details',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text(d.name||'—',M,y); y+=5;
-  doc.text((d.bankName||'—')+(d.branch?' — '+d.branch:''),M,y); y+=5;
-  doc.text('A/C: '+(d.accountNo||'—')+'   IFSC: '+(d.ifsc||'—'),M,y); y+=14;
-  // Signature area
-  _rule(doc,W-M-50,y,W-M,0.5,80);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text('Authorised Signatory',W-M-50,y+4);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('Auto-generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  let y=M;
+  doc.setFillColor(40,40,40); doc.rect(M,y,CW,12,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255);
+  doc.text('INVOICE',W/2,y+8.5,{align:'center'}); y+=16;
+  doc.setTextColor(0); doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text('NO: '+(d.invoiceNo||'—'),M,y); doc.text('DATE: '+(d.date||'—'),W-M,y,{align:'right'}); y+=8;
+  _rule(doc,M,y,W-M,0.5,60); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100);
+  doc.text('VENDOR DETAILS',M,y); doc.text('COMPANY DETAILS',W/2+5,y); y+=5;
+  const yf=_from(doc,d,M,y,9,7.5); const yt=_to(doc,W/2+5,y,9,7.5);
+  y=Math.max(yf,yt)+6;
+  doc.setFillColor(40,40,40); doc.rect(M,y,CW,7,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255);
+  doc.text('SL.',M+3,y+5); doc.text('DESCRIPTION',M+15,y+5); doc.text('AMOUNT',W-M-3,y+5,{align:'right'}); y+=7;
+  doc.setTextColor(20); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  doc.text('1.',M+3,y+5); y=_wtext(doc,d.description||'—',M+15,y+5,CW-35);
+  doc.setFont('helvetica','bold'); doc.text('RS.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y-4,{align:'right'}); y+=4;
+  _rule(doc,M,y,W-M,0.5,60); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('TOTAL: RS. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y,{align:'right'}); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('(RUPEES '+numToWords(Number(d.amount)||0).toUpperCase()+' ONLY)',M,y); y+=10;
+  _rule(doc,M,y,W-M,0.5,60); y+=6;
+  y=_bankGrid(doc,d,M,y,CW); y+=12;
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100);
+  doc.text('FOR '+COMPANY.name.toUpperCase(),W-M,y,{align:'right'}); y+=12;
+  _rule(doc,W-M-45,y,W-M,0.3,120);
+  doc.text('AUTHORIZED SIGNATORY',W-M,y+4,{align:'right'});
+  return _footer(doc,y+10,M,W);
 }
 
 function _tpl13(doc,d,M,W,CW){
-  // Tabular with outer border around full document
-  _box(doc,M,M,CW,265,0.6,80);
-  let y=M+6;
-  // Header row inside box
-  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(20,20,20);
-  doc.text('INVOICE',W/2,y+5,{align:'center'}); y+=12;
-  _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(90,90,90);
-  doc.text(COMPANY.name,W/2,y,{align:'center'}); y+=4;
-  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,W/2,y,{align:'center'}); y+=7;
-  _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Invoice No:',M+4,y);doc.setFont('helvetica','normal');doc.text(d.invoiceNo||'—',M+28,y);
-  doc.setFont('helvetica','bold');doc.text('Date:',W-M-30,y);doc.setFont('helvetica','normal');doc.text(d.date||'—',W-M-18,y); y+=7;
-  _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('PAYEE DETAILS',M+4,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(20,20,20);doc.text(d.name||'—',M+4,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M+4,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,M+4,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,M+4,y);y+=4;}
-  y=_wtext(doc,d.address,M+4,y,CW-8,4); y+=4;
-  _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('PARTICULARS',M+4,y+4);doc.text('AMOUNT (RS.)',W-M-4,y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.4,150); y+=9;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  const dl=doc.splitTextToSize(d.description||'—',CW-30);doc.text(dl,M+4,y+4);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-4,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.5+4); _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFontSize(10);doc.text('TOTAL (Rs.)',W-M-50,y);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-4,y,{align:'right'}); y+=7;
-  _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
-  doc.text('Amount in Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M+4,y); y+=7;
-  _rule(doc,M,y,W-M,0.4,150); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('BANK DETAILS',M+4,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Account Holder: ',M+4,y);doc.setFont('helvetica','bold');doc.text(d.name||'—',M+36,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('Bank: ',M+4,y);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',M+18,y);
-  doc.setFont('helvetica','normal');doc.text('A/C No: ',W/2,y);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',W/2+18,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('IFSC: ',M+4,y);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',M+16,y);
-  if(d.branch){doc.setFont('helvetica','normal');doc.text('Branch: ',W/2,y);doc.setFont('helvetica','bold');doc.text(d.branch,W/2+16,y);}
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('Computer Generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  let y=M;
+  // Left sidebar-like section
+  doc.setDrawColor(180); doc.setLineWidth(0.3); doc.line(M+55,M,M+55,270);
+  // Left column
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(120);
+  doc.text('INVOICE',M,y+5); y+=8;
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80);
+  doc.text('No:',M,y); doc.text(d.invoiceNo||'—',M,y+4); y+=10;
+  doc.text('Date:',M,y); doc.text(d.date||'—',M,y+4); y+=12;
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(120);
+  doc.text('FROM:',M,y); y+=4;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(50);
+  doc.text(d.name||'—',M,y); y+=3.5;
+  if(d.mob)doc.text(d.mob,M,y), y+=3.5;
+  if(d.pan)doc.text('PAN:'+d.pan,M,y), y+=3.5;
+  if(d.aadhar)doc.text(d.aadhar,M,y), y+=3.5;
+  // Right main area
+  const rx=M+62; y=M;
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(20);
+  doc.text('Invoice',rx,y+8); y+=16;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60);
+  doc.text('Billed To:',rx,y); y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20);
+  doc.text(COMPANY.name,rx,y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80);
+  y=_wtext(doc,COMPANY.addr,rx,y,W-rx-M,3.5); y+=2;
+  doc.text('GSTIN: '+COMPANY.gst,rx,y); y+=10;
+  _rule(doc,rx,y,W-M,0.3,200); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30);
+  y=_wtext(doc,d.description||'—',rx,y,W-rx-M-5); y+=8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-M,y,{align:'right'}); y+=6;
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',rx,y); y+=12;
+  _rule(doc,rx,y,W-M,0.3,200); y+=6;
+  y=_bankGrid(doc,d,rx,y,W-rx-M); y+=15;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120);
+  _rule(doc,W-M-40,y,W-M,0.3,160);
+  doc.text('Authorized Signatory',W-M,y+4,{align:'right'});
+  return _footer(doc,y+10,M,W);
 }
 
 function _tpl14(doc,d,M,W,CW){
-  // Watermark-style title, side-by-side detailed blocks
   let y=M;
-  // Light watermark
-  doc.setFont('helvetica','bold');doc.setFontSize(60);doc.setTextColor(230,230,230);
-  doc.text('INVOICE',W/2,155,{align:'center'});
-  // Real content
-  doc.setFontSize(9);doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name,M,y+5);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text(COMPANY.addr.slice(0,65),M,y+10);
-  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,M,y+15);
-  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(20,20,20);
-  doc.text('INVOICE',W-M,y+10,{align:'right'});
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(100,100,100);
-  doc.text('No: '+(d.invoiceNo||'—'),W-M,y+16,{align:'right'});
-  doc.text('Date: '+(d.date||'—'),W-M,y+21,{align:'right'});
-  y+=28; _rule(doc,M,y,W-M,0.6,60); y+=7;
-  // Sender
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(80,80,80);doc.text('SENDER',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(20,20,20);doc.text(d.name||'—',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,M,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=4;}
-  y=_wtext(doc,d.address,M,y,CW,4); y+=6;
-  // Recipient
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(80,80,80);doc.text('RECIPIENT',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20,20,20);doc.text(COMPANY.name,M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  y=_wtext(doc,COMPANY.addr,M,y,CW,4); y+=2;
-  doc.text('GSTIN: '+COMPANY.gst+'   PAN: '+COMPANY.pan,M,y); y+=8;
-  // Invoice table
-  _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('Particulars',M,y+4);doc.text('Amount',W-M-3,y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.5,80); y+=9;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);
-  const dl=doc.splitTextToSize(d.description||'—',CW-25);doc.text(dl,M,y+4);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.8+4); _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFontSize(10);doc.text('Total',W-M-40,y);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=7;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
-  doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(60,60,60);doc.text('PAYMENT',M,y); y+=4;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Holder: ',M,y);doc.setFont('helvetica','bold');doc.text(d.name||'—',M+16,y);
-  doc.setFont('helvetica','normal');doc.text('Bank: ',W/2,y);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',W/2+12,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('A/C: ',M,y);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',M+12,y);
-  doc.setFont('helvetica','normal');doc.text('IFSC: ',W/2,y);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',W/2+12,y);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('Auto-generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  _box(doc,M,y,CW,270-M,1.2,40);
+  y+=6;
+  doc.setFont('courier','bold'); doc.setFontSize(16); doc.setTextColor(0);
+  doc.text('INVOICE / BILL',W/2,y+5,{align:'center'}); y+=12;
+  _rule(doc,M+5,y,W-M-5,0.6,60); y+=8;
+  doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(50);
+  doc.text('Invoice No : '+(d.invoiceNo||'—'),M+8,y);
+  doc.text('Date : '+(d.date||'—'),W-M-8,y,{align:'right'}); y+=8;
+  _rule(doc,M+5,y,W-M-5,0.3,120); y+=6;
+  doc.setFont('courier','bold'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Bill From:',M+8,y); y+=5;
+  y=_from(doc,d,M+8,y,10,8); y+=6;
+  _rule(doc,M+5,y,W-M-5,0.3,120); y+=6;
+  doc.setFont('courier','bold'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Bill To:',M+8,y); y+=5;
+  y=_to(doc,M+8,y,10,8); y+=6;
+  _rule(doc,M+5,y,W-M-5,0.6,60); y+=6;
+  doc.setFont('courier','bold'); doc.setFontSize(8); doc.setTextColor(40);
+  doc.text('Sl',M+8,y); doc.text('Particulars',M+20,y); doc.text('Amount',W-M-8,y,{align:'right'}); y+=2;
+  _rule(doc,M+5,y,W-M-5,0.3,120); y+=5;
+  doc.setFont('courier','normal'); doc.setFontSize(9); doc.setTextColor(20);
+  doc.text('1.',M+8,y); y=_wtext(doc,d.description||'—',M+20,y,CW-40);
+  doc.setFont('courier','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-8,y-4,{align:'right'}); y+=4;
+  _rule(doc,M+5,y,W-M-5,0.6,60); y+=6;
+  doc.setFont('courier','bold'); doc.setFontSize(10);
+  doc.text('TOTAL : Rs. '+Number(d.amount||0).toLocaleString('en-IN')+'/-',W-M-8,y,{align:'right'}); y+=7;
+  doc.setFont('courier','italic'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',M+8,y); y+=10;
+  _rule(doc,M+5,y,W-M-5,0.3,120); y+=6;
+  y=_bank(doc,d,M+8,y,CW-16); y+=12;
+  doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('Authorised Signatory',W-M-8,y+8,{align:'right'});
+  _rule(doc,W-M-55,y+4,W-M-8,0.3,150);
+  return _footer(doc,y+15,M,W);
 }
 
 function _tpl15(doc,d,M,W,CW){
-  // Stripe-style: alternating label rows
-  let y=M;
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(20,20,20);
-  doc.text('KRISHI CARE & MANAGEMENT SERVICES PVT. LTD.',M,y+5);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text(COMPANY.addr.slice(0,70),M,y+10);
-  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,M,y+15); y+=22;
-  _rule(doc,M,y,W-M,1,30); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(20,20,20);
-  doc.text('INVOICE',M,y+5);
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(80,80,80);
-  doc.text('#'+(d.invoiceNo||'—'),W-M,y+5,{align:'right'}); y+=12;
-  _rule(doc,M,y,W-M,0.4,160); y+=5;
-  // Info rows with alternating background
-  const rows2=[
-    ['Billed By', d.name||'—'],
-    ['Mobile', d.mob||'—'],
-    ['Aadhar', d.aadhar||'—'],
-    ['PAN', d.pan||'—'],
-    ['Address', d.address||'—'],
-    ['Date', d.date||'—'],
-    ['Billed To', COMPANY.name],
-    ['GSTIN', COMPANY.gst+' | PAN: '+COMPANY.pan],
-  ];
-  rows2.forEach((row,i)=>{
-    if(i%2===0){doc.setFillColor(248,248,248);doc.rect(M,y,CW,7,'F');}
-    doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-    doc.text(row[0].toUpperCase(),M+2,y+5);
-    doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(20,20,20);
-    const vl=doc.splitTextToSize(row[1],CW-45);doc.text(vl,M+42,y+5);
-    y+=Math.max(7,vl.length*4.5);
-  });
-  y+=3; _rule(doc,M,y,W-M,0.5,80); y+=6;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('DESCRIPTION',M,y+4);doc.text('AMOUNT (RS.)',W-M-3,y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.5,80); y+=9;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);
-  const dl=doc.splitTextToSize(d.description||'—',CW-25);doc.text(dl,M,y+4);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.8+4); _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFontSize(10);doc.text('TOTAL',W-M-44,y);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=7;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
-  doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=7;
-  _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(60,60,60);doc.text('BANK',M,y); y+=4;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Account: ',M,y);doc.setFont('helvetica','bold');doc.text(d.name||'—',M+20,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('Bank: ',M,y);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',M+14,y);
-  doc.setFont('helvetica','normal');doc.text('  A/C: ',M+14+(d.bankName||'').length*2.4,y);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',M+14+(d.bankName||'').length*2.4+14,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('IFSC: ',M,y);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',M+13,y);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('System generated invoice | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  let y=M+5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(150);
+  doc.text('INVOICE',M,y);
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(0);
+  doc.text('#'+(d.invoiceNo||''),M,y+10); y+=14;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('Issued: '+(d.date||'—'),M,y); y+=10;
+  // From & To in a row
+  _box(doc,M,y,CW/2-3,32,0.3,200);
+  _box(doc,W/2+3,y,CW/2-3,32,0.3,200);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140);
+  doc.text('From',M+4,y+5); doc.text('To',W/2+7,y+5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30);
+  doc.text(d.name||'—',M+4,y+11); doc.text(COMPANY.name,W/2+7,y+11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80);
+  if(d.pan)doc.text('PAN: '+d.pan,M+4,y+16);
+  if(d.mob)doc.text('Mob: '+d.mob,M+4,y+20);
+  doc.text('GSTIN: '+COMPANY.gst,W/2+7,y+16);
+  doc.text('PAN: '+COMPANY.pan,W/2+7,y+20);
+  y+=38;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30);
+  doc.text('Description:',M,y); y+=6;
+  y=_wtext(doc,d.description||'—',M,y,CW); y+=10;
+  // Big amount box
+  doc.setFillColor(245,245,245); doc.rect(M,y,CW,20,'F');
+  _box(doc,M,y,CW,20,0.5,180);
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W/2,y+13,{align:'center'}); y+=24;
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=12;
+  _rule(doc,M,y,W-M,0.2,200); y+=6;
+  y=_bankGrid(doc,d,M,y,CW); y+=15;
+  _rule(doc,W-M-45,y,W-M,0.3,180);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140);
+  doc.text('Authorized Signatory',W-M,y+4,{align:'right'});
+  return _footer(doc,y+10,M,W);
 }
 
 function _tpl16(doc,d,M,W,CW){
-  // Portrait letter format with reference line
-  let y=M+4;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name,M,y);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(90,90,90);
-  doc.text(COMPANY.addr.slice(0,70),M,y+5);
-  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,M,y+10); y+=18;
-  _rule(doc,M,y,W-M,0.5,80); y+=7;
-  // To address block
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(70,70,70);
-  doc.text('To,',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(20,20,20);
-  doc.text(d.name||'—',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,M,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=4;}
-  y=_wtext(doc,d.address,M,y,CW,4); y+=6;
-  // Reference line
-  _rule(doc,M,y,W-M,0.3,180); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('Sub: Invoice No '+( d.invoiceNo||'—')+' dated '+(d.date||'—'), M, y); y+=8;
-  // Body text style
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(40,40,40);
-  doc.text('Dear Sir/Madam,', M, y); y+=6;
-  doc.text('We hereby submit our invoice for the services rendered as detailed below:', M, y); y+=8;
-  // Services table
-  _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);
-  doc.text('Sr.',M,y+4);doc.text('Particulars',M+12,y+4);doc.text('Amount (Rs.)',W-M-3,y+4,{align:'right'});
-  _rule(doc,M,y+5,W-M,0.5,80); y+=9;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);
-  doc.text('1',M,y+4);
-  const dl=doc.splitTextToSize(d.description||'—',CW-22);doc.text(dl,M+12,y+4);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y+4,{align:'right'});
-  y+=Math.max(10,dl.length*4.5+4); _rule(doc,M,y,W-M,0.5,80); y+=5;
-  doc.setFontSize(10);doc.text('Total Amount',W-M-50,y);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-3,y,{align:'right'}); y+=7;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
-  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',M,y); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.text('Kindly arrange payment at the earliest. Bank details are as follows:', M, y); y+=6;
-  doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Account Name: ',M,y);doc.setFont('helvetica','normal');doc.text(d.name||'—',M+34,y); y+=5;
-  doc.setFont('helvetica','bold');doc.text('Bank: ',M,y);doc.setFont('helvetica','normal');doc.text(d.bankName||'—',M+16,y);
-  doc.setFont('helvetica','bold');doc.text('A/C No: ',W/2,y);doc.setFont('helvetica','normal');doc.text(d.accountNo||'—',W/2+20,y); y+=5;
-  doc.setFont('helvetica','bold');doc.text('IFSC: ',M,y);doc.setFont('helvetica','normal');doc.text(d.ifsc||'—',M+14,y);
-  if(d.branch){doc.setFont('helvetica','bold');doc.text('Branch: ',W/2,y);doc.setFont('helvetica','normal');doc.text(d.branch,W/2+16,y);} y+=14;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(40,40,40);
-  doc.text('Yours Sincerely,', M, y); y+=8;
-  doc.setFont('helvetica','bold');doc.text(d.name||'—', M, y);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('System generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  let y=M+5;
+  doc.setFont('times','bolditalic'); doc.setFontSize(20); doc.setTextColor(0);
+  doc.text('Invoice',W/2,y,{align:'center'}); y+=8;
+  doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text(COMPANY.name+' | GSTIN: '+COMPANY.gst,W/2,y,{align:'center'}); y+=6;
+  _rule(doc,M+20,y,W-M-20,0.3,160); y+=10;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(60);
+  doc.text('Invoice No: '+(d.invoiceNo||'—'),W/2,y,{align:'center'}); y+=5;
+  doc.text('Date: '+(d.date||'—'),W/2,y,{align:'center'}); y+=10;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.setTextColor(80);
+  doc.text('Received From',M,y); y+=5;
+  y=_from(doc,d,M,y,10,8.5); y+=8;
+  _rule(doc,M,y,W-M,0.2,200); y+=6;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.setTextColor(80);
+  doc.text('Towards',M,y); y+=5;
+  doc.setFont('times','normal'); doc.setFontSize(9.5); doc.setTextColor(20);
+  y=_wtext(doc,d.description||'—',M,y,CW); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(0);
+  doc.text('Amount: Rs. '+Number(d.amount||0).toLocaleString('en-IN')+'/-',W/2,y,{align:'center'}); y+=8;
+  doc.setFont('times','italic'); doc.setFontSize(8.5); doc.setTextColor(80);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',W/2,y,{align:'center'}); y+=12;
+  _rule(doc,M+20,y,W-M-20,0.3,160); y+=8;
+  y=_bank(doc,d,M,y,CW); y+=15;
+  doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(120);
+  _rule(doc,W-M-45,y,W-M,0.3,160);
+  doc.text('Authorized Signatory',W-M,y+5,{align:'right'});
+  return _footer(doc,y+10,M,W);
 }
 
 function _tpl17(doc,d,M,W,CW){
-  // Split page: left half details, right half financials separated by vertical line
-  let y=M;
-  // Full vertical line in middle
-  doc.setDrawColor(180,180,180);doc.setLineWidth(0.4);
-  doc.line(W/2-3, M, W/2-3, 275);
-  const lW=W/2-M-5, rX=W/2+2, rW=W-M-rX;
-  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(20,20,20);
-  doc.text('INVOICE',M,y+7);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text(d.invoiceNo||'—',M,y+13); y+=18;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('FROM',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(20,20,20);doc.text(d.name||'—',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,M,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=4;}
-  const al=doc.splitTextToSize(d.address||'',lW);doc.text(al,M,y);y+=al.length*4+6;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(80,80,80);doc.text('TO',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20,20,20);doc.text(COMPANY.name.split('Pvt')[0].trim(),M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.text('Pvt. Ltd.',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  const ta=doc.splitTextToSize(COMPANY.addr,lW);doc.text(ta,M,y);y+=ta.length*4+3;
-  doc.text('GSTIN: '+COMPANY.gst,M,y);y+=4;
-  doc.text('PAN: '+COMPANY.pan,M,y);
-  // Right side
-  let ry=M+4;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text('Date',rX,ry); ry+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20,20,20);
-  doc.text(d.date||'—',rX,ry); ry+=10;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);doc.text('Particulars',rX,ry); ry+=4;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  const dl=doc.splitTextToSize(d.description||'—',rW);doc.text(dl,rX,ry); ry+=dl.length*4.5+6;
-  _rule(doc,rX,ry,W-M,0.4,160); ry+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(20,20,20);
-  doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),rX,ry+6); ry+=12;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  const wl=doc.splitTextToSize('Rupees '+numToWords(Number(d.amount)||0)+' Only',rW);
-  doc.text(wl,rX,ry); ry+=wl.length*4+8;
-  _rule(doc,rX,ry,W-M,0.4,160); ry+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(60,60,60);doc.text('BANK',rX,ry); ry+=4;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('A/C: ',rX,ry);doc.setFont('helvetica','bold');doc.text(d.name||'—',rX+12,ry); ry+=5;
-  doc.setFont('helvetica','normal');doc.text('Bank: ',rX,ry);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',rX+14,ry); ry+=5;
-  doc.setFont('helvetica','normal');doc.text('No: ',rX,ry);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',rX+10,ry); ry+=5;
-  doc.setFont('helvetica','normal');doc.text('IFSC: ',rX,ry);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',rX+14,ry);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('Auto-generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  let y=M; let ln=1;
+  const L=(t)=>{doc.text(String(ln).padStart(2,'0')+'| '+t,M,y);ln++;y+=4.5;};
+  doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(40);
+  doc.setFont('courier','bold'); L('INVOICE'); L('');
+  doc.setFont('courier','normal');
+  L('Invoice No  : '+(d.invoiceNo||'—'));
+  L('Date        : '+(d.date||'—'));
+  L(''); L('--- BILL FROM ---');
+  L('Name        : '+(d.name||'—'));
+  if(d.mob)L('Mobile      : '+d.mob);
+  if(d.aadhar)L('Aadhar      : '+d.aadhar);
+  if(d.pan)L('PAN         : '+d.pan);
+  if(d.address){const al=doc.splitTextToSize(d.address,CW-30);al.forEach(a=>L('Address     : '+a));}
+  L(''); L('--- BILL TO ---');
+  L('Company     : '+COMPANY.name);
+  L('GSTIN       : '+COMPANY.gst);
+  L('PAN         : '+COMPANY.pan);
+  L(''); L('--- PARTICULARS ---');
+  const dl=doc.splitTextToSize(d.description||'—',CW-30);
+  dl.forEach(line=>L('  '+line));
+  L(''); L('=========================================');
+  doc.setFont('courier','bold');
+  L('AMOUNT      : Rs. '+Number(d.amount||0).toLocaleString('en-IN')+'/-');
+  doc.setFont('courier','normal');
+  L('In Words    : Rupees '+numToWords(Number(d.amount)||0)+' Only');
+  L(''); L('--- BANK DETAILS ---');
+  L('Account     : '+(d.name||'—'));
+  L('Bank        : '+(d.bankName||'—'));
+  if(d.branch)L('Branch      : '+d.branch);
+  L('A/C No      : '+(d.accountNo||'—'));
+  L('IFSC        : '+(d.ifsc||'—'));
+  L(''); L('=========================================');
+  L('');
+  L('Signature: ________________________');
+  return _footer(doc,y+5,M,W);
 }
 
 function _tpl18(doc,d,M,W,CW){
-  // Dense compact official format
-  let y=M;
-  _rule(doc,M,y,W-M,2,20); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(20,20,20);
-  doc.text('INVOICE',W/2,y+4,{align:'center'});
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  doc.text('(Original for Recipient)',W/2,y+9,{align:'center'}); y+=14;
-  _rule(doc,M,y,W-M,2,20); y+=7;
-  // Reference row
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('Invoice No: ',M,y); doc.setFont('helvetica','normal'); doc.text(d.invoiceNo||'—',M+25,y);
-  doc.setFont('helvetica','bold'); doc.text('Date: ',W-M-44,y); doc.setFont('helvetica','normal'); doc.text(d.date||'—',W-M-30,y); y+=8;
-  // Full-border table for parties
-  const hw=(CW)/2;
-  _box(doc,M,y,hw,30,0.5,120); _box(doc,M+hw,y,hw,30,0.5,120);
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(70,70,70);
-  doc.text('SUPPLIER',M+2,y+4); doc.text('RECIPIENT',M+hw+2,y+4);
-  doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(20,20,20);
-  doc.text(d.name||'—',M+2,y+9); doc.text(COMPANY.name.split('Pvt')[0].trim(),M+hw+2,y+9);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(70,70,70);
-  let lInfo=''; if(d.mob) lInfo+='Mob: '+d.mob; if(d.pan) lInfo+=' | PAN: '+d.pan;
-  doc.text(lInfo,M+2,y+15);
-  if(d.aadhar) doc.text('Aadhaar: '+d.aadhar,M+2,y+20);
-  const al=doc.splitTextToSize(d.address||'',hw-4);doc.text(al.slice(0,2),M+2,y+24);
-  const ta=doc.splitTextToSize(COMPANY.addr.slice(0,60),hw-4);doc.text(ta,M+hw+2,y+14);
-  doc.text('GSTIN: '+COMPANY.gst,M+hw+2,y+26);
-  y+=36;
-  // Items full border table
-  _box(doc,M,y,CW,9,0.5,120);
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(30,30,30);
-  doc.text('Sl.No',M+2,y+6);doc.text('Description of Services',M+18,y+6);doc.text('Amount (Rs.)',W-M-2,y+6,{align:'right'});
-  y+=9;
-  const dl=doc.splitTextToSize(d.description||'—',CW-28);
-  _box(doc,M,y,CW,Math.max(14,dl.length*4.5+4),0.4,180);
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('1',M+2,y+6);doc.text(dl,M+18,y+5);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-2,y+6,{align:'right'});
-  y+=Math.max(14,dl.length*4.5+4);
-  _box(doc,M+CW*0.5,y,CW*0.5,9,0.5,120);
-  doc.setFont('helvetica','bold');doc.setFontSize(10);
-  doc.text('Total Amount:',M+CW*0.5+2,y+6);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-2,y+6,{align:'right'}); y+=14;
-  _box(doc,M,y,CW,8,0.4,200);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(50,50,50);
-  doc.text('Amount in Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M+3,y+5.5); y+=12;
-  // Bank details box
-  _box(doc,M,y,CW,26,0.5,120);
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(70,70,70);
-  doc.text('BANK ACCOUNT DETAILS',M+2,y+5);
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('Account Name: ',M+2,y+11);doc.setFont('helvetica','bold');doc.text(d.name||'—',M+34,y+11);
-  doc.setFont('helvetica','normal');doc.text('Bank Name: ',M+2,y+17);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',M+26,y+17);
-  doc.setFont('helvetica','normal');doc.text('Account No: ',W/2,y+11);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',W/2+26,y+11);
-  doc.setFont('helvetica','normal');doc.text('IFSC Code: ',W/2,y+17);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',W/2+24,y+17);
-  if(d.branch){doc.setFont('helvetica','normal');doc.text('Branch: ',M+2,y+23);doc.setFont('helvetica','bold');doc.text(d.branch,M+20,y+23);}
-  y+=32;
-  _rule(doc,M,y,W-M,2,20);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('System generated document | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  const m=22; let y=m;
+  // Top right invoice block
+  _box(doc,W-m-55,y,55,18,0.4,150);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0);
+  doc.text('INVOICE',W-m-50,y+7);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80);
+  doc.text('#'+(d.invoiceNo||'—'),W-m-50,y+13);
+  doc.text(d.date||'—',W-m-5,y+13,{align:'right'});
+  // Company name left
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30);
+  doc.text(COMPANY.name,m,y+5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100);
+  doc.text(COMPANY.addr.replace(/\n/g,', '),m,y+10,{maxWidth:90});
+  y+=26;
+  _rule(doc,m,y,W-m,0.3,200); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140);
+  doc.text('Vendor / Payee',m,y); y+=5;
+  y=_from(doc,d,m,y,11,8); y+=10;
+  _rule(doc,m,y,W-m,0.15,210); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(140);
+  doc.text('Description',m,y); doc.text('Amount',W-m,y,{align:'right'}); y+=2;
+  _rule(doc,m,y,W-m,0.3,180); y+=6;
+  doc.setFontSize(9); doc.setTextColor(30);
+  y=_wtext(doc,d.description||'—',m,y,W-m*2-30);
+  doc.setFont('helvetica','bold'); doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-m,y-4,{align:'right'}); y+=6;
+  _rule(doc,m,y,W-m,0.3,180); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0);
+  doc.text('Total Due: Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-m,y,{align:'right'}); y+=7;
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(100);
+  doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',m,y); y+=12;
+  _rule(doc,m,y,W-m,0.15,210); y+=6;
+  y=_bankGrid(doc,d,m,y,W-m*2); y+=18;
+  _rule(doc,W-m-45,y,W-m,0.3,160);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(130);
+  doc.text('Authorized Signatory',W-m,y+5,{align:'right'});
+  return _footer(doc,y+10,m,W);
 }
 
 function _tpl19(doc,d,M,W,CW){
-  // Receipt-style narrow card with perforated top effect
   let y=M;
-  // Dotted top border
-  doc.setLineDashPattern([1,2],0);doc.setDrawColor(150,150,150);doc.setLineWidth(0.5);
-  doc.line(M,y,W-M,y); doc.setLineDashPattern([],0); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,30,30);
-  doc.text('SERVICE INVOICE',W/2,y+5,{align:'center'});
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text(COMPANY.name,W/2,y+11,{align:'center'}); y+=16;
-  doc.setLineDashPattern([1,2],0);doc.line(M,y,W-M,y);doc.setLineDashPattern([],0); y+=6;
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('Receipt No:',M,y);doc.setFont('helvetica','normal');doc.text(d.invoiceNo||'—',M+26,y);
-  doc.text(d.date||'—',W-M,y,{align:'right'}); y+=8;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20,20,20);doc.text('Payee: '+( d.name||'—'),M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(70,70,70);
-  if(d.mob){doc.text('Mob: '+d.mob,M,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhaar: '+d.aadhar,M,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,M,y);y+=4;}
-  y=_wtext(doc,d.address,M,y,CW,4); y+=6;
-  _rule(doc,M,y,W-M,0.3,200); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(80,80,80);doc.text('RECEIVED FROM',M,y); y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20,20,20);doc.text(COMPANY.name,M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  y=_wtext(doc,COMPANY.addr,M,y,CW,4);y+=2;
-  doc.text('GSTIN: '+COMPANY.gst+'  PAN: '+COMPANY.pan,M,y); y+=8;
-  _rule(doc,M,y,W-M,0.4,140); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  const dl=doc.splitTextToSize('For: '+(d.description||'—'),CW);doc.text(dl,M,y+4);
-  y+=Math.max(10,dl.length*4.8+4); _rule(doc,M,y,W-M,0.4,140); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(20,20,20);
-  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),M,y); y+=6;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=8;
-  _rule(doc,M,y,W-M,0.4,140); y+=6;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(60,60,60);doc.text('PAYMENT DETAILS',M,y); y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  doc.text('A/C Name: ',M,y);doc.setFont('helvetica','bold');doc.text(d.name||'—',M+22,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('Bank: ',M,y);doc.setFont('helvetica','bold');doc.text(d.bankName||'—',M+14,y);
-  doc.setFont('helvetica','normal');doc.text('A/C No: ',W/2,y);doc.setFont('helvetica','bold');doc.text(d.accountNo||'—',W/2+18,y); y+=5;
-  doc.setFont('helvetica','normal');doc.text('IFSC: ',M,y);doc.setFont('helvetica','bold');doc.text(d.ifsc||'—',M+13,y); y+=10;
-  doc.setLineDashPattern([1,2],0);doc.setDrawColor(150,150,150);doc.setLineWidth(0.5);
-  doc.line(M,y,W-M,y);doc.setLineDashPattern([],0);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('Computer Generated Receipt | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(0);
+  doc.text('INVOICE',M,y+4);
+  doc.setFont('times','normal'); doc.setFontSize(7); doc.setTextColor(80);
+  doc.text('Ref: '+(d.invoiceNo||'—')+' / '+(d.date||'—'),W-M,y+4,{align:'right'}); y+=7;
+  _rule(doc,M,y,W-M,0.6,40); y+=5;
+  // Two column info
+  const lx=M, rx=W/2+2;
+  doc.setFont('times','bold'); doc.setFontSize(7); doc.setTextColor(100);
+  doc.text('FROM:',lx,y); doc.text('TO:',rx,y); y+=4;
+  doc.setFont('times','normal'); doc.setFontSize(7.5); doc.setTextColor(30);
+  let ly=y, ry=y;
+  doc.text(d.name||'—',lx,ly); ly+=3.5;
+  if(d.mob){doc.text('Mob: '+d.mob,lx,ly);ly+=3.5;}
+  if(d.pan){doc.text('PAN: '+d.pan,lx,ly);ly+=3.5;}
+  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,lx,ly);ly+=3.5;}
+  if(d.address){ly=_wtext(doc,d.address,lx,ly,80,3.5);}
+  doc.text(COMPANY.name,rx,ry); ry+=3.5;
+  ry=_wtext(doc,COMPANY.addr,rx,ry,80,3.5);
+  doc.text('GSTIN: '+COMPANY.gst,rx,ry); ry+=3.5;
+  doc.text('PAN: '+COMPANY.pan,rx,ry); ry+=3.5;
+  y=Math.max(ly,ry)+5;
+  _rule(doc,M,y,W-M,0.3,160); y+=4;
+  // Table
+  _box(doc,M,y,CW,6,0.4,100);
+  doc.setFont('times','bold'); doc.setFontSize(7); doc.setTextColor(50);
+  doc.text('S.No.',M+2,y+4.2); doc.text('Particulars',M+14,y+4.2); doc.text('Amount',W-M-2,y+4.2,{align:'right'}); y+=6;
+  const dh=Math.max(8,doc.splitTextToSize(d.description||'—',CW-35).length*3.5+4);
+  _box(doc,M,y,CW,dh,0.2,160);
+  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(20);
+  doc.text('1',M+4,y+4.5); _wtext(doc,d.description||'—',M+14,y+4.5,CW-35,3.5);
+  doc.setFont('times','bold'); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-2,y+4.5,{align:'right'}); y+=dh;
+  _box(doc,M,y,CW,6,0.4,100);
+  doc.setFontSize(8);
+  doc.text('Total',M+14,y+4.2); doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-2,y+4.2,{align:'right'}); y+=10;
+  doc.setFont('times','italic'); doc.setFontSize(7.5); doc.setTextColor(80);
+  doc.text('('+numToWords(Number(d.amount)||0)+' Rupees Only)',M,y); y+=8;
+  _rule(doc,M,y,W-M,0.3,160); y+=4;
+  y=_bankGrid(doc,d,M,y,CW); y+=10;
+  _rule(doc,M,y,W-M,0.6,40);
+  doc.setFont('times','normal'); doc.setFontSize(7); doc.setTextColor(120);
+  doc.text('For '+COMPANY.name,W-M,y+6,{align:'right'});
+  doc.text('Authorized Signatory',W-M,y+10,{align:'right'});
+  return _footer(doc,y+15,M,W);
 }
 
 function _tpl20(doc,d,M,W,CW){
-  // Government/official form style
-  let y=M;
-  _box(doc,M,y,CW,14,0.8,40);
-  doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(20,20,20);
-  doc.text('INVOICE / BILL',W/2,y+6,{align:'center'});
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
-  doc.text('Under PMFBY Scheme | Krishi Care & Management Services Pvt. Ltd.',W/2,y+11.5,{align:'center'}); y+=18;
-  // Form fields style
-  const fld=(label,val,fx,fy,fw)=>{
-    doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-    doc.text(label,fx,fy);
-    _rule(doc,fx,fy+1,fx+fw,0.3,160);
-    doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(20,20,20);
-    doc.text(String(val||'—'),fx,fy+6);
-  };
-  fld('Invoice No.',d.invoiceNo,M,y,75); fld('Date',d.date,W/2,y,75); y+=12;
-  fld('Name of Payee',d.name,M,y,CW); y+=12;
-  fld('Mobile',d.mob,M,y,70); fld('PAN',d.pan,M+80,y,70); fld('Aadhaar',d.aadhar,W/2+10,y,65); y+=12;
-  fld('Address',d.address,M,y,CW); y+=12;
-  fld('Billed To',COMPANY.name,M,y,CW); y+=12;
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
-  doc.text(COMPANY.addr.slice(0,80),M,y); y+=5;
-  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,M,y); y+=8;
-  _rule(doc,M,y,W-M,0.6,80); y+=5;
-  // Service table
-  _box(doc,M,y,CW,9,0.5,100);
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(30,30,30);
-  doc.text('Sr.',M+2,y+6);doc.text('Nature of Services',M+14,y+6);doc.text('Amount (Rs.)',W-M-2,y+6,{align:'right'}); y+=9;
-  const dl=doc.splitTextToSize(d.description||'—',CW-22);
-  _box(doc,M,y,CW,Math.max(13,dl.length*4.5+3),0.4,180);
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(30,30,30);
-  doc.text('1.',M+2,y+6);doc.text(dl,M+14,y+5);
-  doc.setFont('helvetica','bold');doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-2,y+6,{align:'right'});
-  y+=Math.max(13,dl.length*4.5+3);
-  _box(doc,M+CW*0.55,y,CW*0.45,9,0.5,100);
-  doc.setFont('helvetica','bold');doc.setFontSize(9.5);
-  doc.text('Total:',W-M-60,y+6);doc.text('Rs.'+Number(d.amount||0).toLocaleString('en-IN'),W-M-2,y+6,{align:'right'}); y+=13;
-  fld('Amount in Words','Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y,CW); y+=12;
-  _rule(doc,M,y,W-M,0.6,80); y+=5;
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(60,60,60);doc.text('BANK / PAYMENT DETAILS',M,y); y+=4;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(30,30,30);
-  fld('Account Holder',d.name,M,y,80); fld('Bank Name',d.bankName,W/2,y,75); y+=12;
-  fld('Account Number',d.accountNo,M,y,80); fld('IFSC Code',d.ifsc,W/2,y,75); y+=12;
-  if(d.branch){ fld('Branch',d.branch,M,y,80); y+=12; }
-  _box(doc,M,y,CW,18,0.6,80);
-  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-  doc.text('Declaration: I hereby declare that the above information is true and correct to the best of my knowledge.',M+3,y+5,{maxWidth:CW-6});
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(30,30,30);
-  doc.text('Signature: ___________________',W-M-50,y+14);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.text('System Generated | Krishi Care & Management Services Pvt. Ltd.',W/2,290,{align:'center'});
-  return doc;
+  let y=M+5;
+  _rule(doc,M+20,y,W-M-20,0.8,80); y+=2; _rule(doc,M+30,y,W-M-30,0.3,120); y+=8;
+  doc.setFont('times','bolditalic'); doc.setFontSize(22); doc.setTextColor(30);
+  doc.text('Invoice',W/2,y,{align:'center'}); y+=8;
+  doc.setFont('times','italic'); doc.setFontSize(9); doc.setTextColor(100);
+  doc.text(COMPANY.name,W/2,y,{align:'center'}); y+=5;
+  _rule(doc,M+30,y,W-M-30,0.3,120); y+=2; _rule(doc,M+20,y,W-M-20,0.8,80); y+=10;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(70);
+  doc.text('Invoice No: '+(d.invoiceNo||'—'),M,y);
+  doc.text('Date: '+(d.date||'—'),W-M,y,{align:'right'}); y+=10;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Received from:',M,y); y+=6;
+  doc.setFont('times','normal'); doc.setFontSize(10); doc.setTextColor(20);
+  doc.text(d.name||'—',M,y); y+=5;
+  doc.setFontSize(8); doc.setTextColor(70);
+  if(d.mob)doc.text('Phone: '+d.mob,M,y), y+=4;
+  if(d.pan)doc.text('PAN: '+d.pan,M,y), y+=4;
+  if(d.aadhar)doc.text('Aadhar: '+d.aadhar,M,y), y+=4;
+  if(d.address)y=_wtext(doc,d.address,M,y,CW); y+=8;
+  _rule(doc,M,y,W-M,0.2,180); y+=8;
+  doc.setFont('times','bold'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('For:',M,y); y+=6;
+  doc.setFont('times','normal'); doc.setFontSize(9); doc.setTextColor(40);
+  y=_wtext(doc,d.description||'—',M,y,CW,5); y+=10;
+  _rule(doc,M+20,y-2,W-M-20,0.2,200);
+  doc.setFont('times','bold'); doc.setFontSize(14); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN')+'/-',W/2,y+6,{align:'center'}); y+=10;
+  doc.setFont('times','italic'); doc.setFontSize(9); doc.setTextColor(80);
+  doc.text('( Rupees '+numToWords(Number(d.amount)||0)+' Only )',W/2,y,{align:'center'}); y+=12;
+  _rule(doc,M,y,W-M,0.2,180); y+=6;
+  y=_bank(doc,d,M,y,CW); y+=15;
+  _rule(doc,M+20,y,W-M-20,0.3,120); y+=2; _rule(doc,M+30,y,W-M-30,0.8,80);
+  doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('Authorized Signatory',W-M,y+8,{align:'right'});
+  _rule(doc,W-M-45,y+4,W-M,0.3,160);
+  return _footer(doc,y+15,M,W);
 }
 
 // Master dispatcher
