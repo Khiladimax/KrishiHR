@@ -750,7 +750,7 @@ function _tpl3(doc,d,M,W,CW){
   doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(80);
   doc.text('In Words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=10;
   // Bank box
-  _box(doc,M,y,CW,24,0.3,180);
+  _box(doc,M,y,CW,32,0.3,180);
   y=_bank(doc,d,M+4,y+5,CW-8); y+=8;
   doc.setFont('times','normal'); doc.setFontSize(8);
   doc.text('For '+COMPANY.name,W-M-4,y+10,{align:'right'});
