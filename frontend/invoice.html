@@ -644,8 +644,6 @@ function _desc(doc, d, x, y, maxW=120) {
   return _wtext(doc, d.description||'—', x, y, maxW);
 }
 function _footer(doc, y, M, W) {
-  doc.setFontSize(7); doc.setTextColor(150,150,150);
-  doc.text('This is a computer-generated invoice.', W/2, Math.max(y+10, 275), {align:'center'});
   return doc;
 }
 
