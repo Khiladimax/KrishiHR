@@ -803,7 +803,10 @@ function _tpl5(doc,d,M,W,CW){
     doc.setFont('courier','normal');
   }); y+=Math.ceil(labels.length/2)*5+4;
   _rule(doc,M,y,W-M,0.3,160); y+=4;
-  doc.setTextColor(100); doc.setFontSize(7); doc.text('Bill To: '+COMPANY.name+' | GSTIN: '+COMPANY.gst+' | '+COMPANY.addr.replace(/\\n/g,', '),M,y); y+=6;
+  doc.setTextColor(100); doc.setFontSize(7); doc.text('Bill To:',M,y); y+=4;
+  doc.text(COMPANY.name,M,y); y+=3.5;
+  y=_wtext(doc,COMPANY.addr,M,y,CW,3.5);
+  doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,M,y); y+=6;
   _rule(doc,M,y,W-M,0.3,160); y+=2;
   // Full grid table
   const tw=CW, cols=[12,tw-62,25,25]; let cx=M;
