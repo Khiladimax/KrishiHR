@@ -192,7 +192,7 @@ function renderTable(){
   for(const e of list){
     const name=((e.first_name||'')+' '+(e.last_name||'')).trim();
     const pe=e.alternate_email||'';
-    const ok=pe&&pe.includes('@');
+    const ok=pe&&pe.includes('@')&&!pe.toLowerCase().includes('@krishicare.in');
     const sent=!!e.relieving_letter_sent_at;
     const jdVal=e.joining_date?new Date(e.joining_date).toISOString().split('T')[0]:'';
     const rdRaw=e.separation_date||e.last_working_date||'';

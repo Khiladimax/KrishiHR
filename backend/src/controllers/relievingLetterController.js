@@ -327,6 +327,10 @@ exports.sendRelievingLetter = async (req, res) => {
     }
 
     // Don't send to company email
+    if (personalEmail.toLowerCase().includes('@krishicare.in')) {
+      return res.status(400).json({ success: false, message: `Personal email must not be a company email (@krishicare.in). Please set a personal email (Gmail, Yahoo, etc.) in the alternate email field.` });
+    }
+
     // Fetch signatures from DB
     const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
     const sig1 = sigRow.rows[0]?.sig1_image || null;
@@ -439,6 +443,12 @@ exports.bulkSend = async (req, res) => {
 
         if (!personalEmail || !personalEmail.includes('@')) {
           results.push({ id: emp.id, name: fullName, email: '', status: 'failed', reason: 'No personal email set' });
+          failed++;
+          continue;
+        }
+
+        if (personalEmail.toLowerCase().includes('@krishicare.in')) {
+          results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'failed', reason: 'Company email — need personal email' });
           failed++;
           continue;
         }
@@ -590,6 +600,11 @@ exports.bulkSendExcel = async (req, res) => {
         const targetEmail = empEmail || emp.alternate_email;
         if (!targetEmail || !targetEmail.includes('@')) {
           results.push({ row: rowNum, name: fullName, email: '', status: 'failed', reason: 'No personal email' });
+          failed++;
+          continue;
+        }
+        if (targetEmail.toLowerCase().includes('@krishicare.in')) {
+          results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'failed', reason: 'Company email — need personal' });
           failed++;
           continue;
         }
