@@ -604,19 +604,19 @@ function _wtext(doc, txt, x, y, maxW, lineH=4.5){
 // ── Shared rendering helpers ────────────────────────────────
 function _from(doc, d, x, y, fs1=10, fs2=8) {
   doc.setFont('helvetica','bold'); doc.setFontSize(fs1); doc.setTextColor(20,20,20);
-  doc.text(d.name||'—', x, y); y+=5;
+  doc.text(d.name||'—', x, y); y+=6;
   doc.setFont('helvetica','normal'); doc.setFontSize(fs2); doc.setTextColor(60,60,60);
-  if(d.mob){doc.text('Mob: '+d.mob,x,y);y+=4;}
-  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,x,y);y+=4;}
-  if(d.pan){doc.text('PAN: '+d.pan,x,y);y+=4;}
-  if(d.address){y=_wtext(doc,d.address,x,y,80);}
+  if(d.mob){doc.text('Mob: '+d.mob,x,y);y+=4.5;}
+  if(d.aadhar){doc.text('Aadhar: '+d.aadhar,x,y);y+=4.5;}
+  if(d.pan){doc.text('PAN: '+d.pan,x,y);y+=4.5;}
+  if(d.address){y+=1;y=_wtext(doc,d.address,x,y,80);}
   return y;
 }
 function _to(doc, x, y, fs1=10, fs2=8) {
   doc.setFont('helvetica','bold'); doc.setFontSize(fs1); doc.setTextColor(20,20,20);
-  doc.text(COMPANY.name, x, y); y+=5;
+  doc.text(COMPANY.name, x, y); y+=6;
   doc.setFont('helvetica','normal'); doc.setFontSize(fs2); doc.setTextColor(60,60,60);
-  y=_wtext(doc,COMPANY.addr,x,y,80); y+=1;
+  y=_wtext(doc,COMPANY.addr,x,y,80); y+=2;
   doc.text('GSTIN: '+COMPANY.gst, x, y); y+=4;
   doc.text('PAN: '+COMPANY.pan, x, y); y+=4;
   return y;
@@ -682,8 +682,6 @@ function _tpl1(doc,d,M,W,CW){
   y=_bank(doc,d,M,y,CW); y+=8;
   // Signature
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
-  doc.text('Authorized Signatory',W-M,y+15,{align:'right'});
-  _rule(doc,W-M-45,y+10,W-M,0.3,150);
   return _footer(doc,y+20,M,W);
 }
 
@@ -715,7 +713,6 @@ function _tpl2(doc,d,M,W,CW){
   _rule(doc,M,y,W-M,0.5,120); y+=6;
   y=_bankGrid(doc,d,M,y,CW); y+=12;
   doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(100);
-  doc.text('Signature: ____________________',W-M-55,y);
   return _footer(doc,y+10,M,W);
 }
 
@@ -753,8 +750,6 @@ function _tpl3(doc,d,M,W,CW){
   _box(doc,M,y,CW,32,0.3,180);
   y=_bank(doc,d,M+4,y+5,CW-8); y+=8;
   doc.setFont('times','normal'); doc.setFontSize(8);
-  doc.text('For '+COMPANY.name,W-M-4,y+10,{align:'right'});
-  doc.text('Authorized Signatory',W-M-4,y+18,{align:'right'});
   return _footer(doc,y+25,M,W);
 }
 
@@ -808,7 +803,7 @@ function _tpl5(doc,d,M,W,CW){
     doc.setFont('courier','normal');
   }); y+=Math.ceil(labels.length/2)*5+4;
   _rule(doc,M,y,W-M,0.3,160); y+=4;
-  doc.setTextColor(100); doc.setFontSize(7); doc.text('Bill To: '+COMPANY.name+' | GSTIN: '+COMPANY.gst,M,y); y+=6;
+  doc.setTextColor(100); doc.setFontSize(7); doc.text('Bill To: '+COMPANY.name+' | GSTIN: '+COMPANY.gst+' | '+COMPANY.addr.replace(/\\n/g,', '),M,y); y+=6;
   _rule(doc,M,y,W-M,0.3,160); y+=2;
   // Full grid table
   const tw=CW, cols=[12,tw-62,25,25]; let cx=M;
@@ -830,9 +825,7 @@ function _tpl5(doc,d,M,W,CW){
   doc.text('('+numToWords(Number(d.amount)||0)+' Rupees Only)',M,y); y+=10;
   _rule(doc,M,y,W-M,0.4,160); y+=6;
   y=_bank(doc,d,M,y,CW); y+=10;
-  _rule(doc,W-M-50,y+8,W-M,0.3,160);
   doc.setFont('courier','normal'); doc.setFontSize(7); doc.setTextColor(100);
-  doc.text('Authorized Signatory',W-M-50,y+12);
   return _footer(doc,y+18,M,W);
 }
 
@@ -868,9 +861,6 @@ function _tpl6(doc,d,M,W,CW){
   _rule(doc,M,y,W-M,0.3,180); y+=6;
   y=_bank(doc,d,M,y,CW); y+=12;
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100);
-  doc.text('For '+COMPANY.name,W-M,y+5,{align:'right'});
-  _rule(doc,W-M-45,y+10,W-M,0.3,150);
-  doc.text('Authorized Signatory',W-M,y+14,{align:'right'});
   return _footer(doc,y+20,M,W);
 }
 
@@ -903,8 +893,6 @@ function _tpl7(doc,d,M,W,CW){
   doc.setLineDashPattern([1,1],0); _rule(doc,M,y,W-M,0.3,150); doc.setLineDashPattern([],0); y+=6;
   y=_bank(doc,d,M,y,CW); y+=15;
   doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(100);
-  _rule(doc,W-M-45,y,W-M,0.3,150);
-  doc.text('Authorized Signatory',W-M,y+4,{align:'right'});
   return _footer(doc,y+10,M,W);
 }
 
@@ -938,7 +926,6 @@ function _tpl8(doc,d,M,W,CW){
   y=_bankGrid(doc,d,M,y,CW); y+=10;
   _rule(doc,M,y,W-M,1,0);
   doc.setFont('courier','normal'); doc.setFontSize(6); doc.setTextColor(140);
-  doc.text('Signature: ____________________',W-M,y+6,{align:'right'});
   return _footer(doc,y+12,M,W);
 }
 
@@ -969,7 +956,6 @@ function _tpl9(doc,d,M,W,CW){
   _rule(doc,M+5,y,W-M-5,0.3,160); y+=6;
   y=_bank(doc,d,M+5,y,CW-10); y+=15;
   doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(100);
-  doc.text('Authorized Signatory',W-M-5,y+5,{align:'right'});
   return _footer(doc,y+15,M,W);
 }
 
@@ -1006,7 +992,6 @@ function _tpl10(doc,d,M,W,CW){
   doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',m,y); y+=14;
   _rule(doc,m,y,W-m,0.3,200); y+=8;
   y=_bankGrid(doc,d,m,y,W-m*2); y+=20;
-  _rule(doc,W-m-50,y,W-m,0.3,160);
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
   doc.text('Signature',W-m,y+4,{align:'right'});
   return _footer(doc,y+10,m,W);
@@ -1037,7 +1022,6 @@ function _tpl11(doc,d,M,W,CW){
   doc.setLineDashPattern([2,2],0); _rule(doc,M,y,W-M,0.3,160); doc.setLineDashPattern([],0); y+=8;
   y=_bank(doc,d,M,y,CW); y+=15;
   doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(120);
-  doc.text('Signature ___________________',W-M-55,y);
   return _footer(doc,y+10,M,W);
 }
 
@@ -1068,7 +1052,6 @@ function _tpl12(doc,d,M,W,CW){
   y=_bankGrid(doc,d,M,y,CW); y+=12;
   doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100);
   doc.text('FOR '+COMPANY.name.toUpperCase(),W-M,y,{align:'right'}); y+=12;
-  _rule(doc,W-M-45,y,W-M,0.3,120);
   doc.text('AUTHORIZED SIGNATORY',W-M,y+4,{align:'right'});
   return _footer(doc,y+10,M,W);
 }
@@ -1112,7 +1095,6 @@ function _tpl13(doc,d,M,W,CW){
   y=_bankGrid(doc,d,rx,y,W-rx-M); y+=15;
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120);
   _rule(doc,W-M-40,y,W-M,0.3,160);
-  doc.text('Authorized Signatory',W-M,y+4,{align:'right'});
   return _footer(doc,y+10,M,W);
 }
 
@@ -1149,7 +1131,6 @@ function _tpl14(doc,d,M,W,CW){
   _rule(doc,M+5,y,W-M-5,0.3,120); y+=6;
   y=_bank(doc,d,M+8,y,CW-16); y+=12;
   doc.setFont('courier','normal'); doc.setFontSize(8); doc.setTextColor(100);
-  doc.text('Authorised Signatory',W-M-8,y+8,{align:'right'});
   _rule(doc,W-M-55,y+4,W-M-8,0.3,150);
   return _footer(doc,y+15,M,W);
 }
@@ -1187,9 +1168,7 @@ function _tpl15(doc,d,M,W,CW){
   doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=12;
   _rule(doc,M,y,W-M,0.2,200); y+=6;
   y=_bankGrid(doc,d,M,y,CW); y+=15;
-  _rule(doc,W-M-45,y,W-M,0.3,180);
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140);
-  doc.text('Authorized Signatory',W-M,y+4,{align:'right'});
   return _footer(doc,y+10,M,W);
 }
 
@@ -1218,8 +1197,6 @@ function _tpl16(doc,d,M,W,CW){
   _rule(doc,M+20,y,W-M-20,0.3,160); y+=8;
   y=_bank(doc,d,M,y,CW); y+=15;
   doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(120);
-  _rule(doc,W-M-45,y,W-M,0.3,160);
-  doc.text('Authorized Signatory',W-M,y+5,{align:'right'});
   return _footer(doc,y+10,M,W);
 }
 
@@ -1257,7 +1234,6 @@ function _tpl17(doc,d,M,W,CW){
   L('IFSC        : '+(d.ifsc||'—'));
   L(''); L('=========================================');
   L('');
-  L('Signature: ________________________');
   return _footer(doc,y+5,M,W);
 }
 
@@ -1294,9 +1270,7 @@ function _tpl18(doc,d,M,W,CW){
   doc.text('(Rupees '+numToWords(Number(d.amount)||0)+' Only)',m,y); y+=12;
   _rule(doc,m,y,W-m,0.15,210); y+=6;
   y=_bankGrid(doc,d,m,y,W-m*2); y+=18;
-  _rule(doc,W-m-45,y,W-m,0.3,160);
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(130);
-  doc.text('Authorized Signatory',W-m,y+5,{align:'right'});
   return _footer(doc,y+10,m,W);
 }
 
@@ -1342,8 +1316,6 @@ function _tpl19(doc,d,M,W,CW){
   y=_bankGrid(doc,d,M,y,CW); y+=10;
   _rule(doc,M,y,W-M,0.6,40);
   doc.setFont('times','normal'); doc.setFontSize(7); doc.setTextColor(120);
-  doc.text('For '+COMPANY.name,W-M,y+6,{align:'right'});
-  doc.text('Authorized Signatory',W-M,y+10,{align:'right'});
   return _footer(doc,y+15,M,W);
 }
 
@@ -1381,8 +1353,6 @@ function _tpl20(doc,d,M,W,CW){
   y=_bank(doc,d,M,y,CW); y+=15;
   _rule(doc,M+20,y,W-M-20,0.3,120); y+=2; _rule(doc,M+30,y,W-M-30,0.8,80);
   doc.setFont('times','italic'); doc.setFontSize(8); doc.setTextColor(120);
-  doc.text('Authorized Signatory',W-M,y+8,{align:'right'});
-  _rule(doc,W-M-45,y+4,W-M,0.3,160);
   return _footer(doc,y+15,M,W);
 }
 
