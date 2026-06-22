@@ -437,7 +437,8 @@ function numToWords(n) {
 // ── Company fixed info ─────────────────────────────────
 const COMPANY = {
   name: 'Krishi Care & Management Services Pvt. Ltd.',
-  addr: '617, 6th Floor, Hub Town Viva, Western Express Highway,\nShankarwadi, Jogeshwari (East), Mumbai - 400060.',
+  addr: '617, 6th Floor, Hub Town Viva, Western Express Highway,
+Shankarwadi, Jogeshwari (East), Mumbai - 400060.',
   gst:  '27AAFCK7320M1Z9',
   pan:  'AAFCK7320M',
 };
@@ -835,7 +836,7 @@ function _tpl6(doc,d,M,W,CW){
   doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(30);
   doc.text(COMPANY.name,W/2,y+7,{align:'center'}); y+=10;
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100);
-  doc.text(COMPANY.addr.replace(/\n/g,', '),W/2,y,{align:'center'}); y+=4;
+  doc.text(COMPANY.addr.replace(/\n/g,' '),W/2,y,{align:'center'}); y+=4;
   doc.text('GSTIN: '+COMPANY.gst+' | PAN: '+COMPANY.pan,W/2,y,{align:'center'}); y+=4;
   _rule(doc,M,y,W-M,0.8,40); y+=3; _rule(doc,M,y,W-M,0.3,40); y+=8;
   doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('TAX INVOICE',W/2,y,{align:'center'}); y+=8;
@@ -1249,7 +1250,7 @@ function _tpl18(doc,d,M,W,CW){
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30);
   doc.text(COMPANY.name,m,y+5);
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100);
-  doc.text(COMPANY.addr.replace(/\n/g,', '),m,y+10,{maxWidth:90});
+  doc.text(COMPANY.addr.replace(/\n/g,' '),m,y+10,{maxWidth:90});
   y+=26;
   _rule(doc,m,y,W-m,0.3,200); y+=10;
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(140);
