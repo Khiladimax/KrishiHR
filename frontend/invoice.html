@@ -14,24 +14,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <style>
-/* ── Page-specific styles ───────────────────────────────── */
-.inv-tabs { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+/* ── Green-themed Invoice Page (matching offer/relieving letter) ── */
+.inv-tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
 .inv-tab {
-  padding:9px 20px; border-radius:var(--radius-sm); font-size:13px; font-weight:600;
-  border:1.5px solid var(--border2); background:var(--surface); color:var(--muted);
-  cursor:pointer; transition:all .2s;
+  padding:9px 20px; border-radius:8px; font-size:13px; font-weight:700;
+  border:1.5px solid #c8e6c9; background:#fff; color:#666;
+  cursor:pointer; transition:all .2s; letter-spacing:.3px;
 }
 .inv-tab.active {
-  background:var(--accent); color:#fff; border-color:var(--accent);
+  background:linear-gradient(135deg,#1B5E20,#2E7D32); color:#fff; border-color:#1B5E20;
 }
-.inv-tab:hover:not(.active) { border-color:var(--accent); color:var(--accent); }
+.inv-tab:hover:not(.active) { border-color:#1B5E20; color:#1B5E20; background:#f0fdf4; }
 
 .tab-panel { display:none; }
 .tab-panel.active { display:block; }
 
-/* ── Invoice Template Preview ───────────────────────────── */
+/* ── Invoice Preview ── */
 .invoice-preview-wrap {
-  background:#e8e8e8; border-radius:var(--radius); padding:20px;
+  background:#e8f5e9; border-radius:10px; padding:20px; border:1px solid #c8e6c9;
   display:flex; justify-content:center;
 }
 .invoice-sheet {
@@ -41,42 +41,43 @@
   color:#1a1a1a; position:relative;
 }
 
-/* ── Paper invoice styles (no color) ───────────────────── */
-.pi-header { text-align:center; border-bottom:2px solid #222; padding-bottom:12px; margin-bottom:18px; }
-.pi-header h1 { font-size:22px; font-weight:800; letter-spacing:3px; margin:0 0 3px; color:#111; }
+/* ── Paper invoice styles ── */
+.pi-header { text-align:center; border-bottom:2px solid #1B5E20; padding-bottom:12px; margin-bottom:18px; }
+.pi-header h1 { font-size:22px; font-weight:800; letter-spacing:3px; margin:0 0 3px; color:#1B5E20; }
 .pi-header p  { font-size:11px; color:#555; margin:0; }
 
 .pi-meta-row { display:flex; justify-content:space-between; margin-bottom:16px; gap:20px; }
 .pi-meta-left { flex:1; }
-.pi-meta-right { min-width:160px; border:1px solid #bbb; padding:10px 12px; }
-.pi-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#666; font-weight:700; margin-bottom:2px; }
+.pi-meta-right { min-width:160px; border:1px solid #a5d6a7; padding:10px 12px; border-radius:6px; background:#fafff9; }
+.pi-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#1B5E20; font-weight:700; margin-bottom:2px; }
 .pi-value { font-size:13px; font-weight:700; color:#111; }
-.pi-name  { font-size:14px; font-weight:700; color:#111; margin-bottom:4px; }
+.pi-name  { font-size:14px; font-weight:700; color:#1B5E20; margin-bottom:4px; }
 .pi-info  { font-size:11.5px; color:#555; line-height:1.7; }
 
-.pi-divider { border:none; border-top:1px solid #ccc; margin:14px 0; }
-.pi-section-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#555; font-weight:700; margin-bottom:6px; border-bottom:1px solid #ccc; padding-bottom:3px; }
+.pi-divider { border:none; border-top:1px solid #c8e6c9; margin:14px 0; }
+.pi-section-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#1B5E20; font-weight:700; margin-bottom:6px; border-bottom:1px solid #c8e6c9; padding-bottom:3px; }
 
 .pi-table { width:100%; border-collapse:collapse; margin-bottom:0; }
-.pi-table thead tr { border-top:1.5px solid #333; border-bottom:1.5px solid #333; }
-.pi-table thead th { padding:8px 10px; font-size:10px; font-weight:700; text-align:left; color:#222; text-transform:uppercase; letter-spacing:.5px; }
+.pi-table thead tr { border-top:2px solid #1B5E20; border-bottom:2px solid #1B5E20; }
+.pi-table thead th { padding:8px 10px; font-size:10px; font-weight:700; text-align:left; color:#1B5E20; text-transform:uppercase; letter-spacing:.5px; }
 .pi-table thead th:last-child { text-align:right; }
-.pi-table tbody td { padding:10px 10px; font-size:12.5px; border-bottom:1px solid #e0e0e0; vertical-align:top; color:#222; }
+.pi-table tbody td { padding:10px 10px; font-size:12.5px; border-bottom:1px solid #e8f5e9; vertical-align:top; color:#222; }
 .pi-table tbody td:last-child { text-align:right; font-weight:600; }
-.pi-total-row { border-top:1.5px solid #333; border-bottom:1.5px solid #333; }
-.pi-total-row td { padding:9px 10px; font-size:13px; font-weight:700; color:#111; }
+.pi-total-row { border-top:2px solid #1B5E20; border-bottom:2px solid #1B5E20; }
+.pi-total-row td { padding:9px 10px; font-size:13px; font-weight:700; color:#1B5E20; }
 .pi-total-row td:last-child { text-align:right; }
 
-.pi-words-box { border:1px solid #bbb; padding:9px 12px; font-size:12px; color:#333; margin:14px 0; background:#fafafa; }
+.pi-words-box { border:1px solid #a5d6a7; padding:9px 12px; font-size:12px; color:#333; margin:14px 0; background:#f0fdf4; border-radius:6px; }
 .pi-words-box b { font-weight:700; }
 
 .pi-bank-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; margin-top:8px; }
 .pi-bank-row { display:flex; gap:8px; font-size:12px; }
-.pi-bank-row .lbl { color:#888; min-width:88px; flex-shrink:0; font-size:11px; }
+.pi-bank-row .lbl { color:#1B5E20; min-width:88px; flex-shrink:0; font-size:11px; font-weight:600; }
 .pi-bank-row .val { font-weight:700; color:#111; }
 
-.pi-footer { text-align:center; border-top:1px solid #ccc; padding-top:10px; margin-top:20px; font-size:10px; color:#888; }
-/* ── Manual Form ────────────────────────────────────────── */
+.pi-footer { text-align:center; border-top:1px solid #c8e6c9; padding-top:10px; margin-top:20px; font-size:10px; color:#888; }
+
+/* ── Form styles (green-themed) ── */
 .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px 20px; }
 .form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px 20px; }
 @media(max-width:768px){
@@ -84,47 +85,47 @@
   .invoice-sheet { width:100%; padding:24px 16px; }
 }
 
-/* ── Bulk Upload Zone ───────────────────────────────────── */
+/* ── Bulk Upload ── */
 .bulk-upload-zone {
-  border:2.5px dashed var(--border2); border-radius:var(--radius);
+  border:2.5px dashed #a5d6a7; border-radius:10px;
   padding:48px 24px; text-align:center; cursor:pointer;
-  transition:all .2s; background:var(--surface2);
+  transition:all .2s; background:#fafff9;
 }
 .bulk-upload-zone:hover, .bulk-upload-zone.dragover {
-  border-color:var(--accent); background:var(--accent-l); transform:scale(1.01);
+  border-color:#1B5E20; background:#e8f5e9; transform:scale(1.01);
 }
 .bulk-upload-icon { font-size:42px; margin-bottom:10px; }
-.bulk-upload-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:4px; }
-.bulk-upload-sub { font-size:12.5px; color:var(--muted); margin-bottom:16px; }
+.bulk-upload-title { font-size:16px; font-weight:700; color:#1B5E20; margin-bottom:4px; }
+.bulk-upload-sub { font-size:12.5px; color:#666; margin-bottom:16px; }
 
 .excel-column-map { margin-top:20px; }
-.excel-col-table { width:100%; border-collapse:collapse; font-size:12.5px; }
-.excel-col-table th { background:var(--surface2); padding:8px 12px; text-align:left; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; border-bottom:1.5px solid var(--border); }
-.excel-col-table td { padding:8px 12px; border-bottom:1px solid var(--border); color:var(--text2); }
+.excel-col-table { width:100%; border-collapse:collapse; font-size:12.5px; border:1px solid #c8e6c9; }
+.excel-col-table th { background:linear-gradient(135deg,#1B5E20,#2E7D32); color:#fff; padding:8px 12px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+.excel-col-table td { padding:8px 12px; border-bottom:1px solid #e8f5e9; color:#333; }
 .excel-col-table tr:last-child td { border-bottom:none; }
 
-.bulk-result-table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:16px; }
-.bulk-result-table th { background:var(--surface3); padding:9px 12px; text-align:left; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; border-bottom:1.5px solid var(--border); }
-.bulk-result-table td { padding:9px 12px; border-bottom:1px solid var(--border); color:var(--text2); vertical-align:middle; }
-.bulk-result-table tr:hover td { background:var(--accent-l); }
+.bulk-result-table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:16px; border:1px solid #c8e6c9; }
+.bulk-result-table th { background:linear-gradient(135deg,#1B5E20,#2E7D32); color:#fff; padding:9px 12px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; }
+.bulk-result-table td { padding:9px 12px; border-bottom:1px solid #e8f5e9; color:#333; vertical-align:middle; }
+.bulk-result-table tr:hover td { background:#f0fdf4; }
 
 .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-.dot-ok   { background:#22c55e; }
-.dot-warn { background:#f59e0b; }
-.dot-err  { background:#ef4444; }
+.dot-ok   { background:#1B5E20; }
+.dot-warn { background:#F57C00; }
+.dot-err  { background:#C62828; }
 
-.progress-wrap { background:var(--border); border-radius:99px; height:8px; overflow:hidden; margin-top:8px; }
-.progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .3s; }
+.progress-wrap { background:#e8f5e9; border-radius:99px; height:8px; overflow:hidden; margin-top:8px; }
+.progress-fill { height:100%; background:linear-gradient(90deg,#1B5E20,#43A047); border-radius:99px; transition:width .3s; }
 
-/* ── Template download badge ─────────────────────────────── */
+/* ── Template badge ── */
 .template-badge {
   display:inline-flex; align-items:center; gap:8px;
-  background:var(--surface3); border:1.5px solid var(--border2);
-  border-radius:var(--radius-sm); padding:10px 16px;
-  font-size:12.5px; font-weight:600; color:var(--accent); cursor:pointer;
+  background:#f0fdf4; border:1.5px solid #a5d6a7;
+  border-radius:8px; padding:10px 16px;
+  font-size:12.5px; font-weight:700; color:#1B5E20; cursor:pointer;
   transition:all .15s; text-decoration:none;
 }
-.template-badge:hover { background:var(--accent-l); border-color:var(--accent); }
+.template-badge:hover { background:#e8f5e9; border-color:#1B5E20; }
 </style>
 </head>
 <body>
