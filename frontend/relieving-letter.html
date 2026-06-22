@@ -214,7 +214,7 @@ function renderTable(){
       <td class="c-center"><button class="act-btn act-save" onclick="saveRow(${e.id})">💾</button></td>
       <td class="c-center">${badge}</td>
       <td class="c-center"><button class="act-btn act-preview" onclick="previewLetter(${e.id})">👁 Preview</button></td>
-      <td class="c-center"><button class="act-btn act-send" ${!ok?'disabled':''} onclick="sendOne(${e.id},this)">📤 Send</button></td>
+      <td class="c-center"><button class="act-btn act-send" ${!ok?'disabled':''} onclick="sendOne(${e.id},this)">${sent?'🔄 Resend':'📤 Send'}</button></td>
     </tr>`;
   }
   h+='</tbody></table>';
