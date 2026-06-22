@@ -775,10 +775,10 @@ function _tpl4(doc,d,M,W,CW){
   y=_wtext(doc,d.description||'—',m,y,w-40);
   doc.setFont('helvetica','bold'); doc.text(Number(d.amount||0).toLocaleString('en-IN'),W-m,y-4,{align:'right'}); y+=8;
   _rule(doc,m,y,W-m,0.15,210); y+=6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0);
-  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-m,y,{align:'right'});
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120);
-  doc.text('Total Due',W-m-doc.getTextWidth('Rs. '+Number(d.amount||0).toLocaleString('en-IN'))-3,y); y+=5;
+  doc.text('Total Due',W-m,y,{align:'right'}); y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0);
+  doc.text('Rs. '+Number(d.amount||0).toLocaleString('en-IN'),W-m,y,{align:'right'}); y+=7;
   doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(130);
   doc.text('Rupees '+numToWords(Number(d.amount)||0)+' Only',m,y); y+=14;
   _rule(doc,m,y,W-m,0.15,210); y+=6;
