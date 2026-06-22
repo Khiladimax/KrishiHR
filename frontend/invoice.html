@@ -680,7 +680,6 @@ function _tpl1(doc,d,M,W,CW){
   doc.text('Amount in words: Rupees '+numToWords(Number(d.amount)||0)+' Only',M,y); y+=10;
   _rule(doc,M,y,W-M,0.3,180); y+=6;
   y=_bank(doc,d,M,y,CW); y+=8;
-  // Signature
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
   return _footer(doc,y+20,M,W);
 }
@@ -784,7 +783,6 @@ function _tpl4(doc,d,M,W,CW){
   _rule(doc,m,y,W-m,0.15,210); y+=6;
   y=_bankGrid(doc,d,m,y,w); y+=15;
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(160);
-  doc.text('Signature',W-m,y,{align:'right'});
   return _footer(doc,y+8,m,W);
 }
 
@@ -996,7 +994,6 @@ function _tpl10(doc,d,M,W,CW){
   _rule(doc,m,y,W-m,0.3,200); y+=8;
   y=_bankGrid(doc,d,m,y,W-m*2); y+=20;
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
-  doc.text('Signature',W-m,y+4,{align:'right'});
   return _footer(doc,y+10,m,W);
 }
 
@@ -1055,7 +1052,6 @@ function _tpl12(doc,d,M,W,CW){
   y=_bankGrid(doc,d,M,y,CW); y+=12;
   doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100);
   doc.text('FOR '+COMPANY.name.toUpperCase(),W-M,y,{align:'right'}); y+=12;
-  doc.text('AUTHORIZED SIGNATORY',W-M,y+4,{align:'right'});
   return _footer(doc,y+10,M,W);
 }
 
