@@ -1273,12 +1273,26 @@ exports.getLeaveSummary = async (req, res) => {
     if (!['hr','super_admin','admin','accounts','client_admin'].includes(role))
       return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const year   = parseInt(req.query.year) || new Date().getFullYear();
-    const search = req.query.search || '';
+    const year      = parseInt(req.query.year) || new Date().getFullYear();
+    const search    = req.query.search || '';
+    const clientId  = req.query.client_id || null; // 'own' = NULL, numeric = client
 
-    let empConds = ['e.is_active = true'];
+    let empConds  = ['e.is_active = true'];
     let empParams = [year];
     let idx = 2;
+
+    // Scope by company/client
+    if (role === 'client_admin' && req.user.client_id) {
+      // client_admin always scoped to their own client
+      empConds.push(`e.client_id = $${idx++}`);
+      empParams.push(req.user.client_id);
+    } else if (clientId === 'own') {
+      empConds.push(`e.client_id IS NULL`);
+    } else if (clientId && clientId !== 'all') {
+      empConds.push(`e.client_id = $${idx++}`);
+      empParams.push(parseInt(clientId));
+    }
+
     if (search) {
       empConds.push(`(LOWER(CONCAT(e.first_name,' ',e.last_name)) LIKE $${idx} OR LOWER(e.employee_code) LIKE $${idx})`);
       empParams.push(`%${search.toLowerCase()}%`);
@@ -1323,15 +1337,25 @@ exports.getLeaveTransactions = async (req, res) => {
     if (!['hr','super_admin','admin','accounts','client_admin'].includes(role))
       return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const year       = parseInt(req.query.year) || new Date().getFullYear();
-    const search     = req.query.search || '';
+    const year        = parseInt(req.query.year) || new Date().getFullYear();
+    const search      = req.query.search || '';
     const employee_id = req.query.employee_id ? parseInt(req.query.employee_id) : null;
     const leave_type  = req.query.leave_type || '';
     const status      = req.query.status || '';
+    const clientId    = req.query.client_id || null;
 
     let conds  = [`EXTRACT(YEAR FROM lr.from_date) = $1`];
     let params = [year];
     let idx    = 2;
+
+    // Scope by company/client
+    if (role === 'client_admin' && req.user.client_id) {
+      conds.push(`e.client_id = $${idx++}`); params.push(req.user.client_id);
+    } else if (clientId === 'own') {
+      conds.push(`e.client_id IS NULL`);
+    } else if (clientId && clientId !== 'all') {
+      conds.push(`e.client_id = $${idx++}`); params.push(parseInt(clientId));
+    }
 
     if (employee_id) {
       conds.push(`lr.employee_id = $${idx++}`); params.push(employee_id);

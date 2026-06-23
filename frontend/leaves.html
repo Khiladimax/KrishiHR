@@ -208,7 +208,10 @@
         <div class="card-header" style="flex-wrap:wrap;gap:10px">
           <div class="card-title"><span class="card-title-icon">📊</span>Leave Summary — EL / SL / CL</div>
           <div class="flex gap-2" style="flex-wrap:wrap;align-items:center">
-            <input id="summary-search" class="form-control" style="width:220px" placeholder="Search by name or ID…" oninput="loadLeaveSummary()">
+            <select id="summary-client" class="form-control" style="width:170px" onchange="if(document.getElementById('summary-search').value.trim()) loadLeaveSummary()">
+              <option value="own">🏢 Own Company</option>
+            </select>
+            <input id="summary-search" class="form-control" style="width:200px" placeholder="Search by name or ID…" oninput="loadLeaveSummary()">
             <select id="summary-year" class="form-control" style="width:100px" onchange="if(document.getElementById('summary-search').value.trim()) loadLeaveSummary()"></select>
             <button class="btn btn-outline btn-sm" onclick="downloadLeaveSummaryExcel()">⬇ Download Excel</button>
           </div>
@@ -223,6 +226,9 @@
         <div class="card-header" style="flex-wrap:wrap;gap:10px">
           <div class="card-title"><span class="card-title-icon">🔄</span>Leave Transactions</div>
           <div class="flex gap-2" style="flex-wrap:wrap;align-items:center">
+            <select id="txn-client" class="form-control" style="width:170px" onchange="if(document.getElementById('txn-search').value.trim()) loadLeaveTransactions()">
+              <option value="own">🏢 Own Company</option>
+            </select>
             <input id="txn-search" class="form-control" style="width:180px" placeholder="Search by name or ID…" oninput="loadLeaveTransactions()">
             <select id="txn-type" class="form-control" style="width:130px" onchange="if(document.getElementById('txn-search').value.trim()) loadLeaveTransactions()">
               <option value="">All Types</option>
@@ -384,7 +390,6 @@ if (Role.isAdminOrHR() || Role.is('accounts','client_admin')) {
   // Populate year dropdowns
   (function() {
     const NOW = new Date();
-    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     ['summary-year','txn-year'].forEach(id => {
       const sel = document.getElementById(id);
       if (sel && !sel.options.length)
@@ -392,6 +397,27 @@ if (Role.isAdminOrHR() || Role.is('accounts','client_admin')) {
           sel.innerHTML += `<option value="${y}" ${y===NOW.getFullYear()?'selected':''}>${y}</option>`;
     });
   })();
+  // Populate client/company dropdowns (super_admin / hr can see all clients)
+  if (Role.is('super_admin','admin','hr','accounts')) {
+    api('GET', '/clients').then(resp => {
+      if (!resp?.success) return;
+      ['summary-client','txn-client'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        // Clear and rebuild
+        sel.innerHTML = '<option value="own">🏢 Own Company</option><option value="all">🌐 All Companies</option>';
+        (resp.data || resp.clients || []).forEach(c => {
+          sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+      });
+    }).catch(() => {});
+  } else {
+    // client_admin — hide the dropdown, backend scopes automatically
+    ['summary-client','txn-client'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  }
 }
 if (Role.isAdminOrHR() || Role.is('accounts')) {
   document.getElementById('all-tab').style.display = '';
@@ -998,7 +1024,8 @@ async function loadLeaveSummary() {
     return;
   }
   el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
-  const data = await api('GET', `/leave/summary?year=${yr}&search=${encodeURIComponent(srch)}`);
+  const clientId = document.getElementById('summary-client')?.value || 'own';
+  const data = await api('GET', `/leave/summary?year=${yr}&search=${encodeURIComponent(srch)}&client_id=${clientId}`);
   if (!data?.success || !data.data?.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><p>No leave summary found for "<b>${srch}</b>".</p></div>`;
     return;
@@ -1065,7 +1092,8 @@ async function loadLeaveTransactions() {
     return;
   }
   el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
-  const qs   = `year=${yr}&search=${encodeURIComponent(srch)}&leave_type=${ltype}&status=${status}`;
+  const clientId = document.getElementById('txn-client')?.value || 'own';
+  const qs   = `year=${yr}&search=${encodeURIComponent(srch)}&leave_type=${ltype}&status=${status}&client_id=${clientId}`;
   const data = await api('GET', `/leave/transactions?${qs}`);
   if (!data?.success || !data.data?.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div><p>No transactions found for "<b>${srch}</b>".</p></div>`;
