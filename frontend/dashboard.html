@@ -1407,19 +1407,20 @@ async function loadOfficeBuffers() {
   _mapCircles = [];
   const user = Auth.getUser();
   if (!user) return;
-  const ruleData = await api('GET', `/geofence/buffer-rules/${user.id}`);
+  const ruleData = await api('GET', `/geofence/buffer-rules/${user.id}`).catch(() => null);
   const rule = ruleData?.data;
-  if (!rule) return;
+  const ruleType = rule?.rule_type;
 
-  if (rule.rule_type === 'district' && rule.state && rule.district) {
+  if (ruleType === 'district' && rule.state && rule.district) {
     await drawDistrictPolygon(rule.state, rule.district);
-  } else if (rule.rule_type === 'state' && rule.state) {
+  } else if (ruleType === 'state' && rule.state) {
     await drawStatePolygon(rule.state);
-  } else if (rule.rule_type === 'universal') {
+  } else if (ruleType === 'universal') {
     setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
     document.getElementById('confirm-punch-btn').disabled = false;
     if (_pLat && _pLng) { _map.setCenter({ lat: _pLat, lng: _pLng }); _map.setZoom(16); }
   } else {
+    // No rule set OR office rule — always draw office location circles
     // office rule — green border + fill + dotted line to nearest circle edge
     const locData = await api('GET', '/geofence/my-locations');
     let firstOffice = null;
