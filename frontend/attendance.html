@@ -1372,35 +1372,30 @@ async function loadOfficeBuffers() {
   if (ruleType === 'universal') {
     setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
     document.getElementById('confirm-punch-btn').disabled = false;
-    if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
+    if (_pLat && _pLng) { _map.setCenter({ lat: _pLat, lng: _pLng }); _map.setZoom(16); }
     return;
   }
-  // Office rule — blue border + pink fill (matches district/state style)
+
+  // Office buffer rule — draw green circles, zoom directly to office
   let data = await api('GET', '/geofence/my-locations').catch(() => null);
   if (!data?.success || !data.data?.length) data = await api('GET', '/geofence/locations').catch(() => null);
   const locs = data?.data || [];
-  const b = new google.maps.LatLngBounds();
+  let firstOffice = null;
   let closestOfficeDist = Infinity;
   let closestOfficeEdgePt = null;
 
   locs.forEach(loc => {
-    if (!loc.latitude || loc.radius_meters >= 50000) return;
+    if (!loc.latitude) return;
     const lat = +loc.latitude, lng = +loc.longitude, r = +(loc.radius_meters || 200);
     const circle = new google.maps.Circle({
       map: _map, center: { lat, lng }, radius: r,
       strokeColor: '#16a34a', strokeOpacity: 1.0, strokeWeight: 3,
-      fillColor: '#22c55e', fillOpacity: 0.20
+      fillColor: '#22c55e', fillOpacity: 0.25
     });
     const infoW = new google.maps.InfoWindow({ content: `<b>${loc.name}</b><br>📏 ${r}m buffer` });
     circle.addListener('click', () => infoW.open(_map));
     _mapCircles.push(circle);
-    b.union(circle.getBounds());
-
-    // Immediately center map on first office location so it's never stuck on India zoom
-    if (_mapCircles.length === 1) {
-      _map.setCenter({ lat, lng });
-      _map.setZoom(16);
-    }
+    if (!firstOffice) firstOffice = { lat, lng, r };
 
     // Track nearest office circle edge for dotted line
     if (_pLat && _pLng) {
@@ -1408,7 +1403,7 @@ async function loadOfficeBuffers() {
       const centerPt = new google.maps.LatLng(lat, lng);
       const distToCenter = google.maps.geometry.spherical.computeDistanceBetween(userPt, centerPt);
       const distToEdge   = Math.abs(distToCenter - r);
-      if (distToEdge < closestOfficeDist) {
+      if (distToEdge < (closestOfficeDist || Infinity)) {
         closestOfficeDist = distToEdge;
         const heading = google.maps.geometry.spherical.computeHeading(centerPt, userPt);
         closestOfficeEdgePt = google.maps.geometry.spherical.computeOffset(centerPt, r, heading);
@@ -1416,17 +1411,31 @@ async function loadOfficeBuffers() {
     }
   });
 
-  if (_pLat && _pLng) b.extend({ lat: _pLat, lng: _pLng });
-  if (!b.isEmpty()) {
-    // Small timeout ensures the map div is fully rendered before fitBounds
-    setTimeout(() => {
-      _map.fitBounds(b, { top: 80, bottom: 80, left: 80, right: 80 });
-      google.maps.event.addListenerOnce(_map, 'idle', () => {
-        if (_map.getZoom() < 14) _map.setZoom(15);
-      });
-    }, 300);
+  // Zoom to show office + user — pick the midpoint if both exist, else office center
+  if (firstOffice) {
+    if (_pLat && _pLng) {
+      // Center between user and office, zoom 15-16
+      const midLat = (_pLat + firstOffice.lat) / 2;
+      const midLng = (_pLng + firstOffice.lng) / 2;
+      _map.setCenter({ lat: midLat, lng: midLng });
+      _map.setZoom(15);
+      // After a tick, use fitBounds with explicit zoom enforcement
+      setTimeout(() => {
+        const b = new google.maps.LatLngBounds();
+        b.extend({ lat: _pLat, lng: _pLng });
+        b.extend({ lat: firstOffice.lat, lng: firstOffice.lng });
+        google.maps.event.addListenerOnce(_map, 'bounds_changed', () => {
+          if (_map.getZoom() < 14) _map.setZoom(15);
+        });
+        _map.fitBounds(b, { top: 100, bottom: 100, left: 100, right: 100 });
+      }, 500);
+    } else {
+      _map.setCenter({ lat: firstOffice.lat, lng: firstOffice.lng });
+      _map.setZoom(15);
+    }
   } else if (_pLat && _pLng) {
-    _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(16);
+    _map.setCenter({ lat: _pLat, lng: _pLng });
+    _map.setZoom(16);
   }
 
   // Draw dotted line from user to nearest office circle edge
