@@ -471,9 +471,13 @@ exports.getRequests = async (req, res) => {
       conds.push(`lr.status='pending'`);
       conds.push(`lr.employee_id != $${idx++}`);
       params.push(userId);
-      // HR/admin: only own-company employees (client_id IS NULL), not client manpower
       if (['super_admin','hr','admin'].includes(userRole)) {
+        // Own-company HR: only non-client employees
         conds.push(`e.client_id IS NULL`);
+      } else if (userRole === 'client_admin' && req.user.client_id) {
+        // Client admin: only their client's employees
+        conds.push(`e.client_id = $${idx++}`);
+        params.push(req.user.client_id);
       } else {
         conds.push(
           `(lr.current_approver_code=$${idx++}
