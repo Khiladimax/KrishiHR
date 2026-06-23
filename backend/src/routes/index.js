@@ -212,6 +212,8 @@ router.put ('/leave/balance',         authenticate, authorize(...HR_ADMIN), leav
 router.post('/leave/monthly-accrual',        authenticate, authorize(...HR_ADMIN), leaveCtrl.monthlyAccrual);
 router.post('/leave/recalculate/:id',        authenticate, authorize(...HR_ADMIN), leaveCtrl.recalculateEmployee);
 router.get ('/leave/report',                 authenticate,                        leaveCtrl.getLeaveReport);
+router.get ('/leave/summary',                authenticate, authorize('hr','super_admin','admin','accounts','client_admin'), leaveCtrl.getLeaveSummary);
+router.get ('/leave/transactions',           authenticate, authorize('hr','super_admin','admin','accounts','client_admin'), leaveCtrl.getLeaveTransactions);
 
 // ── Comp Off ──────────────────────────────────────────────────────────────────
 router.post  ('/compoff/grant',        authenticate, authorize('hr','admin','super_admin'), compoffCtrl.grantCredit);

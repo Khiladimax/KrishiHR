@@ -57,6 +57,8 @@
       <button class="tab-btn" onclick="switchTab('compoff-credits')">🔄 My Comp Off</button>
       <button class="tab-btn" id="approvals-tab" style="display:none" onclick="switchTab('approvals')">✅ Approvals</button>
       <button class="tab-btn" id="all-tab"        style="display:none" onclick="switchTab('all-leaves')">📂 All Applications</button>
+      <button class="tab-btn" id="summary-tab"    style="display:none" onclick="switchTab('leave-summary')">📊 Leave Summary</button>
+      <button class="tab-btn" id="txn-tab"        style="display:none" onclick="switchTab('leave-txn')">🔄 Leave Transactions</button>
       <!-- Accrual tab removed — runs automatically via cron on 1st of every month -->
     </div>
 
@@ -200,6 +202,51 @@
       </div>
     </div>
 
+    <!-- LEAVE SUMMARY TAB -->
+    <div id="tab-leave-summary" style="display:none">
+      <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px">
+          <div class="card-title"><span class="card-title-icon">📊</span>Leave Summary — EL / SL / CL</div>
+          <div class="flex gap-2" style="flex-wrap:wrap;align-items:center">
+            <input id="summary-search" class="form-control" style="width:220px" placeholder="Search by name or ID…" oninput="loadLeaveSummary()">
+            <select id="summary-year" class="form-control" style="width:100px" onchange="if(document.getElementById('summary-search').value.trim()) loadLeaveSummary()"></select>
+            <button class="btn btn-outline btn-sm" onclick="downloadLeaveSummaryExcel()">⬇ Download Excel</button>
+          </div>
+        </div>
+        <div id="leave-summary-content"><div class="empty-state" style="padding:40px"><div class="empty-icon">🔍</div><p style="color:var(--muted)">Enter an employee name or ID to view their leave summary.</p></div></div>
+      </div>
+    </div>
+
+    <!-- LEAVE TRANSACTIONS TAB -->
+    <div id="tab-leave-txn" style="display:none">
+      <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px">
+          <div class="card-title"><span class="card-title-icon">🔄</span>Leave Transactions</div>
+          <div class="flex gap-2" style="flex-wrap:wrap;align-items:center">
+            <input id="txn-search" class="form-control" style="width:180px" placeholder="Search by name or ID…" oninput="loadLeaveTransactions()">
+            <select id="txn-type" class="form-control" style="width:130px" onchange="if(document.getElementById('txn-search').value.trim()) loadLeaveTransactions()">
+              <option value="">All Types</option>
+              <option value="EL">EL (Earned)</option>
+              <option value="SL">SL (Sick)</option>
+              <option value="CL">CL (Casual)</option>
+              <option value="OD">OD</option>
+              <option value="LWP">LWP</option>
+            </select>
+            <select id="txn-status" class="form-control" style="width:130px" onchange="if(document.getElementById('txn-search').value.trim()) loadLeaveTransactions()">
+              <option value="">All Status</option>
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select id="txn-year" class="form-control" style="width:100px" onchange="if(document.getElementById('txn-search').value.trim()) loadLeaveTransactions()"></select>
+            <button class="btn btn-outline btn-sm" onclick="downloadLeaveTransactionsExcel()">⬇ Download Excel</button>
+          </div>
+        </div>
+        <div id="leave-txn-content"><div class="empty-state" style="padding:40px"><div class="empty-icon">🔍</div><p style="color:var(--muted)">Enter an employee name or ID to view their leave transactions.</p></div></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -331,6 +378,21 @@ let balanceData    = [];
 let holidayDates   = new Set();
 
 if (Role.is('admin','super_admin','hr','manager','tl','accounts','client_admin')) document.getElementById('approvals-tab').style.display = '';
+if (Role.isAdminOrHR() || Role.is('accounts','client_admin')) {
+  document.getElementById('summary-tab').style.display = '';
+  document.getElementById('txn-tab').style.display     = '';
+  // Populate year dropdowns
+  (function() {
+    const NOW = new Date();
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    ['summary-year','txn-year'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (sel && !sel.options.length)
+        for (let y = NOW.getFullYear(); y >= NOW.getFullYear()-3; y--)
+          sel.innerHTML += `<option value="${y}" ${y===NOW.getFullYear()?'selected':''}>${y}</option>`;
+    });
+  })();
+}
 if (Role.isAdminOrHR() || Role.is('accounts')) {
   document.getElementById('all-tab').style.display = '';
   // accrual tab hidden — auto-runs via cron
@@ -813,7 +875,7 @@ async function revokeLeave(id, fromDate) {
 // runAccrual removed — handled by cron automatically
 
 function switchTab(name) {
-  ['my-leaves','compoff-credits','approvals','all-leaves'].forEach(t => {
+  ['my-leaves','compoff-credits','approvals','all-leaves','leave-summary','leave-txn'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===name?'':'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -821,6 +883,8 @@ function switchTab(name) {
   if (name==='approvals' && document.getElementById('approvals-list').innerHTML.includes('spinner')) loadApprovals();
   if (name==='all-leaves') loadAllLeaves();
   if (name==='compoff-credits') loadCompOffCredits();
+  if (name==='leave-summary') { if(document.getElementById('summary-search')?.value?.trim()) loadLeaveSummary(); }
+  if (name==='leave-txn') { if(document.getElementById('txn-search')?.value?.trim()) loadLeaveTransactions(); }
 }
 
 async function loadCompOffCredits() {
@@ -923,6 +987,173 @@ function resetApplyModal() {
   document.getElementById('apply-category').value = 'leave';
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── Leave Summary ─────────────────────────────────────────────────────────────
+async function loadLeaveSummary() {
+  const el   = document.getElementById('leave-summary-content');
+  const yr   = document.getElementById('summary-year')?.value || new Date().getFullYear();
+  const srch = document.getElementById('summary-search')?.value?.trim() || '';
+  if (!srch) {
+    el.innerHTML = '<div class="empty-state" style="padding:40px"><div class="empty-icon">🔍</div><p style="color:var(--muted)">Enter an employee name or ID to view their leave summary.</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  const data = await api('GET', `/leave/summary?year=${yr}&search=${encodeURIComponent(srch)}`);
+  if (!data?.success || !data.data?.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><p>No leave summary found for "<b>${srch}</b>".</p></div>`;
+    return;
+  }
+  const XLH = `border:1px solid #9ca3af;background:#f0f4ff;font-weight:700;font-size:11px;padding:8px 10px;white-space:nowrap`;
+  const XLD = `border:1px solid #e5e7eb;padding:7px 10px;font-size:12px`;
+  el.innerHTML = `
+    <div style="overflow-x:auto;margin-top:4px">
+    <table style="border-collapse:collapse;width:100%;min-width:900px">
+      <thead>
+        <tr>
+          <th colspan="4" style="${XLH};background:#e8eaf6;border:1px solid #9fa8da"></th>
+          <th colspan="3" style="${XLH};background:#fce4ec;border:1px solid #f48fb1;color:#880e4f">📅 Earned Leave (EL)</th>
+          <th colspan="3" style="${XLH};background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20">🤒 Sick Leave (SL)</th>
+          <th colspan="3" style="${XLH};background:#fff8e1;border:1px solid #ffe082;color:#e65100">📋 Casual Leave (CL)</th>
+        </tr>
+        <tr>
+          <th style="${XLH}">Emp Code</th>
+          <th style="${XLH}">Employee Name</th>
+          <th style="${XLH}">Department</th>
+          <th style="${XLH}">Designation</th>
+          <th style="${XLH};background:#fce4ec">Allocated</th>
+          <th style="${XLH};background:#fce4ec">Used</th>
+          <th style="${XLH};background:#fce4ec">Available</th>
+          <th style="${XLH};background:#e8f5e9">Allocated</th>
+          <th style="${XLH};background:#e8f5e9">Used</th>
+          <th style="${XLH};background:#e8f5e9">Available</th>
+          <th style="${XLH};background:#fff8e1">Allocated</th>
+          <th style="${XLH};background:#fff8e1">Used</th>
+          <th style="${XLH};background:#fff8e1">Available</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.data.map((r, i) => `<tr style="background:${i%2===0?'#fff':'#f9fafb'}">
+          <td style="${XLD};font-weight:700;color:var(--accent)">${r.employee_code}</td>
+          <td style="${XLD};font-weight:600">${r.employee_name}</td>
+          <td style="${XLD};color:var(--muted)">${r.department||'—'}</td>
+          <td style="${XLD};color:var(--muted)">${r.designation||'—'}</td>
+          <td style="${XLD};text-align:center">${fmt.num(r.el_allocated)}</td>
+          <td style="${XLD};text-align:center;color:#c62828;font-weight:600">${fmt.num(r.el_used)}</td>
+          <td style="${XLD};text-align:center;color:#2e7d32;font-weight:700">${fmt.num(r.el_available)}</td>
+          <td style="${XLD};text-align:center">${fmt.num(r.sl_allocated)}</td>
+          <td style="${XLD};text-align:center;color:#c62828;font-weight:600">${fmt.num(r.sl_used)}</td>
+          <td style="${XLD};text-align:center;color:#2e7d32;font-weight:700">${fmt.num(r.sl_available)}</td>
+          <td style="${XLD};text-align:center">${fmt.num(r.cl_allocated)}</td>
+          <td style="${XLD};text-align:center;color:#c62828;font-weight:600">${fmt.num(r.cl_used)}</td>
+          <td style="${XLD};text-align:center;color:#2e7d32;font-weight:700">${fmt.num(r.cl_available)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">${data.count} employee(s) · Year ${yr}</div>
+    </div>`;
+}
+
+// ── Leave Transactions ────────────────────────────────────────────────────────
+async function loadLeaveTransactions() {
+  const el     = document.getElementById('leave-txn-content');
+  const yr     = document.getElementById('txn-year')?.value    || new Date().getFullYear();
+  const srch   = document.getElementById('txn-search')?.value?.trim() || '';
+  const ltype  = document.getElementById('txn-type')?.value    || '';
+  const status = document.getElementById('txn-status')?.value  || '';
+  if (!srch) {
+    el.innerHTML = '<div class="empty-state" style="padding:40px"><div class="empty-icon">🔍</div><p style="color:var(--muted)">Enter an employee name or ID to view their leave transactions.</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  const qs   = `year=${yr}&search=${encodeURIComponent(srch)}&leave_type=${ltype}&status=${status}`;
+  const data = await api('GET', `/leave/transactions?${qs}`);
+  if (!data?.success || !data.data?.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div><p>No transactions found for "<b>${srch}</b>".</p></div>`;
+    return;
+  }
+  const statusColors = {
+    approved:  'background:#dcfce7;color:#166534',
+    pending:   'background:#fef9c3;color:#854d0e',
+    rejected:  'background:#fee2e2;color:#991b1b',
+    cancelled: 'background:#f3f4f6;color:#6b7280',
+  };
+  const XLH = `border:1px solid #9ca3af;background:#f0f4ff;font-weight:700;font-size:11px;padding:8px 10px;white-space:nowrap`;
+  const XLD = `border:1px solid #e5e7eb;padding:7px 10px;font-size:12px`;
+  el.innerHTML = `
+    <div style="overflow-x:auto;margin-top:4px">
+    <table style="border-collapse:collapse;width:100%;min-width:800px">
+      <thead>
+        <tr>
+          <th style="${XLH}">Emp Code</th>
+          <th style="${XLH}">Employee Name</th>
+          <th style="${XLH}">Department</th>
+          <th style="${XLH}">Leave Type</th>
+          <th style="${XLH}">From Date</th>
+          <th style="${XLH}">To Date</th>
+          <th style="${XLH}">Days</th>
+          <th style="${XLH}">Half Day</th>
+          <th style="${XLH}">Reason</th>
+          <th style="${XLH}">Status</th>
+          <th style="${XLH}">Applied On</th>
+          <th style="${XLH}">Approved/Rejected By</th>
+          <th style="${XLH}">Approver Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.data.map((r, i) => `<tr style="background:${i%2===0?'#fff':'#f9fafb'}">
+          <td style="${XLD};font-weight:700;color:var(--accent)">${r.employee_code}</td>
+          <td style="${XLD};font-weight:600">${r.employee_name}</td>
+          <td style="${XLD};color:var(--muted)">${r.department||'—'}</td>
+          <td style="${XLD}"><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#e0e7ff;color:#3730a3">${r.leave_type_name||r.leave_type_code} (${r.leave_type_code})</span></td>
+          <td style="${XLD}">${fmt.date(r.from_date)}</td>
+          <td style="${XLD}">${fmt.date(r.to_date)}</td>
+          <td style="${XLD};text-align:center;font-weight:700">${r.days_requested}</td>
+          <td style="${XLD};text-align:center">${r.is_half_day?'<span style="color:#7e22ce;font-weight:700">½ Yes</span>':'No'}</td>
+          <td style="${XLD};max-width:200px;word-break:break-word;color:var(--muted)">${r.reason||'—'}</td>
+          <td style="${XLD};text-align:center"><span style="padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;${statusColors[r.status]||statusColors.cancelled}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span></td>
+          <td style="${XLD};white-space:nowrap;color:var(--muted)">${fmt.date(r.applied_at)}</td>
+          <td style="${XLD};color:var(--muted)">${r.actioned_by_name||'—'}</td>
+          <td style="${XLD};color:var(--muted);max-width:180px;word-break:break-word">${r.actioned_remarks||'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">${data.count} transaction(s) · Year ${yr}</div>
+    </div>`;
+}
+
+// ── Download Helpers ──────────────────────────────────────────────────────────
+function tableToCSV(tableEl) {
+  return [...tableEl.querySelectorAll('tr')].map(r =>
+    [...r.querySelectorAll('th,td')].map(c =>
+      `"${c.innerText.replace(/"/g,'""').replace(/\n/g,' ').trim()}"`
+    ).join(',')
+  ).join('\n');
+}
+
+function downloadCSV(csv, filename) {
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob), download: filename
+  });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+function downloadLeaveSummaryExcel() {
+  const tbl = document.querySelector('#leave-summary-content table');
+  if (!tbl) { toast('No data to download. Search first.', 'error'); return; }
+  const yr = document.getElementById('summary-year')?.value || new Date().getFullYear();
+  downloadCSV(tableToCSV(tbl), `Leave_Summary_${yr}.csv`);
+  toast('✅ Leave Summary downloaded');
+}
+
+function downloadLeaveTransactionsExcel() {
+  const tbl = document.querySelector('#leave-txn-content table');
+  if (!tbl) { toast('No data to download. Search first.', 'error'); return; }
+  const yr = document.getElementById('txn-year')?.value || new Date().getFullYear();
+  downloadCSV(tableToCSV(tbl), `Leave_Transactions_${yr}.csv`);
+  toast('✅ Leave Transactions downloaded');
+}
 </script>
 </body>
 </html>
