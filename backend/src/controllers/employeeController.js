@@ -426,7 +426,8 @@ exports.update = async (req, res) => {
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         sets.push(`${key}=$${idx++}`);
-        params.push(req.body[key] === '' ? null : req.body[key]);
+        const nullableKeys = ['last_name','first_name'];
+        params.push(req.body[key] === '' && !nullableKeys.includes(key) ? null : (req.body[key] ?? ''));
       }
     }
 
