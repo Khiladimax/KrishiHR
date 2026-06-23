@@ -1408,8 +1408,15 @@ async function loadOfficeBuffers() {
   });
 
   if (_pLat && _pLng) b.extend({ lat: _pLat, lng: _pLng });
-  if (!b.isEmpty()) _map.fitBounds(b, { top: 60, bottom: 60, left: 60, right: 60 });
-  else if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
+  if (!b.isEmpty()) {
+    _map.fitBounds(b, { top: 80, bottom: 80, left: 80, right: 80 });
+    // fitBounds is async — enforce minimum zoom once map settles
+    google.maps.event.addListenerOnce(_map, 'idle', () => {
+      if (_map.getZoom() < 15) _map.setZoom(15);
+    });
+  } else if (_pLat && _pLng) {
+    _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(16);
+  }
 
   // Draw dotted line from user to nearest office circle edge
   if (_pLat && _pLng && closestOfficeEdgePt) {
