@@ -110,7 +110,6 @@ const ICONS = {
   reimbursement:`🧾`,
   provision:    `⏳`,
   geofence:     `📍`,
-  approvals:    `✅`,
   compoff:      `🔄`,
   projects:     `📊`,
   aivoice:      `🤖`,
@@ -126,7 +125,6 @@ const NAV_GROUPS = [
   {
     label: 'Workspace',
     items: [
-      { href:'approvals.html',        icon: ICONS.approvals,    label:'Approvals',        roles:['manager','tl','hr','admin','super_admin','accounts','client_admin'] },
       { href:'attendance.html',     icon: ICONS.attendance,   label:'Attendance',       always:true },
       { href:'leaves.html',         icon: ICONS.leaves,       label:'Leaves',           always:true },
       { href:'movement.html',       icon: ICONS.movement,     label:'Movement',         roles:['admin','super_admin','hr','manager','tl','client_admin'] },

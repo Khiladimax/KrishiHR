@@ -1011,7 +1011,6 @@ router.get('/chat/groups/:id/typing', authenticate, (req, res) => {
 router.post  ('/chat/groups/:id/messages',                authenticate, chatCtrl.sendMessage);
 // ── File upload: direct (<=50 MB) + chunked (up to 1 GB) ─────────────────────
 const fileCtrl = require('../controllers/chatFileController');
-const approvalsCtrl    = require('../controllers/approvalsController');
 router.post  ('/chat/groups/:id/files', authenticate, (req, res, next) => {
   fileCtrl.directUploadMiddleware(req, res, (err) => {
     if (err) return res.status(400).json({ success: false, message: err.message });
@@ -1052,10 +1051,6 @@ router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 
 // ── Call History ──────────────────────────────────────────────────────────────
 
-
-// ── Unified Approvals Inbox ──────────────────────────────────────────────────
-router.get ('/approvals/pending',     authenticate, approvalsCtrl.getPendingApprovals);
-router.post('/approvals/bulk-action', authenticate, approvalsCtrl.bulkAction);
 
 module.exports = router;
 
