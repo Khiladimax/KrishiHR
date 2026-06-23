@@ -57,50 +57,63 @@ exports.upsertSalaryStructure = async (req, res) => {
   try {
     const {
       employee_id, basic = 0, hra = 0, conveyance = 0, special_allowance = 0,
-      gratuity = 0, pf_applicable = true, esi_applicable = true,
-      pt_applicable = true, lwf_applicable = true, tds_applicable = false, notes
+      gratuity = 0, other_allowance = 0,
+      pf_applicable = true, esi_applicable = true,
+      pt_applicable = true, lwf_applicable = true, tds_applicable = false,
+      // HR-defined manual amounts
+      pf_employee: pf_emp_in, pf_employer: pf_emr_in, pf_admin: pf_admin_in,
+      esi_employee: esi_emp_in, esi_employer: esi_emr_in,
+      pt_amount, lwf_amount, tds_monthly, loan_emi_recovery = 0,
+      notes
     } = req.body;
 
     if (!employee_id)
       return res.status(400).json({ success: false, message: 'employee_id required' });
 
-    // Auto-calculate statutory amounts
-    const gross        = parseFloat(basic) + parseFloat(hra) + parseFloat(conveyance) + parseFloat(special_allowance) + parseFloat(gratuity);
-    const pfBase       = Math.min(parseFloat(basic), 15000);
-    const pf_employee  = pf_applicable  ? Math.round(pfBase * 0.12)  : 0;
-    const pf_employer  = pf_applicable  ? Math.round(pfBase * 0.12)  : 0;
-    const pf_admin     = pf_applicable  ? 150 : 0;  // Fixed ₹150 (EPFO minimum admin charge)
-    const esi_employee = esi_applicable && gross <= 21000 ? Math.round(gross * 0.0075) : 0;
-    const esi_employer = esi_applicable && gross <= 21000 ? Math.round(gross * 0.0325) : 0;
-    const pt           = pt_applicable  && gross >= 10000 ? 200 : 0;
-    const lwf          = lwf_applicable ? 6 : 0;
-    const total_ded    = pf_employee + esi_employee + pt + lwf;
-    const net          = gross - total_ded;
-    const ctc          = gross + pf_employer + esi_employer + pf_admin;
+    // Use HR-provided amounts (fall back to 0 if not provided)
+    const gross        = parseFloat(basic) + parseFloat(hra) + parseFloat(conveyance)
+                       + parseFloat(special_allowance) + parseFloat(gratuity) + parseFloat(other_allowance || 0);
+    const pf_employee  = pf_applicable  ? parseFloat(pf_emp_in  || 0) : 0;
+    const pf_employer  = pf_applicable  ? parseFloat(pf_emr_in  || 0) : 0;
+    const pf_admin     = pf_applicable  ? parseFloat(pf_admin_in || 150) : 0;
+    const esi_employee = esi_applicable ? parseFloat(esi_emp_in || 0) : 0;
+    const esi_employer = esi_applicable ? parseFloat(esi_emr_in || 0) : 0;
+    const pt           = pt_applicable  ? parseFloat(pt_amount  || 0) : 0;
+    const lwf          = lwf_applicable ? parseFloat(lwf_amount || 0) : 0;
+    const tds          = tds_applicable ? parseFloat(tds_monthly|| 0) : 0;
+    const emi          = parseFloat(loan_emi_recovery || 0);
 
+    const total_ded   = pf_employee + esi_employee + pt + lwf + tds + emi;
+    const net         = gross - total_ded;
+    const ctc         = gross + pf_employer + esi_employer + pf_admin;
     const ctc_monthly = ctc;
     const ctc_annual  = ctc * 12;
     const total_employer_cost = pf_employer + esi_employer + pf_admin;
 
+    // Check if other_allowance column exists; add via ALTER if needed
+    await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`);
+    await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`);
+    await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS tds NUMERIC(12,2) DEFAULT 0`);
+
     await db.query(
       `INSERT INTO employee_salary_structure
-         (employee_id, basic, hra, conveyance, special_allowance, gratuity, gross_salary,
+         (employee_id, basic, hra, conveyance, special_allowance, gratuity, other_allowance, gross_salary,
           pf_applicable, esi_applicable, pt_applicable, lwf_applicable, tds_applicable,
           pf_employee, pf_employer, pf_admin, esi_employee, esi_employer,
-          professional_tax, lwf, total_employer_cost,
+          professional_tax, lwf, tds, loan_emi_recovery, total_employer_cost,
           total_deductions, net_salary, ctc_monthly, ctc_annual, notes, updated_by, updated_at)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,NOW())
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,NOW())
        ON CONFLICT(employee_id) DO UPDATE SET
-         basic=$2, hra=$3, conveyance=$4, special_allowance=$5, gratuity=$6, gross_salary=$7,
-         pf_applicable=$8, esi_applicable=$9, pt_applicable=$10, lwf_applicable=$11, tds_applicable=$12,
-         pf_employee=$13, pf_employer=$14, pf_admin=$15, esi_employee=$16, esi_employer=$17,
-         professional_tax=$18, lwf=$19, total_employer_cost=$20,
-         total_deductions=$21, net_salary=$22, ctc_monthly=$23, ctc_annual=$24, notes=$25,
-         updated_by=$26, updated_at=NOW()`,
-      [employee_id, basic, hra, conveyance, special_allowance, gratuity, gross,
+         basic=$2, hra=$3, conveyance=$4, special_allowance=$5, gratuity=$6, other_allowance=$7, gross_salary=$8,
+         pf_applicable=$9, esi_applicable=$10, pt_applicable=$11, lwf_applicable=$12, tds_applicable=$13,
+         pf_employee=$14, pf_employer=$15, pf_admin=$16, esi_employee=$17, esi_employer=$18,
+         professional_tax=$19, lwf=$20, tds=$21, loan_emi_recovery=$22, total_employer_cost=$23,
+         total_deductions=$24, net_salary=$25, ctc_monthly=$26, ctc_annual=$27, notes=$28,
+         updated_by=$29, updated_at=NOW()`,
+      [employee_id, basic, hra, conveyance, special_allowance, gratuity, other_allowance||0, gross,
        pf_applicable, esi_applicable, pt_applicable, lwf_applicable, tds_applicable,
        pf_employee, pf_employer, pf_admin, esi_employee, esi_employer,
-       pt, lwf, total_employer_cost,
+       pt, lwf, tds, emi, total_employer_cost,
        total_ded, net, ctc_monthly, ctc_annual, notes || null, req.user.id]
     );
 

@@ -692,9 +692,14 @@
               <input id="edit-special" type="number" class="form-control" placeholder="0.00" style="padding:8px 12px;font-size:14px;font-weight:600" oninput="recalcSalaryPreview()">
             </div>
 
-            <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;grid-column:1/-1">
+            <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px">
               <div style="font-size:10px;color:var(--accent);font-weight:800;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Gratuity (₹) — monthly provision</div>
-              <input id="edit-gratuity" type="number" class="form-control" placeholder="0.00" style="padding:8px 12px;font-size:14px;font-weight:600;max-width:280px" oninput="recalcSalaryPreview()">
+              <input id="edit-gratuity" type="number" class="form-control" placeholder="0.00" style="padding:8px 12px;font-size:14px;font-weight:600" oninput="recalcSalaryPreview()">
+            </div>
+
+            <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px">
+              <div style="font-size:10px;color:var(--accent);font-weight:800;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Other Allowance (₹)</div>
+              <input id="edit-other-allowance" type="number" class="form-control" placeholder="0.00" style="padding:8px 12px;font-size:14px;font-weight:600" oninput="recalcSalaryPreview()">
             </div>
 
           </div>
@@ -759,6 +764,20 @@
                   <input id="edit-tds-annual" type="number" class="form-control" placeholder="0" style="padding:6px 10px;font-size:12px"
                     oninput="document.getElementById('edit-tds-amt').value = Math.round(parseFloat(this.value||0)/12) || ''"></div>
               </div>
+            </div>
+
+            <!-- PF Admin Charges -->
+            <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px">
+              <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">PF Admin Charges (₹)</div>
+              <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">MONTHLY AMOUNT (₹) — typically ₹150</div>
+              <input id="edit-pf-admin-amt" type="number" class="form-control" placeholder="150" value="150" style="padding:6px 10px;font-size:12px" oninput="recalcSalaryPreview()">
+            </div>
+
+            <!-- EMI / Loan Recovery -->
+            <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:12px 14px">
+              <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:8px">EMI / Loan Recovery (₹)</div>
+              <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">MONTHLY DEDUCTION (₹)</div>
+              <input id="edit-emi-recovery" type="number" class="form-control" placeholder="0" style="padding:6px 10px;font-size:12px" oninput="recalcSalaryPreview()">
             </div>
           </div>
         </div>
@@ -2355,9 +2374,12 @@ async function openEditEmp(id) {
   document.getElementById('edit-esi-emr-amt').value   = s.esi_employer || '';
   document.getElementById('edit-pt-amt').value        = s.pt_amount    || '';
   document.getElementById('edit-lwf-amt').value       = s.lwf_amount   || '';
-  document.getElementById('edit-tds-amt').value       = s.tds_monthly  || '';
-  document.getElementById('edit-tds-annual').value    = s.tds_amount   || '';
-  document.getElementById('edit-sal-notes').value     = s.notes || '';
+  document.getElementById('edit-tds-amt').value        = s.tds_monthly  || '';
+  document.getElementById('edit-tds-annual').value     = s.tds_amount   || '';
+  document.getElementById('edit-other-allowance').value = s.other_allowance || s.special_allowance2 || '';
+  document.getElementById('edit-pf-admin-amt').value   = s.pf_admin     || '150';
+  document.getElementById('edit-emi-recovery').value   = s.loan_emi_recovery || '';
+  document.getElementById('edit-sal-notes').value      = s.notes || '';
 
   // Bank tab
   document.getElementById('edit-bank-name').value   = e.bank_name    || '';
@@ -2404,24 +2426,27 @@ function onRoleChange() {
 
 function recalcSalaryPreview() {
   const v = id => parseFloat(document.getElementById(id)?.value) || 0;
-  const basic      = v('edit-basic');
-  const hra        = v('edit-hra');
-  const conveyance = v('edit-conveyance');
-  const special    = v('edit-special');
-  const gratuity   = v('edit-gratuity');
+  const basic         = v('edit-basic');
+  const hra           = v('edit-hra');
+  const conveyance    = v('edit-conveyance');
+  const special       = v('edit-special');
+  const gratuity      = v('edit-gratuity');
+  const otherAllow    = v('edit-other-allowance');
   if (!basic) { document.getElementById('salary-preview').style.display = 'none'; return; }
 
-  const gross   = basic + hra + conveyance + special + gratuity;
+  const gross   = basic + hra + conveyance + special + gratuity + otherAllow;
   const pfEmp   = document.getElementById('edit-pf').checked  ? (parseFloat(document.getElementById('edit-pf-emp-amt')?.value) || 0) : 0;
   const pfEmr   = document.getElementById('edit-pf').checked  ? (parseFloat(document.getElementById('edit-pf-emr-amt')?.value) || 0) : 0;
   const esiEmp  = document.getElementById('edit-esi').checked ? (parseFloat(document.getElementById('edit-esi-emp-amt')?.value) || 0) : 0;
   const esiEmr  = document.getElementById('edit-esi').checked ? (parseFloat(document.getElementById('edit-esi-emr-amt')?.value) || 0) : 0;
   const pt      = document.getElementById('edit-pt').checked  ? (parseFloat(document.getElementById('edit-pt-amt')?.value) || 0) : 0;
   const lwf     = document.getElementById('edit-lwf').checked ? (parseFloat(document.getElementById('edit-lwf-amt')?.value) || 0) : 0;
-  const tds     = document.getElementById('edit-tds').checked ? (parseFloat(document.getElementById('edit-tds-amt')?.value) || 0) : 0;
-  const totalDed = pfEmp + esiEmp + pt + lwf + tds;
+  const tds      = document.getElementById('edit-tds').checked ? (parseFloat(document.getElementById('edit-tds-amt')?.value) || 0) : 0;
+  const pfAdmin  = parseFloat(document.getElementById('edit-pf-admin-amt')?.value) || 0;
+  const emiRec   = parseFloat(document.getElementById('edit-emi-recovery')?.value)  || 0;
+  const totalDed = pfEmp + esiEmp + pt + lwf + tds + emiRec;
   const net      = gross - totalDed;
-  const ctc      = gross + pfEmr + esiEmr;
+  const ctc      = gross + pfEmr + esiEmr + pfAdmin;
 
   const fmt2 = n => '₹' + Math.round(n).toLocaleString('en-IN');
   document.getElementById('prev-gross').textContent   = fmt2(gross);
@@ -2512,9 +2537,12 @@ async function saveEmployeeEdit() {
       esi_employer:   parseFloat(document.getElementById('edit-esi-emr-amt').value) || 0,
       pt_amount:      parseFloat(document.getElementById('edit-pt-amt').value)      || 0,
       lwf_amount:     parseFloat(document.getElementById('edit-lwf-amt').value)     || 0,
-      tds_monthly:    parseFloat(document.getElementById('edit-tds-amt').value)     || 0,
-      tds_amount:     parseFloat(document.getElementById('edit-tds-annual').value)  || 0,
-      notes:          document.getElementById('edit-sal-notes').value.trim() || null,
+      tds_monthly:       parseFloat(document.getElementById('edit-tds-amt').value)        || 0,
+      tds_amount:        parseFloat(document.getElementById('edit-tds-annual').value)     || 0,
+      other_allowance:   parseFloat(document.getElementById('edit-other-allowance').value) || 0,
+      pf_admin:          parseFloat(document.getElementById('edit-pf-admin-amt').value)   || 0,
+      loan_emi_recovery: parseFloat(document.getElementById('edit-emi-recovery').value)   || 0,
+      notes:             document.getElementById('edit-sal-notes').value.trim() || null,
     };
     const salRes = await api('POST', '/payroll/salary-structure', salBody);
     if (!salRes?.success) {
