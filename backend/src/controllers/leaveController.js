@@ -466,12 +466,15 @@ exports.getRequests = async (req, res) => {
       conds.push(`lr.employee_id=$${idx++}`);
       params.push(userId);
     }
-    // scope=approvals → only requests this user needs to approve
+    // scope=approvals → only requests needing this user's approval
     else if (scope === 'approvals') {
       conds.push(`lr.status='pending'`);
       conds.push(`lr.employee_id != $${idx++}`);
       params.push(userId);
-      if (!['super_admin','hr','admin'].includes(userRole)) {
+      // HR/admin: only own-company employees (client_id IS NULL), not client manpower
+      if (['super_admin','hr','admin'].includes(userRole)) {
+        conds.push(`e.client_id IS NULL`);
+      } else {
         conds.push(
           `(lr.current_approver_code=$${idx++}
             OR EXISTS (
