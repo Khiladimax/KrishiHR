@@ -1331,6 +1331,9 @@ function openMapPunch(type) {
       _pLat = pos.coords.latitude; _pLng = pos.coords.longitude;
       const acc = Math.round(pos.coords.accuracy);
       document.getElementById('map-acc').textContent = `GPS accuracy: ±${acc}m`;
+      // Immediately zoom to user location — don't wait for office buffers
+      _map.setCenter({ lat: _pLat, lng: _pLng });
+      _map.setZoom(16);
       if (_mapMarker) _mapMarker.setMap(null);
       _mapMarker = new google.maps.Marker({
         position: { lat: _pLat, lng: _pLng }, map: _map, title: 'Your Location',
@@ -1381,17 +1384,23 @@ async function loadOfficeBuffers() {
   let closestOfficeEdgePt = null;
 
   locs.forEach(loc => {
-    if (!loc.latitude || loc.radius_meters >= 10000) return;
-    const lat = +loc.latitude, lng = +loc.longitude, r = loc.radius_meters || 200;
+    if (!loc.latitude || loc.radius_meters >= 50000) return;
+    const lat = +loc.latitude, lng = +loc.longitude, r = +(loc.radius_meters || 200);
     const circle = new google.maps.Circle({
       map: _map, center: { lat, lng }, radius: r,
-      strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 3,
-      fillColor: '#ec4899', fillOpacity: 0.15
+      strokeColor: '#16a34a', strokeOpacity: 1.0, strokeWeight: 3,
+      fillColor: '#22c55e', fillOpacity: 0.20
     });
     const infoW = new google.maps.InfoWindow({ content: `<b>${loc.name}</b><br>📏 ${r}m buffer` });
     circle.addListener('click', () => infoW.open(_map));
     _mapCircles.push(circle);
     b.union(circle.getBounds());
+
+    // Immediately center map on first office location so it's never stuck on India zoom
+    if (_mapCircles.length === 1) {
+      _map.setCenter({ lat, lng });
+      _map.setZoom(16);
+    }
 
     // Track nearest office circle edge for dotted line
     if (_pLat && _pLng) {
@@ -1409,11 +1418,13 @@ async function loadOfficeBuffers() {
 
   if (_pLat && _pLng) b.extend({ lat: _pLat, lng: _pLng });
   if (!b.isEmpty()) {
-    _map.fitBounds(b, { top: 80, bottom: 80, left: 80, right: 80 });
-    // fitBounds is async — enforce minimum zoom once map settles
-    google.maps.event.addListenerOnce(_map, 'idle', () => {
-      if (_map.getZoom() < 15) _map.setZoom(15);
-    });
+    // Small timeout ensures the map div is fully rendered before fitBounds
+    setTimeout(() => {
+      _map.fitBounds(b, { top: 80, bottom: 80, left: 80, right: 80 });
+      google.maps.event.addListenerOnce(_map, 'idle', () => {
+        if (_map.getZoom() < 14) _map.setZoom(15);
+      });
+    }, 300);
   } else if (_pLat && _pLng) {
     _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(16);
   }
