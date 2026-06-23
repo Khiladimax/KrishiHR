@@ -1312,14 +1312,24 @@ function openMapPunch(type) {
   setTimeout(() => {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
+    // Start at a reasonable zoom — will be updated once GPS/office loads
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 5, center: { lat: 22.5, lng: 80.0 },  // India — fitBounds fires once GPS+boundary ready
+      zoom: 14, center: { lat: 19.1136, lng: 72.8697 }, // Default Mumbai — GPS will override
       mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: true,
       mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
       gestureHandling: 'greedy'
     });
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
+
+    // Pre-center on office immediately so map never shows India
+    api('GET', '/geofence/my-locations').then(d => {
+      const loc = d?.data?.[0];
+      if (loc?.latitude) {
+        _map.setCenter({ lat: +loc.latitude, lng: +loc.longitude });
+        _map.setZoom(15);
+      }
+    }).catch(() => {});
 
     if (!navigator.geolocation) {
       setMapStatus('fail', '⚠ GPS not supported. You can still punch manually.');
