@@ -1350,15 +1350,23 @@ function openMapPunch(type) {
   setTimeout(() => {
     if (_map) { _map = null; }
     document.getElementById('punch-map').innerHTML = '';
-    // zoom:5 India center — fitBounds overrides once GPS + boundary both ready
     _map = new google.maps.Map(document.getElementById('punch-map'), {
-      zoom: 5, center: { lat: 22.5, lng: 80.0 },
+      zoom: 14, center: { lat: 19.1136, lng: 72.8697 }, // Default Mumbai — GPS will override
       mapTypeId: 'roadmap', streetViewControl: false, mapTypeControl: true,
       mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU },
       gestureHandling: 'greedy'
     });
     _mapInfoWindow = new google.maps.InfoWindow();
     _mapCircles = [];
+
+    // Pre-center on office immediately so map never shows India
+    api('GET', '/geofence/my-locations').then(d => {
+      const loc = d?.data?.[0];
+      if (loc?.latitude) {
+        _map.setCenter({ lat: +loc.latitude, lng: +loc.longitude });
+        _map.setZoom(15);
+      }
+    }).catch(() => {});
 
     if (!navigator.geolocation) {
       setMapStatus('fail', '⚠ GPS not supported. You can still punch manually.');
@@ -1370,6 +1378,9 @@ function openMapPunch(type) {
     navigator.geolocation.getCurrentPosition(async pos => {
       _pLat = pos.coords.latitude; _pLng = pos.coords.longitude;
       document.getElementById('map-acc').textContent = `GPS accuracy: ±${Math.round(pos.coords.accuracy)}m`;
+      // Immediately zoom to user location
+      _map.setCenter({ lat: _pLat, lng: _pLng });
+      _map.setZoom(16);
       if (_mapMarker) _mapMarker.setMap(null);
       _mapMarker = new google.maps.Marker({
         position: { lat: _pLat, lng: _pLng }, map: _map, title: 'Your Location',
@@ -1407,24 +1418,26 @@ async function loadOfficeBuffers() {
   } else if (rule.rule_type === 'universal') {
     setMapStatus('ok', '✓ Universal access — punch allowed from anywhere');
     document.getElementById('confirm-punch-btn').disabled = false;
-    if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
+    if (_pLat && _pLng) { _map.setCenter({ lat: _pLat, lng: _pLng }); _map.setZoom(16); }
   } else {
-    // office rule — blue border + pink fill + dotted line to nearest circle edge
+    // office rule — green border + fill + dotted line to nearest circle edge
     const locData = await api('GET', '/geofence/my-locations');
-    const officeBounds = new google.maps.LatLngBounds();
+    let firstOffice = null;
     let closestOfficeDist = Infinity;
     let closestOfficeEdgePt = null;
 
     (locData?.data || []).forEach(loc => {
-      if (!loc.latitude || loc.radius_meters >= 10000) return;
-      const lat = +loc.latitude, lng = +loc.longitude, r = loc.radius_meters;
+      if (!loc.latitude) return;
+      const lat = +loc.latitude, lng = +loc.longitude, r = +(loc.radius_meters || 200);
       const circle = new google.maps.Circle({
         map: _map, center: { lat, lng }, radius: r,
-        strokeColor: '#1d4ed8', strokeOpacity: 1.0, strokeWeight: 3,
-        fillColor: '#ec4899', fillOpacity: 0.15
+        strokeColor: '#16a34a', strokeOpacity: 1.0, strokeWeight: 3,
+        fillColor: '#22c55e', fillOpacity: 0.25
       });
+      const infoW = new google.maps.InfoWindow({ content: `<b>${loc.name}</b><br>📏 ${r}m buffer` });
+      circle.addListener('click', () => infoW.open(_map));
       _mapCircles.push(circle);
-      officeBounds.union(circle.getBounds());
+      if (!firstOffice) firstOffice = { lat, lng, r };
 
       // Track nearest circle edge for dotted line
       if (_pLat && _pLng) {
@@ -1440,17 +1453,38 @@ async function loadOfficeBuffers() {
       }
     });
 
-    if (_pLat && _pLng) officeBounds.extend({ lat: _pLat, lng: _pLng });
-    if (!officeBounds.isEmpty()) _map.fitBounds(officeBounds, { top: 60, bottom: 60, left: 60, right: 60 });
-    else if (_pLat && _pLng) { _map.panTo({ lat: _pLat, lng: _pLng }); _map.setZoom(14); }
+    // Direct zoom — no fitBounds (it overrides setZoom and shows India)
+    if (firstOffice) {
+      if (_pLat && _pLng) {
+        const midLat = (_pLat + firstOffice.lat) / 2;
+        const midLng = (_pLng + firstOffice.lng) / 2;
+        _map.setCenter({ lat: midLat, lng: midLng });
+        _map.setZoom(15);
+        setTimeout(() => {
+          const b = new google.maps.LatLngBounds();
+          b.extend({ lat: _pLat, lng: _pLng });
+          b.extend({ lat: firstOffice.lat, lng: firstOffice.lng });
+          google.maps.event.addListenerOnce(_map, 'bounds_changed', () => {
+            if (_map.getZoom() < 14) _map.setZoom(15);
+          });
+          _map.fitBounds(b, { top: 100, bottom: 100, left: 100, right: 100 });
+        }, 500);
+      } else {
+        _map.setCenter({ lat: firstOffice.lat, lng: firstOffice.lng });
+        _map.setZoom(15);
+      }
+    } else if (_pLat && _pLng) {
+      _map.setCenter({ lat: _pLat, lng: _pLng });
+      _map.setZoom(16);
+    }
 
     // Draw dotted line from user to nearest circle edge
     if (_pLat && _pLng && closestOfficeEdgePt) {
       const dottedLine = new google.maps.Polyline({
         path: [new google.maps.LatLng(_pLat, _pLng), closestOfficeEdgePt],
         map: _map,
-        strokeColor: '#1d4ed8', strokeOpacity: 0, strokeWeight: 2,
-        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, strokeColor: '#1d4ed8', strokeWeight: 2, scale: 3 }, offset: '0', repeat: '12px' }]
+        strokeColor: '#16a34a', strokeOpacity: 0, strokeWeight: 2,
+        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, strokeColor: '#16a34a', strokeWeight: 2, scale: 3 }, offset: '0', repeat: '12px' }]
       });
       _mapCircles.push(dottedLine);
       const dTxt = closestOfficeDist < 1000
