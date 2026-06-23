@@ -706,16 +706,19 @@ exports.getTeamToday = async (req, res) => {
       params.push(userId);
     }
 
-    // Apply client_id filter if provided (for KC admin/HR/accounts/all_admin dropdown)
-    if (clientIdFilter && ['super_admin', 'hr', 'admin', 'all_admin', 'accounts'].includes(role)) {
-      if (clientIdFilter === 'kc') {
-        // KC tab: keep existing empCond (your normal team scope) + restrict to KC employees only
-        empCond += ` AND e.client_id IS NULL`;
-      } else {
+    // KC-internal roles (super_admin/hr/admin/all_admin/accounts) default to KC-only
+    // employees (client_id IS NULL) unless a specific client tab is explicitly requested.
+    // This prevents client manpower from leaking into the default Team Today view.
+    const kcInternalRoles = ['super_admin', 'hr', 'admin', 'all_admin', 'accounts'];
+    if (kcInternalRoles.includes(role)) {
+      if (clientIdFilter && clientIdFilter !== 'kc') {
         // Client tab (Bajaj, Tata AIG, etc): override scope entirely — show full client team
         params = [today];
         empCond = `AND e.client_id = $2`;
         params.push(parseInt(clientIdFilter));
+      } else {
+        // Default / explicit "kc" tab: restrict to KC's own employees only
+        empCond += ` AND e.client_id IS NULL`;
       }
     }
 
@@ -819,10 +822,11 @@ exports.getPunchLocations = async (req, res) => {
     const userId = req.user.id;
     const role   = req.user.role;
     const date   = req.query.date || toLocalDateString(new Date());
+    const clientIdFilter = req.query.client_id;
 
     // ── Scope: mirror getTeamToday role logic exactly ─────────────────────
     let empCond = '';
-    const params = [date];
+    let params = [date];
 
     if (role === 'super_admin') {
       empCond = `AND e.id != $2`;
@@ -860,6 +864,19 @@ exports.getPunchLocations = async (req, res) => {
       // Regular employee — show only themselves
       empCond = `AND e.id = $2`;
       params.push(userId);
+    }
+
+    // KC-internal roles default to KC-only employees (client_id IS NULL) unless
+    // a specific client is explicitly requested via ?client_id=
+    const kcInternalRoles = ['super_admin', 'hr', 'accounts', 'admin', 'all_admin'];
+    if (kcInternalRoles.includes(role)) {
+      if (clientIdFilter && clientIdFilter !== 'kc') {
+        params = [date];
+        empCond = `AND e.client_id = $2`;
+        params.push(parseInt(clientIdFilter));
+      } else {
+        empCond += ` AND e.client_id IS NULL`;
+      }
     }
 
     const result = await db.query(
