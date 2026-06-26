@@ -1090,6 +1090,21 @@ router.get  ('/send-documents/file/:id',      authenticate,                     
 router.get  ('/send-documents/zip/:batch_id', authenticate,                         sendDocsCtrl.getZip);
 router.delete('/send-documents/:id',          authenticate,                         sendDocsCtrl.deleteDoc);
 
+
+// ── IT Declaration & Tax ──────────────────────────────────────────────────────
+const itDeclCtrl = require('../controllers/itDeclarationController');
+router.get   ('/it-declaration',              authenticate,                     itDeclCtrl.getDeclaration);
+router.get   ('/it-declaration/all',          authenticate, authorize('hr','accounts'), itDeclCtrl.getAllDeclarations);
+router.get   ('/it-declaration/tax-preview',  authenticate,                     itDeclCtrl.taxPreview);
+router.get   ('/it-declaration/export-excel', authenticate, authorize('hr','accounts'), itDeclCtrl.exportExcel);
+router.get   ('/it-declaration/proofs',       authenticate, authorize('hr','accounts'), itDeclCtrl.getProofsByDeclaration);
+router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
+router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
+router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
+router.get   ('/it-declaration/:id',           authenticate, authorize('hr','accounts','admin','super_admin'), itDeclCtrl.getDeclarationById);
+router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
+router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
+
 module.exports = router;
 
 

@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IT Declaration</title>
+<script src="config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.content .card{overflow:visible;padding:0;border:1.5px solid #c5cae9;border-radius:12px;max-width:100%}
+.itd{width:100%;box-sizing:border-box}
+/* ── Top bar ── */
+.itd-bar{padding:14px 22px 0;background:#fff;border-radius:12px 12px 0 0;border-bottom:2px solid #e8eaf6}
+.itd-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-bottom:12px}
+/* ── Employee Info Panel ── */
+.emp-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;background:#f0f4ff;border:1.5px solid #c5cae9;border-radius:10px;padding:14px 18px;margin:14px 22px 0}
+.emp-field{display:flex;flex-direction:column;gap:2px;background:#fff;border:1.5px solid #c5cae9;border-radius:8px;padding:9px 12px}
+.emp-field .lbl{font-size:10px;font-weight:700;color:#9fa8da;text-transform:uppercase;letter-spacing:.05em}
+.emp-field .val{font-size:13px;font-weight:700;color:#1e3a5f}
+/* ── Controls ── */
+.itd-ctrl{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:10px 22px;background:#f8f9ff;border-bottom:1px solid #e0e3ec}
+.itd-ctrl-item{display:flex;align-items:center;gap:8px}
+.itd-window-bar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:8px 22px;background:#eef1fd;border-bottom:1px solid #e0e3ec}
+.iwb-item{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.iwb-icon{font-size:15px}
+.iwb-lbl{font-size:11px;font-weight:700;color:#5c6bc0;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+.iwb-val{font-size:12.5px;font-weight:600;color:#283593;display:inline}
+.iwb-val.closed{color:#b91c1c}
+.iwb-val.open{color:#166534}
+.iwb-divider{width:1px;height:18px;background:#c5cae9}
+.itd-ctrl label{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;margin:0}
+.itd-ctrl select,.itd-ctrl input{padding:7px 11px;border-radius:7px;border:1.5px solid #c5cae9;font-size:13px;font-family:inherit;background:#fff;outline:none}
+.itd-ctrl select:focus{border-color:#3949ab}
+/* ── Regime toggle ── */
+.reg-tog{display:flex;border-radius:8px;overflow:hidden;border:1.5px solid #c5cae9}
+.reg-btn{padding:7px 20px;border:none;background:#fff;font-size:12.5px;font-weight:600;color:#546e7a;cursor:pointer;transition:all .15s}
+.reg-btn.active{background:#3949ab;color:#fff}
+.reg-btn:first-child{border-right:1.5px solid #c5cae9}
+/* ── Status badge ── */
+.st-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:700;letter-spacing:.04em}
+.st-draft    {background:#fef9c3;color:#92400e;border:1px solid #fde68a}
+.st-submitted{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+.st-approved {background:#dcfce7;color:#166534;border:1px solid #86efac}
+.st-rejected {background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.st-verified {background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe}
+/* ── Tabs ── */
+.itd-tabs{display:flex;width:100%}
+.itd-tab{flex:1;padding:12px 8px;border:none;background:transparent;font-size:12.5px;font-weight:600;color:#78909c;cursor:pointer;border-bottom:3px solid transparent;text-align:center;transition:all .15s}
+.itd-tab:hover{color:#3949ab;background:#f5f6fb}
+.itd-tab.active{color:#3949ab;border-bottom-color:#3949ab;font-weight:700}
+.itd-body{padding:20px 22px}
+/* ── Deduction summary cards ── */
+.ded-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:18px}
+.ded-card{border:1.5px solid #c5cae9;border-radius:10px;padding:12px 14px;background:#fff}
+.ded-card .dc-lbl{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.ded-card .dc-val{font-size:18px;font-weight:800;color:#1e3a5f}
+.ded-card .dc-sub{font-size:11px;color:#9ca3af;margin-top:2px}
+.ded-card.used{border-color:#86efac;background:#f0fdf4}
+.ded-card.used .dc-val{color:#166534}
+.ded-card.warn{border-color:#fde68a;background:#fefce8}
+.ded-card.warn .dc-val{color:#92400e}
+/* ── Section accordion ── */
+.it-sec{border:1.5px solid #e0e3ec;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.it-sec-hdr{padding:12px 16px;background:#f5f6fb;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.it-sec-hdr:hover{background:#eef0fb}
+.it-sec-hdr .sh-title{font-size:13px;font-weight:700;color:#283593;display:flex;align-items:center;gap:8px}
+.it-sec-hdr .sh-right{display:flex;align-items:center;gap:8px}
+.it-sec-hdr .sh-amt{font-size:13px;font-weight:800;color:#166534}
+.it-sec-hdr .sh-chev{font-size:11px;color:#9fa8da;transition:transform .2s}
+.it-sec-hdr.open .sh-chev{transform:rotate(180deg)}
+.it-sec-hdr.sec-complete{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-bottom:2px solid #86efac}
+.it-sec-hdr.sec-complete .sh-title{color:#166534}
+.it-sec.sec-complete-wrap{border-color:#86efac}
+.sec-done-badge{font-size:11px;font-weight:700;color:#166534;background:#dcfce7;border:1px solid #86efac;border-radius:12px;padding:2px 10px;display:inline-flex;align-items:center;gap:4px}
+.sec-upload-badge{font-size:11px;font-weight:600;color:#6b7280;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:2px 10px}
+.it-sec-body{padding:16px 18px;display:none;background:#fff}
+.it-sec-body.open{display:block}
+/* ── Form ── */
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:13px 18px}
+.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px 18px}
+@media(max-width:680px){.fg2,.fg3{grid-template-columns:1fr}}
+.if{display:flex;flex-direction:column;gap:4px}
+.if label{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.04em}
+.if input,.if select,.if textarea{padding:9px 11px;border:1.5px solid #d0d5e8;border-radius:7px;font-size:13.5px;font-family:inherit;color:#1e293b;background:#f8f9ff;outline:none;transition:border-color .15s,background .15s;width:100%;box-sizing:border-box}
+.if input:focus,.if select:focus,.if textarea:focus{border-color:#3949ab;background:#fff;box-shadow:0 0 0 3px rgba(57,73,171,.07)}
+.if input[readonly]{background:#f0f2f8;color:#546e7a;cursor:default}
+.if .hint{font-size:11px;color:#94a3b8}
+.sub-lbl{font-size:11px;font-weight:800;color:#3949ab;letter-spacing:.06em;text-transform:uppercase;margin:14px 0 10px;display:flex;align-items:center;gap:8px}
+.sub-lbl::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,#c5cae9,transparent)}
+.lim-bar{display:flex;flex-wrap:wrap;gap:6px 16px;background:#eef0fb;border:1px solid #c5cae9;border-radius:7px;padding:8px 12px;margin-top:10px;font-size:12px}
+.lim-bar span{font-weight:600;color:#3949ab}.lim-bar b{color:#166534}
+/* ── Proof upload inside section ── */
+.proof-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+@media(max-width:600px){.proof-grid{grid-template-columns:1fr}}
+.proof-item{border:1.5px solid #e0e3ec;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fafbff}
+.proof-item .pi-info{flex:1;min-width:0}
+.proof-item .pi-name{font-size:12px;font-weight:700;color:#1e3a5f}
+.proof-item .pi-file{font-size:11px;color:#546e7a;margin-top:2px}
+.proof-item .pi-actions{display:flex;gap:5px;align-items:center;flex-shrink:0}
+.proof-st{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:8px}
+.ps-none   {background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb}
+.ps-pending{background:#fef9c3;color:#92400e;border:1px solid #fde68a}
+.ps-approved{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.ps-rejected{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+/* ── Tax Preview ── */
+.regime-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:580px){.regime-cmp{grid-template-columns:1fr}}
+.rc{border:2px solid #e0e3ec;border-radius:12px;padding:18px;text-align:center;position:relative}
+.rc.cheaper{border-color:#166534;background:#f0fdf4}
+.rc h3{font-size:14px;font-weight:800;color:#1e3a5f;margin:0 0 10px}
+.rc .tax-amt{font-size:30px;font-weight:800;color:#1e3a5f}
+.rc .tds-ln{font-size:12px;color:#546e7a;margin-top:4px}
+.rc .rec-bdg{display:inline-block;background:#166534;color:#fff;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:10px;margin-top:8px}
+.rc .sel-btn{margin-top:12px;width:100%;padding:8px;border-radius:7px;border:1.5px solid #3949ab;background:#fff;color:#3949ab;font-size:12px;font-weight:700;cursor:pointer}
+.rc .sel-btn:hover,.rc .sel-btn.chosen{background:#3949ab;color:#fff}
+.tax-bk{background:#f0f4ff;border:1.5px solid #c5cae9;border-radius:10px;padding:16px 18px;margin-bottom:14px}
+.tax-bk h4{font-size:12px;font-weight:800;color:#3949ab;text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px}
+.tr{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e0e3ec;font-size:13px}
+.tr:last-child{border-bottom:none;font-weight:800;font-size:14px;color:#283593}
+.tr .tl{color:#546e7a}.tr .tv{font-weight:700;color:#1e293b}
+.tr.ded .tv{color:#166534}
+.tr.total .tv{color:#3949ab;font-size:15px}
+.tds-hl{background:linear-gradient(135deg,#1e3a5f,#3949ab);border-radius:9px;padding:14px 18px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.tds-hl .thl{font-size:12.5px;font-weight:600;opacity:.85}
+.tds-hl .tha{font-size:24px;font-weight:800}
+.rec-box{background:#fffbeb;border:1.5px solid #fde68a;border-radius:9px;padding:14px 16px;font-size:13px;color:#92400e;margin-bottom:14px}
+.rec-box strong{color:#1e3a5f;display:block;font-size:15px;margin-bottom:4px}
+.rec-box ul{margin:8px 0 0 16px;padding:0}
+.rec-box li{margin-bottom:4px}
+/* ── HR dashboard stats ── */
+.hr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.hr-stat{border:1.5px solid #e0e3ec;border-radius:9px;padding:12px 14px;text-align:center}
+.hr-stat .hs-n{font-size:26px;font-weight:800;color:#1e3a5f}
+.hr-stat .hs-l{font-size:11px;font-weight:600;color:#546e7a;text-transform:uppercase;letter-spacing:.04em}
+/* ── HR Table ── */
+.hr-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.hr-tbl th{background:#1e3a5f;color:#fff;font-weight:700;padding:10px 12px;text-align:left;letter-spacing:.03em;white-space:nowrap}
+.hr-tbl td{padding:10px 12px;border-bottom:1px solid #e8eaf6;vertical-align:middle}
+.hr-tbl tr:nth-child(even) td{background:#f8faff}
+.hr-tbl tr:hover td{background:#eef0fb}
+/* ── Admin config ── */
+.cfg-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.cfg-tbl th{background:#283593;color:#fff;padding:10px 12px;text-align:left;font-weight:700}
+.cfg-tbl td{padding:10px 12px;border-bottom:1px solid #e8eaf6;vertical-align:middle}
+.cfg-tbl tr:nth-child(even) td{background:#f8faff}
+.cfg-tbl input{padding:6px 10px;border:1.5px solid #c5cae9;border-radius:6px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box}
+/* ── Modal ── */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.mb{background:#fff;border-radius:14px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.mb h3{font-size:16px;font-weight:800;color:#1e3a5f;margin:0 0 14px}
+.mc{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:#888;margin-top:-4px}
+/* ── House property card ── */
+.hp-card{border:1.5px solid #c5cae9;border-radius:9px;padding:14px 16px;margin-bottom:10px;background:#fafbff;position:relative}
+.hp-card-del{position:absolute;top:8px;right:10px;background:none;border:none;font-size:17px;cursor:pointer;color:#ef4444}
+/* ── Locked notice ── */
+.lk-notice{background:#fef9c3;border:1.5px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#92400e;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div><div class="logo-text-wrap"><div class="logo-text" id="sidebar-logo-text"></div></div></div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+      <div class="topbar-title">🧾 IT Declaration & Tax</div>
+    </div>
+    <div class="topbar-right">
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+  <div class="card">
+  <div class="itd">
+
+    <!-- Top bar -->
+    <div class="itd-bar">
+      <div class="itd-row">
+        <div style="font-size:17px;font-weight:800;color:#1e3a5f">🧾 Income Tax Declaration</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span id="decl-st-badge" class="st-badge st-draft">📝 Draft</span>
+          <button id="btn-save"   class="btn btn-outline btn-sm" onclick="saveDecl('save')">💾 Save Draft</button>
+          <button id="btn-submit" class="btn btn-primary btn-sm" onclick="confirmSubmit()">✅ Submit to HR</button>
+        </div>
+      </div>
+
+      <!-- Employee Info Panel -->
+      <div class="emp-panel" id="emp-panel">
+        <div class="emp-field"><span class="lbl">Employee Code</span><span class="val" id="ep-code">—</span></div>
+        <div class="emp-field"><span class="lbl">Employee Name</span><span class="val" id="ep-name">—</span></div>
+        <div class="emp-field"><span class="lbl">PAN Number</span><span class="val" id="ep-pan">—</span></div>
+        <div class="emp-field"><span class="lbl">Department</span><span class="val" id="ep-dept">—</span></div>
+        <div class="emp-field"><span class="lbl">Designation</span><span class="val" id="ep-desg">—</span></div>
+        <div class="emp-field"><span class="lbl">Location</span><span class="val" id="ep-city">—</span></div>
+        <div class="emp-field"><span class="lbl">Date of Joining</span><span class="val" id="ep-join">—</span></div>
+        <div class="emp-field"><span class="lbl">Annual CTC</span><span class="val" id="ep-ctc">—</span></div>
+        <div class="emp-field"><span class="lbl">Monthly Gross</span><span class="val" id="ep-gross">—</span></div>
+        <div class="emp-field"><span class="lbl">Tax Regime</span><span class="val" id="ep-regime">—</span></div>
+      </div>
+
+      <!-- Controls -->
+      <div class="itd-ctrl">
+        <div class="itd-ctrl-item">
+          <label>Financial Year</label>
+          <select id="sel-fy" onchange="onFYChange()">
+            <option value="2030-31">FY 2030-31</option>
+            <!-- populated by buildFYDropdowns() -->
+          </select>
+        </div>
+        <div class="itd-ctrl-item">
+          <label>Tax Regime</label>
+          <div class="reg-tog">
+            <button class="reg-btn active" id="rb-old" onclick="setRegime('old')">🏛️ Old Regime</button>
+            <button class="reg-btn" id="rb-new" onclick="setRegime('new')">✨ New Regime</button>
+          </div>
+        </div>
+        <div class="itd-ctrl-item" id="hr-sel-wrap" style="display:none">
+          <label>Employee</label>
+          <select id="sel-hr-emp" style="min-width:200px" onchange="onHREmpChange()">
+            <option value="">— All / Select Employee —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Window Dates Banner -->
+      <div class="itd-window-bar" id="itd-window-bar">
+        <div class="iwb-item">
+          <span class="iwb-icon">📝</span>
+          <span class="iwb-lbl">Declaration Window:</span>
+          <span class="iwb-val" id="iwb-decl">Loading…</span>
+        </div>
+        <div class="iwb-divider"></div>
+        <div class="iwb-item">
+          <span class="iwb-icon">📎</span>
+          <span class="iwb-lbl">Proof Upload Window:</span>
+          <span class="iwb-val" id="iwb-proof">Loading…</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="itd-tabs">
+        <button class="itd-tab active" id="itab-decl"  onclick="sw('decl')">📋 My Declaration</button>
+        <button class="itd-tab"        id="itab-proof" onclick="sw('proof')">📎 Proofs</button>
+        <button class="itd-tab"        id="itab-tax"   onclick="sw('tax')">🧮 Tax Preview</button>
+        <button class="itd-tab"        id="itab-hr"    onclick="sw('hr')" style="display:none">👩‍💼 HR Review</button>
+        <button class="itd-tab"        id="itab-cfg"   onclick="sw('cfg')" style="display:none">⚙️ Admin Config</button>
+      </div>
+    </div>
+
+    <!-- ══ TAB: Declaration ══ -->
+    <div id="pane-decl" class="itd-body">
+      <div id="lk-notice" class="lk-notice" style="display:none">🔒 Declaration is locked. Contact HR to reopen.</div>
+
+      <!-- Deduction Summary Cards -->
+      <div class="ded-cards" id="ded-cards"></div>
+
+      <!-- OLD REGIME SECTIONS -->
+      <div id="old-secs">
+        <!-- HRA -->
+        <div class="it-sec" id="itsec-HRA">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🏠 HRA — House Rent Allowance</span>
+            <span class="sh-right"><span class="sh-amt" id="s-hra"></span><span id="secb-HRA" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Monthly Rent Paid (₹)</label><input type="number" id="rent_paid_monthly" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Annual Rent (auto)</label><input type="number" id="annual_rent" readonly></div>
+              <div class="if"><label>Landlord Name</label><input type="text" id="landlord_name" placeholder="Full Name"></div>
+              <div class="if"><label>Landlord PAN <span style="color:#ef4444;font-size:10px">*if &gt;₹1L/yr</span></label><input type="text" id="landlord_pan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase"></div>
+            </div>
+            <div class="if" style="margin-top:10px"><label>City Type</label>
+              <select id="hra_city_type">
+                <option value="metro">Metro (Mumbai/Delhi/Kolkata/Chennai) — 50%</option>
+                <option value="nonmetro">Non-Metro — 40%</option>
+              </select>
+            </div>
+            <div class="hint" style="font-size:11.5px;color:#546e7a;margin-top:8px">Exemption = Min(Actual HRA, Rent−10% Basic, 50%/40% of Basic)</div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-HRA"></div>
+          </div>
+        </div>
+
+        <!-- 80C -->
+        <div class="it-sec" id="itsec-80C">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">💰 Section 80C — Investments</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80c"></span><span id="secb-80C" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>EPF (₹)</label><input type="number" id="sec80c_pf"        placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>PPF (₹)</label><input type="number" id="sec80c_ppf"       placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>LIC Premium (₹)</label><input type="number" id="sec80c_lic"  placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>ELSS / Mutual Fund (₹)</label><input type="number" id="sec80c_elss" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>NSC (₹)</label><input type="number" id="sec80c_nsc"       placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Home Loan Principal (₹)</label><input type="number" id="sec80c_home_loan" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Children Tuition Fees (₹)</label><input type="number" id="sec80c_tuition" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Tax Saving FD (₹)</label><input type="number" id="sec80c_fd"    placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Other 80C (₹)</label><input type="number" id="sec80c_other" placeholder="0" min="0" oninput="live()"></div>
+            </div>
+            <div class="lim-bar">
+              <span>Declared: <b id="c80c-d">₹0</b></span>
+              <span>Eligible (Max ₹1.5L): <b id="c80c-e">₹0</b></span>
+              <span>Remaining: <b id="c80c-r" style="color:#92400e">₹1,50,000</b></span>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80C"></div>
+          </div>
+        </div>
+
+        <!-- NPS 80CCD(1B) -->
+        <div class="it-sec" id="itsec-80CCD">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🏦 Section 80CCD(1B) — NPS</span>
+            <span class="sh-right"><span class="sh-amt" id="s-nps"></span><span id="secb-80CCD" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>NPS Contribution (₹) <span class="hint">Max ₹50,000</span></label>
+                <input type="number" id="sec80ccd_nps" placeholder="0" min="0" oninput="live()"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80CCD"></div>
+          </div>
+        </div>
+
+        <!-- 80D -->
+        <div class="it-sec" id="itsec-80D">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🏥 Section 80D — Medical Insurance</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80d"></span><span id="secb-80D" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Self + Family (₹) <span class="hint">Max ₹25,000</span></label><input type="number" id="sec80d_self" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Parents (₹)</label><input type="number" id="sec80d_parents" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Parents Senior Citizen?</label>
+                <select id="sec80d_senior_parent">
+                  <option value="false">No — Max ₹25,000</option>
+                  <option value="true">Yes — Max ₹50,000</option>
+                </select>
+              </div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80D"></div>
+          </div>
+        </div>
+
+        <!-- House Property / Sec 24b -->
+        <div class="it-sec" id="itsec-HP">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🏡 House Property Income & Sec 24(b)</span>
+            <span class="sh-right"><span class="sh-amt" id="s-hp"></span><span id="secb-HP" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div id="hp-list"></div>
+            <button class="btn btn-outline btn-sm" onclick="addProperty()" style="margin-top:4px">+ Add Property</button>
+            <div class="sub-lbl">Home Loan Interest (Sec 24b)</div>
+            <div class="fg2">
+              <div class="if"><label>Loan Provider / Bank</label><input type="text" id="homeloan_provider" placeholder="SBI / HDFC …"></div>
+              <div class="if"><label>Annual Interest Paid (₹) <span class="hint">Max ₹2L SOP</span></label><input type="number" id="sec24b_home_loan" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if" style="grid-column:1/-1"><label>Property Address</label><input type="text" id="homeloan_address" placeholder="Full property address"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-HP"></div>
+          </div>
+        </div>
+
+        <!-- 80E -->
+        <div class="it-sec" id="itsec-80E">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🎓 Section 80E — Education Loan Interest</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80e"></span><span id="secb-80E" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Interest Paid (₹) <span class="hint">Full deduction — no limit</span></label><input type="number" id="sec80e_edu_loan" placeholder="0" min="0" oninput="live()"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80E"></div>
+          </div>
+        </div>
+
+        <!-- 80G -->
+        <div class="it-sec" id="itsec-80G">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🤝 Section 80G — Donations</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80g"></span><span id="secb-80G" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Donation Amount (₹)</label><input type="number" id="sec80g_donation" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Institution Name</label><input type="text" id="sec80g_institution" placeholder="PM Relief Fund …"></div>
+              <div class="if"><label>Institution PAN</label><input type="text" id="sec80g_pan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase"></div>
+              <div class="if"><label>Category</label>
+                <select id="sec80g_category">
+                  <option value="100">100% Deduction</option>
+                  <option value="50">50% Deduction</option>
+                </select>
+              </div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80G"></div>
+          </div>
+        </div>
+
+        <!-- 80DD -->
+        <div class="it-sec" id="itsec-80DD">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">♿ Section 80DD — Dependent Disability</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80dd"></span><span id="secb-80DD" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Dependent Name</label><input type="text" id="sec80dd_dependent" placeholder="Name"></div>
+              <div class="if"><label>Relationship</label><input type="text" id="sec80dd_relation" placeholder="Spouse / Child / Parent …"></div>
+              <div class="if"><label>Disability Percentage (%)</label><input type="number" id="sec80dd_pct" placeholder="40" min="0" max="100" oninput="live()">
+                <span class="hint">Normal (&lt;80%): ₹75,000 | Severe (≥80%): ₹1,25,000</span></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80DD"></div>
+          </div>
+        </div>
+
+        <!-- 80U -->
+        <div class="it-sec" id="itsec-80U">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🦯 Section 80U — Self Disability</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80u"></span><span id="secb-80U" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Disability Percentage (%)</label><input type="number" id="sec80u_pct" placeholder="40" min="0" max="100" oninput="live()">
+                <span class="hint">Normal (&lt;80%): ₹75,000 | Severe (≥80%): ₹1,25,000</span></div>
+              <div class="if"><label>Disability Category</label><input type="text" id="sec80u_category" placeholder="Locomotor / Visual / Hearing …"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80U"></div>
+          </div>
+        </div>
+
+        <!-- 80DDB -->
+        <div class="it-sec" id="itsec-80DDB">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">💊 Section 80DDB — Medical Treatment</span>
+            <span class="sh-right"><span class="sh-amt" id="s-80ddb"></span><span id="secb-80DDB" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Disease Name</label><input type="text" id="sec80ddb_disease" placeholder="Cancer / Neurological …"></div>
+              <div class="if"><label>Patient Name</label><input type="text" id="sec80ddb_patient" placeholder="Full Name"></div>
+              <div class="if"><label>Relationship</label><input type="text" id="sec80ddb_relation" placeholder="Self / Spouse / Parent …"></div>
+              <div class="if"><label>Claimed Amount (₹) <span class="hint">Max ₹40,000/₹1L sr</span></label><input type="number" id="sec80ddb_amount" placeholder="0" min="0" oninput="live()"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-80DDB"></div>
+          </div>
+        </div>
+
+        <!-- LTA -->
+        <div class="it-sec" id="itsec-LTA">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">✈️ LTA — Leave Travel Allowance</span>
+            <span class="sh-right"><span class="sh-amt" id="s-lta"></span><span id="secb-LTA" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Travel Period</label><input type="text" id="lta_travel_period" placeholder="Apr 2025 – Apr 2025"></div>
+              <div class="if"><label>Destination</label><input type="text" id="lta_destination" placeholder="Goa, Kerala …"></div>
+              <div class="if"><label>Travel Amount (₹)</label><input type="number" id="lta_amount" placeholder="0" min="0" oninput="live()"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-LTA"></div>
+          </div>
+        </div>
+      </div><!-- /old-secs -->
+
+      <!-- ══ NEW REGIME SECTIONS (hidden when Old Regime) ══ -->
+      <div id="new-secs" style="display:none">
+
+        <!-- 1. Previous Employment Income -->
+        <div class="it-sec" id="itsec-PREV_EMP">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🏢 Previous Employment Income</span>
+            <span class="sh-right"><span class="sh-amt" id="s-prev-emp"></span><span id="secb-PREV_EMP" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Previous Employer Name</label><input type="text" id="prev_employer" placeholder="Company Ltd."></div>
+              <div class="if"><label>Employer TAN</label><input type="text" id="prev_employer_tan" placeholder="MUMB12345A" maxlength="10" style="text-transform:uppercase"></div>
+              <div class="if"><label>Employment Period</label><input type="text" id="prev_period" placeholder="Apr 2024 – Jun 2024"></div>
+              <div class="if"><label>Previous Gross Salary (₹)</label><input type="number" id="prev_gross_salary" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Previous Taxable Income (₹)</label><input type="number" id="prev_taxable_income" placeholder="0" min="0"></div>
+              <div class="if"><label>TDS Deducted by Prev. Employer (₹)</label><input type="number" id="prev_tds" placeholder="0" min="0"></div>
+              <div class="if"><label>PF Contribution (₹)</label><input type="number" id="prev_pf" placeholder="0" min="0"></div>
+            </div>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-PREV_EMP"></div>
+          </div>
+        </div>
+
+        <!-- 2. Income From House Property -->
+        <div class="it-sec" id="itsec-NEW_HP">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">🏡 Income From House Property</span>
+            <span class="sh-right"><span class="sh-amt" id="s-new-hp"></span><span id="secb-NEW_HP" style="margin-right:6px"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div id="new-hp-list"></div>
+            <button class="btn btn-outline btn-sm" onclick="addNewProperty()" style="margin-top:4px">+ Add Property</button>
+            <div class="sub-lbl">Proof Documents</div>
+            <div class="proof-grid" id="pg-NEW_HP"></div>
+          </div>
+        </div>
+
+        <!-- 3. Other Income -->
+        <div class="it-sec">
+          <div class="it-sec-hdr" onclick="tgl(this)">
+            <span class="sh-title">💹 Other Income</span>
+            <span class="sh-right"><span class="sh-amt" id="s-other"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body">
+            <div class="fg2">
+              <div class="if"><label>Savings Interest (₹)</label><input type="number" id="other_savings_int" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>FD Interest (₹)</label><input type="number" id="other_fd_int" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Capital Gains (₹)</label><input type="number" id="other_capital_gains" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Dividend (₹)</label><input type="number" id="other_dividend" placeholder="0" min="0" oninput="live()"></div>
+              <div class="if"><label>Other (₹)</label><input type="number" id="other_misc" placeholder="0" min="0" oninput="live()"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Employer NPS 80CCD(2) — read only, auto-fetched -->
+        <div class="it-sec">
+          <div class="it-sec-hdr open" onclick="tgl(this)" style="cursor:default">
+            <span class="sh-title">🏦 Employer NPS Contribution — 80CCD(2)</span>
+            <span class="sh-right"><span class="sh-amt" id="s-enps"></span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body open">
+            <div style="background:#eef0fb;border:1.5px solid #c5cae9;border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;color:#3949ab;font-weight:600">
+              ℹ️ Auto-fetched from your payroll structure. Read-only. No attachment required.
+            </div>
+            <div class="fg2">
+              <div class="if">
+                <label>Employer NPS Contribution (₹)</label>
+                <input type="number" id="employer_nps" placeholder="Auto-fetched" readonly style="background:#f0f2f8;color:#546e7a">
+              </div>
+              <div class="if">
+                <label>Section</label>
+                <input type="text" value="80CCD(2) — Employer Contribution" readonly style="background:#f0f2f8;color:#546e7a">
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /new-secs -->
+
+      <!-- ══ OLD REGIME: Other Income (only in old regime) ══ -->
+      <div id="old-other-sec" class="it-sec">
+        <div class="it-sec-hdr" onclick="tgl(this)">
+          <span class="sh-title">💹 Other Income</span>
+          <span class="sh-right"><span class="sh-amt" id="s-other-old"></span><span class="sh-chev">▼</span></span>
+        </div>
+        <div class="it-sec-body">
+          <div class="fg2">
+            <div class="if"><label>Savings Interest (₹)</label><input type="number" id="other_savings_int_old" placeholder="0" min="0" oninput="live()"></div>
+            <div class="if"><label>FD Interest (₹)</label><input type="number" id="other_fd_int_old" placeholder="0" min="0" oninput="live()"></div>
+            <div class="if"><label>Capital Gains (₹)</label><input type="number" id="other_capital_gains_old" placeholder="0" min="0" oninput="live()"></div>
+            <div class="if"><label>Dividend (₹)</label><input type="number" id="other_dividend_old" placeholder="0" min="0" oninput="live()"></div>
+            <div class="if"><label>Other (₹)</label><input type="number" id="other_misc_old" placeholder="0" min="0" oninput="live()"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save bar -->
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:2px solid #e8eaf6">
+        <button class="btn btn-outline" onclick="saveDecl('save')">💾 Save Draft</button>
+        <button class="btn btn-primary" onclick="confirmSubmit()">✅ Submit to HR</button>
+      </div>
+    </div>
+
+    <!-- ══ TAB: Proof Upload ══ -->
+    <div id="pane-proof" class="itd-body" style="display:none">
+      <div id="proof-content"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ══ TAB: Tax Preview ══ -->
+    <div id="pane-tax" class="itd-body" style="display:none">
+      <div id="tax-content"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ══ TAB: HR Review ══ -->
+    <div id="pane-hr" class="itd-body" style="display:none">
+      <div id="hr-stats-row" class="hr-stats"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:13px;font-weight:700;color:#1e3a5f">All Declarations</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="hr-filter-fy" class="form-control" style="font-size:13px;padding:7px 10px;width:auto" onchange="loadHR()">
+            <!-- populated by buildFYDropdowns() -->
+          </select>
+          <select id="hr-filter-st" class="form-control" style="font-size:13px;padding:7px 10px;width:auto" onchange="loadHR()">
+            <option value="">All Statuses</option>
+            <option value="submitted">Submitted</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="verified">Verified</option>
+            <option value="draft">Draft</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="hr-export-btn" onclick="exportHRExcel()" style="font-size:12px;padding:7px 14px;font-weight:700">
+            📊 Export Excel
+          </button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e3ec">
+        <table class="hr-tbl">
+          <thead><tr>
+            <th>Employee</th><th>Code</th><th>PAN</th><th>FY</th><th>Regime</th>
+            <th>80C</th><th>Total Ded.</th><th>Est. Tax</th><th>TDS/mo</th>
+            <th>Status</th><th>Submitted</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="hr-tbody"><tr><td colspan="12" style="text-align:center;padding:28px;color:#9ca3af">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ TAB: Admin Config ══ -->
+    <div id="pane-cfg" class="itd-body" style="display:none">
+      <div style="font-size:14px;font-weight:700;color:#1e3a5f;margin-bottom:14px">⚙️ Tax Configuration — FY <span id="cfg-fy-label">2025-26</span></div>
+      <div id="cfg-content"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+  </div><!-- .itd -->
+  </div><!-- .card -->
+  </div><!-- .content -->
+</div><!-- .main -->
+
+<!-- HR Review Modal -->
+<div class="mo" id="mo-review">
+  <div class="mb">
+    <button class="mc" onclick="closeMo('mo-review')">×</button>
+    <h3 id="mo-review-title">Review Declaration</h3>
+    <div id="mo-review-body" style="font-size:13px;color:#546e7a;margin-bottom:12px"></div>
+    <div class="if"><label>Action</label>
+      <select id="review-action">
+        <option value="approve">✅ Approve</option>
+        <option value="reject">❌ Reject</option>
+        <option value="send_back">↩️ Send Back to Employee</option>
+        <option value="request_clarification">❓ Request Clarification</option>
+        <option value="reopen">🔓 Reopen (locked declaration)</option>
+      </select>
+    </div>
+    <div class="if" style="margin-top:10px"><label>Comment for Employee</label>
+      <textarea id="review-comment" class="form-control" rows="3" placeholder="Add note…"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-outline" onclick="closeMo('mo-review')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReview()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proof Modal -->
+<div class="mo" id="mo-proof">
+  <div class="mb" style="width:min(700px,96vw)">
+    <button class="mc" onclick="closeMo('mo-proof')">×</button>
+    <h3 id="mo-proof-title">Proofs</h3>
+    <div id="mo-proof-body"></div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="mo" id="mo-detail">
+  <div class="mb" style="width:min(750px,96vw)">
+    <button class="mc" onclick="closeMo('mo-detail')">×</button>
+    <h3 id="mo-detail-title">Declaration Detail</h3>
+    <div id="mo-detail-body"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+// ── Build FY dropdowns dynamically ───────────────────────────────────────────
+function buildFYDropdowns() {
+  const now = new Date();
+  // Indian FY: Apr-Mar. Current FY start year = year if month>=4, else year-1
+  const curFYStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const startYear  = 2021; // earliest FY to show
+  const endYear    = curFYStart + 5; // 5 years into future
+
+  const fys = [];
+  for (let y = endYear; y >= startYear; y--) {
+    const val   = `${y}-${String(y + 1).slice(-2)}`;
+    const label = `FY ${val}`;
+    fys.push({ val, label, selected: y === curFYStart });
+  }
+
+  const toOptions = (fys) => fys.map(f =>
+    `<option value="${f.val}"${f.selected ? ' selected' : ''}>${f.label}</option>`
+  ).join('');
+
+  const selFY    = document.getElementById('sel-fy');
+  const hrFiltFY = document.getElementById('hr-filter-fy');
+  if (selFY)    selFY.innerHTML    = toOptions(fys);
+  if (hrFiltFY) hrFiltFY.innerHTML = toOptions(fys);
+}
+
+Auth.guard();
+const HR_ROLES = ['hr','accounts','admin','super_admin'];
+const ADMIN_ROLES = ['admin','super_admin'];
+let isHR = false, isAdmin = false;
+let currentDecl = null, declId = null, currentEmpId = null;
+let currentRegime = 'old', currentFY = '2025-26';
+let isLocked = false;
+let reviewDeclId = null;
+let houseProps = [];
+// proof uploads per section (keyed by section code → [{doc_type, file_name, id, status}])
+let uploadedProofs = {};
+
+// ── Section proof definitions ─────────────────────────────────────────────────
+const PROOF_DEFS = {
+  HRA:      [{k:'rent_receipt',    l:'Rent Receipt'},{k:'rent_agreement',  l:'Rent Agreement'},{k:'landlord_pan',l:'Landlord PAN Card'}],
+  '80C':    [{k:'lic_receipt',     l:'LIC Premium Receipt'},{k:'elss_stmt',l:'ELSS Statement'},{k:'ppf_stmt',   l:'PPF Statement'},
+             {k:'epf_stmt',        l:'EPF Statement'},{k:'fd_cert',        l:'FD Certificate'},{k:'tuition_rcpt',l:'Tuition Fee Receipt'},
+             {k:'loan_cert',       l:'Home Loan Principal Certificate'},{k:'other_80c',     l:'Other 80C Proof'}],
+  '80CCD':  [{k:'nps_stmt',        l:'NPS Statement'},{k:'nps_rcpt',       l:'NPS Receipt'}],
+  '80D':    [{k:'ins_receipt',     l:'Insurance Premium Receipt'},{k:'policy_copy',    l:'Policy Copy'}],
+  HP:       [{k:'int_cert',        l:'Interest Certificate'},{k:'prop_tax_rcpt',  l:'Property Tax Receipt'},{k:'rental_agreement',l:'Rental Agreement'}],
+  '80E':    [{k:'edu_int_cert',    l:'Interest Certificate'}],
+  '80G':    [{k:'donation_rcpt',   l:'Donation Receipt'},{k:'80g_cert',         l:'80G Certificate'}],
+  '80DD':   [{k:'disab_cert',      l:'Govt Disability Certificate'}],
+  '80U':    [{k:'disab_cert_u',    l:'Disability Certificate'}],
+  '80DDB':  [{k:'med_cert',        l:'Specialist Certificate'},{k:'med_bills',       l:'Medical Bills'}],
+  LTA:      [{k:'air_ticket',      l:'Air Ticket'},{k:'rail_ticket',      l:'Rail Ticket'},{k:'boarding_pass',  l:'Boarding Pass'},{k:'travel_bills',   l:'Travel Bills'}],
+  PREV_EMP: [{k:'form16', l:'Form 16'},{k:'last_slip', l:'Last Salary Slip'},{k:'tax_computation', l:'Tax Computation Sheet'}],
+  NEW_HP:   [{k:'int_cert_hp', l:'Interest Certificate'},{k:'rental_agr', l:'Rental Agreement'},{k:'prop_tax', l:'Property Tax Receipt'}],
+};
+
+// ── Window dates banner ────────────────────────────────────────────────────────
+function fmtD(d) {
+  return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+}
+async function loadWindowBanner() {
+  const declEl  = document.getElementById('iwb-decl');
+  const proofEl = document.getElementById('iwb-proof');
+  declEl.textContent = 'Loading…'; declEl.className = 'iwb-val';
+  proofEl.textContent = 'Loading…'; proofEl.className = 'iwb-val';
+  try {
+    const res = await api('GET', `/it-declaration/config?fy=${currentFY}`);
+    if (!res?.success) { declEl.textContent = '—'; proofEl.textContent = '—'; return; }
+    const cfg = {};
+    res.data.forEach(r => { cfg[r.config_key] = r.config_value; });
+    const now = new Date();
+
+    const renderWindow = (el, startKey, endKey) => {
+      const startRaw = cfg[startKey], endRaw = cfg[endKey];
+      if (!startRaw || !endRaw) { el.textContent = 'Not configured'; return; }
+      const start = new Date(startRaw), end = new Date(endRaw);
+      const isOpen = now >= start && now <= end;
+      el.textContent = `${fmtD(start)} → ${fmtD(end)}${isOpen ? '' : '  (Closed)'}`;
+      el.className = 'iwb-val ' + (isOpen ? 'open' : 'closed');
+    };
+    renderWindow(declEl,  'declaration_start', 'declaration_end');
+    renderWindow(proofEl, 'proof_start',        'proof_end');
+  } catch (e) {
+    declEl.textContent = '—'; proofEl.textContent = '—';
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  buildFYDropdowns();
+  buildSidebar('it-declaration.html');
+  const user = Auth.getUser();
+  isHR    = HR_ROLES.includes(user.role);
+  isAdmin = ADMIN_ROLES.includes(user.role);
+  currentEmpId = user.id;
+  if (isHR) {
+    document.getElementById('itab-hr').style.display = '';
+    document.getElementById('hr-sel-wrap').style.display = '';
+    loadHREmps();
+    loadHRStats();
+  }
+  if (isAdmin) document.getElementById('itab-cfg').style.display = '';
+  await loadDecl();
+  loadWindowBanner();
+});
+
+function onFYChange() {
+  currentFY = document.getElementById('sel-fy').value;
+  document.getElementById('cfg-fy-label').textContent = currentFY;
+  loadDecl();
+  loadWindowBanner();
+  if (isHR) { loadHRStats(); loadHR(); }
+}
+async function loadHREmps() {
+  const r = await api('GET','/employees');
+  if (!r?.success) return;
+  const sel = document.getElementById('sel-hr-emp');
+  r.data.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e.id;
+    o.textContent = `${e.employee_code} — ${e.first_name} ${e.last_name}`;
+    sel.appendChild(o);
+  });
+}
+function onHREmpChange() {
+  const v = document.getElementById('sel-hr-emp').value;
+  currentEmpId = v ? parseInt(v) : Auth.getUser().id;
+  loadDecl();
+}
+
+// ── Tab switch ────────────────────────────────────────────────────────────────
+function sw(t) {
+  ['decl','proof','tax','hr','cfg'].forEach(x => {
+    document.getElementById('pane-' + x).style.display  = x === t ? '' : 'none';
+    document.getElementById('itab-' + x)?.classList.toggle('active', x === t);
+  });
+  if (t === 'proof') renderProofTab();
+  if (t === 'tax')   loadTaxPreview();
+  if (t === 'hr')    loadHR();
+  if (t === 'cfg')   loadCfg();
+}
+
+// ── Regime ────────────────────────────────────────────────────────────────────
+function setRegime(r) {
+  currentRegime = r;
+  document.getElementById('rb-old').classList.toggle('active', r === 'old');
+  document.getElementById('rb-new').classList.toggle('active', r === 'new');
+  document.getElementById('old-secs').style.display     = r === 'old' ? '' : 'none';
+  document.getElementById('new-secs').style.display     = r === 'new' ? '' : 'none';
+  document.getElementById('old-other-sec').style.display= r === 'old' ? '' : 'none';
+  document.getElementById('ep-regime').textContent      = r === 'old' ? '🏛️ Old Regime' : '✨ New Regime';
+  // Auto-fetch employer NPS when switching to new regime
+  if (r === 'new') autoFetchEmployerNPS();
+  live();
+}
+
+// ── Section accordion ─────────────────────────────────────────────────────────
+function tgl(hdr) {
+  hdr.classList.toggle('open');
+  hdr.nextElementSibling.classList.toggle('open');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function n(id) { return parseFloat(document.getElementById(id)?.value || 0) || 0; }
+function sv(id, val) { const el = document.getElementById(id); if (el && val != null) el.value = val; }
+function money(x) { return '₹' + Math.round(parseFloat(x)||0).toLocaleString('en-IN'); }
+
+// ── Live recalc ───────────────────────────────────────────────────────────────
+function live() {
+  // Rent
+  const monthly = n('rent_paid_monthly');
+  sv('annual_rent', monthly * 12);
+  const aRent = monthly * 12;
+  document.getElementById('s-hra').textContent = aRent > 0 ? money(aRent) + '/yr' : '';
+  // 80C
+  const total80c = ['sec80c_pf','sec80c_ppf','sec80c_lic','sec80c_elss','sec80c_nsc',
+    'sec80c_home_loan','sec80c_tuition','sec80c_fd','sec80c_other'].reduce((a,id) => a + n(id), 0);
+  const elig80c = Math.min(total80c, 150000);
+  const rem80c  = 150000 - elig80c;
+  document.getElementById('c80c-d').textContent = money(total80c);
+  document.getElementById('c80c-e').textContent = money(elig80c);
+  document.getElementById('c80c-r').textContent = money(rem80c);
+  document.getElementById('s-80c').textContent  = elig80c > 0 ? money(elig80c) : '';
+  // Others
+  const nps  = Math.min(n('sec80ccd_nps'), 50000);
+  document.getElementById('s-nps').textContent  = nps > 0 ? money(nps) : '';
+  const d80d = n('sec80d_self') + n('sec80d_parents');
+  document.getElementById('s-80d').textContent  = d80d > 0 ? money(d80d) : '';
+  const hl   = n('sec24b_home_loan');
+  document.getElementById('s-hp').textContent   = hl > 0 ? money(Math.min(hl,200000)) : '';
+  const edu  = n('sec80e_edu_loan');
+  document.getElementById('s-80e').textContent  = edu > 0 ? money(edu) : '';
+  const don  = n('sec80g_donation');
+  document.getElementById('s-80g').textContent  = don > 0 ? money(don) : '';
+  // 80DD
+  const ddPct = n('sec80dd_pct');
+  const ddAmt = ddPct >= 80 ? 125000 : (ddPct > 0 ? 75000 : 0);
+  document.getElementById('s-80dd').textContent = ddAmt > 0 ? money(ddAmt) : '';
+  const uPct  = n('sec80u_pct');
+  const uAmt  = uPct >= 80 ? 125000 : (uPct > 0 ? 75000 : 0);
+  document.getElementById('s-80u').textContent  = uAmt > 0 ? money(uAmt) : '';
+  const ddb   = n('sec80ddb_amount');
+  document.getElementById('s-80ddb').textContent= ddb > 0 ? money(Math.min(ddb,40000)) : '';
+  const lta   = n('lta_amount');
+  document.getElementById('s-lta').textContent  = lta > 0 ? money(lta) : '';
+  // Other income - handle both regime fields
+  const isNew = currentRegime === 'new';
+  const otherPfx = isNew ? '' : '_old';
+  const other = n('other_savings_int'+otherPfx) + n('other_fd_int'+otherPfx) + n('other_capital_gains'+otherPfx) + n('other_dividend'+otherPfx) + n('other_misc'+otherPfx);
+  const otherEl = document.getElementById('s-other') || document.getElementById('s-other-old');
+  if (isNew) {
+    const sel = document.getElementById('s-other'); if(sel) sel.textContent = other > 0 ? money(other) : '';
+    const prevEmp = n('prev_gross_salary');
+    const enps    = n('employer_nps');
+    const enpsEl  = document.getElementById('s-enps'); if(enpsEl) enpsEl.textContent = enps > 0 ? money(enps) : '';
+    const prevEl  = document.getElementById('s-prev-emp'); if(prevEl) prevEl.textContent = prevEmp > 0 ? money(prevEmp) : '';
+    renderNewRegimeDedCards(prevEmp, other, enps);
+  } else {
+    const selOld = document.getElementById('s-other-old'); if(selOld) selOld.textContent = other > 0 ? money(other) : '';
+    renderDedCards(elig80c, nps, d80d, Math.min(hl,200000), edu, don, ddAmt, uAmt, Math.min(ddb,40000), lta);
+  }
+}
+
+function renderNewRegimeDedCards(prevEmp, otherInc, enps) {
+  const stdDed = 75000;
+  const items = [
+    { lbl:'Previous Employment', val:prevEmp, sub:'₹ added to income' },
+    { lbl:'Other Income',        val:otherInc, sub:'Interest, Dividends, etc.' },
+    { lbl:'Employer NPS',        val:enps,    sub:'80CCD(2) auto-fetched' },
+    { lbl:'Standard Deduction',  val:stdDed,  sub:'New Regime ₹75,000', ded:true },
+    { lbl:'Total Adjustments',   val:prevEmp + otherInc - stdDed - enps, sub:'Net impact' },
+  ];
+  document.getElementById('ded-cards').innerHTML = items.map(it => {
+    const cls = it.val > 0 ? (it.ded ? 'used' : '') : '';
+    return `<div class="ded-card ${cls}">
+      <div class="dc-lbl">${it.lbl}</div>
+      <div class="dc-val" style="${it.ded?'color:#166534':''}">${it.val < 0 ? '−'+money(Math.abs(it.val)) : money(it.val)}</div>
+      <div class="dc-sub">${it.sub}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDedCards(c80c, nps, d80d, hl, edu, don, dd, u, ddb, lta) {
+  const items = [
+    { lbl:'80C Used', val:c80c, max:150000 },
+    { lbl:'NPS 80CCD(1B)', val:nps, max:50000 },
+    { lbl:'80D Medical', val:d80d, max:75000 },
+    { lbl:'Home Loan Int.', val:hl, max:200000 },
+    { lbl:'80E Edu Loan', val:edu, max:null },
+    { lbl:'80G Donation', val:don, max:null },
+    { lbl:'80DD/80U/80DDB', val:dd+u+ddb, max:null },
+    { lbl:'LTA', val:lta, max:null },
+  ];
+  const total = items.reduce((a,i) => a + i.val, 0);
+  const all   = [...items, { lbl:'Total Deductions', val:total, max:null }];
+  document.getElementById('ded-cards').innerHTML = all.map(it => {
+    const pct = it.max ? Math.min(100, Math.round(it.val/it.max*100)) : null;
+    const cls = it.val > 0 ? (pct !== null && pct >= 100 ? 'warn' : 'used') : '';
+    return `<div class="ded-card ${cls}">
+      <div class="dc-lbl">${it.lbl}</div>
+      <div class="dc-val">${money(it.val)}</div>
+      ${it.max ? `<div class="dc-sub">Max ${money(it.max)} · ${pct}% used</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── House Properties ──────────────────────────────────────────────────────────
+function addProperty(data = {}) {
+  const idx = houseProps.length;
+  houseProps.push(data);
+  renderProperties();
+}
+
+// New regime house properties (separate list)
+let newHouseProps = [];
+function addNewProperty(data = {}) {
+  newHouseProps.push(data);
+  renderNewProperties();
+}
+function removeNewProperty(idx) {
+  newHouseProps.splice(idx, 1);
+  renderNewProperties();
+}
+function renderNewProperties() {
+  const el = document.getElementById('new-hp-list');
+  if (!el) return;
+  el.innerHTML = newHouseProps.map((p, i) => `
+    <div class="hp-card">
+      <button class="hp-card-del" onclick="removeNewProperty(${i})">×</button>
+      <div style="font-size:12px;font-weight:700;color:#3949ab;margin-bottom:8px">Property ${i+1}</div>
+      <div class="fg2">
+        <div class="if"><label>Property Type</label>
+          <select onchange="newHouseProps[${i}].type=this.value">
+            <option value="self_occupied" ${p.type==='self_occupied'?'selected':''}>Self Occupied</option>
+            <option value="let_out"       ${p.type==='let_out'?'selected':''}>Let Out</option>
+            <option value="deemed"        ${p.type==='deemed'?'selected':''}>Deemed Let Out</option>
+          </select>
+        </div>
+        <div class="if"><label>Rental Income (₹/yr)</label><input type="number" value="${p.rental_income||0}" oninput="newHouseProps[${i}].rental_income=this.value;live()"></div>
+        <div class="if"><label>Municipal Tax (₹)</label><input type="number" value="${p.municipal_tax||0}" oninput="newHouseProps[${i}].municipal_tax=this.value"></div>
+        <div class="if"><label>Interest Paid (₹)</label><input type="number" value="${p.interest_paid||0}" oninput="newHouseProps[${i}].interest_paid=this.value"></div>
+        <div class="if"><label>Co-owner Details</label><input type="text" value="${p.coowner||''}" oninput="newHouseProps[${i}].coowner=this.value" placeholder="Name & share %"></div>
+        <div class="if" style="grid-column:1/-1"><label>Property Address</label><input type="text" value="${p.address||''}" oninput="newHouseProps[${i}].address=this.value" placeholder="Full address"></div>
+      </div>
+    </div>`).join('');
+  // Update header amount
+  const totalRental = newHouseProps.reduce((a,p) => a + (parseFloat(p.rental_income)||0), 0);
+  const el2 = document.getElementById('s-new-hp');
+  if (el2) el2.textContent = totalRental > 0 ? money(totalRental) + '/yr' : '';
+}
+
+async function autoFetchEmployerNPS() {
+  // Try to get employer NPS from payroll salary structure (10% of basic is NPS rule)
+  const el = document.getElementById('employer_nps');
+  if (!el || el.value > 0) return; // already set
+  // We fetch the tax preview which calculates from payroll
+  const fy  = document.getElementById('sel-fy').value;
+  const res = await api('GET', `/it-declaration/tax-preview?fy=${fy}`);
+  if (res?.success && res.data) {
+    const enps = res.data.new_regime?.employer_nps || 0;
+    if (enps > 0) el.value = enps;
+  }
+}
+function removeProperty(idx) {
+  houseProps.splice(idx, 1);
+  renderProperties();
+}
+function renderProperties() {
+  document.getElementById('hp-list').innerHTML = houseProps.map((p, i) => `
+    <div class="hp-card">
+      <button class="hp-card-del" onclick="removeProperty(${i})">×</button>
+      <div style="font-size:12px;font-weight:700;color:#3949ab;margin-bottom:8px">Property ${i+1}</div>
+      <div class="fg2">
+        <div class="if"><label>Property Name</label><input type="text" value="${p.name||''}" oninput="houseProps[${i}].name=this.value"></div>
+        <div class="if"><label>Property Type</label>
+          <select onchange="houseProps[${i}].type=this.value">
+            <option value="self_occupied" ${p.type==='self_occupied'?'selected':''}>Self Occupied</option>
+            <option value="let_out"       ${p.type==='let_out'?'selected':''}>Let Out</option>
+            <option value="deemed"        ${p.type==='deemed'?'selected':''}>Deemed Let Out</option>
+          </select>
+        </div>
+        <div class="if"><label>Rental Income (₹/yr)</label><input type="number" value="${p.rental_income||0}" oninput="houseProps[${i}].rental_income=this.value;live()"></div>
+        <div class="if"><label>Municipal Tax (₹)</label><input type="number" value="${p.municipal_tax||0}" oninput="houseProps[${i}].municipal_tax=this.value;live()"></div>
+        <div class="if"><label>Interest Paid (₹)</label><input type="number" value="${p.interest_paid||0}" oninput="houseProps[${i}].interest_paid=this.value;live()"></div>
+        <div class="if"><label>Co-owner Details</label><input type="text" value="${p.coowner||''}" oninput="houseProps[${i}].coowner=this.value" placeholder="Name & share %"></div>
+        <div class="if" style="grid-column:1/-1"><label>Address</label><input type="text" value="${p.address||''}" oninput="houseProps[${i}].address=this.value" placeholder="Full property address"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Load / Fill Declaration ───────────────────────────────────────────────────
+async function loadDecl() {
+  const fy  = document.getElementById('sel-fy').value;
+  const empQ= currentEmpId !== Auth.getUser().id ? `&employee_id=${currentEmpId}` : '';
+  const res = await api('GET', `/it-declaration?fy=${fy}${empQ}`);
+  if (!res?.success) return;
+  // Fill employee panel
+  const emp = res.employee || {};
+  fillEmpPanel(emp);
+  currentDecl = res.data;
+  declId = currentDecl?.id || null;
+  if (!currentDecl) {
+    resetForm(); updateSt('draft'); setLocked(false); return;
+  }
+  fillForm(currentDecl);
+  updateSt(currentDecl.status);
+  setLocked(currentDecl.locked || ['approved','verified','submitted'].includes(currentDecl.status));
+  if (currentDecl.status === 'rejected' && currentDecl.hr_comment)
+    toast('Rejected: ' + currentDecl.hr_comment, 'error');
+  renderProofGrids();
+}
+
+function fillEmpPanel(e) {
+  sv2('ep-code',  e.employee_code);
+  sv2('ep-name',  e.employee_name);
+  sv2('ep-pan',   e.pan_number || '—');
+  sv2('ep-dept',  e.department  || '—');
+  sv2('ep-desg',  e.designation || '—');
+  sv2('ep-city',  e.city        || '—');
+  sv2('ep-join',  e.joining_date ? fmt.date(e.joining_date) : '—');
+  sv2('ep-ctc',   e.ctc ? money(e.ctc) : '—');
+  sv2('ep-gross', e.gross_salary ? money(e.gross_salary) + '/mo' : '—');
+}
+function sv2(id, val) { const el = document.getElementById(id); if(el) el.textContent = val; }
+
+function fillForm(d) {
+  const flds = ['rent_paid_monthly','landlord_name','landlord_pan',
+    'sec80c_pf','sec80c_ppf','sec80c_lic','sec80c_elss','sec80c_nsc',
+    'sec80c_home_loan','sec80c_tuition','sec80c_fd','sec80c_other',
+    'sec80ccd_nps','sec80d_self','sec80d_parents',
+    'sec24b_home_loan','homeloan_provider','homeloan_address',
+    'sec80e_edu_loan','sec80g_donation','sec80g_institution','sec80g_pan',
+    'sec80dd_dependent','sec80dd_relation','sec80dd_pct',
+    'sec80u_pct','sec80u_category',
+    'sec80ddb_amount','sec80ddb_disease','sec80ddb_patient','sec80ddb_relation',
+    'lta_amount','lta_destination','lta_travel_period',
+    'prev_employer','prev_employer_tan','prev_period',
+    'prev_gross_salary','prev_taxable_income','prev_tds','prev_pf',
+    'other_savings_int','other_fd_int','other_dividend','other_misc',
+  ];
+  flds.forEach(id => { if (d[id] != null) sv(id, d[id]); });
+  if (d.sec80d_senior_parent != null)
+    sv('sec80d_senior_parent', String(d.sec80d_senior_parent));
+  if (d.hra_city_type) sv('hra_city_type', d.hra_city_type);
+  if (d.sec80g_category) sv('sec80g_category', d.sec80g_category);
+  // Other income — sync to correct fields based on regime
+  if (d.other_savings_int != null) { sv('other_savings_int', d.other_savings_int); sv('other_savings_int_old', d.other_savings_int); }
+  if (d.other_fd_int != null)      { sv('other_fd_int', d.other_fd_int);           sv('other_fd_int_old', d.other_fd_int); }
+  if (d.other_capital_gains != null){ sv('other_capital_gains', d.other_capital_gains); sv('other_capital_gains_old', d.other_capital_gains); }
+  if (d.other_dividend != null)    { sv('other_dividend', d.other_dividend);       sv('other_dividend_old', d.other_dividend); }
+  if (d.other_misc != null)        { sv('other_misc', d.other_misc);               sv('other_misc_old', d.other_misc); }
+  if (d.employer_nps != null)      sv('employer_nps', d.employer_nps);
+  // House properties
+  houseProps = Array.isArray(d.house_properties) ? d.house_properties : [];
+  newHouseProps = Array.isArray(d.house_properties) ? d.house_properties : []; // shared store
+  renderProperties();
+  renderNewProperties();
+  setRegime(d.regime || 'old');
+  live();
+  // Upload proofs
+  uploadedProofs = {};
+  (d.proof_documents || []).forEach(p => {
+    if (!uploadedProofs[p.section]) uploadedProofs[p.section] = [];
+    uploadedProofs[p.section].push(p);
+  });
+  renderProofGrids();
+}
+
+function resetForm() {
+  document.querySelectorAll('#pane-decl input[type=number], #pane-decl input[type=text], #pane-decl input[type=email]')
+    .forEach(el => { if (!el.readOnly) el.value = ''; });
+  houseProps = []; renderProperties();
+  setRegime('old'); live();
+  uploadedProofs = {}; renderProofGrids();
+}
+
+function updateSt(st) {
+  const el = document.getElementById('decl-st-badge');
+  const m  = {draft:'st-draft',submitted:'st-submitted',approved:'st-approved',rejected:'st-rejected',verified:'st-verified'};
+  const lb = {draft:'📝 Draft',submitted:'📤 Submitted',approved:'✅ Approved',rejected:'❌ Rejected',verified:'🔏 Verified'};
+  el.className = 'st-badge ' + (m[st] || 'st-draft');
+  el.textContent = lb[st] || st;
+  document.getElementById('ep-regime').textContent = currentRegime === 'old' ? '🏛️ Old Regime' : '✨ New Regime';
+}
+
+function setLocked(locked) {
+  isLocked = locked;
+  const status = currentDecl?.status || 'draft';
+  const isSubmitted = status === 'submitted';
+  const isRejected  = status === 'rejected';
+  const isApproved  = ['approved','verified'].includes(status);
+
+  // Submitted banner
+  const lkNotice = document.getElementById('lk-notice');
+  if (isSubmitted) {
+    lkNotice.style.display = '';
+    lkNotice.style.background = '#eff6ff';
+    lkNotice.style.border = '1px solid #93c5fd';
+    lkNotice.style.color = '#1d4ed8';
+    lkNotice.innerHTML = '📤 <strong>Declaration submitted to HR.</strong> You cannot edit until HR sends it back or rejects it.';
+  } else if (isApproved) {
+    lkNotice.style.display = '';
+    lkNotice.style.background = '#f0fdf4';
+    lkNotice.style.border = '1px solid #86efac';
+    lkNotice.style.color = '#166534';
+    lkNotice.innerHTML = '✅ <strong>Declaration approved by HR.</strong> No further changes allowed.';
+  } else if (isRejected) {
+    lkNotice.style.display = '';
+    lkNotice.style.background = '#fef2f2';
+    lkNotice.style.border = '1px solid #fca5a5';
+    lkNotice.style.color = '#991b1b';
+    lkNotice.innerHTML = '❌ <strong>Declaration rejected by HR.</strong> ' + (currentDecl?.hr_comment ? 'Reason: ' + currentDecl.hr_comment : 'Please revise and re-submit.');
+  } else {
+    lkNotice.style.display = 'none';
+    lkNotice.innerHTML = '';
+  }
+
+  // Save/Submit buttons
+  document.getElementById('btn-save').style.display   = (locked && !isRejected) ? 'none' : '';
+  document.getElementById('btn-submit').style.display = (!locked || isRejected)  ? '' : 'none';
+
+  // Disable all inputs when locked
+  document.querySelectorAll('#pane-decl input, #pane-decl select, #pane-decl textarea')
+    .forEach(el => { el.disabled = locked; });
+}
+
+// ── Proof grids inside each section ──────────────────────────────────────────
+function renderProofGrids() {
+  Object.entries(PROOF_DEFS).forEach(([sec, defs]) => {
+    const el = document.getElementById('pg-' + sec);
+    if (!el) return;
+    const uploaded = uploadedProofs[sec] || [];
+
+    // ── Check completion: every doc type has at least 1 upload ──────────────
+    const totalDocs    = defs.length;
+    const uploadedDocs = defs.filter(def => uploaded.some(u => u.doc_type === def.k)).length;
+    const allDone      = uploadedDocs === totalDocs && totalDocs > 0;
+
+    // ── Update section header badge + color ──────────────────────────────────
+    const badge  = document.getElementById('secb-' + sec);
+    const secDiv = document.getElementById('itsec-' + sec);
+    const hdr    = secDiv?.querySelector('.it-sec-hdr');
+    if (badge) {
+      if (allDone) {
+        badge.innerHTML = `<span class="sec-done-badge">✅ Complete</span>`;
+      } else if (uploadedDocs > 0) {
+        badge.innerHTML = `<span class="sec-upload-badge">${uploadedDocs}/${totalDocs} uploaded</span>`;
+      } else {
+        badge.innerHTML = '';
+      }
+    }
+    if (hdr) {
+      hdr.classList.toggle('sec-complete', allDone);
+    }
+    if (secDiv) {
+      secDiv.classList.toggle('sec-complete-wrap', allDone);
+    }
+
+    el.innerHTML = defs.map(def => {
+      // ALL files for this doc_type (not just the first)
+      const allFiles = uploaded.filter(u => u.doc_type === def.k);
+      const hasAny   = allFiles.length > 0;
+
+      const upBtn = !isLocked ? `<label class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 7px;cursor:pointer;margin:0" title="${hasAny ? 'Add more files' : 'Upload document'}">
+        📤 <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style="display:none" onchange="uploadProof('${sec}','${def.l}','${def.k}',this)"></label>` : '';
+
+      // Build one row per uploaded file + one upload button row at the end
+      const fileRows = allFiles.map(f => {
+        const stCls = `ps-${f.status}`;
+        const stLbl = f.status==='approved' ? '✅ Verified' : f.status==='rejected' ? '❌ Rejected' : '⏳ Pending';
+        const viewBtn = `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 7px" title="View document" onclick="viewProof(${f.id},'${def.l}')">👁</button>`;
+        const delBtn  = !isLocked ? `<button class="btn btn-sm" style="font-size:11px;padding:3px 7px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" title="Delete this file" onclick="delProof(${f.id},'${sec}','${def.k}')">🗑</button>` : '';
+        return `<div class="proof-item" style="margin-bottom:4px">
+          <div class="pi-info">
+            <div class="pi-name" style="font-size:11.5px">📎 ${f.file_name || 'File'}</div>
+          </div>
+          <div class="pi-actions"><span class="proof-st ${stCls}">${stLbl}</span>${viewBtn}${delBtn}</div>
+        </div>`;
+      }).join('');
+
+      // Section header row with label + upload button
+      const headerRow = `<div class="proof-item" style="${hasAny ? 'background:#f0f4ff;border-color:#c5cae9;margin-bottom:2px' : ''}">
+        <div class="pi-info"><div class="pi-name">${def.l}</div>
+          ${!hasAny ? '<div class="pi-file" style="color:#94a3b8">— Not Uploaded</div>' : `<div class="pi-file" style="color:#166534">${allFiles.length} file${allFiles.length>1?'s':''} uploaded</div>`}
+        </div>
+        <div class="pi-actions">
+          ${hasAny ? '' : `<span class="proof-st ps-none">— Not Uploaded</span>`}
+          ${upBtn}
+        </div>
+      </div>`;
+
+      return `<div style="margin-bottom:8px">${headerRow}${fileRows}</div>`;
+    }).join('');
+  });
+}
+
+// ── Save / Submit ─────────────────────────────────────────────────────────────
+function getBody(action) {
+  const user = Auth.getUser();
+  const isHRViewing = isHR && currentEmpId && currentEmpId !== user.id;
+  return {
+    financial_year: document.getElementById('sel-fy').value,
+    regime: currentRegime, action,
+    // When HR is saving on behalf of an employee, pass their ID
+    ...(isHRViewing ? { employee_id: currentEmpId } : {}),
+    rent_paid_monthly: n('rent_paid_monthly'), hra_city_type: document.getElementById('hra_city_type').value,
+    landlord_name: document.getElementById('landlord_name').value.trim(),
+    landlord_pan:  document.getElementById('landlord_pan').value.trim().toUpperCase(),
+    sec80c_pf: n('sec80c_pf'), sec80c_ppf: n('sec80c_ppf'), sec80c_lic: n('sec80c_lic'),
+    sec80c_elss: n('sec80c_elss'), sec80c_nsc: n('sec80c_nsc'),
+    sec80c_home_loan: n('sec80c_home_loan'), sec80c_tuition: n('sec80c_tuition'),
+    sec80c_fd: n('sec80c_fd'), sec80c_other: n('sec80c_other'),
+    sec80ccd_nps: n('sec80ccd_nps'),
+    sec80d_self: n('sec80d_self'), sec80d_parents: n('sec80d_parents'),
+    sec80d_senior_parent: document.getElementById('sec80d_senior_parent').value,
+    sec24b_home_loan: n('sec24b_home_loan'),
+    homeloan_provider: document.getElementById('homeloan_provider').value.trim(),
+    homeloan_address:  document.getElementById('homeloan_address').value.trim(),
+    sec80e_edu_loan: n('sec80e_edu_loan'),
+    sec80g_donation: n('sec80g_donation'),
+    sec80g_institution: document.getElementById('sec80g_institution').value.trim(),
+    sec80g_pan:   document.getElementById('sec80g_pan').value.trim().toUpperCase(),
+    sec80g_category: document.getElementById('sec80g_category').value,
+    sec80dd_dependent: document.getElementById('sec80dd_dependent').value.trim(),
+    sec80dd_relation:  document.getElementById('sec80dd_relation').value.trim(),
+    sec80dd_pct: n('sec80dd_pct'),
+    sec80u_pct:  n('sec80u_pct'),
+    sec80u_category: document.getElementById('sec80u_category').value.trim(),
+    sec80ddb_amount: n('sec80ddb_amount'),
+    sec80ddb_disease: document.getElementById('sec80ddb_disease').value.trim(),
+    sec80ddb_patient: document.getElementById('sec80ddb_patient').value.trim(),
+    sec80ddb_relation:document.getElementById('sec80ddb_relation').value.trim(),
+    lta_amount: n('lta_amount'),
+    lta_destination: document.getElementById('lta_destination').value.trim(),
+    lta_travel_period:document.getElementById('lta_travel_period').value.trim(),
+    prev_employer: document.getElementById('prev_employer').value.trim(),
+    prev_employer_tan: document.getElementById('prev_employer_tan').value.trim().toUpperCase(),
+    prev_period: document.getElementById('prev_period').value.trim(),
+    prev_gross_salary: n('prev_gross_salary'), prev_taxable_income: n('prev_taxable_income'),
+    prev_tds: n('prev_tds'), prev_pf: n('prev_pf'),
+    // Pick correct income fields based on regime
+    other_savings_int:    currentRegime === 'new' ? n('other_savings_int')     : n('other_savings_int_old'),
+    other_fd_int:         currentRegime === 'new' ? n('other_fd_int')          : n('other_fd_int_old'),
+    other_capital_gains:  currentRegime === 'new' ? n('other_capital_gains')   : n('other_capital_gains_old'),
+    other_dividend:       currentRegime === 'new' ? n('other_dividend')        : n('other_dividend_old'),
+    other_misc:           currentRegime === 'new' ? n('other_misc')            : n('other_misc_old'),
+    employer_nps:         n('employer_nps'),
+    house_properties:     currentRegime === 'new' ? newHouseProps : houseProps,
+  };
+}
+
+async function saveDecl(action = 'save') {
+  if (isLocked && action !== 'save') { toast('Declaration is locked', 'error'); return; }
+  const res = await api('POST', '/it-declaration', getBody(action));
+  if (res?.success) {
+    toast(res.message || 'Saved ✅');
+    declId = res.data?.id;
+    currentDecl = res.data;
+    updateSt(res.data.status);
+    if (action === 'submit') setLocked(true);
+  } else toast(res?.message || 'Failed', 'error');
+}
+
+function confirmSubmit() {
+  if (!confirm('Submit declaration to HR?\n\nYou will not be able to edit after submission.')) return;
+  saveDecl('submit');
+}
+
+// ── Proof upload / delete / view ──────────────────────────────────────────────
+async function uploadProof(sec, secLabel, docType, input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  const oversized = files.filter(f => f.size > 10*1024*1024);
+  if (oversized.length) {
+    toast(`${oversized.map(f=>f.name).join(', ')} exceed 10MB limit`, 'error');
+    input.value = ''; return;
+  }
+
+  // Auto-save draft first if no declaration exists yet
+  if (!declId) {
+    toast('Auto-saving draft…');
+    const saveRes = await api('POST', '/it-declaration', getBody('save'));
+    if (!saveRes?.success) { toast('Could not save: ' + (saveRes?.message||'error'), 'error'); input.value=''; return; }
+    declId = saveRes.data?.id;
+    currentDecl = saveRes.data;
+    updateSt(saveRes.data.status);
+  }
+  if (!declId) { toast('Could not create declaration', 'error'); input.value=''; return; }
+
+  let ok = 0, fail = 0;
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('proof_file', file);
+    fd.append('declaration_id', declId);
+    fd.append('section', sec);
+    fd.append('section_label', secLabel);
+    fd.append('doc_type', docType);
+    try {
+      const r = await fetch(API_BASE + '/it-declaration/proof', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + Auth.getToken() }, body: fd
+      });
+      const d = await r.json();
+      if (d.success) ok++; else { fail++; toast(d.message || 'Upload failed', 'error'); }
+    } catch { fail++; }
+  }
+
+  input.value = '';
+  if (ok > 0) toast(`${ok} file${ok>1?'s':''} uploaded ✅`);
+  if (ok > 0) { await loadDecl(); renderProofGrids(); }
+}
+
+async function delProof(proofId, sec, docType) {
+  if (!confirm('Delete this proof?')) return;
+  const res = await api('DELETE', `/it-declaration/proof/${proofId}`);
+  if (res?.success) { toast('Deleted'); await loadDecl(); }
+  else toast(res?.message || 'Failed', 'error');
+}
+
+async function viewProof(proofId, label) {
+  document.getElementById('mo-proof-title').textContent = label;
+  document.getElementById('mo-proof-body').innerHTML = '<div style="text-align:center;padding:32px;color:#888">Loading…</div>';
+  document.getElementById('mo-proof').classList.add('open');
+  try {
+    const r = await fetch(API_BASE + '/it-declaration/proof/' + proofId, { headers:{ Authorization:'Bearer '+Auth.getToken() } });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      document.getElementById('mo-proof-body').innerHTML =
+        `<div style="text-align:center;padding:32px;color:#c62828">
+          <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+          <div style="font-weight:700">${err.message || 'Failed to load file'}</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">The file may have been uploaded before a server migration.<br>Please re-upload the document.</div>
+        </div>`;
+      return;
+    }
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const mime = blob.type || '';
+    if (mime.startsWith('image/')) {
+      document.getElementById('mo-proof-body').innerHTML =
+        `<img src="${url}" style="max-width:100%;border-radius:8px;display:block;margin:0 auto">
+         <a href="${url}" download="${label}" class="btn btn-outline btn-sm" style="display:block;margin-top:10px;text-align:center">⬇ Download</a>`;
+    } else if (mime === 'application/pdf') {
+      document.getElementById('mo-proof-body').innerHTML =
+        `<iframe src="${url}" style="width:100%;height:68vh;border:none;border-radius:8px"></iframe>
+         <a href="${url}" download="${label}" class="btn btn-outline btn-sm" style="display:block;margin-top:8px;text-align:center">⬇ Download</a>`;
+    } else {
+      document.getElementById('mo-proof-body').innerHTML =
+        `<p style="color:#555;margin-bottom:12px">Cannot preview this file type.</p>
+         <a href="${url}" download="${label}" class="btn btn-primary btn-sm">⬇ Download</a>`;
+    }
+  } catch(err) {
+    document.getElementById('mo-proof-body').innerHTML =
+      `<div style="text-align:center;padding:32px;color:#c62828">
+        <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+        <div style="font-weight:700">Network error</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">${err.message}</div>
+      </div>`;
+  }
+}
+
+// ── Proof Summary Tab ─────────────────────────────────────────────────────────
+function renderProofTab() {
+  const el = document.getElementById('proof-content');
+  // Show proof sections even without declId — upload will auto-save first
+  const allProofs = Object.values(uploadedProofs).flat();
+  const total  = Object.values(PROOF_DEFS).flat().length;
+  const done   = allProofs.length;
+  const verif  = allProofs.filter(p => p.status==='approved').length;
+  const pending= allProofs.filter(p => p.status==='pending').length;
+  const reject = allProofs.filter(p => p.status==='rejected').length;
+  el.innerHTML = `
+    <div class="hr-stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+      <div class="hr-stat"><div class="hs-n">${done}</div><div class="hs-l">Uploaded</div></div>
+      <div class="hr-stat"><div class="hs-n" style="color:#166534">${verif}</div><div class="hs-l">Verified</div></div>
+      <div class="hr-stat"><div class="hs-n" style="color:#92400e">${pending}</div><div class="hs-l">Pending Review</div></div>
+      <div class="hr-stat"><div class="hs-n" style="color:#991b1b">${reject}</div><div class="hs-l">Rejected</div></div>
+    </div>
+    ${Object.entries(PROOF_DEFS).map(([sec, defs]) => {
+      const secUploads = uploadedProofs[sec] || [];
+      // In new regime hide old-regime-only sections
+      const OLD_ONLY = ['HRA','80C','80CCD','80D','80DD','80U','80DDB','LTA','80E','80G','HP'];
+      if (currentRegime === 'new' && OLD_ONLY.includes(sec)) return '';
+      // In old regime hide new-regime-only sections
+      const NEW_ONLY = ['PREV_EMP','NEW_HP'];
+      if (currentRegime === 'old' && NEW_ONLY.includes(sec)) return '';
+      const SEC_LABELS = {
+        HRA:'🏠 HRA — House Rent Allowance', '80C':'💰 Section 80C — Investments',
+        '80CCD':'🏦 Section 80CCD(1B) — NPS', '80D':'🏥 Section 80D — Medical Insurance',
+        HP:'🏡 House Property & Sec 24(b)', '80E':'🎓 Section 80E — Education Loan',
+        '80G':'🤝 Section 80G — Donations', '80DD':'♿ Section 80DD — Dependent Disability',
+        '80U':'🦯 Section 80U — Self Disability', '80DDB':'💊 Section 80DDB — Medical Treatment',
+        LTA:'✈️ LTA — Leave Travel Allowance', PREV_EMP:'🏢 Previous Employment',
+        NEW_HP:'🏡 House Property (New Regime)'
+      };
+      return `
+        <div class="it-sec" style="margin-bottom:8px">
+          <div class="it-sec-hdr open" onclick="tgl(this)">
+            <span class="sh-title">${SEC_LABELS[sec]||sec}</span>
+            <span class="sh-right"><span class="sh-amt">${secUploads.length}/${defs.length} uploaded</span><span class="sh-chev">▼</span></span>
+          </div>
+          <div class="it-sec-body open">
+            <div class="proof-grid">
+              ${defs.map(def => {
+                const found = secUploads.find(u => u.doc_type === def.k);
+                const stCls = found ? `ps-${found.status}` : 'ps-none';
+                const stLbl = found ? (found.status==='approved'?'✅ Verified':found.status==='rejected'?'❌ Rejected':'⏳ Pending') : '— Not Uploaded';
+                const fname = found?.file_name ? `<div class="pi-file">📎 ${found.file_name}</div>` : '';
+                const vBtn  = found ? `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 7px" title="View / Preview document" onclick="viewProof(${found.id},'${def.l}')">👁</button>` : '';
+                const upBtn = !isLocked ? `<label class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 7px;cursor:pointer;margin:0" title="${found ? 'Replace / Re-upload' : 'Upload document'}">📤
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style="display:none" onchange="uploadProof('${sec}','${def.l}','${def.k}',this)"></label>` : '';
+                return `<div class="proof-item">
+                  <div class="pi-info"><div class="pi-name">${def.l}</div>${fname}${found?.hr_comment?`<div style="font-size:11px;color:#ef4444">HR: ${found.hr_comment}</div>`:''}</div>
+                  <div class="pi-actions"><span class="proof-st ${stCls}">${stLbl}</span>${vBtn}${upBtn}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>`;
+    }).join('')}`;
+}
+
+// ── Tax Preview ───────────────────────────────────────────────────────────────
+async function loadTaxPreview() {
+  const el = document.getElementById('tax-content');
+  el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  const fy  = document.getElementById('sel-fy').value;
+  const empQ = currentEmpId !== Auth.getUser().id ? `&employee_id=${currentEmpId}` : '';
+  const res = await api('GET', `/it-declaration/tax-preview?fy=${fy}${empQ}`);
+  if (!res?.success) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${res?.message||'Salary structure not set up.'}</p></div>`;
+    return;
+  }
+  const d  = res.data;
+  const o  = d.old_regime;
+  const nw = d.new_regime;
+  const rec= d.recommended;
+  const oCheap = rec === 'old', nCheap = rec === 'new';
+
+  el.innerHTML = `
+    <!-- Recommendation box -->
+    <div class="rec-box">
+      <strong>💡 Recommendation: ${rec === 'old' ? '🏛️ Old Regime' : '✨ New Regime'} &nbsp;—&nbsp; Save ${money(d.savings)}</strong>
+      <ul>${d.recommendation_reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+    </div>
+
+    <!-- Regime comparison cards -->
+    <div class="regime-cmp">
+      <div class="rc ${oCheap?'cheaper':''}">
+        <h3>🏛️ Old Regime</h3>
+        <div class="tax-amt">${money(o.net_tax)}</div>
+        <div class="tds-ln">Monthly TDS: <strong>${money(o.monthly_tds)}</strong></div>
+        <div class="tds-ln">Taxable Income: ${money(o.taxable_income)}</div>
+        ${oCheap ? '<span class="rec-bdg">⭐ RECOMMENDED</span>' : ''}
+        <button class="sel-btn ${currentRegime==='old'?'chosen':''}" onclick="setRegime('old');sw('decl')">Select Old Regime</button>
+      </div>
+      <div class="rc ${nCheap?'cheaper':''}">
+        <h3>✨ New Regime</h3>
+        <div class="tax-amt">${money(nw.net_tax)}</div>
+        <div class="tds-ln">Monthly TDS: <strong>${money(nw.monthly_tds)}</strong></div>
+        <div class="tds-ln">Taxable Income: ${money(nw.taxable_income)}</div>
+        ${nCheap ? '<span class="rec-bdg">⭐ RECOMMENDED</span>' : ''}
+        <button class="sel-btn ${currentRegime==='new'?'chosen':''}" onclick="setRegime('new');sw('decl')">Select New Regime</button>
+      </div>
+    </div>
+
+    <!-- Old Regime breakdown -->
+    <div class="tax-bk">
+      <h4>🏛️ Old Regime — Full Breakdown</h4>
+      ${row('Gross Salary (Annual)', money(d.annual_gross))}
+      ${d.prev_salary > 0 ? row('+ Previous Employment Income', money(d.prev_salary)) : ''}
+      ${d.other_income > 0 ? row('+ Other Income', money(d.other_income)) : ''}
+      ${rowDed('Less: Standard Deduction', money(o.std_deduction))}
+      ${o.hra_exemption > 0 ? rowDed('Less: HRA Exemption', money(o.hra_exemption)) : ''}
+      ${o.deduction_80c > 0 ? rowDed('Less: 80C Investments', money(o.deduction_80c)) : ''}
+      ${o.deduction_nps > 0 ? rowDed('Less: NPS 80CCD(1B)', money(o.deduction_nps)) : ''}
+      ${o.deduction_80d > 0 ? rowDed('Less: 80D Medical Insurance', money(o.deduction_80d)) : ''}
+      ${o.deduction_homeloan > 0 ? rowDed('Less: Home Loan Interest Sec24(b)', money(o.deduction_homeloan)) : ''}
+      ${o.deduction_80e > 0 ? rowDed('Less: 80E Education Loan', money(o.deduction_80e)) : ''}
+      ${o.deduction_80g > 0 ? rowDed('Less: 80G Donations', money(o.deduction_80g)) : ''}
+      ${o.deduction_80dd > 0 ? rowDed('Less: 80DD Dependent Disability', money(o.deduction_80dd)) : ''}
+      ${o.deduction_80u  > 0 ? rowDed('Less: 80U Self Disability', money(o.deduction_80u)) : ''}
+      ${o.deduction_80ddb> 0 ? rowDed('Less: 80DDB Medical Treatment', money(o.deduction_80ddb)) : ''}
+      ${o.deduction_lta  > 0 ? rowDed('Less: LTA', money(o.deduction_lta)) : ''}
+      ${o.house_property > 0 ? rowDed('Less: House Property Loss', money(o.house_property)) : ''}
+      <div class="tr total"><span class="tl">Net Taxable Income</span><span class="tv">${money(o.taxable_income)}</span></div>
+      ${row('Income Tax', money(o.tax_before_cess))}
+      ${row('Health & Education Cess (4%)', money(o.cess))}
+      ${row('Total Tax Liability', money(o.tax))}
+      ${o.prev_tds > 0 ? rowDed('Less: TDS by Previous Employer', money(o.prev_tds)) : ''}
+      <div class="tds-hl">
+        <div><div class="thl">Net Tax Payable (Old Regime)</div></div>
+        <div class="tha">${money(o.net_tax)}</div>
+      </div>
+      <div class="tds-hl" style="background:linear-gradient(135deg,#283593,#3949ab);margin-top:8px">
+        <div><div class="thl">Monthly TDS</div></div>
+        <div class="tha">${money(o.monthly_tds)}/mo</div>
+      </div>
+    </div>
+
+    <!-- New Regime breakdown -->
+    <div class="tax-bk" style="background:#f0fdf4;border-color:#86efac">
+      <h4 style="color:#166534">✨ New Regime — Full Breakdown</h4>
+      ${row('Annual Gross Salary', money(d.annual_gross))}
+      ${d.prev_salary > 0 ? row('+ Previous Employment Income', money(d.prev_salary)) : ''}
+      ${d.other_income > 0 ? row('+ Other Income', money(d.other_income)) : ''}
+      ${nw.employer_nps > 0 ? rowDed('Less: Employer NPS — 80CCD(2)', money(nw.employer_nps)) : ''}
+      ${rowDed('Less: Standard Deduction (New Regime)', money(nw.std_deduction))}
+      <div class="tr total"><span class="tl">Net Taxable Income</span><span class="tv">${money(nw.taxable_income)}</span></div>
+      ${row('Income Tax', money(nw.tax_before_cess))}
+      ${row('Health & Education Cess (4%)', money(nw.cess))}
+      <div class="tds-hl" style="background:linear-gradient(135deg,#166534,#16a34a)">
+        <div><div class="thl">Net Tax Payable (New Regime)</div></div>
+        <div class="tha">${money(nw.net_tax)}</div>
+      </div>
+      <div class="tds-hl" style="background:linear-gradient(135deg,#166534,#22c55e);margin-top:8px">
+        <div><div class="thl">Monthly TDS</div></div>
+        <div class="tha">${money(nw.monthly_tds)}/mo</div>
+      </div>
+    </div>`;
+}
+function row(l, v) { return `<div class="tr"><span class="tl">${l}</span><span class="tv">${v}</span></div>`; }
+function rowDed(l,v){ return `<div class="tr ded"><span class="tl">${l}</span><span class="tv">− ${v}</span></div>`; }
+
+// ── HR Review ─────────────────────────────────────────────────────────────────
+async function loadHRStats() {
+  const fy  = document.getElementById('sel-fy').value;
+  const res = await api('GET', `/it-declaration/dashboard?fy=${fy}`);
+  if (!res?.success) return;
+  const d = res.data;
+  document.getElementById('hr-stats-row').innerHTML = [
+    {n:d.submitted,   l:'Submitted', c:'#1d4ed8'},
+    {n:d.approved,    l:'Approved',  c:'#166534'},
+    {n:d.rejected,    l:'Rejected',  c:'#991b1b'},
+    {n:d.verified,    l:'Verified',  c:'#6b21a8'},
+    {n:d.locked_count,l:'Locked',    c:'#92400e'},
+    {n:d.draft,       l:'Draft',     c:'#546e7a'},
+  ].map(s => `<div class="hr-stat"><div class="hs-n" style="color:${s.c}">${s.n||0}</div><div class="hs-l">${s.l}</div></div>`).join('');
+}
+
+async function loadHR() {
+  loadHRStats();
+  const fy  = document.getElementById('hr-filter-fy')?.value || document.getElementById('sel-fy').value;
+  const st  = document.getElementById('hr-filter-st').value;
+  const res = await api('GET', `/it-declaration/all?fy=${fy}${st?'&status='+st:''}`);
+  const tb  = document.getElementById('hr-tbody');
+  if (!res?.success) { tb.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#ef4444">Failed to load</td></tr>'; return; }
+  if (!res.data.length) { tb.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#9ca3af;padding:28px">No records found for selected filters</td></tr>'; return; }
+  const stM = {draft:'st-draft',submitted:'st-submitted',approved:'st-approved',rejected:'st-rejected',verified:'st-verified'};
+  tb.innerHTML = res.data.map(d => `<tr>
+    <td style="font-weight:700;color:#1e3a5f">${d.employee_name}${d.locked?'&nbsp;🔒':''}</td>
+    <td>${d.employee_code}</td>
+    <td style="font-size:11.5px;color:#546e7a">${d.pan_number||'—'}</td>
+    <td>${d.financial_year}</td>
+    <td><span style="font-size:11px;background:#e8eaf6;color:#3949ab;padding:2px 8px;border-radius:4px;font-weight:700">${(d.regime||'old').toUpperCase()}</span></td>
+    <td>${money(d.total_80c||0)}</td>
+    <td>${money(d.total_deductions||0)}</td>
+    <td style="font-weight:700;color:#283593">${money(d.estimated_tax||0)}</td>
+    <td style="font-weight:700">${money(d.monthly_tds||0)}/mo</td>
+    <td><span class="st-badge ${stM[d.status]||'st-draft'}">${d.status}</span></td>
+    <td>${d.submitted_at ? fmt.date(d.submitted_at) : '—'}</td>
+    <td>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" style="font-size:11px" title="Approve / Reject declaration" onclick="openReview(${d.id},'${d.employee_name}')">📋 Review</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px" title="View full declaration details" onclick="viewDeclDetail(${d.id})">👁 Detail</button>
+        ${d.proof_count > 0 ? `<button class="btn btn-outline btn-sm" style="font-size:11px" title="View uploaded proofs" onclick="viewDeclProofs(${d.id})">📎 ${d.proof_count} Proof${d.proof_count==1?'':'s'}</button>` : ''}
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+async function exportHRExcel() {
+  const fy  = document.getElementById('hr-filter-fy')?.value || document.getElementById('sel-fy').value;
+  const st  = document.getElementById('hr-filter-st').value;
+  const btn = document.getElementById('hr-export-btn');
+  btn.disabled = true; btn.textContent = '⏳ Exporting…';
+  try {
+    const url = `${API_BASE}/it-declaration/export-excel?fy=${fy}${st ? '&status=' + st : ''}`;
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast(err.message || 'Export failed', 'error');
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `IT_Declaration_${fy.replace('-','_')}${st ? '_' + st : ''}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('Excel exported ✅');
+  } catch(err) {
+    toast('Export failed: ' + err.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '📊 Export Excel';
+}
+
+function openReview(id, name) {
+  reviewDeclId = id;
+  document.getElementById('mo-review-title').textContent = `Review — ${name}`;
+  document.getElementById('mo-review-body').textContent  = 'Select action and add a comment for the employee.';
+  document.getElementById('review-comment').value        = '';
+  document.getElementById('mo-review').classList.add('open');
+}
+async function submitReview() {
+  const action  = document.getElementById('review-action').value;
+  const comment = document.getElementById('review-comment').value.trim();
+  const res = await api('POST', `/it-declaration/${reviewDeclId}/review`, { action, comment });
+  if (res?.success) {
+    const labels = { approve:'Approved ✅', reject:'Rejected ❌', send_back:'Sent back to employee ↩️',
+                     request_clarification:'Clarification requested ❓', reopen:'Reopened 🔓' };
+    toast(labels[action] || `${action} done ✅`);
+    closeMo('mo-review');
+    loadHR();
+    loadHRStats();
+    // If HR is also viewing their own declaration, refresh it
+    if (currentEmpId) loadDecl();
+  } else toast(res?.message||'Failed', 'error');
+}
+
+async function viewDeclDetail(id) {
+  document.getElementById('mo-detail-title').textContent = 'Declaration Details';
+  document.getElementById('mo-detail-body').innerHTML = '<div style="text-align:center;padding:28px">Loading…</div>';
+  document.getElementById('mo-detail').classList.add('open');
+  const res = await api('GET', `/it-declaration/${id}`);
+  if (!res?.success) { document.getElementById('mo-detail-body').innerHTML = '<p style="color:#ef4444">Failed</p>'; return; }
+  const d = res.data;
+  const fields = [
+    ['Employee', d.employee_name], ['Code', d.employee_code], ['PAN', d.pan_number||'—'],
+    ['FY', d.financial_year], ['Regime', d.regime], ['Status', d.status],
+    ['80C', money(d.total_80c||0)], ['Total Deductions', money(d.total_deductions||0)],
+    ['Estimated Tax', money(d.estimated_tax||0)], ['Monthly TDS', money(d.monthly_tds||0)],
+    ['Submitted', d.submitted_at ? fmt.date(d.submitted_at) : '—'],
+    ['HR Comment', d.hr_comment||'—'],
+  ];
+  let auditHtml = '';
+  if (d.audit_logs?.length) {
+    auditHtml = `<div class="sub-lbl" style="margin-top:14px">Audit Log</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f0f4ff"><th style="padding:7px;text-align:left;border-bottom:1px solid #e0e3ec">Action</th><th style="padding:7px;border-bottom:1px solid #e0e3ec">By</th><th style="padding:7px;border-bottom:1px solid #e0e3ec">When</th></tr></thead>
+        <tbody>${d.audit_logs.slice(0,15).map(al => `<tr><td style="padding:7px;border-bottom:1px solid #f0f2f8;font-weight:600;color:#283593">${al.action}</td><td style="padding:7px;border-bottom:1px solid #f0f2f8">${al.actor_name||al.performed_by||'—'}</td><td style="padding:7px;border-bottom:1px solid #f0f2f8;color:#546e7a">${fmt.ago(al.created_at)}</td></tr>`).join('')}</tbody>
+      </table>`;
+  }
+  document.getElementById('mo-detail-body').innerHTML = `
+    <div class="fg2" style="margin-bottom:12px">
+      ${fields.map(([l,v]) => `<div><div style="font-size:10px;font-weight:700;color:#9fa8da;text-transform:uppercase;letter-spacing:.05em">${l}</div><div style="font-size:13px;font-weight:700;color:#1e3a5f">${v}</div></div>`).join('')}
+    </div>${auditHtml}`;
+}
+
+async function viewDeclProofs(declId) {
+  document.getElementById('mo-proof-title').textContent = 'Proof Documents';
+  document.getElementById('mo-proof-body').innerHTML = '<div style="text-align:center;padding:24px">Loading…</div>';
+  document.getElementById('mo-proof').classList.add('open');
+  const res = await api('GET', `/it-declaration/proofs?declaration_id=${declId}`);
+  if (!res?.success||!res.data.length) {
+    document.getElementById('mo-proof-body').innerHTML = '<p style="color:#9ca3af">No proofs uploaded.</p>'; return;
+  }
+  document.getElementById('mo-proof-body').innerHTML = res.data.map(p => `
+    <div class="proof-item" style="margin-bottom:6px">
+      <div class="pi-info">
+        <div class="pi-name">${p.section_label||p.section} — ${p.doc_type||''}</div>
+        <div class="pi-file">📎 ${p.file_name}</div>
+        ${p.hr_comment ? `<div style="font-size:11px;color:#ef4444">HR: ${p.hr_comment}</div>` : ''}
+      </div>
+      <div class="pi-actions">
+        <span class="proof-st ps-${p.status}">${p.status}</span>
+        <button class="btn btn-outline btn-sm" style="font-size:11px" title="Preview document" onclick="viewProof(${p.id},'${p.section_label||p.section}')">👁 View</button>
+        ${p.status!=='approved'?`<button class="btn btn-sm" style="font-size:11px;background:#dcfce7;color:#166534;border:1px solid #86efac" title="Approve this proof" onclick="qkReviewProof(${p.id},'approve')">✅ Approve</button>`:''}
+        ${p.status!=='rejected'?`<button class="btn btn-sm" style="font-size:11px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" title="Reject this proof" onclick="qkReviewProof(${p.id},'reject')">❌ Reject</button>`:''}
+      </div>
+    </div>`).join('');
+}
+async function qkReviewProof(id, action) {
+  const res = await api('POST', `/it-declaration/proof/${id}/review`, { action });
+  if (res?.success) toast(`Proof ${action}d`);
+  else toast(res?.message||'Failed', 'error');
+}
+
+// ── Admin Config ──────────────────────────────────────────────────────────────
+async function loadCfg() {
+  const fy  = document.getElementById('sel-fy').value;
+  const el  = document.getElementById('cfg-content');
+  const res = await api('GET', `/it-declaration/config?fy=${fy}`);
+  if (!res?.success) { el.innerHTML = '<p style="color:#ef4444">Failed to load config</p>'; return; }
+  el.innerHTML = `<div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e3ec">
+    <table class="cfg-tbl">
+      <thead><tr><th style="width:200px">Config Key</th><th>Description</th><th style="width:200px">Value</th><th style="width:100px">Action</th></tr></thead>
+      <tbody>${res.data.map(r => `<tr>
+        <td style="font-size:12px;font-weight:700;color:#283593">${r.config_key}</td>
+        <td style="font-size:12px;color:#546e7a">${r.description||'—'}</td>
+        <td><input id="cfg-${r.config_key.replace(/[^a-z0-9]/gi,'_')}" value="${r.config_value}" style="font-size:12.5px"></td>
+        <td><button class="btn btn-primary btn-sm" style="font-size:11px" onclick="saveCfgRow('${r.config_key}','${r.config_key.replace(/[^a-z0-9]/gi,'_')}','${r.description||''}')">Save</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  <div style="margin-top:12px;font-size:12px;color:#546e7a">Changes take effect immediately. Tax calculations use these values at runtime.</div>`;
+}
+async function saveCfgRow(key, idSafe, desc) {
+  const val = document.getElementById('cfg-' + idSafe)?.value;
+  const fy  = document.getElementById('sel-fy').value;
+  const res = await api('POST', '/it-declaration/config', { fy, config_key:key, config_value:val, description:desc });
+  if (res?.success) toast('Saved ✅');
+  else toast(res?.message||'Failed', 'error');
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function closeMo(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.mo').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+</script>
+</body>
+</html>
