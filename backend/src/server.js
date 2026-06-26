@@ -12,7 +12,10 @@ const chatCtrl   = require('./controllers/chatController');
 const attCtrl    = require('./controllers/attendanceController');
 const alertsCtrl = require('./controllers/movementAlertsController');
 const emailSvc = require('./config/emailService'); // for startup repair
-const itDeclCtrl = require('./controllers/itDeclarationController');
+const itDeclCtrl   = require('./controllers/itDeclarationController');
+const docsCtrl     = require('./controllers/documentsController');
+const empDocsCtrl  = require('./controllers/empDocsController');
+const sendDocsCtrl = require('./controllers/sendDocumentsController');
 const offerCtrl  = require('./controllers/offerLetterController');
 const fcm        = require('./services/fcmService');
 // Initialize FCM at startup — logs success or failure immediately
@@ -851,6 +854,8 @@ async function start() {
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
         await itDeclCtrl.initTables();
+        await docsCtrl.initTables();
+        await sendDocsCtrl.initTables();
         await offerCtrl.initTables();
         const projCtrl = require('./controllers/projectController');
         await projCtrl.migrate();
