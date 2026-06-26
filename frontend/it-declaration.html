@@ -7,66 +7,66 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-.content .card{overflow:visible;padding:0;border:1.5px solid #c5cae9;border-radius:12px;max-width:100%}
+.content .card{overflow:visible;padding:0;border:1.5px solid #b8d49a;border-radius:12px;max-width:100%}
 .itd{width:100%;box-sizing:border-box}
 /* ── Top bar ── */
-.itd-bar{padding:14px 22px 0;background:#fff;border-radius:12px 12px 0 0;border-bottom:2px solid #e8eaf6}
+.itd-bar{padding:14px 22px 0;background:#fff;border-radius:12px 12px 0 0;border-bottom:2px solid #eaf3d8}
 .itd-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-bottom:12px}
 /* ── Employee Info Panel ── */
-.emp-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;background:#f0f4ff;border:1.5px solid #c5cae9;border-radius:10px;padding:14px 18px;margin:14px 22px 0}
-.emp-field{display:flex;flex-direction:column;gap:2px;background:#fff;border:1.5px solid #c5cae9;border-radius:8px;padding:9px 12px}
-.emp-field .lbl{font-size:10px;font-weight:700;color:#9fa8da;text-transform:uppercase;letter-spacing:.05em}
-.emp-field .val{font-size:13px;font-weight:700;color:#1e3a5f}
+.emp-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;background:#f7faf3;border:1.5px solid #b8d49a;border-radius:10px;padding:14px 18px;margin:14px 22px 0}
+.emp-field{display:flex;flex-direction:column;gap:2px;background:#fff;border:1.5px solid #b8d49a;border-radius:8px;padding:9px 12px}
+.emp-field .lbl{font-size:10px;font-weight:700;color:#8aaa6a;text-transform:uppercase;letter-spacing:.05em}
+.emp-field .val{font-size:13px;font-weight:700;color:var(--text2)}
 /* ── Controls ── */
-.itd-ctrl{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:10px 22px;background:#f8f9ff;border-bottom:1px solid #e0e3ec}
+.itd-ctrl{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:10px 22px;background:#f7faf3;border-bottom:1px solid #d4e5be}
 .itd-ctrl-item{display:flex;align-items:center;gap:8px}
-.itd-window-bar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:8px 22px;background:#eef1fd;border-bottom:1px solid #e0e3ec}
+.itd-window-bar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:8px 22px;background:#eef1fd;border-bottom:1px solid #d4e5be}
 .iwb-item{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .iwb-icon{font-size:15px}
-.iwb-lbl{font-size:11px;font-weight:700;color:#5c6bc0;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
-.iwb-val{font-size:12.5px;font-weight:600;color:#283593;display:inline}
+.iwb-lbl{font-size:11px;font-weight:700;color:#4a8c1c;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+.iwb-val{font-size:12.5px;font-weight:600;color:#3a7015;display:inline}
 .iwb-val.closed{color:#b91c1c}
 .iwb-val.open{color:#166534}
-.iwb-divider{width:1px;height:18px;background:#c5cae9}
-.itd-ctrl label{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;margin:0}
-.itd-ctrl select,.itd-ctrl input{padding:7px 11px;border-radius:7px;border:1.5px solid #c5cae9;font-size:13px;font-family:inherit;background:#fff;outline:none}
-.itd-ctrl select:focus{border-color:#3949ab}
+.iwb-divider{width:1px;height:18px;background:#b8d49a}
+.itd-ctrl label{font-size:11px;font-weight:700;color:#5a7a42;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;margin:0}
+.itd-ctrl select,.itd-ctrl input{padding:7px 11px;border-radius:7px;border:1.5px solid #b8d49a;font-size:13px;font-family:inherit;background:#fff;outline:none}
+.itd-ctrl select:focus{border-color:var(--accent)}
 /* ── Regime toggle ── */
-.reg-tog{display:flex;border-radius:8px;overflow:hidden;border:1.5px solid #c5cae9}
-.reg-btn{padding:7px 20px;border:none;background:#fff;font-size:12.5px;font-weight:600;color:#546e7a;cursor:pointer;transition:all .15s}
-.reg-btn.active{background:#3949ab;color:#fff}
-.reg-btn:first-child{border-right:1.5px solid #c5cae9}
+.reg-tog{display:flex;border-radius:8px;overflow:hidden;border:1.5px solid #b8d49a}
+.reg-btn{padding:7px 20px;border:none;background:#fff;font-size:12.5px;font-weight:600;color:#5a7a42;cursor:pointer;transition:all .15s}
+.reg-btn.active{background:#4a8c1c;color:#fff}
+.reg-btn:first-child{border-right:1.5px solid #b8d49a}
 /* ── Status badge ── */
 .st-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:700;letter-spacing:.04em}
-.st-draft    {background:#fef9c3;color:#92400e;border:1px solid #fde68a}
-.st-submitted{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+.st-draft    {background:#eaf3d8;color:#3a7015;border:1px solid #d4e5be}
+.st-submitted{background:#dbeafe;color:#4a8c1c;border:1px solid #b8d49a}
 .st-approved {background:#dcfce7;color:#166534;border:1px solid #86efac}
-.st-rejected {background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.st-rejected {background:#d4e5be;color:#166534;border:1px solid #b8d49a}
 .st-verified {background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe}
 /* ── Tabs ── */
 .itd-tabs{display:flex;width:100%}
-.itd-tab{flex:1;padding:12px 8px;border:none;background:transparent;font-size:12.5px;font-weight:600;color:#78909c;cursor:pointer;border-bottom:3px solid transparent;text-align:center;transition:all .15s}
-.itd-tab:hover{color:#3949ab;background:#f5f6fb}
-.itd-tab.active{color:#3949ab;border-bottom-color:#3949ab;font-weight:700}
+.itd-tab{flex:1;padding:12px 8px;border:none;background:transparent;font-size:12.5px;font-weight:600;color:#5a7a42;cursor:pointer;border-bottom:3px solid transparent;text-align:center;transition:all .15s}
+.itd-tab:hover{color:var(--accent);background:#f7faf3}
+.itd-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
 .itd-body{padding:20px 22px}
 /* ── Deduction summary cards ── */
 .ded-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:18px}
-.ded-card{border:1.5px solid #c5cae9;border-radius:10px;padding:12px 14px;background:#fff}
-.ded-card .dc-lbl{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
-.ded-card .dc-val{font-size:18px;font-weight:800;color:#1e3a5f}
+.ded-card{border:1.5px solid #b8d49a;border-radius:10px;padding:12px 14px;background:#fff}
+.ded-card .dc-lbl{font-size:11px;font-weight:700;color:#5a7a42;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.ded-card .dc-val{font-size:18px;font-weight:800;color:var(--text2)}
 .ded-card .dc-sub{font-size:11px;color:#9ca3af;margin-top:2px}
 .ded-card.used{border-color:#86efac;background:#f0fdf4}
 .ded-card.used .dc-val{color:#166534}
-.ded-card.warn{border-color:#fde68a;background:#fefce8}
-.ded-card.warn .dc-val{color:#92400e}
+.ded-card.warn{border-color:#d4e5be;background:#fefce8}
+.ded-card.warn .dc-val{color:#3a7015}
 /* ── Section accordion ── */
-.it-sec{border:1.5px solid #e0e3ec;border-radius:10px;margin-bottom:10px;overflow:hidden}
-.it-sec-hdr{padding:12px 16px;background:#f5f6fb;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
-.it-sec-hdr:hover{background:#eef0fb}
-.it-sec-hdr .sh-title{font-size:13px;font-weight:700;color:#283593;display:flex;align-items:center;gap:8px}
+.it-sec{border:1.5px solid #d4e5be;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.it-sec-hdr{padding:12px 16px;background:#f7faf3;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.it-sec-hdr:hover{background:#eaf3d8}
+.it-sec-hdr .sh-title{font-size:13px;font-weight:700;color:#3a7015;display:flex;align-items:center;gap:8px}
 .it-sec-hdr .sh-right{display:flex;align-items:center;gap:8px}
 .it-sec-hdr .sh-amt{font-size:13px;font-weight:800;color:#166534}
-.it-sec-hdr .sh-chev{font-size:11px;color:#9fa8da;transition:transform .2s}
+.it-sec-hdr .sh-chev{font-size:11px;color:#8aaa6a;transition:transform .2s}
 .it-sec-hdr.open .sh-chev{transform:rotate(180deg)}
 .it-sec-hdr.sec-complete{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-bottom:2px solid #86efac}
 .it-sec-hdr.sec-complete .sh-title{color:#166534}
@@ -80,81 +80,81 @@
 .fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px 18px}
 @media(max-width:680px){.fg2,.fg3{grid-template-columns:1fr}}
 .if{display:flex;flex-direction:column;gap:4px}
-.if label{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.04em}
-.if input,.if select,.if textarea{padding:9px 11px;border:1.5px solid #d0d5e8;border-radius:7px;font-size:13.5px;font-family:inherit;color:#1e293b;background:#f8f9ff;outline:none;transition:border-color .15s,background .15s;width:100%;box-sizing:border-box}
-.if input:focus,.if select:focus,.if textarea:focus{border-color:#3949ab;background:#fff;box-shadow:0 0 0 3px rgba(57,73,171,.07)}
-.if input[readonly]{background:#f0f2f8;color:#546e7a;cursor:default}
-.if .hint{font-size:11px;color:#94a3b8}
-.sub-lbl{font-size:11px;font-weight:800;color:#3949ab;letter-spacing:.06em;text-transform:uppercase;margin:14px 0 10px;display:flex;align-items:center;gap:8px}
-.sub-lbl::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,#c5cae9,transparent)}
-.lim-bar{display:flex;flex-wrap:wrap;gap:6px 16px;background:#eef0fb;border:1px solid #c5cae9;border-radius:7px;padding:8px 12px;margin-top:10px;font-size:12px}
-.lim-bar span{font-weight:600;color:#3949ab}.lim-bar b{color:#166534}
+.if label{font-size:11px;font-weight:700;color:#5a7a42;text-transform:uppercase;letter-spacing:.04em}
+.if input,.if select,.if textarea{padding:9px 11px;border:1.5px solid #d0d5e8;border-radius:7px;font-size:13.5px;font-family:inherit;color:#1e293b;background:#f7faf3;outline:none;transition:border-color .15s,background .15s;width:100%;box-sizing:border-box}
+.if input:focus,.if select:focus,.if textarea:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(57,73,171,.07)}
+.if input[readonly]{background:#f7faf3;color:#5a7a42;cursor:default}
+.if .hint{font-size:11px;color:#5a7a42}
+.sub-lbl{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;margin:14px 0 10px;display:flex;align-items:center;gap:8px}
+.sub-lbl::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,#b8d49a,transparent)}
+.lim-bar{display:flex;flex-wrap:wrap;gap:6px 16px;background:#eaf3d8;border:1px solid #b8d49a;border-radius:7px;padding:8px 12px;margin-top:10px;font-size:12px}
+.lim-bar span{font-weight:600;color:var(--accent)}.lim-bar b{color:#166534}
 /* ── Proof upload inside section ── */
 .proof-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 @media(max-width:600px){.proof-grid{grid-template-columns:1fr}}
-.proof-item{border:1.5px solid #e0e3ec;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fafbff}
+.proof-item{border:1.5px solid #d4e5be;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f7faf3}
 .proof-item .pi-info{flex:1;min-width:0}
-.proof-item .pi-name{font-size:12px;font-weight:700;color:#1e3a5f}
-.proof-item .pi-file{font-size:11px;color:#546e7a;margin-top:2px}
+.proof-item .pi-name{font-size:12px;font-weight:700;color:var(--text2)}
+.proof-item .pi-file{font-size:11px;color:#5a7a42;margin-top:2px}
 .proof-item .pi-actions{display:flex;gap:5px;align-items:center;flex-shrink:0}
 .proof-st{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:8px}
 .ps-none   {background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb}
-.ps-pending{background:#fef9c3;color:#92400e;border:1px solid #fde68a}
+.ps-pending{background:#eaf3d8;color:#3a7015;border:1px solid #d4e5be}
 .ps-approved{background:#dcfce7;color:#166534;border:1px solid #86efac}
-.ps-rejected{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.ps-rejected{background:#d4e5be;color:#166534;border:1px solid #b8d49a}
 /* ── Tax Preview ── */
 .regime-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
 @media(max-width:580px){.regime-cmp{grid-template-columns:1fr}}
-.rc{border:2px solid #e0e3ec;border-radius:12px;padding:18px;text-align:center;position:relative}
+.rc{border:2px solid #d4e5be;border-radius:12px;padding:18px;text-align:center;position:relative}
 .rc.cheaper{border-color:#166534;background:#f0fdf4}
-.rc h3{font-size:14px;font-weight:800;color:#1e3a5f;margin:0 0 10px}
-.rc .tax-amt{font-size:30px;font-weight:800;color:#1e3a5f}
-.rc .tds-ln{font-size:12px;color:#546e7a;margin-top:4px}
+.rc h3{font-size:14px;font-weight:800;color:var(--text2);margin:0 0 10px}
+.rc .tax-amt{font-size:30px;font-weight:800;color:var(--text2)}
+.rc .tds-ln{font-size:12px;color:#5a7a42;margin-top:4px}
 .rc .rec-bdg{display:inline-block;background:#166534;color:#fff;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:10px;margin-top:8px}
-.rc .sel-btn{margin-top:12px;width:100%;padding:8px;border-radius:7px;border:1.5px solid #3949ab;background:#fff;color:#3949ab;font-size:12px;font-weight:700;cursor:pointer}
-.rc .sel-btn:hover,.rc .sel-btn.chosen{background:#3949ab;color:#fff}
-.tax-bk{background:#f0f4ff;border:1.5px solid #c5cae9;border-radius:10px;padding:16px 18px;margin-bottom:14px}
-.tax-bk h4{font-size:12px;font-weight:800;color:#3949ab;text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px}
-.tr{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e0e3ec;font-size:13px}
-.tr:last-child{border-bottom:none;font-weight:800;font-size:14px;color:#283593}
-.tr .tl{color:#546e7a}.tr .tv{font-weight:700;color:#1e293b}
+.rc .sel-btn{margin-top:12px;width:100%;padding:8px;border-radius:7px;border:1.5px solid #4a8c1c;background:#fff;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer}
+.rc .sel-btn:hover,.rc .sel-btn.chosen{background:#4a8c1c;color:#fff}
+.tax-bk{background:#f7faf3;border:1.5px solid #b8d49a;border-radius:10px;padding:16px 18px;margin-bottom:14px}
+.tax-bk h4{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px}
+.tr{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #d4e5be;font-size:13px}
+.tr:last-child{border-bottom:none;font-weight:800;font-size:14px;color:#3a7015}
+.tr .tl{color:#5a7a42}.tr .tv{font-weight:700;color:#1e293b}
 .tr.ded .tv{color:#166534}
-.tr.total .tv{color:#3949ab;font-size:15px}
-.tds-hl{background:linear-gradient(135deg,#1e3a5f,#3949ab);border-radius:9px;padding:14px 18px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.tr.total .tv{color:var(--accent);font-size:15px}
+.tds-hl{background:linear-gradient(135deg,#2d4a18,#4a8c1c);border-radius:9px;padding:14px 18px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin-top:12px}
 .tds-hl .thl{font-size:12.5px;font-weight:600;opacity:.85}
 .tds-hl .tha{font-size:24px;font-weight:800}
-.rec-box{background:#fffbeb;border:1.5px solid #fde68a;border-radius:9px;padding:14px 16px;font-size:13px;color:#92400e;margin-bottom:14px}
-.rec-box strong{color:#1e3a5f;display:block;font-size:15px;margin-bottom:4px}
+.rec-box{background:#fffbeb;border:1.5px solid #d4e5be;border-radius:9px;padding:14px 16px;font-size:13px;color:#3a7015;margin-bottom:14px}
+.rec-box strong{color:var(--text2);display:block;font-size:15px;margin-bottom:4px}
 .rec-box ul{margin:8px 0 0 16px;padding:0}
 .rec-box li{margin-bottom:4px}
 /* ── HR dashboard stats ── */
 .hr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
-.hr-stat{border:1.5px solid #e0e3ec;border-radius:9px;padding:12px 14px;text-align:center}
-.hr-stat .hs-n{font-size:26px;font-weight:800;color:#1e3a5f}
-.hr-stat .hs-l{font-size:11px;font-weight:600;color:#546e7a;text-transform:uppercase;letter-spacing:.04em}
+.hr-stat{border:1.5px solid #d4e5be;border-radius:9px;padding:12px 14px;text-align:center}
+.hr-stat .hs-n{font-size:26px;font-weight:800;color:var(--text2)}
+.hr-stat .hs-l{font-size:11px;font-weight:600;color:#5a7a42;text-transform:uppercase;letter-spacing:.04em}
 /* ── HR Table ── */
 .hr-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
-.hr-tbl th{background:#1e3a5f;color:#fff;font-weight:700;padding:10px 12px;text-align:left;letter-spacing:.03em;white-space:nowrap}
-.hr-tbl td{padding:10px 12px;border-bottom:1px solid #e8eaf6;vertical-align:middle}
-.hr-tbl tr:nth-child(even) td{background:#f8faff}
-.hr-tbl tr:hover td{background:#eef0fb}
+.hr-tbl th{background:#2d4a18;color:#fff;font-weight:700;padding:10px 12px;text-align:left;letter-spacing:.03em;white-space:nowrap}
+.hr-tbl td{padding:10px 12px;border-bottom:1px solid #eaf3d8;vertical-align:middle}
+.hr-tbl tr:nth-child(even) td{background:#f7faf3}
+.hr-tbl tr:hover td{background:#eaf3d8}
 /* ── Admin config ── */
 .cfg-tbl{width:100%;border-collapse:collapse;font-size:13px}
-.cfg-tbl th{background:#283593;color:#fff;padding:10px 12px;text-align:left;font-weight:700}
-.cfg-tbl td{padding:10px 12px;border-bottom:1px solid #e8eaf6;vertical-align:middle}
-.cfg-tbl tr:nth-child(even) td{background:#f8faff}
-.cfg-tbl input{padding:6px 10px;border:1.5px solid #c5cae9;border-radius:6px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box}
+.cfg-tbl th{background:#3a7015;color:#fff;padding:10px 12px;text-align:left;font-weight:700}
+.cfg-tbl td{padding:10px 12px;border-bottom:1px solid #eaf3d8;vertical-align:middle}
+.cfg-tbl tr:nth-child(even) td{background:#f7faf3}
+.cfg-tbl input{padding:6px 10px;border:1.5px solid #b8d49a;border-radius:6px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box}
 /* ── Modal ── */
 .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
 .mo.open{display:flex}
 .mb{background:#fff;border-radius:14px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
-.mb h3{font-size:16px;font-weight:800;color:#1e3a5f;margin:0 0 14px}
+.mb h3{font-size:16px;font-weight:800;color:var(--text2);margin:0 0 14px}
 .mc{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:#888;margin-top:-4px}
 /* ── House property card ── */
-.hp-card{border:1.5px solid #c5cae9;border-radius:9px;padding:14px 16px;margin-bottom:10px;background:#fafbff;position:relative}
+.hp-card{border:1.5px solid #b8d49a;border-radius:9px;padding:14px 16px;margin-bottom:10px;background:#f7faf3;position:relative}
 .hp-card-del{position:absolute;top:8px;right:10px;background:none;border:none;font-size:17px;cursor:pointer;color:#ef4444}
 /* ── Locked notice ── */
-.lk-notice{background:#fef9c3;border:1.5px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#92400e;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.lk-notice{background:#eaf3d8;border:1.5px solid #d4e5be;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#3a7015;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 </style>
 </head>
 <body>
@@ -195,7 +195,7 @@
     <!-- Top bar -->
     <div class="itd-bar">
       <div class="itd-row">
-        <div style="font-size:17px;font-weight:800;color:#1e3a5f">🧾 Income Tax Declaration</div>
+        <div style="font-size:17px;font-weight:800;color:var(--text2)">🧾 Income Tax Declaration</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span id="decl-st-badge" class="st-badge st-draft">📝 Draft</span>
           <button id="btn-save"   class="btn btn-outline btn-sm" onclick="saveDecl('save')">💾 Save Draft</button>
@@ -294,7 +294,7 @@
                 <option value="nonmetro">Non-Metro — 40%</option>
               </select>
             </div>
-            <div class="hint" style="font-size:11.5px;color:#546e7a;margin-top:8px">Exemption = Min(Actual HRA, Rent−10% Basic, 50%/40% of Basic)</div>
+            <div class="hint" style="font-size:11.5px;color:#5a7a42;margin-top:8px">Exemption = Min(Actual HRA, Rent−10% Basic, 50%/40% of Basic)</div>
             <div class="sub-lbl">Proof Documents</div>
             <div class="proof-grid" id="pg-HRA"></div>
           </div>
@@ -321,7 +321,7 @@
             <div class="lim-bar">
               <span>Declared: <b id="c80c-d">₹0</b></span>
               <span>Eligible (Max ₹1.5L): <b id="c80c-e">₹0</b></span>
-              <span>Remaining: <b id="c80c-r" style="color:#92400e">₹1,50,000</b></span>
+              <span>Remaining: <b id="c80c-r" style="color:#3a7015">₹1,50,000</b></span>
             </div>
             <div class="sub-lbl">Proof Documents</div>
             <div class="proof-grid" id="pg-80C"></div>
@@ -557,17 +557,17 @@
             <span class="sh-right"><span class="sh-amt" id="s-enps"></span><span class="sh-chev">▼</span></span>
           </div>
           <div class="it-sec-body open">
-            <div style="background:#eef0fb;border:1.5px solid #c5cae9;border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;color:#3949ab;font-weight:600">
+            <div style="background:#eaf3d8;border:1.5px solid #b8d49a;border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;color:var(--accent);font-weight:600">
               ℹ️ Auto-fetched from your payroll structure. Read-only. No attachment required.
             </div>
             <div class="fg2">
               <div class="if">
                 <label>Employer NPS Contribution (₹)</label>
-                <input type="number" id="employer_nps" placeholder="Auto-fetched" readonly style="background:#f0f2f8;color:#546e7a">
+                <input type="number" id="employer_nps" placeholder="Auto-fetched" readonly style="background:#f7faf3;color:#5a7a42">
               </div>
               <div class="if">
                 <label>Section</label>
-                <input type="text" value="80CCD(2) — Employer Contribution" readonly style="background:#f0f2f8;color:#546e7a">
+                <input type="text" value="80CCD(2) — Employer Contribution" readonly style="background:#f7faf3;color:#5a7a42">
               </div>
             </div>
           </div>
@@ -593,7 +593,7 @@
       </div>
 
       <!-- Save bar -->
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:2px solid #e8eaf6">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:2px solid #eaf3d8">
         <button class="btn btn-outline" onclick="saveDecl('save')">💾 Save Draft</button>
         <button class="btn btn-primary" onclick="confirmSubmit()">✅ Submit to HR</button>
       </div>
@@ -613,7 +613,7 @@
     <div id="pane-hr" class="itd-body" style="display:none">
       <div id="hr-stats-row" class="hr-stats"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:13px;font-weight:700;color:#1e3a5f">All Declarations</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text2)">All Declarations</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <select id="hr-filter-fy" class="form-control" style="font-size:13px;padding:7px 10px;width:auto" onchange="loadHR()">
             <!-- populated by buildFYDropdowns() -->
@@ -631,7 +631,7 @@
           </button>
         </div>
       </div>
-      <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e3ec">
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid #d4e5be">
         <table class="hr-tbl">
           <thead><tr>
             <th>Employee</th><th>Code</th><th>PAN</th><th>FY</th><th>Regime</th>
@@ -645,7 +645,7 @@
 
     <!-- ══ TAB: Admin Config ══ -->
     <div id="pane-cfg" class="itd-body" style="display:none">
-      <div style="font-size:14px;font-weight:700;color:#1e3a5f;margin-bottom:14px">⚙️ Tax Configuration — FY <span id="cfg-fy-label">2025-26</span></div>
+      <div style="font-size:14px;font-weight:700;color:var(--text2);margin-bottom:14px">⚙️ Tax Configuration — FY <span id="cfg-fy-label">2025-26</span></div>
       <div id="cfg-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
@@ -659,7 +659,7 @@
   <div class="mb">
     <button class="mc" onclick="closeMo('mo-review')">×</button>
     <h3 id="mo-review-title">Review Declaration</h3>
-    <div id="mo-review-body" style="font-size:13px;color:#546e7a;margin-bottom:12px"></div>
+    <div id="mo-review-body" style="font-size:13px;color:#5a7a42;margin-bottom:12px"></div>
     <div class="if"><label>Action</label>
       <select id="review-action">
         <option value="approve">✅ Approve</option>
@@ -988,7 +988,7 @@ function renderNewProperties() {
   el.innerHTML = newHouseProps.map((p, i) => `
     <div class="hp-card">
       <button class="hp-card-del" onclick="removeNewProperty(${i})">×</button>
-      <div style="font-size:12px;font-weight:700;color:#3949ab;margin-bottom:8px">Property ${i+1}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">Property ${i+1}</div>
       <div class="fg2">
         <div class="if"><label>Property Type</label>
           <select onchange="newHouseProps[${i}].type=this.value">
@@ -1030,7 +1030,7 @@ function renderProperties() {
   document.getElementById('hp-list').innerHTML = houseProps.map((p, i) => `
     <div class="hp-card">
       <button class="hp-card-del" onclick="removeProperty(${i})">×</button>
-      <div style="font-size:12px;font-weight:700;color:#3949ab;margin-bottom:8px">Property ${i+1}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">Property ${i+1}</div>
       <div class="fg2">
         <div class="if"><label>Property Name</label><input type="text" value="${p.name||''}" oninput="houseProps[${i}].name=this.value"></div>
         <div class="if"><label>Property Type</label>
@@ -1156,8 +1156,8 @@ function setLocked(locked) {
   if (isSubmitted) {
     lkNotice.style.display = '';
     lkNotice.style.background = '#eff6ff';
-    lkNotice.style.border = '1px solid #93c5fd';
-    lkNotice.style.color = '#1d4ed8';
+    lkNotice.style.border = '1px solid #b8d49a';
+    lkNotice.style.color = '#4a8c1c';
     lkNotice.innerHTML = '📤 <strong>Declaration submitted to HR.</strong> You cannot edit until HR sends it back or rejects it.';
   } else if (isApproved) {
     lkNotice.style.display = '';
@@ -1167,9 +1167,9 @@ function setLocked(locked) {
     lkNotice.innerHTML = '✅ <strong>Declaration approved by HR.</strong> No further changes allowed.';
   } else if (isRejected) {
     lkNotice.style.display = '';
-    lkNotice.style.background = '#fef2f2';
-    lkNotice.style.border = '1px solid #fca5a5';
-    lkNotice.style.color = '#991b1b';
+    lkNotice.style.background = '#f7faf3';
+    lkNotice.style.border = '1px solid #b8d49a';
+    lkNotice.style.color = '#166534';
     lkNotice.innerHTML = '❌ <strong>Declaration rejected by HR.</strong> ' + (currentDecl?.hr_comment ? 'Reason: ' + currentDecl.hr_comment : 'Please revise and re-submit.');
   } else {
     lkNotice.style.display = 'none';
@@ -1230,7 +1230,7 @@ function renderProofGrids() {
         const stCls = `ps-${f.status}`;
         const stLbl = f.status==='approved' ? '✅ Verified' : f.status==='rejected' ? '❌ Rejected' : '⏳ Pending';
         const viewBtn = `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 7px" title="View document" onclick="viewProof(${f.id},'${def.l}')">👁</button>`;
-        const delBtn  = !isLocked ? `<button class="btn btn-sm" style="font-size:11px;padding:3px 7px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" title="Delete this file" onclick="delProof(${f.id},'${sec}','${def.k}')">🗑</button>` : '';
+        const delBtn  = !isLocked ? `<button class="btn btn-sm" style="font-size:11px;padding:3px 7px;background:#d4e5be;color:#166534;border:1px solid #b8d49a" title="Delete this file" onclick="delProof(${f.id},'${sec}','${def.k}')">🗑</button>` : '';
         return `<div class="proof-item" style="margin-bottom:4px">
           <div class="pi-info">
             <div class="pi-name" style="font-size:11.5px">📎 ${f.file_name || 'File'}</div>
@@ -1240,9 +1240,9 @@ function renderProofGrids() {
       }).join('');
 
       // Section header row with label + upload button
-      const headerRow = `<div class="proof-item" style="${hasAny ? 'background:#f0f4ff;border-color:#c5cae9;margin-bottom:2px' : ''}">
+      const headerRow = `<div class="proof-item" style="${hasAny ? 'background:#f7faf3;border-color:#b8d49a;margin-bottom:2px' : ''}">
         <div class="pi-info"><div class="pi-name">${def.l}</div>
-          ${!hasAny ? '<div class="pi-file" style="color:#94a3b8">— Not Uploaded</div>' : `<div class="pi-file" style="color:#166534">${allFiles.length} file${allFiles.length>1?'s':''} uploaded</div>`}
+          ${!hasAny ? '<div class="pi-file" style="color:#5a7a42">— Not Uploaded</div>' : `<div class="pi-file" style="color:#166534">${allFiles.length} file${allFiles.length>1?'s':''} uploaded</div>`}
         </div>
         <div class="pi-actions">
           ${hasAny ? '' : `<span class="proof-st ps-none">— Not Uploaded</span>`}
@@ -1387,7 +1387,7 @@ async function viewProof(proofId, label) {
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       document.getElementById('mo-proof-body').innerHTML =
-        `<div style="text-align:center;padding:32px;color:#c62828">
+        `<div style="text-align:center;padding:32px;color:#3a7015">
           <div style="font-size:32px;margin-bottom:8px">⚠️</div>
           <div style="font-weight:700">${err.message || 'Failed to load file'}</div>
           <div style="font-size:12px;color:#888;margin-top:4px">The file may have been uploaded before a server migration.<br>Please re-upload the document.</div>
@@ -1412,7 +1412,7 @@ async function viewProof(proofId, label) {
     }
   } catch(err) {
     document.getElementById('mo-proof-body').innerHTML =
-      `<div style="text-align:center;padding:32px;color:#c62828">
+      `<div style="text-align:center;padding:32px;color:#3a7015">
         <div style="font-size:32px;margin-bottom:8px">⚠️</div>
         <div style="font-weight:700">Network error</div>
         <div style="font-size:12px;color:#888;margin-top:4px">${err.message}</div>
@@ -1434,8 +1434,8 @@ function renderProofTab() {
     <div class="hr-stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
       <div class="hr-stat"><div class="hs-n">${done}</div><div class="hs-l">Uploaded</div></div>
       <div class="hr-stat"><div class="hs-n" style="color:#166534">${verif}</div><div class="hs-l">Verified</div></div>
-      <div class="hr-stat"><div class="hs-n" style="color:#92400e">${pending}</div><div class="hs-l">Pending Review</div></div>
-      <div class="hr-stat"><div class="hs-n" style="color:#991b1b">${reject}</div><div class="hs-l">Rejected</div></div>
+      <div class="hr-stat"><div class="hs-n" style="color:#3a7015">${pending}</div><div class="hs-l">Pending Review</div></div>
+      <div class="hr-stat"><div class="hs-n" style="color:#166534">${reject}</div><div class="hs-l">Rejected</div></div>
     </div>
     ${Object.entries(PROOF_DEFS).map(([sec, defs]) => {
       const secUploads = uploadedProofs[sec] || [];
@@ -1553,7 +1553,7 @@ async function loadTaxPreview() {
         <div><div class="thl">Net Tax Payable (Old Regime)</div></div>
         <div class="tha">${money(o.net_tax)}</div>
       </div>
-      <div class="tds-hl" style="background:linear-gradient(135deg,#283593,#3949ab);margin-top:8px">
+      <div class="tds-hl" style="background:linear-gradient(135deg,var(--accent-h),#4a8c1c);margin-top:8px">
         <div><div class="thl">Monthly TDS</div></div>
         <div class="tha">${money(o.monthly_tds)}/mo</div>
       </div>
@@ -1590,12 +1590,12 @@ async function loadHRStats() {
   if (!res?.success) return;
   const d = res.data;
   document.getElementById('hr-stats-row').innerHTML = [
-    {n:d.submitted,   l:'Submitted', c:'#1d4ed8'},
+    {n:d.submitted,   l:'Submitted', c:'#4a8c1c'},
     {n:d.approved,    l:'Approved',  c:'#166534'},
-    {n:d.rejected,    l:'Rejected',  c:'#991b1b'},
+    {n:d.rejected,    l:'Rejected',  c:'#166534'},
     {n:d.verified,    l:'Verified',  c:'#6b21a8'},
-    {n:d.locked_count,l:'Locked',    c:'#92400e'},
-    {n:d.draft,       l:'Draft',     c:'#546e7a'},
+    {n:d.locked_count,l:'Locked',    c:'#3a7015'},
+    {n:d.draft,       l:'Draft',     c:'#5a7a42'},
   ].map(s => `<div class="hr-stat"><div class="hs-n" style="color:${s.c}">${s.n||0}</div><div class="hs-l">${s.l}</div></div>`).join('');
 }
 
@@ -1609,14 +1609,14 @@ async function loadHR() {
   if (!res.data.length) { tb.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#9ca3af;padding:28px">No records found for selected filters</td></tr>'; return; }
   const stM = {draft:'st-draft',submitted:'st-submitted',approved:'st-approved',rejected:'st-rejected',verified:'st-verified'};
   tb.innerHTML = res.data.map(d => `<tr>
-    <td style="font-weight:700;color:#1e3a5f">${d.employee_name}${d.locked?'&nbsp;🔒':''}</td>
+    <td style="font-weight:700;color:var(--text2)">${d.employee_name}${d.locked?'&nbsp;🔒':''}</td>
     <td>${d.employee_code}</td>
-    <td style="font-size:11.5px;color:#546e7a">${d.pan_number||'—'}</td>
+    <td style="font-size:11.5px;color:#5a7a42">${d.pan_number||'—'}</td>
     <td>${d.financial_year}</td>
-    <td><span style="font-size:11px;background:#e8eaf6;color:#3949ab;padding:2px 8px;border-radius:4px;font-weight:700">${(d.regime||'old').toUpperCase()}</span></td>
+    <td><span style="font-size:11px;background:var(--accent-l);color:var(--accent);padding:2px 8px;border-radius:4px;font-weight:700">${(d.regime||'old').toUpperCase()}</span></td>
     <td>${money(d.total_80c||0)}</td>
     <td>${money(d.total_deductions||0)}</td>
-    <td style="font-weight:700;color:#283593">${money(d.estimated_tax||0)}</td>
+    <td style="font-weight:700;color:#3a7015">${money(d.estimated_tax||0)}</td>
     <td style="font-weight:700">${money(d.monthly_tds||0)}/mo</td>
     <td><span class="st-badge ${stM[d.status]||'st-draft'}">${d.status}</span></td>
     <td>${d.submitted_at ? fmt.date(d.submitted_at) : '—'}</td>
@@ -1698,13 +1698,13 @@ async function viewDeclDetail(id) {
   if (d.audit_logs?.length) {
     auditHtml = `<div class="sub-lbl" style="margin-top:14px">Audit Log</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f0f4ff"><th style="padding:7px;text-align:left;border-bottom:1px solid #e0e3ec">Action</th><th style="padding:7px;border-bottom:1px solid #e0e3ec">By</th><th style="padding:7px;border-bottom:1px solid #e0e3ec">When</th></tr></thead>
-        <tbody>${d.audit_logs.slice(0,15).map(al => `<tr><td style="padding:7px;border-bottom:1px solid #f0f2f8;font-weight:600;color:#283593">${al.action}</td><td style="padding:7px;border-bottom:1px solid #f0f2f8">${al.actor_name||al.performed_by||'—'}</td><td style="padding:7px;border-bottom:1px solid #f0f2f8;color:#546e7a">${fmt.ago(al.created_at)}</td></tr>`).join('')}</tbody>
+        <thead><tr style="background:#f7faf3"><th style="padding:7px;text-align:left;border-bottom:1px solid #d4e5be">Action</th><th style="padding:7px;border-bottom:1px solid #d4e5be">By</th><th style="padding:7px;border-bottom:1px solid #d4e5be">When</th></tr></thead>
+        <tbody>${d.audit_logs.slice(0,15).map(al => `<tr><td style="padding:7px;border-bottom:1px solid #f7faf3;font-weight:600;color:#3a7015">${al.action}</td><td style="padding:7px;border-bottom:1px solid #f7faf3">${al.actor_name||al.performed_by||'—'}</td><td style="padding:7px;border-bottom:1px solid #f7faf3;color:#5a7a42">${fmt.ago(al.created_at)}</td></tr>`).join('')}</tbody>
       </table>`;
   }
   document.getElementById('mo-detail-body').innerHTML = `
     <div class="fg2" style="margin-bottom:12px">
-      ${fields.map(([l,v]) => `<div><div style="font-size:10px;font-weight:700;color:#9fa8da;text-transform:uppercase;letter-spacing:.05em">${l}</div><div style="font-size:13px;font-weight:700;color:#1e3a5f">${v}</div></div>`).join('')}
+      ${fields.map(([l,v]) => `<div><div style="font-size:10px;font-weight:700;color:#8aaa6a;text-transform:uppercase;letter-spacing:.05em">${l}</div><div style="font-size:13px;font-weight:700;color:var(--text2)">${v}</div></div>`).join('')}
     </div>${auditHtml}`;
 }
 
@@ -1727,7 +1727,7 @@ async function viewDeclProofs(declId) {
         <span class="proof-st ps-${p.status}">${p.status}</span>
         <button class="btn btn-outline btn-sm" style="font-size:11px" title="Preview document" onclick="viewProof(${p.id},'${p.section_label||p.section}')">👁 View</button>
         ${p.status!=='approved'?`<button class="btn btn-sm" style="font-size:11px;background:#dcfce7;color:#166534;border:1px solid #86efac" title="Approve this proof" onclick="qkReviewProof(${p.id},'approve')">✅ Approve</button>`:''}
-        ${p.status!=='rejected'?`<button class="btn btn-sm" style="font-size:11px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" title="Reject this proof" onclick="qkReviewProof(${p.id},'reject')">❌ Reject</button>`:''}
+        ${p.status!=='rejected'?`<button class="btn btn-sm" style="font-size:11px;background:#d4e5be;color:#166534;border:1px solid #b8d49a" title="Reject this proof" onclick="qkReviewProof(${p.id},'reject')">❌ Reject</button>`:''}
       </div>
     </div>`).join('');
 }
@@ -1743,17 +1743,17 @@ async function loadCfg() {
   const el  = document.getElementById('cfg-content');
   const res = await api('GET', `/it-declaration/config?fy=${fy}`);
   if (!res?.success) { el.innerHTML = '<p style="color:#ef4444">Failed to load config</p>'; return; }
-  el.innerHTML = `<div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e3ec">
+  el.innerHTML = `<div style="overflow-x:auto;border-radius:8px;border:1px solid #d4e5be">
     <table class="cfg-tbl">
       <thead><tr><th style="width:200px">Config Key</th><th>Description</th><th style="width:200px">Value</th><th style="width:100px">Action</th></tr></thead>
       <tbody>${res.data.map(r => `<tr>
-        <td style="font-size:12px;font-weight:700;color:#283593">${r.config_key}</td>
-        <td style="font-size:12px;color:#546e7a">${r.description||'—'}</td>
+        <td style="font-size:12px;font-weight:700;color:#3a7015">${r.config_key}</td>
+        <td style="font-size:12px;color:#5a7a42">${r.description||'—'}</td>
         <td><input id="cfg-${r.config_key.replace(/[^a-z0-9]/gi,'_')}" value="${r.config_value}" style="font-size:12.5px"></td>
         <td><button class="btn btn-primary btn-sm" style="font-size:11px" onclick="saveCfgRow('${r.config_key}','${r.config_key.replace(/[^a-z0-9]/gi,'_')}','${r.description||''}')">Save</button></td>
       </tr>`).join('')}</tbody>
     </table></div>
-  <div style="margin-top:12px;font-size:12px;color:#546e7a">Changes take effect immediately. Tax calculations use these values at runtime.</div>`;
+  <div style="margin-top:12px;font-size:12px;color:#5a7a42">Changes take effect immediately. Tax calculations use these values at runtime.</div>`;
 }
 async function saveCfgRow(key, idSafe, desc) {
   const val = document.getElementById('cfg-' + idSafe)?.value;

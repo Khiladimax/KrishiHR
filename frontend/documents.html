@@ -12,29 +12,29 @@
 .doc-page { width:100%; }
 
 /* ── Top bar ── */
-.doc-topbar { padding:16px 24px 0;background:#fff;border-radius:12px 12px 0 0;border-bottom:2px solid #e8eaf6; }
+.doc-topbar { padding:16px 24px 0;background:#fff;border-radius:12px 12px 0 0;border-bottom:2px solid #eaf3d8; }
 
 /* ── HR Search ── */
 .hr-search-row { display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding-bottom:14px; }
-.hr-search-label { font-size:11px;font-weight:800;color:#9fa8da;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap; }
+.hr-search-label { font-size:11px;font-weight:800;color:#8aaa6a;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap; }
 .hr-search-bar { position:relative; }
-.hr-search-input { width:280px;padding:9px 14px 9px 36px;border-radius:8px;border:1.5px solid #c5cae9;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;background:#f5f6fb; }
-.hr-search-input:focus { border-color:#3949ab;background:#fff; }
-.hr-search-icon { position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:#9fa8da; }
-.hr-search-dropdown { position:absolute;top:calc(100% + 4px);left:0;min-width:300px;background:#fff;border:1.5px solid #9fa8da;border-radius:10px;box-shadow:0 8px 32px rgba(57,73,171,.14);z-index:9999;max-height:260px;overflow-y:auto;display:none; }
+.hr-search-input { width:280px;padding:9px 14px 9px 36px;border-radius:8px;border:1.5px solid #b8d49a;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;background:#f7faf3; }
+.hr-search-input:focus { border-color:var(--accent);background:#fff; }
+.hr-search-icon { position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:#8aaa6a; }
+.hr-search-dropdown { position:absolute;top:calc(100% + 4px);left:0;min-width:300px;background:#fff;border:1.5px solid #8aaa6a;border-radius:10px;box-shadow:0 8px 32px rgba(57,73,171,.14);z-index:9999;max-height:260px;overflow-y:auto;display:none; }
 .hr-search-dropdown.open { display:block }
-.hr-search-option { padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f8; }
+.hr-search-option { padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f7faf3; }
 .hr-search-option:last-child { border-bottom:none }
-.hr-search-option:hover { background:#e8eaf6 }
-.hr-selected-badge { display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#3949ab,#5c6bc0);color:#fff;border-radius:20px;padding:6px 14px;font-size:12.5px;font-weight:600;box-shadow:0 2px 8px rgba(57,73,171,.25); }
+.hr-search-option:hover { background:var(--accent-l) }
+.hr-selected-badge { display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#4a8c1c,#4a8c1c);color:#fff;border-radius:20px;padding:6px 14px;font-size:12.5px;font-weight:600;box-shadow:0 2px 8px rgba(57,73,171,.25); }
 .hr-selected-badge .badge-clear { cursor:pointer;opacity:.75;font-size:16px;line-height:1;margin-left:2px; }
 .hr-selected-badge .badge-clear:hover { opacity:1 }
 
 /* ── Tabs — equal width, full stretch ── */
 .doc-tabs { display:flex;width:100%;margin-top:6px; }
-.doc-tab-btn { flex:1;padding:14px 10px;border:none;background:transparent;font-size:13.5px;font-weight:600;color:#78909c;cursor:pointer;transition:all .15s;border-bottom:3px solid transparent;text-align:center;letter-spacing:.01em; }
-.doc-tab-btn:hover { color:#3949ab;background:#f5f6fb; }
-.doc-tab-btn.active { color:#3949ab;border-bottom:3px solid #3949ab;font-weight:700; }
+.doc-tab-btn { flex:1;padding:14px 10px;border:none;background:transparent;font-size:13.5px;font-weight:600;color:#5a7a42;cursor:pointer;transition:all .15s;border-bottom:3px solid transparent;text-align:center;letter-spacing:.01em; }
+.doc-tab-btn:hover { color:var(--accent);background:#f7faf3; }
+.doc-tab-btn.active { color:var(--accent);border-bottom:3px solid #4a8c1c;font-weight:700; }
 
 /* ── Tab body ── */
 .doc-tab-body { padding:24px; }
@@ -45,37 +45,37 @@
   border:1.5px solid #1a1a2e;border-radius:10px;
   padding:24px 28px;margin-bottom:24px;background:#fff;
 }
-.form-box-title { font-size:15px;font-weight:800;color:#283593;margin:0 0 20px;padding-bottom:12px;border-bottom:2px solid #e8eaf6; }
+.form-box-title { font-size:15px;font-weight:800;color:#3a7015;margin:0 0 20px;padding-bottom:12px;border-bottom:2px solid #eaf3d8; }
 .fg { display:grid;grid-template-columns:1fr 1fr;gap:16px 24px; }
 .fg3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 24px; }
 @media(max-width:768px){ .fg,.fg3 { grid-template-columns:1fr } }
-.fl { font-size:11px;font-weight:700;color:#546e7a;letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px;display:block; }
-.fc { font-size:13.5px;padding:10px 14px;border-radius:7px;border:1.5px solid #d0d5e8;background:#f8f9ff;width:100%;box-sizing:border-box;font-family:inherit;transition:border-color .15s,background .15s; }
-.fc:focus { border-color:#3949ab;background:#fff;outline:none;box-shadow:0 0 0 3px rgba(57,73,171,.08); }
+.fl { font-size:11px;font-weight:700;color:#5a7a42;letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px;display:block; }
+.fc { font-size:13.5px;padding:10px 14px;border-radius:7px;border:1.5px solid #d0d5e8;background:#f7faf3;width:100%;box-sizing:border-box;font-family:inherit;transition:border-color .15s,background .15s; }
+.fc:focus { border-color:var(--accent);background:#fff;outline:none;box-shadow:0 0 0 3px rgba(57,73,171,.08); }
 textarea.fc { resize:vertical;min-height:80px; }
-.fsec { font-size:11px;font-weight:800;color:#3949ab;letter-spacing:.06em;text-transform:uppercase;margin:20px 0 12px;display:flex;align-items:center;gap:8px; }
-.fsec::after { content:'';flex:1;height:1px;background:linear-gradient(90deg,#c5cae9,transparent); }
+.fsec { font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 12px;display:flex;align-items:center;gap:8px; }
+.fsec::after { content:'';flex:1;height:1px;background:linear-gradient(90deg,#b8d49a,transparent); }
 .fchks { display:flex;gap:12px;flex-wrap:wrap;margin-top:14px; }
-.fchk { display:inline-flex;align-items:center;gap:8px;background:#f0f2ff;border:1.5px solid #c5cae9;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;color:#3949ab;cursor:pointer; }
-.fchk input[type=checkbox] { width:15px;height:15px;accent-color:#3949ab }
-.fchk:hover { background:#e8eaf6 }
-.fbtn { display:flex;justify-content:flex-end;gap:12px;padding-top:16px;border-top:2px solid #e8eaf6;margin-top:20px; }
+.fchk { display:inline-flex;align-items:center;gap:8px;background:#eaf3d8;border:1.5px solid #b8d49a;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;color:var(--accent);cursor:pointer; }
+.fchk input[type=checkbox] { width:15px;height:15px;accent-color:var(--accent) }
+.fchk:hover { background:var(--accent-l) }
+.fbtn { display:flex;justify-content:flex-end;gap:12px;padding-top:16px;border-top:2px solid #eaf3d8;margin-top:20px; }
 
 /* ── Saved Records Table ── */
 .rec-table-wrap { overflow-x:auto;margin-top:8px;border:1px solid #d1d5db;border-radius:8px }
 .rec-table { width:100%;border-collapse:collapse;min-width:700px; }
-.rec-table th { background:#1e3a5f;color:#fff;font-size:11.5px;font-weight:700;padding:10px 14px;text-align:left;letter-spacing:.04em;border:1px solid #2d5282; }
+.rec-table th { background:#2d4a18;color:#fff;font-size:11.5px;font-weight:700;padding:10px 14px;text-align:left;letter-spacing:.04em;border:1px solid #2d5282; }
 .rec-table td { border:1px solid #e5e7eb;padding:10px 14px;font-size:13px;vertical-align:middle;background:#fff; }
-.rec-table tr:nth-child(even) td { background:#f8faff }
-.rec-table tr:hover td { background:#eef0fb }
-.rec-tag { display:inline-block;font-size:11px;background:#e8eaf6;color:#3949ab;border-radius:4px;padding:2px 7px;font-weight:600;margin:1px 2px;border:1px solid #c5cae9; }
+.rec-table tr:nth-child(even) td { background:#f7faf3 }
+.rec-table tr:hover td { background:#eaf3d8 }
+.rec-tag { display:inline-block;font-size:11px;background:var(--accent-l);color:var(--accent);border-radius:4px;padding:2px 7px;font-weight:600;margin:1px 2px;border:1px solid #b8d49a; }
 
 /* ── Documents table cells ── */
-.attach-chip { display:inline-flex;align-items:center;gap:5px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:5px;padding:3px 8px;font-size:11.5px;color:#1b5e20;cursor:pointer;max-width:180px;font-weight:600; }
+.attach-chip { display:inline-flex;align-items:center;gap:5px;background:#eaf3d8;border:1px solid #a5d6a7;border-radius:5px;padding:3px 8px;font-size:11.5px;color:#3a7015;cursor:pointer;max-width:180px;font-weight:600; }
 .attach-chip:hover { background:#c8e6c9 }
 .attach-chip-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px }
-.attach-chip-del { color:#90a4ae;cursor:pointer;font-size:14px;line-height:1; }
-.attach-chip-del:hover { color:#c62828 }
+.attach-chip-del { color:#8aaa6a;cursor:pointer;font-size:14px;line-height:1; }
+.attach-chip-del:hover { color:#3a7015 }
 
 /* ── Modal ── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
@@ -336,7 +336,7 @@ function onSearchInput() {
     (e.employee_code || '').toLowerCase().includes(q)
   ).slice(0, 10);
   if (!matches.length) {
-    dd.innerHTML = '<div class="hr-search-option" style="color:#90a4ae">No results found</div>';
+    dd.innerHTML = '<div class="hr-search-option" style="color:#8aaa6a">No results found</div>';
     dd.classList.add('open'); return;
   }
   dd.innerHTML = matches.map(e =>
@@ -384,7 +384,7 @@ function clearEmployeeSelection() {
 // ══════════════════════════════════════════════════════════════════════════════
 const DOC_GROUPS = [
   { label:'📄 Resume',              bg:'#1a237e', keys:['resume'] },
-  { label:'🏆 Broker / Compliance', bg:'#1b5e20', keys:['broker_qual_renewal','broker_training'] },
+  { label:'🏆 Broker / Compliance', bg:'#3a7015', keys:['broker_qual_renewal','broker_training'] },
   { label:'🪪 Identity Documents',  bg:'#bf360c', keys:['aadhaar_card','pan_card','id_residence_proof','passport_dl_voterid','passport_photo'] },
   { label:'🎓 Educational',          bg:'#4a148c', keys:['tenth_marksheet','twelfth_marksheet','graduation_marksheet','post_graduation_cert'] },
   { label:'💳 Financial',            bg:'#0d47a1', keys:['last3_payslips','bank_statement_salary','uan_pf_document'] },
@@ -437,11 +437,11 @@ function renderTable() {
     <table style="border-collapse:collapse;width:100%;min-width:900px">
       <thead>
         <tr>
-          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;text-align:left;width:30%">Document</th>
-          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:10%">Submitted</th>
-          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:22%">Add Attachments</th>
-          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:24%">Attachments</th>
-          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:14%">Updated</th>
+          <th style="${XLH};background:var(--accent-l);border:1px solid #8aaa6a;text-align:left;width:30%">Document</th>
+          <th style="${XLH};background:var(--accent-l);border:1px solid #8aaa6a;width:10%">Submitted</th>
+          <th style="${XLH};background:var(--accent-l);border:1px solid #8aaa6a;width:22%">Add Attachments</th>
+          <th style="${XLH};background:var(--accent-l);border:1px solid #8aaa6a;width:24%">Attachments</th>
+          <th style="${XLH};background:var(--accent-l);border:1px solid #8aaa6a;width:14%">Updated</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -457,11 +457,11 @@ function buildRow(d, idx) {
   const bg        = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
 
   const submitted = (hasFiles || hasPending)
-    ? `<span style="display:inline-flex;align-items:center;gap:5px;color:#1b5e20;font-weight:700;font-size:12px;background:#dcfce7;border:1px solid #86efac;padding:3px 12px;border-radius:20px">✅ Yes</span>`
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;color:#3a7015;font-weight:700;font-size:12px;background:#dcfce7;border:1px solid #86efac;padding:3px 12px;border-radius:20px">✅ Yes</span>`
     : `<span style="display:inline-flex;align-items:center;gap:4px;color:#6b7280;font-weight:600;font-size:12px;background:#f3f4f6;border:1px solid #d1d5db;padding:3px 12px;border-radius:20px">— No</span>`;
 
   const pendBadge = hasPending
-    ? `<div style="font-size:10.5px;color:#283593;background:#e8eaf6;border:1px solid #9fa8da;border-radius:6px;padding:3px 8px;margin-top:4px;font-weight:600">📎 ${pend.length} file(s) ready</div>` : '';
+    ? `<div style="font-size:10.5px;color:#3a7015;background:var(--accent-l);border:1px solid #8aaa6a;border-radius:6px;padding:3px 8px;margin-top:4px;font-weight:600">📎 ${pend.length} file(s) ready</div>` : '';
 
   const fileCell = `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
     <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="font-size:11.5px;max-width:180px"
@@ -484,14 +484,14 @@ function buildRow(d, idx) {
     const dt = new Date(docs[0].uploaded_at);
     if (!isNaN(dt)) {
       dtHtml = `<div style="text-align:center">
-        <div style="font-size:12px;font-weight:700;color:#283593">${fmt.date(docs[0].uploaded_at)}</div>
-        <div style="font-size:11px;color:#5c6bc0">${dt.toLocaleTimeString(window.CFG.currencyLocale,{hour:'2-digit',minute:'2-digit'})}</div>
+        <div style="font-size:12px;font-weight:700;color:#3a7015">${fmt.date(docs[0].uploaded_at)}</div>
+        <div style="font-size:11px;color:#4a8c1c">${dt.toLocaleTimeString(window.CFG.currencyLocale,{hour:'2-digit',minute:'2-digit'})}</div>
       </div>`;
     }
   }
 
   return `<tr style="background:${bg}">
-    <td style="${XLD};font-weight:600;color:#1e3a5f;text-align:left">${d.label}</td>
+    <td style="${XLD};font-weight:600;color:var(--text2);text-align:left">${d.label}</td>
     <td style="${XLD};text-align:center">${submitted}</td>
     <td style="${XLD};text-align:center">${fileCell}</td>
     <td style="${XLD};text-align:center">${attachHtml}</td>
@@ -535,7 +535,7 @@ async function viewAttachment(docId, name, mime) {
     }
   } catch(err) {
     document.getElementById('viewerBody').innerHTML =
-      `<p style="color:#c62828">Failed to load.<br><small>${err.message}</small></p>`;
+      `<p style="color:#3a7015">Failed to load.<br><small>${err.message}</small></p>`;
   }
 }
 
@@ -588,7 +588,7 @@ async function loadEmploymentRecords() {
   if (!res?.success || !res.data?.length) {
     el.innerHTML = ''; return;
   }
-  el.innerHTML = `<div style="font-size:11px;font-weight:800;color:#9fa8da;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">SAVED RECORDS</div>
+  el.innerHTML = `<div style="font-size:11px;font-weight:800;color:#8aaa6a;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">SAVED RECORDS</div>
     <div class="rec-table-wrap"><table class="rec-table">
       <thead><tr>
         <th>Company</th><th>Designation</th><th>Period</th><th>Job Type</th>
@@ -605,15 +605,15 @@ function buildEmpCard(r) {
   const flags= [r.is_overseas&&'🌐 Overseas', r.is_relevant&&'✅ Relevant'].filter(Boolean).join(' ');
   const hrBtns = isHR ? `<td style="white-space:nowrap">
     <button class="btn btn-outline btn-sm" onclick="loadEmpIntoForm(${r.id})">✏️</button>
-    <button class="btn btn-sm" style="background:#fce4ec;color:#c62828;border:1px solid #f48fb1" onclick="deleteEmployment(${r.id})">🗑️</button>
+    <button class="btn btn-sm" style="background:var(--accent-l);color:#3a7015;border:1px solid #8dc63f" onclick="deleteEmployment(${r.id})">🗑️</button>
   </td>` : '';
   return `<tr>
-    <td style="font-weight:700;color:#283593">${r.company_name}${flags?`<br><small style="font-weight:400;color:#78909c">${flags}</small>`:''}</td>
+    <td style="font-weight:700;color:#3a7015">${r.company_name}${flags?`<br><small style="font-weight:400;color:#5a7a42">${flags}</small>`:''}</td>
     <td>${r.designation||'—'}</td>
     <td style="white-space:nowrap">${from}<br><span style="color:#9ca3af;font-size:11px">→ ${to}</span></td>
     <td><span class="rec-tag">${r.job_type||'—'}</span></td>
     <td>${loc}</td>
-    <td style="color:#546e7a">${r.pf_number||'—'}</td>
+    <td style="color:#5a7a42">${r.pf_number||'—'}</td>
     ${hrBtns}
   </tr>`;
 }
@@ -707,7 +707,7 @@ async function loadQualificationRecords() {
   if (!res?.success || !res.data?.length) {
     el.innerHTML = ''; return;
   }
-  el.innerHTML = `<div style="font-size:11px;font-weight:800;color:#9fa8da;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">SAVED RECORDS</div>
+  el.innerHTML = `<div style="font-size:11px;font-weight:800;color:#8aaa6a;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">SAVED RECORDS</div>
     <div class="rec-table-wrap"><table class="rec-table">
       <thead><tr>
         <th>Qualification</th><th>Degree / Spec</th><th>Institute</th>
@@ -723,13 +723,13 @@ function buildQualCard(r) {
   const passed = [r.passing_month ? MONTHS[r.passing_month] : '', r.passing_year].filter(Boolean).join(' ') || '—';
   const hrBtns = isHR ? `<td style="white-space:nowrap">
     <button class="btn btn-outline btn-sm" onclick="loadQualIntoForm(${r.id})">✏️</button>
-    <button class="btn btn-sm" style="background:#fce4ec;color:#c62828;border:1px solid #f48fb1" onclick="deleteQualification(${r.id})">🗑️</button>
+    <button class="btn btn-sm" style="background:var(--accent-l);color:#3a7015;border:1px solid #8dc63f" onclick="deleteQualification(${r.id})">🗑️</button>
   </td>` : '';
   return `<tr>
-    <td><span class="rec-tag">${r.qualification||'—'}</span>${r.is_highest?'<br><span class="rec-tag" style="background:#fff8e1;color:#e65100;border-color:#ffe082">⭐ Highest</span>':''}</td>
-    <td style="font-weight:600;color:#283593">${r.degree||r.qualification||'—'}${r.specialization?`<br><span style="font-weight:400;color:#546e7a;font-size:12px">${r.specialization}</span>`:''}</td>
+    <td><span class="rec-tag">${r.qualification||'—'}</span>${r.is_highest?'<br><span class="rec-tag" style="background:#fff8e1;color:#e65100;border-color:#d4e5be">⭐ Highest</span>':''}</td>
+    <td style="font-weight:600;color:#3a7015">${r.degree||r.qualification||'—'}${r.specialization?`<br><span style="font-weight:400;color:#5a7a42;font-size:12px">${r.specialization}</span>`:''}</td>
     <td>${r.institute_name||'—'}</td>
-    <td style="color:#546e7a">${r.board_university||'—'}</td>
+    <td style="color:#5a7a42">${r.board_university||'—'}</td>
     <td style="white-space:nowrap">${passed}</td>
     <td>${r.grade_percentage||'—'}</td>
     <td><span class="rec-tag">${r.mode_of_education||'—'}</span></td>
