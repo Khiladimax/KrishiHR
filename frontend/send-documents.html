@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Send Documents</title>
+<script src="config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── Layout ── */
+.sd-layout { display:grid; grid-template-columns:420px 1fr; gap:20px; align-items:start; }
+.sd-layout.full-width { grid-template-columns:1fr; }
+@media(max-width:900px){ .sd-layout { grid-template-columns:1fr; } }
+
+/* ── Send Panel ── */
+.send-panel {
+  background:#fff; border-radius:16px;
+  box-shadow:0 2px 12px rgba(0,0,0,.07);
+  border:1px solid #f0f0f0; overflow:hidden;
+  position:sticky; top:20px;
+}
+.send-panel-header {
+  background:linear-gradient(135deg,#C0272D,#E53935);
+  padding:20px 24px; color:#fff;
+}
+.send-panel-header h2 { margin:0; font-size:16px; font-weight:700; }
+.send-panel-header p  { margin:4px 0 0; font-size:12px; opacity:.85; }
+.send-panel-body { padding:20px 24px; }
+
+/* ── Form fields ── */
+.sf-label { font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.06em; text-transform:uppercase; display:block; margin-bottom:5px; }
+.sf-input {
+  width:100%; padding:10px 14px; border:1.5px solid #e5e7eb;
+  border-radius:8px; font-size:13.5px; font-family:inherit;
+  background:#f9fafb; transition:.15s; box-sizing:border-box;
+}
+.sf-input:focus { border-color:#C0272D; background:#fff; outline:none; box-shadow:0 0 0 3px rgba(192,39,45,.1); }
+.sf-group { margin-bottom:14px; }
+
+/* ── Recipient search ── */
+.recip-search { position:relative; }
+.recip-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:13px; pointer-events:none; }
+.recip-input { padding-left:34px !important; }
+.recip-dropdown {
+  position:absolute; top:calc(100% + 4px); left:0; right:0;
+  background:#fff; border:1.5px solid #e5e7eb; border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:9999;
+  max-height:220px; overflow-y:auto; display:none;
+}
+.recip-dropdown.open { display:block; }
+.recip-option { padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f3f4f6; }
+.recip-option:last-child { border-bottom:none; }
+.recip-option:hover { background:#fef2f2; }
+.recip-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:linear-gradient(135deg,#C0272D,#E53935); color:#fff;
+  border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:600;
+  box-shadow:0 2px 8px rgba(192,39,45,.25);
+}
+.recip-badge .clr { cursor:pointer; opacity:.8; font-size:16px; }
+.recip-badge .clr:hover { opacity:1; }
+
+/* ── Drop zone ── */
+.drop-zone {
+  border:2px dashed #fca5a5; background:#fff8f8;
+  border-radius:10px; padding:24px 16px; text-align:center;
+  cursor:pointer; transition:.15s; margin-top:4px;
+}
+.drop-zone:hover, .drop-zone.dragover { background:#fee2e2; border-color:#C0272D; }
+.drop-zone-icon { font-size:26px; margin-bottom:6px; }
+.drop-zone-text { font-size:13px; color:#6b7280; font-weight:600; }
+.drop-zone-sub  { font-size:11px; color:#9ca3af; margin-top:3px; }
+
+/* ── Picked files ── */
+.picked-list { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+.picked-item {
+  display:flex; align-items:center; gap:10px;
+  background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:8px 12px;
+}
+.picked-icon { font-size:18px; flex-shrink:0; }
+.picked-name { flex:1; font-size:12.5px; font-weight:600; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.picked-size { font-size:11px; color:#9ca3af; flex-shrink:0; }
+.picked-del  { cursor:pointer; color:#d1d5db; font-size:18px; flex-shrink:0; transition:.1s; }
+.picked-del:hover { color:#C0272D; }
+
+/* ── Submit button ── */
+.send-btn {
+  width:100%; padding:12px; border:none; border-radius:10px; font-size:14px;
+  font-weight:700; cursor:pointer; margin-top:16px; letter-spacing:.3px;
+  background:linear-gradient(135deg,#C0272D,#E53935); color:#fff;
+  transition:.15s; box-shadow:0 2px 8px rgba(192,39,45,.3);
+}
+.send-btn:hover:not(:disabled) { background:linear-gradient(135deg,#8B1A1A,#C0272D); box-shadow:0 4px 12px rgba(192,39,45,.4); }
+.send-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* ── Right panel (inbox/sent) ── */
+.inbox-panel { background:#fff; border-radius:16px; box-shadow:0 2px 12px rgba(0,0,0,.07); border:1px solid #f0f0f0; overflow:hidden; }
+.inbox-tabs { display:flex; border-bottom:2px solid #f3f4f6; }
+.inbox-tab {
+  flex:1; padding:14px 10px; border:none; background:transparent;
+  font-size:13px; font-weight:600; color:#6b7280; cursor:pointer;
+  transition:.15s; border-bottom:3px solid transparent; margin-bottom:-2px;
+}
+.inbox-tab:hover { color:#C0272D; background:#fef2f2; }
+.inbox-tab.active { color:#C0272D; border-bottom-color:#C0272D; font-weight:700; }
+.inbox-body { padding:20px; }
+
+/* ── Batch cards ── */
+.batch-card {
+  border:1.5px solid #f3f4f6; border-radius:12px; padding:16px 18px;
+  margin-bottom:12px; background:#fff; transition:.15s;
+}
+.batch-card:hover { border-color:#fca5a5; box-shadow:0 3px 14px rgba(192,39,45,.07); }
+.batch-card.unread { border-color:#C0272D; background:#fff8f8; }
+.batch-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.batch-title { font-size:14px; font-weight:800; color:#111827; margin:0 0 4px; }
+.batch-meta  { font-size:11.5px; color:#9ca3af; display:flex; gap:8px; flex-wrap:wrap; }
+.batch-meta b { color:#6b7280; }
+.batch-note  { font-size:12.5px; color:#6b7280; background:#f9fafb; border-left:3px solid #fca5a5; border-radius:0 6px 6px 0; padding:8px 12px; margin:10px 0; }
+.new-pill { background:#C0272D; color:#fff; font-size:9px; font-weight:800; letter-spacing:.05em; padding:2px 8px; border-radius:20px; vertical-align:middle; margin-left:6px; }
+
+/* ── File rows in batch ── */
+.file-list { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+.file-row {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:#f9fafb; border:1.5px solid #f3f4f6; border-radius:10px; padding:10px 14px;
+  transition:.15s;
+}
+.file-row:hover { border-color:#fca5a5; background:#fff8f8; }
+.file-row-left { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.file-row-icon { font-size:22px; flex-shrink:0; }
+.file-row-info { display:flex; flex-direction:column; min-width:0; }
+.file-row-name { font-size:13px; font-weight:600; color:#111827; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file-row-size { font-size:11px; color:#9ca3af; margin-top:1px; }
+.file-row-actions { display:flex; gap:6px; flex-shrink:0; }
+.file-action-btn {
+  border:none; border-radius:7px; padding:6px 12px; font-size:11.5px; font-weight:700;
+  cursor:pointer; transition:.15s; letter-spacing:.2px;
+}
+.view-btn { background:#EFF6FF; color:#1D4ED8; }
+.view-btn:hover { background:#DBEAFE; }
+.dl-btn { background:#F0FDF4; color:#15803D; }
+.dl-btn:hover { background:#DCFCE7; }
+.del-btn { background:#FFF1F2; color:#BE123C; }
+.del-btn:hover { background:#FFE4E6; }
+
+/* ── Empty / loader ── */
+.sd-empty { text-align:center; padding:48px 20px; color:#9ca3af; }
+.sd-empty-icon { font-size:40px; margin-bottom:12px; }
+.sd-empty p  { font-size:13.5px; margin:0; }
+
+/* ── Modal ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:#fff; border-radius:16px; width:min(680px,95vw); max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 8px 40px rgba(0,0,0,.2); border-top:4px solid #C0272D; }
+.modal-box h3 { font-size:16px; font-weight:700; margin:0 0 14px; color:#111827; }
+.modal-close  { float:right; background:none; border:none; font-size:22px; cursor:pointer; color:#9ca3af; margin-top:-4px; }
+.modal-close:hover { color:#C0272D; }
+
+/* ── Warn ── */
+.pick-warn { font-size:11.5px; color:#C0272D; font-weight:600; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark"></div>
+    <div><div class="logo-text-wrap"><div class="logo-text" id="sidebar-logo-text"></div></div>
+    <div class="sidebar-company-short" id="sidebar-company-short"></div></div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+      <div class="topbar-title">Send Documents</div>
+    </div>
+    <div class="topbar-right">
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+    <div class="sd-layout">
+
+      <!-- ── LEFT: Send Panel ── -->
+      <div class="send-panel" id="send-panel-wrap">
+        <div class="send-panel-header">
+          <h2>📤 Send Documents</h2>
+          <p>Send files directly to any employee</p>
+        </div>
+        <div class="send-panel-body">
+
+          <!-- Recipient -->
+          <div class="sf-group">
+            <label class="sf-label">Recipient *</label>
+            <div class="recip-search" id="recip-search-wrap">
+              <span class="recip-icon">🔍</span>
+              <input id="recip-input" class="sf-input recip-input" placeholder="Search by name or employee ID…"
+                autocomplete="off" oninput="onSearchInput()" onfocus="showDrop()" onblur="hideDrop()">
+              <div id="recip-drop" class="recip-dropdown"></div>
+            </div>
+            <div id="recip-badge-wrap" style="display:none;margin-top:8px">
+              <span class="recip-badge">
+                👤 <span id="recip-label"></span>
+                <span class="clr" onclick="clearRecip()" title="Clear">×</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div class="sf-group">
+            <label class="sf-label">Title <span style="font-weight:400;text-transform:none;opacity:.6">(optional)</span></label>
+            <input type="text" id="sd-title" class="sf-input" placeholder="e.g. Increment Letter 2026" maxlength="255">
+          </div>
+
+          <!-- Note -->
+          <div class="sf-group">
+            <label class="sf-label">Note to recipient <span style="font-weight:400;text-transform:none;opacity:.6">(optional)</span></label>
+            <input type="text" id="sd-note" class="sf-input" placeholder="e.g. Please review and sign">
+          </div>
+
+          <!-- Files -->
+          <div class="sf-group">
+            <label class="sf-label">Files (max 5, up to 10MB each) *</label>
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('sd-file-input').click()">
+              <div class="drop-zone-icon">📎</div>
+              <div class="drop-zone-text">Click to choose or drag &amp; drop</div>
+              <div class="drop-zone-sub">PDF, JPG, PNG, DOC, DOCX, XLS, XLSX</div>
+            </div>
+            <input type="file" id="sd-file-input" multiple style="display:none"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" onchange="onFilesChosen(this.files)">
+            <div class="picked-list" id="picked-list"></div>
+            <div id="pick-warn" class="pick-warn"></div>
+          </div>
+
+          <button class="send-btn" id="send-btn" onclick="submitSend()">📤 Send Documents</button>
+        </div>
+      </div>
+
+      <!-- ── RIGHT: Inbox/Sent ── -->
+      <div class="inbox-panel">
+        <div class="inbox-tabs">
+          <button class="inbox-tab active" id="tab-received" onclick="switchTab('received')">
+            📥 Received <span id="received-pill"></span>
+          </button>
+          <button class="inbox-tab" id="tab-sent" onclick="switchTab('sent')">
+            📁 Sent by Me
+          </button>
+        </div>
+        <div class="inbox-body" id="inbox-body">
+          <div class="loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Viewer Modal -->
+<div class="modal-overlay" id="viewerModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h3 id="viewerTitle">Attachment</h3>
+    <div id="viewerBody"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+Auth.guard();
+
+const HR_ROLES = ['hr','admin','super_admin','accounts'];
+const me = Auth.getUser();
+const isSender = HR_ROLES.includes(me?.role);
+
+let allEmployees = [];
+let selectedId   = null;
+let pickedFiles  = [];
+let currentTab   = 'received';
+
+window.addEventListener('load', () => {
+  buildSidebar('send-documents.html');
+
+  if (!isSender) {
+    document.getElementById('send-panel-wrap').style.display = 'none';
+    document.querySelector('.sd-layout').classList.add('full-width');
+    document.getElementById('tab-sent').style.display = 'none';
+  } else {
+    loadAllEmployees();
+  }
+
+  loadTab('received');
+});
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchTab(name) {
+  currentTab = name;
+  ['received','sent'].forEach(t => {
+    document.getElementById('tab-' + t)?.classList.toggle('active', t === name);
+  });
+  loadTab(name);
+}
+
+async function loadTab(name) {
+  const body = document.getElementById('inbox-body');
+  body.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  if (name === 'received') await loadReceived();
+  else                     await loadSent();
+}
+
+// ── Employees ─────────────────────────────────────────────────────────────────
+async function loadAllEmployees() {
+  const res = await api('GET', '/employees');
+  if (res?.success) allEmployees = (res.data || []).filter(e => e.id !== me.id);
+}
+
+// ── Recipient search ──────────────────────────────────────────────────────────
+function onSearchInput() {
+  const q  = (document.getElementById('recip-input').value || '').trim().toLowerCase();
+  const dd = document.getElementById('recip-drop');
+  if (!q) { dd.classList.remove('open'); return; }
+  const matches = allEmployees.filter(e =>
+    ((e.first_name||'') + ' ' + (e.last_name||'')).toLowerCase().includes(q) ||
+    (e.employee_code||'').toLowerCase().includes(q)
+  ).slice(0, 10);
+  dd.innerHTML = matches.length
+    ? matches.map(e => `<div class="recip-option" onmousedown="selectRecip(${e.id},'${esc(e.employee_code)} — ${esc(e.first_name)} ${esc(e.last_name)}')">${e.employee_code} — ${e.first_name} ${e.last_name}</div>`).join('')
+    : '<div class="recip-option" style="color:#9ca3af">No results</div>';
+  dd.classList.add('open');
+}
+function showDrop() { if (document.getElementById('recip-input').value.trim()) onSearchInput(); }
+function hideDrop() { setTimeout(() => document.getElementById('recip-drop').classList.remove('open'), 150); }
+function selectRecip(id, label) {
+  selectedId = id;
+  document.getElementById('recip-input').value = '';
+  document.getElementById('recip-drop').classList.remove('open');
+  document.getElementById('recip-label').textContent = label;
+  document.getElementById('recip-badge-wrap').style.display = '';
+}
+function clearRecip() {
+  selectedId = null;
+  document.getElementById('recip-badge-wrap').style.display = 'none';
+  document.getElementById('recip-input').value = '';
+}
+
+// ── File picking ──────────────────────────────────────────────────────────────
+const MAX_FILES = 5, MAX_SIZE = 10 * 1024 * 1024;
+
+function onFilesChosen(fileList) { addFiles(Array.from(fileList)); document.getElementById('sd-file-input').value = ''; }
+
+function addFiles(files) {
+  const warn = document.getElementById('pick-warn');
+  warn.textContent = '';
+  for (const f of files) {
+    if (f.size > MAX_SIZE) { warn.textContent = `⚠ Skipped "${f.name}" — over 10MB`; continue; }
+    if (pickedFiles.length >= MAX_FILES) { warn.textContent = `⚠ Max ${MAX_FILES} files allowed`; break; }
+    if (pickedFiles.some(p => p.name === f.name && p.size === f.size)) continue;
+    pickedFiles.push(f);
+  }
+  renderPicked();
+}
+
+function fileIcon(name) {
+  const ext = (name||'').split('.').pop().toLowerCase();
+  if (['jpg','jpeg','png','gif','webp'].includes(ext)) return '🖼️';
+  if (ext === 'pdf') return '📄';
+  if (['doc','docx'].includes(ext)) return '📝';
+  if (['xls','xlsx'].includes(ext)) return '📊';
+  return '📎';
+}
+
+function renderPicked() {
+  const el = document.getElementById('picked-list');
+  el.innerHTML = pickedFiles.map((f,i) => `
+    <div class="picked-item">
+      <span class="picked-icon">${fileIcon(f.name)}</span>
+      <span class="picked-name" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span class="picked-size">${fmtSz(f.size)}</span>
+      <span class="picked-del" onclick="removePicked(${i})" title="Remove">×</span>
+    </div>`).join('');
+}
+
+function removePicked(i) { pickedFiles.splice(i,1); document.getElementById('pick-warn').textContent=''; renderPicked(); }
+
+// Drag & drop
+(function(){
+  const dz = document.getElementById('drop-zone');
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('dragover'); }));
+  dz.addEventListener('drop', e => addFiles(Array.from(e.dataTransfer.files||[])));
+})();
+
+function resetForm() {
+  clearRecip();
+  document.getElementById('sd-title').value = '';
+  document.getElementById('sd-note').value  = '';
+  pickedFiles = [];
+  document.getElementById('pick-warn').textContent = '';
+  renderPicked();
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function submitSend() {
+  if (!selectedId)        { toast('Please select a recipient', 'error'); return; }
+  if (!pickedFiles.length){ toast('Please attach at least 1 file', 'error'); return; }
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  const fd = new FormData();
+  fd.append('recipient_id', selectedId);
+  fd.append('title', document.getElementById('sd-title').value.trim());
+  fd.append('note',  document.getElementById('sd-note').value.trim());
+  pickedFiles.forEach(f => fd.append('files', f));
+  try {
+    const res = await fetch(API_BASE + '/send-documents/send', {
+      method:'POST', headers:{ Authorization:'Bearer ' + Auth.getToken() }, body:fd
+    });
+    const data = await res.json();
+    if (data?.success) { toast(`${pickedFiles.length} document(s) sent ✅`); resetForm(); loadTab('sent'); }
+    else toast(data?.message || 'Failed', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+  btn.disabled = false; btn.textContent = '📤 Send Documents';
+}
+
+// ── Received ──────────────────────────────────────────────────────────────────
+async function loadReceived() {
+  const res = await api('GET', '/send-documents/received');
+  const body = document.getElementById('inbox-body');
+  if (!res?.success) { body.innerHTML = emptyState('⚠️', res?.message || 'Failed to load'); return; }
+  const batches = res.data || [];
+  updateReceivedPill(batches);
+  body.innerHTML = batches.length ? batches.map(b => batchCard(b,'received')).join('') : emptyState('📭','No documents received yet.');
+}
+
+async function loadSent() {
+  const res = await api('GET', '/send-documents/sent');
+  const body = document.getElementById('inbox-body');
+  if (!res?.success) { body.innerHTML = emptyState('⚠️', res?.message || 'Failed to load'); return; }
+  const batches = res.data || [];
+  body.innerHTML = batches.length ? batches.map(b => batchCard(b,'sent')).join('') : emptyState('📭', "You haven't sent any documents yet.");
+}
+
+function updateReceivedPill(batches) {
+  const unread = (batches||[]).filter(b => b.files.some(f => !f.read_at)).length;
+  document.getElementById('received-pill').innerHTML = unread ? `<span class="new-pill">${unread}</span>` : '';
+}
+
+// ── Batch card ────────────────────────────────────────────────────────────────
+function batchCard(b, mode) {
+  const hasUnread = mode === 'received' && b.files.some(f => !f.read_at);
+  const who = mode === 'received'
+    ? `Sent by <b>${esc(b.sender_name)}</b>`
+    : `Sent to <b>${esc(b.recipient_name)}</b>`;
+
+  const chips = b.files.map(f => `
+    <div class="file-row">
+      <div class="file-row-left">
+        <span class="file-row-icon">${fileIcon(f.original_name)}</span>
+        <div class="file-row-info">
+          <span class="file-row-name" title="${esc(f.original_name)}">${esc(f.original_name)}</span>
+          <span class="file-row-size">${fmtSz(f.file_size||0)}</span>
+        </div>
+      </div>
+      <div class="file-row-actions">
+        <button class="file-action-btn view-btn" onclick="viewFile(${f.id},'${esc(f.original_name)}','${esc(f.mime_type||'')}')">👁 View</button>
+        <button class="file-action-btn dl-btn" onclick="dlFile(${f.id},'${esc(f.original_name)}')">⬇ Download</button>
+        ${mode==='sent' ? `<button class="file-action-btn del-btn" onclick="delFile(${f.id},'${b.batch_id}')">🗑</button>` : ''}
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="batch-card ${hasUnread?'unread':''}">
+      <div class="batch-top">
+        <div>
+          <div class="batch-title">${esc(b.title)||'Untitled'} ${hasUnread?'<span class="new-pill">NEW</span>':''}</div>
+          <div class="batch-meta">
+            <span>${who}</span>
+            <span>•</span>
+            <span><b>${b.files.length}</b> file${b.files.length>1?'s':''}</span>
+            <span>•</span>
+            <span>${fmt.date(b.sent_at)}</span>
+          </div>
+        </div>
+      </div>
+      ${b.note ? `<div class="batch-note">💬 ${esc(b.note)}</div>` : ''}
+      <div class="file-list">${chips}</div>
+    </div>`;
+}
+
+// ── File actions ──────────────────────────────────────────────────────────────
+async function viewFile(id, name, mime) {
+  document.getElementById('viewerTitle').textContent = name || 'Attachment';
+  document.getElementById('viewerBody').innerHTML = '<div style="text-align:center;padding:30px;color:#888">Loading…</div>';
+  document.getElementById('viewerModal').classList.add('open');
+  try {
+    const res  = await fetch(`${API_BASE}/send-documents/file/${id}`, { headers:{ Authorization:'Bearer '+Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const m    = blob.type || mime || '';
+    if (m.startsWith('image/')) {
+      document.getElementById('viewerBody').innerHTML =
+        `<img src="${url}" style="max-width:100%;max-height:72vh;border-radius:8px;display:block;margin:0 auto">
+         <a href="${url}" download="${esc(name)}" class="btn btn-outline btn-sm" style="margin-top:10px;display:inline-block">⬇ Download</a>`;
+    } else if (m === 'application/pdf') {
+      document.getElementById('viewerBody').innerHTML =
+        `<iframe src="${url}" style="width:100%;height:72vh;border:none;border-radius:8px"></iframe>
+         <a href="${url}" download="${esc(name)}" class="btn btn-outline btn-sm" style="margin-top:8px;display:inline-block">⬇ Download</a>`;
+    } else {
+      document.getElementById('viewerBody').innerHTML =
+        `<p style="color:#555;margin-bottom:12px">Cannot preview <b>${esc(name)}</b>.</p>
+         <a href="${url}" download="${esc(name)}" class="btn btn-primary btn-sm">⬇ Download</a>`;
+    }
+    if (currentTab === 'received') loadReceived();
+  } catch(err) {
+    document.getElementById('viewerBody').innerHTML = `<p style="color:#c62828">Failed to load.<br><small>${esc(err.message)}</small></p>`;
+  }
+}
+
+async function dlFile(id, name) {
+  try {
+    const res  = await fetch(`${API_BASE}/send-documents/file/${id}`, { headers:{ Authorization:'Bearer '+Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=name||'document'; a.click();
+    URL.revokeObjectURL(url);
+    if (currentTab === 'received') loadReceived();
+  } catch(err) { toast('Download failed: ' + err.message, 'error'); }
+}
+
+async function delFile(id, batchId) {
+  if (!confirm('Remove this file? The recipient will no longer be able to access it.')) return;
+  const res = await api('DELETE', '/send-documents/' + id);
+  if (res?.success) { toast('Removed'); loadTab('sent'); }
+  else toast(res?.message || 'Failed', 'error');
+}
+
+function closeModal() { document.getElementById('viewerModal').classList.remove('open'); }
+document.getElementById('viewerModal').addEventListener('click', e => { if (e.target.id==='viewerModal') closeModal(); });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function emptyState(icon, msg) {
+  return `<div class="sd-empty"><div class="sd-empty-icon">${icon}</div><p>${esc(msg)}</p></div>`;
+}
+function fmtSz(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/(1024*1024)).toFixed(1) + ' MB';
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

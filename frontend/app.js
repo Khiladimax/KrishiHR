@@ -137,6 +137,8 @@ const NAV_GROUPS = [
     items: [
       { href:'form16.html',         icon: ICONS.form16,       label:'Form 16',          always:true, hideRoles:['client_admin'] },
       { href:'payslip.html',        icon: ICONS.payslip,      label:'My Payslip',       always:true, hideRoles:['client_admin'] },
+      { href:'documents.html',      icon: ICONS.mydocs,       label:'My Documents',     always:true },
+      { href:'send-documents.html', icon: '📤',               label:'Send Documents',   always:true },
     ]
   },
   {

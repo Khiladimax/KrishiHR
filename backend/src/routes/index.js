@@ -1041,6 +1041,55 @@ router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 // ── Call History ──────────────────────────────────────────────────────────────
 
 
+
+// ── Employee Documents module ─────────────────────────────────────────────────
+router.get   ('/documents/checklist',     authenticate,                    docsCtrl.getChecklistDefs);
+router.get   ('/documents/employees',     authenticate, authorize('hr','admin','super_admin'), docsCtrl.getEmployeesForPicker);
+router.get   ('/documents/download-zip/:employee_id', authenticate,        docsCtrl.downloadZip);
+router.get   ('/documents',                authenticate,                    docsCtrl.getDocuments);
+router.post  ('/documents/upload',         authenticate, docsCtrl.uploadMiddleware, docsCtrl.uploadDocument);
+router.post  ('/documents/upload-multi',   authenticate, (req, res, next) => {
+  docsCtrl.uploadMultiMiddleware(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message || 'File upload error' });
+    next();
+  });
+}, docsCtrl.uploadMultiDocument);
+router.get   ('/documents/file/:id',       authenticate,                    docsCtrl.getFile);
+router.delete('/documents/:id',            authenticate,                    docsCtrl.deleteDocument);
+
+// ── Employee Documents (new) ─────────────────────────────────────────────────
+const empDocsCtrl = require('../controllers/empDocsController');
+router.get   ('/emp-documents/types',                                         authenticate, empDocsCtrl.getDocumentTypes);
+router.get   ('/emp-documents/:employee_id',                                  authenticate, empDocsCtrl.getDocuments);
+router.post  ('/emp-documents/upload', empDocsCtrl.upload.single('file'),    authenticate, empDocsCtrl.uploadDocument);
+router.delete('/emp-documents/:id',                                           authenticate, empDocsCtrl.deleteDocument);
+// Multi-file upload for the documents checklist page
+router.post  ('/emp-documents/upload-multi', authenticate, (req, res, next) => {
+  docsCtrl.uploadMultiMiddleware(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message || 'File upload error' });
+    next();
+  });
+}, docsCtrl.uploadMultiDocument);
+
+// ── Previous Employment ───────────────────────────────────────────────────────
+router.get   ('/prev-employment/:employee_id', authenticate, empDocsCtrl.getPrevEmployment);
+router.post  ('/prev-employment',              authenticate, empDocsCtrl.upsertPrevEmployment);
+router.delete('/prev-employment/:id',          authenticate, empDocsCtrl.deletePrevEmployment);
+
+// ── Qualifications ────────────────────────────────────────────────────────────
+router.get   ('/qualifications/:employee_id',  authenticate, empDocsCtrl.getQualifications);
+router.post  ('/qualifications',               authenticate, empDocsCtrl.upsertQualification);
+router.delete('/qualifications/:id',           authenticate, empDocsCtrl.deleteQualification);
+
+// ── Send Documents (HR → Employee ad-hoc document delivery) ──────────────────
+const sendDocsCtrl = require('../controllers/sendDocumentsController');
+router.post ('/send-documents/send',          authenticate, authorize(...HR_ADMIN), sendDocsCtrl.uploadMiddleware, sendDocsCtrl.send);
+router.get  ('/send-documents/received',      authenticate,                         sendDocsCtrl.getReceived);
+router.get  ('/send-documents/sent',          authenticate, authorize(...HR_ADMIN), sendDocsCtrl.getSent);
+router.get  ('/send-documents/file/:id',      authenticate,                         sendDocsCtrl.getFile);
+router.get  ('/send-documents/zip/:batch_id', authenticate,                         sendDocsCtrl.getZip);
+router.delete('/send-documents/:id',          authenticate,                         sendDocsCtrl.deleteDoc);
+
 module.exports = router;
 
 

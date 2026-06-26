@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title id="page-title">Documents</title>
+<script src="config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.content .card { overflow:visible; padding:0; }
+.content { padding:16px; }
+.doc-page { width:100%; }
+
+/* ── Top bar ── */
+.doc-topbar { padding:16px 24px 0;background:#fff;border-radius:12px 12px 0 0;border-bottom:2px solid #e8eaf6; }
+
+/* ── HR Search ── */
+.hr-search-row { display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding-bottom:14px; }
+.hr-search-label { font-size:11px;font-weight:800;color:#9fa8da;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap; }
+.hr-search-bar { position:relative; }
+.hr-search-input { width:280px;padding:9px 14px 9px 36px;border-radius:8px;border:1.5px solid #c5cae9;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;background:#f5f6fb; }
+.hr-search-input:focus { border-color:#3949ab;background:#fff; }
+.hr-search-icon { position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:#9fa8da; }
+.hr-search-dropdown { position:absolute;top:calc(100% + 4px);left:0;min-width:300px;background:#fff;border:1.5px solid #9fa8da;border-radius:10px;box-shadow:0 8px 32px rgba(57,73,171,.14);z-index:9999;max-height:260px;overflow-y:auto;display:none; }
+.hr-search-dropdown.open { display:block }
+.hr-search-option { padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f8; }
+.hr-search-option:last-child { border-bottom:none }
+.hr-search-option:hover { background:#e8eaf6 }
+.hr-selected-badge { display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#3949ab,#5c6bc0);color:#fff;border-radius:20px;padding:6px 14px;font-size:12.5px;font-weight:600;box-shadow:0 2px 8px rgba(57,73,171,.25); }
+.hr-selected-badge .badge-clear { cursor:pointer;opacity:.75;font-size:16px;line-height:1;margin-left:2px; }
+.hr-selected-badge .badge-clear:hover { opacity:1 }
+
+/* ── Tabs — equal width, full stretch ── */
+.doc-tabs { display:flex;width:100%;margin-top:6px; }
+.doc-tab-btn { flex:1;padding:14px 10px;border:none;background:transparent;font-size:13.5px;font-weight:600;color:#78909c;cursor:pointer;transition:all .15s;border-bottom:3px solid transparent;text-align:center;letter-spacing:.01em; }
+.doc-tab-btn:hover { color:#3949ab;background:#f5f6fb; }
+.doc-tab-btn.active { color:#3949ab;border-bottom:3px solid #3949ab;font-weight:700; }
+
+/* ── Tab body ── */
+.doc-tab-body { padding:24px; }
+
+/* ── Excel-style form table ── */
+/* ── Form box ── */
+.form-box {
+  border:1.5px solid #1a1a2e;border-radius:10px;
+  padding:24px 28px;margin-bottom:24px;background:#fff;
+}
+.form-box-title { font-size:15px;font-weight:800;color:#283593;margin:0 0 20px;padding-bottom:12px;border-bottom:2px solid #e8eaf6; }
+.fg { display:grid;grid-template-columns:1fr 1fr;gap:16px 24px; }
+.fg3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 24px; }
+@media(max-width:768px){ .fg,.fg3 { grid-template-columns:1fr } }
+.fl { font-size:11px;font-weight:700;color:#546e7a;letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px;display:block; }
+.fc { font-size:13.5px;padding:10px 14px;border-radius:7px;border:1.5px solid #d0d5e8;background:#f8f9ff;width:100%;box-sizing:border-box;font-family:inherit;transition:border-color .15s,background .15s; }
+.fc:focus { border-color:#3949ab;background:#fff;outline:none;box-shadow:0 0 0 3px rgba(57,73,171,.08); }
+textarea.fc { resize:vertical;min-height:80px; }
+.fsec { font-size:11px;font-weight:800;color:#3949ab;letter-spacing:.06em;text-transform:uppercase;margin:20px 0 12px;display:flex;align-items:center;gap:8px; }
+.fsec::after { content:'';flex:1;height:1px;background:linear-gradient(90deg,#c5cae9,transparent); }
+.fchks { display:flex;gap:12px;flex-wrap:wrap;margin-top:14px; }
+.fchk { display:inline-flex;align-items:center;gap:8px;background:#f0f2ff;border:1.5px solid #c5cae9;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;color:#3949ab;cursor:pointer; }
+.fchk input[type=checkbox] { width:15px;height:15px;accent-color:#3949ab }
+.fchk:hover { background:#e8eaf6 }
+.fbtn { display:flex;justify-content:flex-end;gap:12px;padding-top:16px;border-top:2px solid #e8eaf6;margin-top:20px; }
+
+/* ── Saved Records Table ── */
+.rec-table-wrap { overflow-x:auto;margin-top:8px;border:1px solid #d1d5db;border-radius:8px }
+.rec-table { width:100%;border-collapse:collapse;min-width:700px; }
+.rec-table th { background:#1e3a5f;color:#fff;font-size:11.5px;font-weight:700;padding:10px 14px;text-align:left;letter-spacing:.04em;border:1px solid #2d5282; }
+.rec-table td { border:1px solid #e5e7eb;padding:10px 14px;font-size:13px;vertical-align:middle;background:#fff; }
+.rec-table tr:nth-child(even) td { background:#f8faff }
+.rec-table tr:hover td { background:#eef0fb }
+.rec-tag { display:inline-block;font-size:11px;background:#e8eaf6;color:#3949ab;border-radius:4px;padding:2px 7px;font-weight:600;margin:1px 2px;border:1px solid #c5cae9; }
+
+/* ── Documents table cells ── */
+.attach-chip { display:inline-flex;align-items:center;gap:5px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:5px;padding:3px 8px;font-size:11.5px;color:#1b5e20;cursor:pointer;max-width:180px;font-weight:600; }
+.attach-chip:hover { background:#c8e6c9 }
+.attach-chip-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px }
+.attach-chip-del { color:#90a4ae;cursor:pointer;font-size:14px;line-height:1; }
+.attach-chip-del:hover { color:#c62828 }
+
+/* ── Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;width:min(640px,95vw);max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.modal-box h3{font-size:17px;font-weight:700;margin-bottom:16px;color:#1b4332}
+.modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:#888;margin-top:-4px}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div><div class="logo-text-wrap"><div class="logo-text" id="sidebar-logo-text"></div></div></div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+      <div class="topbar-title">📄 Documents</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-outline btn-sm" onclick="refreshCurrentTab()">🔄 Refresh</button>
+      <button id="notif-bell-btn" class="topbar-icon-btn notif-btn" title="Notifications">🔔<span id="notif-badge"></span></button>
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div class="content fade-in">
+    <div class="card">
+    <div class="doc-page">
+
+      <!-- ── HR Search + Tabs top bar ── -->
+      <div class="doc-topbar">
+
+        <!-- HR Search Row -->
+        <div id="hr-search-section" style="display:none">
+          <div class="hr-search-row">
+            <span class="hr-search-label">Viewing for:</span>
+            <div class="hr-search-bar">
+              <span class="hr-search-icon">🔍</span>
+              <input id="hr-search-input" class="hr-search-input" placeholder="Type name or employee code…"
+                autocomplete="off" oninput="onSearchInput()" onfocus="showDropdown()" onblur="hideDropdownDelayed()">
+              <div id="hr-search-dropdown" class="hr-search-dropdown"></div>
+            </div>
+            <div id="hr-selected-badge" style="display:none">
+              <span class="hr-selected-badge">
+                👤 <span id="hr-selected-label"></span>
+                <span class="badge-clear" onclick="clearEmployeeSelection()" title="Clear">×</span>
+              </span>
+            </div>
+            <div id="zip-btn-wrap" style="display:none">
+              <button class="btn btn-outline btn-sm" onclick="downloadZip()">⬇️ Download ZIP</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="doc-tabs">
+          <button class="doc-tab-btn active" id="tab-btn-documents"  onclick="switchDocTab('documents')">📄 Documents</button>
+          <button class="doc-tab-btn"        id="tab-btn-employment" onclick="switchDocTab('employment')">🏢 Previous Employment</button>
+          <button class="doc-tab-btn"        id="tab-btn-quals"      onclick="switchDocTab('quals')">🎓 Qualifications</button>
+        </div>
+      </div><!-- .doc-topbar -->
+
+      <!-- ═══════ TAB 1: Documents ═══════ -->
+      <div id="tab-documents" class="doc-tab-body">
+        <div id="table-wrap"><div class="loader"><div class="spinner"></div></div></div>
+        <div style="margin-top:18px;display:flex;justify-content:flex-end">
+          <button class="btn btn-primary" id="save-btn" onclick="saveAll()">💾 Save Documents</button>
+        </div>
+      </div>
+
+      <!-- ═══════ TAB 2: Previous Employment ═══════ -->
+      <div id="tab-employment" class="doc-tab-body" style="display:none">
+        <div id="emp-form-box" class="form-box">
+          <div class="form-box-title" id="emp-form-title">➕ Add Employment</div>
+          <input type="hidden" id="ef-id">
+          <div class="fg">
+            <div class="form-group"><label class="fl">Company Name *</label><input type="text" id="ef-company" class="fc" placeholder="Company Ltd."></div>
+            <div class="form-group"><label class="fl">Designation</label><input type="text" id="ef-designation" class="fc" placeholder="Software Engineer"></div>
+            <div class="form-group"><label class="fl">From Date</label><input type="date" id="ef-from" class="fc"></div>
+            <div class="form-group"><label class="fl">To Date</label><input type="date" id="ef-to" class="fc"></div>
+            <div class="form-group"><label class="fl">Job Type</label><select id="ef-jobtype" class="fc"><option>Full Time</option><option>Part Time</option><option>Contract</option><option>Internship</option></select></div>
+            <div class="form-group"><label class="fl">PF Number</label><input type="text" id="ef-pf" class="fc" placeholder="PF / UAN number"></div>
+            <div class="form-group"><label class="fl">City</label><input type="text" id="ef-city" class="fc" placeholder="Mumbai"></div>
+            <div class="form-group"><label class="fl">State</label><input type="text" id="ef-state" class="fc" placeholder="Maharashtra"></div>
+          </div>
+          <div class="fsec">Previous Manager</div>
+          <div class="fg3">
+            <div class="form-group"><label class="fl">Name</label><input type="text" id="ef-mgr-name" class="fc" placeholder="Full Name"></div>
+            <div class="form-group"><label class="fl">Phone</label><input type="tel" id="ef-mgr-phone" class="fc" placeholder="+91 …"></div>
+            <div class="form-group"><label class="fl">Email</label><input type="email" id="ef-mgr-email" class="fc" placeholder="manager@company.com"></div>
+          </div>
+          <div class="fsec">Previous HR</div>
+          <div class="fg3">
+            <div class="form-group"><label class="fl">Name</label><input type="text" id="ef-hr-name" class="fc" placeholder="Full Name"></div>
+            <div class="form-group"><label class="fl">Phone</label><input type="tel" id="ef-hr-phone" class="fc" placeholder="+91 …"></div>
+            <div class="form-group"><label class="fl">Email</label><input type="email" id="ef-hr-email" class="fc" placeholder="hr@company.com"></div>
+          </div>
+          <div class="fsec">Additional Details</div>
+          <div class="fg">
+            <div class="form-group"><label class="fl">Company Address</label><textarea id="ef-address" class="fc" placeholder="Full address…"></textarea></div>
+            <div class="form-group"><label class="fl">Reason for Leaving</label><textarea id="ef-reason" class="fc" placeholder="Reason for leaving…"></textarea></div>
+          </div>
+          <div class="fchks">
+            <label class="fchk"><input type="checkbox" id="ef-overseas"> 🌐 Overseas</label>
+            <label class="fchk"><input type="checkbox" id="ef-relevant"> ✅ Is Relevant</label>
+          </div>
+          <div class="fbtn">
+            <button class="btn btn-outline btn-sm" onclick="resetEmpForm()">✕ Clear</button>
+            <button class="btn btn-primary btn-sm" onclick="saveEmployment()">💾 Save Employment</button>
+          </div>
+        </div>
+        <div id="emp-records"></div>
+      </div>
+
+      <!-- ═══════ TAB 3: Qualifications ═══════ -->
+      <div id="tab-quals" class="doc-tab-body" style="display:none">
+        <div id="qual-form-box" class="form-box">
+          <div class="form-box-title" id="qual-form-title">➕ Add Qualification</div>
+          <input type="hidden" id="qf-id">
+          <div class="fg">
+            <div class="form-group"><label class="fl">Qualification *</label><select id="qf-qual" class="fc"><option value="">— Select —</option><option>10th</option><option>12th</option><option>Diploma</option><option>Bachelor's</option><option>Master's</option><option>PhD</option><option>Certification</option><option>Other</option></select></div>
+            <div class="form-group"><label class="fl">Degree</label><input type="text" id="qf-degree" class="fc" placeholder="B.Tech / MBA …"></div>
+            <div class="form-group"><label class="fl">Specialization</label><input type="text" id="qf-spec" class="fc" placeholder="Computer Science …"></div>
+            <div class="form-group"><label class="fl">Institute Name *</label><input type="text" id="qf-institute" class="fc" placeholder="University / College …"></div>
+            <div class="form-group"><label class="fl">Board / University</label><input type="text" id="qf-board" class="fc" placeholder="CBSE / Mumbai University …"></div>
+            <div class="form-group"><label class="fl">Mode of Education</label><select id="qf-mode" class="fc"><option value="">— Select —</option><option>Regular</option><option>Distance</option><option>Online</option><option>Part Time</option></select></div>
+            <div class="form-group"><label class="fl">State / Location</label><input type="text" id="qf-state" class="fc" placeholder="Maharashtra"></div>
+            <div class="form-group"><label class="fl">Grade / %</label><input type="text" id="qf-grade" class="fc" placeholder="8.5 CGPA / 85%"></div>
+            <div class="form-group"><label class="fl">Passing Month</label><select id="qf-month" class="fc"><option value="">— Month —</option><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+            <div class="form-group"><label class="fl">Passing Year</label><select id="qf-year" class="fc"><option value="">— Year —</option></select></div>
+            <div class="form-group"><label class="fl">Academic Achievements</label><textarea id="qf-achievements" class="fc" placeholder="Gold Medal, Rank 1 …"></textarea></div>
+            <div class="form-group"><label class="fl">Remarks</label><textarea id="qf-remarks" class="fc" placeholder="Any additional notes …"></textarea></div>
+          </div>
+          <div class="fchks">
+            <label class="fchk"><input type="checkbox" id="qf-highest"> ⭐ Highest Qualification</label>
+          </div>
+          <div class="fbtn">
+            <button class="btn btn-outline btn-sm" onclick="resetQualForm()">✕ Clear</button>
+            <button class="btn btn-primary btn-sm" onclick="saveQualification()">💾 Save Qualification</button>
+          </div>
+        </div>
+        <div id="qual-records"></div>
+      </div>
+
+        </div><!-- .doc-page -->
+    </div><!-- .card -->
+  </div>
+</div>
+
+<!-- ── Attachment Viewer Modal ── -->
+<div class="modal-overlay" id="viewerModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('viewerModal')">×</button>
+    <h3 id="viewerTitle">Attachment</h3>
+    <div id="viewerBody"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+Auth.guard();
+
+const HR_ROLES = ['hr','admin','super_admin'];
+let isHR = false;
+let currentEmployeeId = null;
+let checklistData = [];
+let pendingFiles   = {};
+let allEmployees   = [];
+let currentTab     = 'documents';
+
+/* ── Populate year dropdown ── */
+(function(){
+  const sel = document.getElementById('qf-year');
+  const yr  = new Date().getFullYear();
+  for (let y = yr; y >= yr - 35; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y; sel.appendChild(o);
+  }
+})();
+
+window.addEventListener('load', async () => {
+  buildSidebar('documents.html');
+  const user = Auth.getUser();
+  isHR = HR_ROLES.includes(user.role);
+  currentEmployeeId = isHR ? null : user.id;  // HR: no selection until they pick someone
+
+  if (isHR) {
+    document.getElementById('hr-search-section').style.display = 'block';
+    loadAllEmployees();
+  }
+
+  if (currentEmployeeId) {
+    loadDocuments();
+    loadEmploymentRecords();
+    loadQualificationRecords();
+  } else {
+    showEmptyPicker();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════════════════════════════════════════════════════
+function switchDocTab(name) {
+  currentTab = name;
+  ['documents','employment','quals'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = (t === name) ? '' : 'none';
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+}
+
+function refreshCurrentTab() {
+  if (currentTab === 'documents')  loadDocuments();
+  if (currentTab === 'employment') loadEmploymentRecords();
+  if (currentTab === 'quals')      loadQualificationRecords();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HR EMPLOYEE SEARCH
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadAllEmployees() {
+  const res = await api('GET', '/employees');
+  if (res?.success) allEmployees = res.data || [];
+}
+
+function showEmptyPicker() {
+  const ph = `<div class="empty-state" style="padding:60px 24px">
+    <div class="empty-icon">🔍</div>
+    <p style="color:var(--muted);font-size:14px">Search and select an employee above to view their documents.</p>
+  </div>`;
+  document.getElementById('table-wrap').innerHTML = ph;
+  document.getElementById('emp-records').innerHTML   = ph;
+  document.getElementById('qual-records').innerHTML  = ph;
+}
+
+function onSearchInput() {
+  const q  = document.getElementById('hr-search-input').value.trim().toLowerCase();
+  const dd = document.getElementById('hr-search-dropdown');
+  if (!q) { dd.classList.remove('open'); return; }
+  const matches = allEmployees.filter(e =>
+    (e.first_name + ' ' + e.last_name).toLowerCase().includes(q) ||
+    (e.employee_code || '').toLowerCase().includes(q)
+  ).slice(0, 10);
+  if (!matches.length) {
+    dd.innerHTML = '<div class="hr-search-option" style="color:#90a4ae">No results found</div>';
+    dd.classList.add('open'); return;
+  }
+  dd.innerHTML = matches.map(e =>
+    `<div class="hr-search-option" onmousedown="selectEmployee(${e.id},'${escAttr(e.employee_code)} — ${escAttr(e.first_name)} ${escAttr(e.last_name)}')">${e.employee_code} — ${e.first_name} ${e.last_name}</div>`
+  ).join('');
+  dd.classList.add('open');
+}
+
+function showDropdown() {
+  if (document.getElementById('hr-search-input').value.trim()) onSearchInput();
+}
+function hideDropdownDelayed() {
+  setTimeout(() => document.getElementById('hr-search-dropdown').classList.remove('open'), 150);
+}
+
+function selectEmployee(id, label) {
+  currentEmployeeId = id;
+  document.getElementById('hr-search-input').value = '';
+  document.getElementById('hr-search-dropdown').classList.remove('open');
+  document.getElementById('hr-selected-label').textContent = label;
+  document.getElementById('hr-selected-badge').style.display = '';
+  document.getElementById('zip-btn-wrap').style.display = '';
+  pendingFiles = {};
+  resetEmpForm();
+  resetQualForm();
+  loadDocuments();
+  loadEmploymentRecords();
+  loadQualificationRecords();
+}
+
+function clearEmployeeSelection() {
+  currentEmployeeId = null;
+  document.getElementById('hr-selected-badge').style.display  = 'none';
+  document.getElementById('hr-selected-label').textContent    = '';
+  document.getElementById('hr-search-input').value            = '';
+  document.getElementById('zip-btn-wrap').style.display       = 'none';
+  pendingFiles = {};
+  resetEmpForm();
+  resetQualForm();
+  showEmptyPicker();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 1 – DOCUMENTS  (group keys match documentsController.js exactly)
+// ══════════════════════════════════════════════════════════════════════════════
+const DOC_GROUPS = [
+  { label:'📄 Resume',              bg:'#1a237e', keys:['resume'] },
+  { label:'🏆 Broker / Compliance', bg:'#1b5e20', keys:['broker_qual_renewal','broker_training'] },
+  { label:'🪪 Identity Documents',  bg:'#bf360c', keys:['aadhaar_card','pan_card','id_residence_proof','passport_dl_voterid','passport_photo'] },
+  { label:'🎓 Educational',          bg:'#4a148c', keys:['tenth_marksheet','twelfth_marksheet','graduation_marksheet','post_graduation_cert'] },
+  { label:'💳 Financial',            bg:'#0d47a1', keys:['last3_payslips','bank_statement_salary','uan_pf_document'] },
+  { label:'🏢 Employment',           bg:'#b71c1c', keys:['relieving_letter','offer_promo_letter','appointment_ack'] },
+  { label:'📁 Other',                bg:'#37474f', keys:['other_certificates'] },
+];
+
+// Excel-style cell and header style strings (like leave summary)
+const XL  = `border:1px solid #d1d5db`;
+const XLH = `border:1px solid #9ca3af;font-weight:700;font-size:11.5px;padding:9px 12px;text-align:center;white-space:nowrap;vertical-align:middle`;
+const XLD = `border:1px solid #e5e7eb;padding:9px 12px;font-size:13px;vertical-align:middle`;
+
+async function loadDocuments() {
+  if (!currentEmployeeId) { showEmptyPicker(); return; }
+  document.getElementById('table-wrap').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  const qs  = currentEmployeeId ? `?employee_id=${currentEmployeeId}` : '';
+  const res = await api('GET', '/documents' + qs);
+  if (!res?.success) {
+    document.getElementById('table-wrap').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${res?.message || 'Failed to load'}</p></div>`;
+    return;
+  }
+  checklistData = res.data;
+  pendingFiles  = {};
+  renderTable();
+}
+
+function renderTable() {
+  const byKey = {};
+  for (const d of checklistData) byKey[d.key] = d;
+
+  let rows = '';
+  const seen = new Set();
+
+  for (const grp of DOC_GROUPS) {
+    grp.keys.filter(k => byKey[k]).forEach((k, i) => {
+      rows += buildRow(byKey[k], seen.size);
+      seen.add(k);
+    });
+  }
+
+  // Fallback for any unmatched keys
+  let fi = 0;
+  for (const d of checklistData) {
+    if (!seen.has(d.key)) { rows += buildRow(d, fi++); }
+  }
+
+  document.getElementById('table-wrap').innerHTML = `
+    <div style="overflow-x:auto;border-radius:10px;border:1px solid #d1d5db;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+    <table style="border-collapse:collapse;width:100%;min-width:900px">
+      <thead>
+        <tr>
+          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;text-align:left;width:30%">Document</th>
+          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:10%">Submitted</th>
+          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:22%">Add Attachments</th>
+          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:24%">Attachments</th>
+          <th style="${XLH};background:#e8eaf6;border:1px solid #9fa8da;width:14%">Updated</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>`;
+}
+
+function buildRow(d, idx) {
+  const docs      = d.documents || [];
+  const pend      = pendingFiles[d.key] || [];
+  const hasFiles  = docs.length > 0;
+  const hasPending= pend.length > 0;
+  const bg        = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+
+  const submitted = (hasFiles || hasPending)
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;color:#1b5e20;font-weight:700;font-size:12px;background:#dcfce7;border:1px solid #86efac;padding:3px 12px;border-radius:20px">✅ Yes</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:4px;color:#6b7280;font-weight:600;font-size:12px;background:#f3f4f6;border:1px solid #d1d5db;padding:3px 12px;border-radius:20px">— No</span>`;
+
+  const pendBadge = hasPending
+    ? `<div style="font-size:10.5px;color:#283593;background:#e8eaf6;border:1px solid #9fa8da;border-radius:6px;padding:3px 8px;margin-top:4px;font-weight:600">📎 ${pend.length} file(s) ready</div>` : '';
+
+  const fileCell = `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+    <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="font-size:11.5px;max-width:180px"
+      onchange="onFilesChosen('${d.key}',this)">
+    ${pendBadge}
+  </div>`;
+
+  let attachHtml = `<span style="color:#9ca3af;font-size:13px">—</span>`;
+  if (hasFiles) {
+    attachHtml = `<div style="display:flex;flex-direction:column;gap:5px;align-items:center">` +
+      docs.map(doc => `
+        <div class="attach-chip" onclick="viewAttachment(${doc.id},'${escAttr(doc.original_name)}','${escAttr(doc.mime_type)}')">
+          <span class="attach-chip-name" title="${escAttr(doc.original_name)}">📎 ${escAttr(doc.original_name)}</span>
+          <span class="attach-chip-del" onclick="event.stopPropagation();removeFile(${doc.id})">×</span>
+        </div>`).join('') + `</div>`;
+  }
+
+  let dtHtml = `<span style="color:#9ca3af;font-size:13px">—</span>`;
+  if (hasFiles && docs[0].uploaded_at) {
+    const dt = new Date(docs[0].uploaded_at);
+    if (!isNaN(dt)) {
+      dtHtml = `<div style="text-align:center">
+        <div style="font-size:12px;font-weight:700;color:#283593">${fmt.date(docs[0].uploaded_at)}</div>
+        <div style="font-size:11px;color:#5c6bc0">${dt.toLocaleTimeString(window.CFG.currencyLocale,{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>`;
+    }
+  }
+
+  return `<tr style="background:${bg}">
+    <td style="${XLD};font-weight:600;color:#1e3a5f;text-align:left">${d.label}</td>
+    <td style="${XLD};text-align:center">${submitted}</td>
+    <td style="${XLD};text-align:center">${fileCell}</td>
+    <td style="${XLD};text-align:center">${attachHtml}</td>
+    <td style="${XLD};text-align:center">${dtHtml}</td>
+  </tr>`;
+}
+
+
+function onFilesChosen(docKey, input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const big = files.filter(f => f.size > 5*1024*1024);
+  if (big.length) { toast(`${big.map(f=>f.name).join(', ')} exceed 5MB`, 'error'); input.value=''; return; }
+  pendingFiles[docKey] = [...(pendingFiles[docKey]||[]), ...files];
+  renderTable();
+}
+
+async function viewAttachment(docId, name, mime) {
+  document.getElementById('viewerTitle').textContent = '📎 ' + (name||'Attachment');
+  document.getElementById('viewerBody').innerHTML = '<div style="text-align:center;padding:30px;color:#888">Loading…</div>';
+  document.getElementById('viewerModal').classList.add('open');
+  try {
+    const res = await fetch(`${API_BASE}/documents/file/${docId}`,
+      { headers:{ Authorization:'Bearer '+Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const blob    = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const m       = blob.type || mime || '';
+    if (m.startsWith('image/')) {
+      document.getElementById('viewerBody').innerHTML =
+        `<img src="${blobUrl}" style="max-width:100%;max-height:72vh;border-radius:8px;display:block;margin:0 auto" alt="${name}"/>
+         <a href="${blobUrl}" download="${name}" class="btn btn-outline btn-sm" style="margin-top:10px;display:inline-block">⬇ Download</a>`;
+    } else if (m==='application/pdf') {
+      document.getElementById('viewerBody').innerHTML =
+        `<iframe src="${blobUrl}" style="width:100%;height:72vh;border:none;border-radius:8px"></iframe>
+         <a href="${blobUrl}" download="${name}" class="btn btn-outline btn-sm" style="margin-top:8px;display:inline-block">⬇ Download</a>`;
+    } else {
+      document.getElementById('viewerBody').innerHTML =
+        `<p style="color:#555;margin-bottom:12px">Cannot preview <b>${name}</b>.</p>
+         <a href="${blobUrl}" download="${name}" class="btn btn-primary btn-sm">⬇ Download</a>`;
+    }
+  } catch(err) {
+    document.getElementById('viewerBody').innerHTML =
+      `<p style="color:#c62828">Failed to load.<br><small>${err.message}</small></p>`;
+  }
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m =>
+  m.addEventListener('click', e => { if (e.target===m) m.classList.remove('open'); })
+);
+
+async function removeFile(docId) {
+  if (!confirm('Remove this attachment?')) return;
+  const res = await api('DELETE', '/documents/'+docId);
+  if (res?.success) { toast('Removed'); loadDocuments(); }
+  else toast(res?.message||'Failed', 'error');
+}
+
+async function saveAll() {
+  const keys = Object.keys(pendingFiles).filter(k => pendingFiles[k]?.length);
+  if (!keys.length) { toast('No files selected', 'warning'); return; }
+  const btn = document.getElementById('save-btn');
+  btn.disabled=true; btn.textContent='⏳ Saving...';
+  let ok=0, fail=0;
+  for (const docKey of keys) {
+    const files = pendingFiles[docKey];
+    const fd    = new FormData();
+    files.forEach(f => fd.append('files', f));
+    fd.append('employee_id', currentEmployeeId);
+    fd.append('doc_key', docKey);
+    try {
+      const r = await fetch(API_BASE+'/emp-documents/upload-multi',
+        { method:'POST', headers:{ Authorization:'Bearer '+Auth.getToken() }, body:fd });
+      const d = await r.json();
+      if (d.success) ok+=files.length; else fail+=files.length;
+    } catch{ fail+=files.length; }
+  }
+  btn.disabled=false; btn.textContent='💾 Save';
+  if (ok)   toast(`${ok} file(s) saved ✅`);
+  if (fail) toast(`${fail} file(s) failed`, 'error');
+  pendingFiles={};
+  loadDocuments();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 2 – PREVIOUS EMPLOYMENT
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadEmploymentRecords() {
+  const el    = document.getElementById('emp-records');
+  const empId = currentEmployeeId;
+  if (!empId) { el.innerHTML = ''; return; }
+  const res   = await api('GET', `/prev-employment/${empId}`);
+  if (!res?.success || !res.data?.length) {
+    el.innerHTML = ''; return;
+  }
+  el.innerHTML = `<div style="font-size:11px;font-weight:800;color:#9fa8da;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">SAVED RECORDS</div>
+    <div class="rec-table-wrap"><table class="rec-table">
+      <thead><tr>
+        <th>Company</th><th>Designation</th><th>Period</th><th>Job Type</th>
+        <th>City / State</th><th>PF No.</th>${isHR?'<th style="width:90px">Actions</th>':''}
+      </tr></thead>
+      <tbody>${res.data.map(r => buildEmpCard(r)).join('')}</tbody>
+    </table></div>`;
+}
+
+function buildEmpCard(r) {
+  const from = r.from_date ? fmt.date(r.from_date) : '—';
+  const to   = r.to_date   ? fmt.date(r.to_date)   : 'Present';
+  const loc  = [r.city, r.state].filter(Boolean).join(', ') || '—';
+  const flags= [r.is_overseas&&'🌐 Overseas', r.is_relevant&&'✅ Relevant'].filter(Boolean).join(' ');
+  const hrBtns = isHR ? `<td style="white-space:nowrap">
+    <button class="btn btn-outline btn-sm" onclick="loadEmpIntoForm(${r.id})">✏️</button>
+    <button class="btn btn-sm" style="background:#fce4ec;color:#c62828;border:1px solid #f48fb1" onclick="deleteEmployment(${r.id})">🗑️</button>
+  </td>` : '';
+  return `<tr>
+    <td style="font-weight:700;color:#283593">${r.company_name}${flags?`<br><small style="font-weight:400;color:#78909c">${flags}</small>`:''}</td>
+    <td>${r.designation||'—'}</td>
+    <td style="white-space:nowrap">${from}<br><span style="color:#9ca3af;font-size:11px">→ ${to}</span></td>
+    <td><span class="rec-tag">${r.job_type||'—'}</span></td>
+    <td>${loc}</td>
+    <td style="color:#546e7a">${r.pf_number||'—'}</td>
+    ${hrBtns}
+  </tr>`;
+}
+
+function resetEmpForm() {
+  document.getElementById('ef-id').value = '';
+  ['ef-company','ef-designation','ef-from','ef-to','ef-pf',
+   'ef-city','ef-state','ef-mgr-name','ef-mgr-phone','ef-mgr-email',
+   'ef-hr-name','ef-hr-phone','ef-hr-email','ef-address','ef-reason'
+  ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('ef-jobtype').value    = 'Full Time';
+  document.getElementById('ef-overseas').checked = false;
+  document.getElementById('ef-relevant').checked = false;
+  document.getElementById('emp-form-title').textContent = '➕ Add Employment';
+}
+
+async function loadEmpIntoForm(id) {
+  const empId = currentEmployeeId;
+  const res   = await api('GET', `/prev-employment/${empId}`);
+  const rec   = res?.data?.find(r => r.id === id);
+  if (!rec) return;
+  document.getElementById('emp-form-title').textContent    = '✏️ Edit Employment';
+  document.getElementById('ef-id').value                   = rec.id;
+  document.getElementById('ef-company').value              = rec.company_name        || '';
+  document.getElementById('ef-designation').value          = rec.designation         || '';
+  document.getElementById('ef-from').value                 = rec.from_date ? rec.from_date.slice(0,10) : '';
+  document.getElementById('ef-to').value                   = rec.to_date   ? rec.to_date.slice(0,10)   : '';
+  document.getElementById('ef-jobtype').value              = rec.job_type            || 'Full Time';
+  document.getElementById('ef-pf').value                   = rec.pf_number           || '';
+  document.getElementById('ef-city').value                 = rec.city                || '';
+  document.getElementById('ef-state').value                = rec.state               || '';
+  document.getElementById('ef-mgr-name').value             = rec.prev_manager_name   || '';
+  document.getElementById('ef-mgr-phone').value            = rec.prev_manager_phone  || '';
+  document.getElementById('ef-mgr-email').value            = rec.prev_manager_email  || '';
+  document.getElementById('ef-hr-name').value              = rec.prev_hr_name        || '';
+  document.getElementById('ef-hr-phone').value             = rec.prev_hr_phone       || '';
+  document.getElementById('ef-hr-email').value             = rec.prev_hr_email       || '';
+  document.getElementById('ef-address').value              = rec.company_address     || '';
+  document.getElementById('ef-reason').value               = rec.reason_for_leaving  || '';
+  document.getElementById('ef-overseas').checked           = !!rec.is_overseas;
+  document.getElementById('ef-relevant').checked           = !!rec.is_relevant;
+  document.getElementById('emp-form-box').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function saveEmployment() {
+  const company = document.getElementById('ef-company').value.trim();
+  if (!company) { toast('Company name is required', 'error'); return; }
+  const empId = currentEmployeeId;
+  const payload = {
+    id:                 document.getElementById('ef-id').value || undefined,
+    employee_id:        empId,
+    company_name:       company,
+    designation:        document.getElementById('ef-designation').value.trim(),
+    from_date:          document.getElementById('ef-from').value   || null,
+    to_date:            document.getElementById('ef-to').value     || null,
+    job_type:           document.getElementById('ef-jobtype').value,
+    pf_number:          document.getElementById('ef-pf').value.trim(),
+    city:               document.getElementById('ef-city').value.trim(),
+    state:              document.getElementById('ef-state').value.trim(),
+    prev_manager_name:  document.getElementById('ef-mgr-name').value.trim(),
+    prev_manager_phone: document.getElementById('ef-mgr-phone').value.trim(),
+    prev_manager_email: document.getElementById('ef-mgr-email').value.trim(),
+    prev_hr_name:       document.getElementById('ef-hr-name').value.trim(),
+    prev_hr_phone:      document.getElementById('ef-hr-phone').value.trim(),
+    prev_hr_email:      document.getElementById('ef-hr-email').value.trim(),
+    company_address:    document.getElementById('ef-address').value.trim(),
+    reason_for_leaving: document.getElementById('ef-reason').value.trim(),
+    is_overseas:        document.getElementById('ef-overseas').checked,
+    is_relevant:        document.getElementById('ef-relevant').checked,
+  };
+  const res = await api('POST', '/prev-employment', payload);
+  if (res?.success) { toast('Employment saved ✅'); resetEmpForm(); loadEmploymentRecords(); }
+  else toast(res?.message || 'Failed to save', 'error');
+}
+
+async function deleteEmployment(id) {
+  if (!confirm('Delete this record?')) return;
+  const res = await api('DELETE', `/prev-employment/${id}`);
+  if (res?.success) { toast('Deleted'); loadEmploymentRecords(); }
+  else toast(res?.message || 'Failed', 'error');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 3 – QUALIFICATIONS
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadQualificationRecords() {
+  const el    = document.getElementById('qual-records');
+  const empId = currentEmployeeId;
+  if (!empId) { el.innerHTML = ''; return; }
+  const res   = await api('GET', `/qualifications/${empId}`);
+  if (!res?.success || !res.data?.length) {
+    el.innerHTML = ''; return;
+  }
+  el.innerHTML = `<div style="font-size:11px;font-weight:800;color:#9fa8da;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">SAVED RECORDS</div>
+    <div class="rec-table-wrap"><table class="rec-table">
+      <thead><tr>
+        <th>Qualification</th><th>Degree / Spec</th><th>Institute</th>
+        <th>Board / Univ</th><th>Passed</th><th>Grade</th><th>Mode</th>${isHR?'<th style="width:90px">Actions</th>':''}
+      </tr></thead>
+      <tbody>${res.data.map(r => buildQualCard(r)).join('')}</tbody>
+    </table></div>`;
+}
+
+const MONTHS = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function buildQualCard(r) {
+  const passed = [r.passing_month ? MONTHS[r.passing_month] : '', r.passing_year].filter(Boolean).join(' ') || '—';
+  const hrBtns = isHR ? `<td style="white-space:nowrap">
+    <button class="btn btn-outline btn-sm" onclick="loadQualIntoForm(${r.id})">✏️</button>
+    <button class="btn btn-sm" style="background:#fce4ec;color:#c62828;border:1px solid #f48fb1" onclick="deleteQualification(${r.id})">🗑️</button>
+  </td>` : '';
+  return `<tr>
+    <td><span class="rec-tag">${r.qualification||'—'}</span>${r.is_highest?'<br><span class="rec-tag" style="background:#fff8e1;color:#e65100;border-color:#ffe082">⭐ Highest</span>':''}</td>
+    <td style="font-weight:600;color:#283593">${r.degree||r.qualification||'—'}${r.specialization?`<br><span style="font-weight:400;color:#546e7a;font-size:12px">${r.specialization}</span>`:''}</td>
+    <td>${r.institute_name||'—'}</td>
+    <td style="color:#546e7a">${r.board_university||'—'}</td>
+    <td style="white-space:nowrap">${passed}</td>
+    <td>${r.grade_percentage||'—'}</td>
+    <td><span class="rec-tag">${r.mode_of_education||'—'}</span></td>
+    ${hrBtns}
+  </tr>`;
+}
+
+function resetQualForm() {
+  document.getElementById('qf-id').value = '';
+  ['qf-degree','qf-spec','qf-institute','qf-board','qf-state','qf-grade','qf-achievements','qf-remarks'
+  ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('qf-qual').value  = '';
+  document.getElementById('qf-mode').value  = '';
+  document.getElementById('qf-month').value = '';
+  document.getElementById('qf-year').value  = '';
+  document.getElementById('qf-highest').checked = false;
+  document.getElementById('qual-form-title').textContent = '➕ Add Qualification';
+}
+
+async function loadQualIntoForm(id) {
+  const empId = currentEmployeeId;
+  const res   = await api('GET', `/qualifications/${empId}`);
+  const rec   = res?.data?.find(r => r.id === id);
+  if (!rec) return;
+  document.getElementById('qual-form-title').textContent      = '✏️ Edit Qualification';
+  document.getElementById('qf-id').value                      = rec.id;
+  document.getElementById('qf-qual').value                    = rec.qualification       || '';
+  document.getElementById('qf-degree').value                  = rec.degree              || '';
+  document.getElementById('qf-spec').value                    = rec.specialization      || '';
+  document.getElementById('qf-institute').value               = rec.institute_name      || '';
+  document.getElementById('qf-board').value                   = rec.board_university    || '';
+  document.getElementById('qf-mode').value                    = rec.mode_of_education   || '';
+  document.getElementById('qf-state').value                   = rec.state_location      || '';
+  document.getElementById('qf-grade').value                   = rec.grade_percentage    || '';
+  document.getElementById('qf-month').value                   = rec.passing_month       || '';
+  document.getElementById('qf-year').value                    = rec.passing_year        || '';
+  document.getElementById('qf-achievements').value            = rec.academic_achievements || '';
+  document.getElementById('qf-remarks').value                 = rec.remarks             || '';
+  document.getElementById('qf-highest').checked               = !!rec.is_highest;
+  document.getElementById('qual-form-box').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function saveQualification() {
+  const qual      = document.getElementById('qf-qual').value;
+  const institute = document.getElementById('qf-institute').value.trim();
+  if (!qual)      { toast('Qualification is required', 'error'); return; }
+  if (!institute) { toast('Institute name is required', 'error'); return; }
+  const empId = currentEmployeeId;
+  const payload = {
+    id:                    document.getElementById('qf-id').value || undefined,
+    employee_id:           empId,
+    qualification:         qual,
+    degree:                document.getElementById('qf-degree').value.trim(),
+    specialization:        document.getElementById('qf-spec').value.trim(),
+    institute_name:        institute,
+    board_university:      document.getElementById('qf-board').value.trim(),
+    mode_of_education:     document.getElementById('qf-mode').value,
+    state_location:        document.getElementById('qf-state').value.trim(),
+    grade_percentage:      document.getElementById('qf-grade').value.trim(),
+    passing_month:         document.getElementById('qf-month').value || null,
+    passing_year:          document.getElementById('qf-year').value  || null,
+    academic_achievements: document.getElementById('qf-achievements').value.trim(),
+    remarks:               document.getElementById('qf-remarks').value.trim(),
+    is_highest:            document.getElementById('qf-highest').checked,
+  };
+  const res = await api('POST', '/qualifications', payload);
+  if (res?.success) { toast('Qualification saved ✅'); resetQualForm(); loadQualificationRecords(); }
+  else toast(res?.message || 'Failed to save', 'error');
+}
+
+async function deleteQualification(id) {
+  if (!confirm('Delete this record?')) return;
+  const res = await api('DELETE', `/qualifications/${id}`);
+  if (res?.success) { toast('Deleted'); loadQualificationRecords(); }
+  else toast(res?.message || 'Failed', 'error');
+}
+
+// ── ZIP Download ──────────────────────────────────────────────────────────────
+async function downloadZip() {
+  if (!currentEmployeeId) { toast('No employee selected', 'error'); return; }
+  const btn = document.querySelector('[onclick="downloadZip()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparing…'; }
+  try {
+    const res = await fetch(`${API_BASE}/documents/download-zip/${currentEmployeeId}`,
+      { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `employee_${currentEmployeeId}_documents.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('ZIP downloaded ✅');
+  } catch(err) {
+    toast('Download failed: ' + err.message, 'error');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '⬇️ Download ZIP'; }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function escAttr(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
