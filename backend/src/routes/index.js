@@ -24,7 +24,6 @@ const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
 const offerCtrl      = require('../controllers/offerLetterController');
 const relievingCtrl  = require('../controllers/relievingLetterController');
-const itDeclCtrl     = require('../controllers/itDeclarationController');
 const compoffCtrl    = require('../controllers/compoffController');
 const clientCtrl     = require('../controllers/clientController');
 
@@ -924,16 +923,6 @@ router.get('/test-email', authenticate, async (req, res) => {
 });
 
 // ── IT Declaration & Tax ──────────────────────────────────────────────────────
-router.get   ('/it-declaration',              authenticate,                     itDeclCtrl.getDeclaration);
-router.get   ('/it-declaration/all',          authenticate, authorize('hr','accounts'), itDeclCtrl.getAllDeclarations);
-router.get   ('/it-declaration/tax-preview',  authenticate,                     itDeclCtrl.taxPreview);
-router.get   ('/it-declaration/proofs',       authenticate, authorize('hr','accounts'), itDeclCtrl.getProofsByDeclaration);
-router.post  ('/it-declaration',              authenticate,                     itDeclCtrl.saveDeclaration);
-router.post  ('/it-declaration/proof',        authenticate, itDeclCtrl.uploadMiddleware, itDeclCtrl.uploadProof);
-router.get   ('/it-declaration/proof/:id',    authenticate,                     itDeclCtrl.getProof);
-router.get   ('/it-declaration/:id',           authenticate, authorize('hr','accounts','admin','super_admin'), itDeclCtrl.getDeclarationById);
-router.post  ('/it-declaration/:id/review',   authenticate, authorize('hr','accounts'), itDeclCtrl.reviewDeclaration);
-router.post  ('/it-declaration/proof/:id/review', authenticate, authorize('hr','accounts'), itDeclCtrl.reviewProof);
 
 // ── Project Budget Tracking ───────────────────────────────────────────────────
 const projCtrl = require('../controllers/projectController');

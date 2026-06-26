@@ -13,7 +13,6 @@ const attCtrl    = require('./controllers/attendanceController');
 const alertsCtrl = require('./controllers/movementAlertsController');
 const emailSvc = require('./config/emailService'); // for startup repair
 const offerCtrl  = require('./controllers/offerLetterController');
-const itDeclCtrl = require('./controllers/itDeclarationController');
 const fcm        = require('./services/fcmService');
 // Initialize FCM at startup — logs success or failure immediately
 fcm.init();
@@ -851,7 +850,6 @@ async function start() {
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_type VARCHAR(50) DEFAULT NULL`);
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS separation_reason TEXT DEFAULT NULL`);
         await offerCtrl.initTables();
-        await itDeclCtrl.initTables();
         const projCtrl = require('./controllers/projectController');
         await projCtrl.migrate();
         // ── Add deactivation_remark column if it doesn't exist ─────────────
