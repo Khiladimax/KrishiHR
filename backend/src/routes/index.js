@@ -1043,6 +1043,7 @@ router.get   ('/api/chat/files/:id', fileCtrl.serveFile);
 
 
 // ── Employee Documents module ─────────────────────────────────────────────────
+const docsCtrl = require('../controllers/documentsController');
 router.get   ('/documents/checklist',     authenticate,                    docsCtrl.getChecklistDefs);
 router.get   ('/documents/employees',     authenticate, authorize('hr','admin','super_admin'), docsCtrl.getEmployeesForPicker);
 router.get   ('/documents/download-zip/:employee_id', authenticate,        docsCtrl.downloadZip);
