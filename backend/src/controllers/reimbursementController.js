@@ -8,7 +8,7 @@ const multer   = require('multer');
 
 const COO_CODE      = 'KC718';
 const MD_CODE       = 'KC01';
-const CBO_CODE      = 'KC03';   // CBO — same approval power as MD
+const CFO_CODE      = 'KC03';   // CFO — same approval power as MD
 const ACCOUNTS_CODE = 'KC7708';
 
 // ── File upload middleware (same as IT declaration — base64 in DB) ─────────────
@@ -50,7 +50,7 @@ async function getChain(employeeId) {
   if (employee_code === COO_CODE) return [MD_CODE, ACCOUNTS_CODE];
 
   // MD / super_admin applies → Accounts only (1 step)
-  if (employee_code === MD_CODE || employee_code === CBO_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
+  if (employee_code === MD_CODE || employee_code === CFO_CODE || role === 'super_admin') return [ACCOUNTS_CODE];
 
   // Accounts applies → COO → MD (no self-loop)
   if (employee_code === ACCOUNTS_CODE) return [COO_CODE, MD_CODE];
@@ -212,14 +212,14 @@ exports.getAll = async (req, res) => {
       conds.push(`r.employee_id=$${idx++}`); params.push(employee_id);
     } else if (userRole === 'hr') {
       // see all
-    } else if (userRole === 'super_admin' || userCode === CBO_CODE) {
-      // MD (KC01) and CBO (KC03) see requests that have REACHED their level:
+    } else if (userRole === 'super_admin' || userCode === CFO_CODE) {
+      // MD (KC01) and CFO (KC03) see requests that have REACHED their level:
       //   1. Currently at their turn (current_approver_code = KC01 or KC03)
-      //   2. Already approved by MD or CBO (passed through)
+      //   2. Already approved by MD or CFO (passed through)
       //   3. Their own requests
       // NOT requests still at Manager or COO level
       conds.push(`(
-        r.current_approver_code IN ('${MD_CODE}','${CBO_CODE}')
+        r.current_approver_code IN ('${MD_CODE}','${CFO_CODE}')
         OR (
           EXISTS (
             SELECT 1 FROM reimbursement_approvals ra
@@ -331,7 +331,7 @@ exports.action = async (req, res) => {
     try { chain = Array.isArray(reimb.approval_chain) ? reimb.approval_chain : JSON.parse(reimb.approval_chain); }
     catch (_) { chain = []; }
 
-    const isSuperAdmin      = actorRole === 'super_admin' || actorCode === CBO_CODE;
+    const isSuperAdmin      = actorRole === 'super_admin' || actorCode === CFO_CODE;
     const isClientAdmin     = actorRole === 'client_admin';
     const isCurrentApprover = actorCode === reimb.current_approver_code;
     if (!isSuperAdmin && !isClientAdmin && !isCurrentApprover)
