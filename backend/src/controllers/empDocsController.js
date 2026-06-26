@@ -25,6 +25,15 @@ const DOCUMENT_TYPES = [
 ];
 
 async function ensureTables() {
+  await db.query(`CREATE TABLE IF NOT EXISTS employee_documents (
+    id SERIAL PRIMARY KEY,
+    employee_id INT REFERENCES employees(id) ON DELETE CASCADE,
+    document_type VARCHAR(150) NOT NULL,
+    file_name VARCHAR(255),
+    file_path VARCHAR(500),
+    uploaded_by INT REFERENCES employees(id),
+    uploaded_at TIMESTAMP DEFAULT NOW()
+  )`).catch(()=>{});
   await db.query(`CREATE TABLE IF NOT EXISTS employee_previous_employment (
     id SERIAL PRIMARY KEY, employee_id INT REFERENCES employees(id) ON DELETE CASCADE,
     company_name VARCHAR(200) NOT NULL, company_address TEXT,
