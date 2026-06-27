@@ -29,26 +29,31 @@ const HR_ROLES = ['hr', 'accounts'];
 // ── Fixed document checklist definition ────────────────────────────────────────
 // key must be stable — used as the unique identifier per employee per document
 const DOCUMENT_DEFS = [
-  { key: 'aadhar',          label: 'Aadhaar Card',                      mandatory: true  },
-  { key: 'pan',             label: 'PAN Card',                           mandatory: true  },
-  { key: '10th_cert',       label: '10th Certificate',                   mandatory: true  },
-  { key: '12th_cert',       label: '12th Certificate',                   mandatory: true  },
-  { key: 'graduation',      label: 'Graduation Degree',                  mandatory: true  },
-  { key: 'pg',              label: 'Post Graduation Degree',             mandatory: false },
-  { key: 'other_edu',       label: 'Other Education Certificate',        mandatory: false },
-  { key: 'offer_letter',    label: 'Offer Letter (Previous)',            mandatory: false },
-  { key: 'exp_letter',      label: 'Experience Letter',                  mandatory: false },
-  { key: 'relieving_letter',label: 'Relieving Letter',                   mandatory: false },
-  { key: 'salary_slips',    label: 'Salary Slips (Last 3 months)',       mandatory: false },
-  { key: 'form16',          label: 'Form 16',                            mandatory: false },
-  { key: 'bank_passbook',   label: 'Bank Passbook / Cancelled Cheque',  mandatory: true  },
-  { key: 'pan_bank',        label: 'PAN (Bank linked)',                  mandatory: true  },
-  { key: 'pf_statement',    label: 'PF Statement',                       mandatory: false },
-  { key: 'salary_cert',     label: 'Salary Certificate',                 mandatory: false },
-  { key: 'photo',           label: 'Passport Size Photo',                mandatory: true  },
-  { key: 'medical_cert',    label: 'Medical Fitness Certificate',        mandatory: false },
-  { key: 'address_proof',   label: 'Address Proof',                      mandatory: true  },
-  { key: 'noc',             label: 'NOC from Previous Employer',         mandatory: false },
+  // Identity
+  { key: 'aadhar',           label: 'Aadhaar Card',                     mandatory: true  },
+  { key: 'pan',              label: 'PAN Card',                          mandatory: true  },
+  // Education
+  { key: '10th_cert',        label: '10th Certificate',                  mandatory: true  },
+  { key: '12th_cert',        label: '12th Certificate',                  mandatory: true  },
+  { key: 'graduation',       label: 'Graduation Degree',                 mandatory: true  },
+  { key: 'pg',               label: 'Post Graduation Degree',            mandatory: false },
+  { key: 'other_edu',        label: 'Other Education Certificate',       mandatory: false },
+  // Employment
+  { key: 'offer_letter',     label: 'Offer Letter (Previous)',           mandatory: false },
+  { key: 'exp_letter',       label: 'Experience Letter',                 mandatory: false },
+  { key: 'relieving_letter', label: 'Relieving Letter',                  mandatory: false },
+  { key: 'salary_slips',     label: 'Salary Slips (Last 3 months)',      mandatory: false },
+  { key: 'form16',           label: 'Form 16',                           mandatory: false },
+  // Financial
+  { key: 'bank_passbook',    label: 'Bank Passbook / Cancelled Cheque', mandatory: true  },
+  { key: 'pan_bank',         label: 'PAN (Bank linked)',                 mandatory: true  },
+  { key: 'pf_statement',     label: 'PF Statement',                      mandatory: false },
+  { key: 'salary_cert',      label: 'Salary Certificate',                mandatory: false },
+  // Other
+  { key: 'photo',            label: 'Passport Size Photo',               mandatory: true  },
+  { key: 'medical_cert',     label: 'Medical Fitness Certificate',       mandatory: false },
+  { key: 'address_proof',    label: 'Address Proof',                     mandatory: true  },
+  { key: 'noc',              label: 'NOC from Previous Employer',        mandatory: false },
 ];
 
 exports.DOCUMENT_DEFS = DOCUMENT_DEFS;
