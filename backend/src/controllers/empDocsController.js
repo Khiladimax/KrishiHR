@@ -53,7 +53,7 @@ exports.getDocumentTypes = (req, res) => res.json({ success: true, data: DOCUMEN
 exports.getDocuments = async (req, res) => {
   try {
     const empId = req.params.employee_id || req.user.id;
-    if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin'].includes(req.user.role))
+    if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin','accounts','client_admin'].includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Access denied' });
     const result = await db.query(
       `SELECT d.*, CONCAT(u.first_name,' ',u.last_name) AS uploaded_by_name
@@ -124,7 +124,7 @@ exports.deleteDocument = async (req, res) => {
 exports.getPrevEmployment = async (req, res) => {
   try { await ensureTables();
     const empId = req.params.employee_id || req.user.id;
-    if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin'].includes(req.user.role))
+    if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin','accounts','client_admin'].includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Access denied' });
     const r = await db.query(`SELECT * FROM employee_previous_employment WHERE employee_id=$1 ORDER BY from_date DESC NULLS LAST`, [empId]);
     res.json({ success: true, data: r.rows });
@@ -177,7 +177,7 @@ exports.deletePrevEmployment = async (req, res) => {
 exports.getQualifications = async (req, res) => {
   try { await ensureTables();
     const empId = req.params.employee_id || req.user.id;
-    if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin'].includes(req.user.role))
+    if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin','accounts','client_admin'].includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Access denied' });
     const r = await db.query(`SELECT * FROM employee_qualifications WHERE employee_id=$1 ORDER BY passing_year DESC NULLS LAST`, [empId]);
     res.json({ success: true, data: r.rows });
