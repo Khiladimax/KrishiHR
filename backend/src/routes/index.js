@@ -1061,6 +1061,7 @@ router.delete('/documents/:id',            authenticate,                    docs
 // ── Employee Documents (new) ─────────────────────────────────────────────────
 const empDocsCtrl = require('../controllers/empDocsController');
 router.get   ('/emp-documents/types',                                         authenticate, empDocsCtrl.getDocumentTypes);
+router.get   ('/emp-documents/file/:id',     authenticate, empDocsCtrl.getFile);
 router.get   ('/emp-documents/:employee_id',                                  authenticate, empDocsCtrl.getDocuments);
 router.post  ('/emp-documents/upload', empDocsCtrl.upload.single('file'),    authenticate, empDocsCtrl.uploadDocument);
 router.delete('/emp-documents/:id',                                           authenticate, empDocsCtrl.deleteDocument);
