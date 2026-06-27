@@ -111,7 +111,7 @@ exports.initTables = async () => {
 async function canAccess(reqUser, targetEmployeeId) {
   if (parseInt(targetEmployeeId) === parseInt(reqUser.id)) return true;
   if (!HR_ROLES.includes(reqUser.role)) return false;
-  // client_admin can only access employees in their own org
+  // client_admin: scope to their org only (if client_id is set)
   if (reqUser.role === 'client_admin' && reqUser.client_id) {
     const check = await db.query(
       `SELECT id FROM employees WHERE id=$1 AND client_id=$2`,
@@ -119,6 +119,7 @@ async function canAccess(reqUser, targetEmployeeId) {
     );
     return check.rows.length > 0;
   }
+  // hr, accounts, or client_admin without client_id — full access
   return true;
 }
 
@@ -291,9 +292,13 @@ exports.getEmployeesForPicker = async (req, res) => {
     if (!HR_ROLES.includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
+    // client_admin only sees their own org's employees
+    const clientFilter = (req.user.role === 'client_admin' && req.user.client_id)
+      ? `AND client_id = ${parseInt(req.user.client_id)}`
+      : '';
     const result = await db.query(
       `SELECT id, employee_code, first_name, last_name
-       FROM employees WHERE is_active = true ORDER BY first_name ASC`
+       FROM employees WHERE is_active = true ${clientFilter} ORDER BY first_name ASC`
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
