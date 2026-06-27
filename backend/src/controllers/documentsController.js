@@ -24,7 +24,7 @@ exports.uploadMiddleware = upload.single('file');
 exports.uploadMultiMiddleware = upload.array('files', 10);
 
 // Roles allowed to view/edit ANY employee's documents
-const HR_ROLES = ['hr', 'accounts'];
+const HR_ROLES = ['hr', 'accounts', 'client_admin'];
 
 // ── Fixed document checklist definition ────────────────────────────────────────
 // key must be stable — used as the unique identifier per employee per document
