@@ -383,13 +383,11 @@ function clearEmployeeSelection() {
 // TAB 1 – DOCUMENTS  (group keys match documentsController.js exactly)
 // ══════════════════════════════════════════════════════════════════════════════
 const DOC_GROUPS = [
-  { label:'📄 Resume',              bg:'#1a237e', keys:['resume'] },
-  { label:'🏆 Broker / Compliance', bg:'#3a7015', keys:['broker_qual_renewal','broker_training'] },
-  { label:'🪪 Identity Documents',  bg:'#bf360c', keys:['aadhaar_card','pan_card','id_residence_proof','passport_dl_voterid','passport_photo'] },
-  { label:'🎓 Educational',          bg:'#4a148c', keys:['tenth_marksheet','twelfth_marksheet','graduation_marksheet','post_graduation_cert'] },
-  { label:'💳 Financial',            bg:'#0d47a1', keys:['last3_payslips','bank_statement_salary','uan_pf_document'] },
-  { label:'🏢 Employment',           bg:'#b71c1c', keys:['relieving_letter','offer_promo_letter','appointment_ack'] },
-  { label:'📁 Other',                bg:'#37474f', keys:['other_certificates'] },
+  { label:'🪪 Identity Documents',  bg:'#1b5e20', keys:['aadhar','pan'] },
+  { label:'🎓 Education Documents', bg:'#4a148c', keys:['10th_cert','12th_cert','graduation','pg','other_edu'] },
+  { label:'💼 Employment Documents',bg:'#b71c1c', keys:['offer_letter','exp_letter','relieving_letter','salary_slips','form16'] },
+  { label:'🏦 Financial Documents', bg:'#0d47a1', keys:['bank_passbook','pan_bank','pf_statement','salary_cert'] },
+  { label:'📎 Other Documents',     bg:'#37474f', keys:['photo','medical_cert','address_proof','noc'] },
 ];
 
 // Excel-style cell and header style strings (like leave summary)
