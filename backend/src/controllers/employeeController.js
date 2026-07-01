@@ -1208,6 +1208,313 @@ async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployee
   return ws;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// CLIENT PUNCH REGISTER — deployed (client_id NOT NULL) manpower, 26→25 cycle.
+// All Saturdays working; only Sunday is a week-off.
+// ════════════════════════════════════════════════════════════════════════════
+async function buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter) {
+  const ExcelJS = require('exceljs');
+
+  // Reuse cycle helper from buildClientAttendanceSheet scope
+  const startDt = new Date(y, m - 1, 26);
+  const endM    = m === 12 ? 1     : m + 1;
+  const endY    = m === 12 ? y + 1 : y;
+  const endDt   = new Date(endY, endM - 1, 25);
+  const fmt = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  const startStr = fmt(startDt), endStr = fmt(endDt);
+
+  // ── Client employees ──────────────────────────────────────────────────────
+  const empRes = await db.query(`
+    SELECT e.id, e.employee_code, e.first_name, e.last_name,
+           d.name AS department, e.city, e.state,
+           e.is_active, e.deactivation_remark, e.separation_date,
+           e.client_id, cl.name AS client_name
+    FROM employees e
+    LEFT JOIN departments d  ON e.department_id = d.id
+    LEFT JOIN clients     cl ON e.client_id     = cl.id
+    WHERE e.client_id IS NOT NULL ${clientFilter}
+      AND (e.is_active = true OR EXISTS (
+        SELECT 1 FROM attendance a WHERE a.employee_id = e.id AND a.date BETWEEN $1 AND $2))
+    ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [startStr, endStr]);
+  const employees = empRes.rows;
+  if (employees.length === 0) return null;
+
+  // ── Punch data ────────────────────────────────────────────────────────────
+  const punchRes = await db.query(`
+    SELECT a.employee_id,
+           TO_CHAR(a.date,'YYYY-MM-DD') AS date_str,
+           a.status,
+           TO_CHAR(a.punch_in,  'HH12:MI AM') AS punch_in_fmt,
+           TO_CHAR(a.punch_out, 'HH12:MI AM') AS punch_out_fmt,
+           EXTRACT(HOUR   FROM a.punch_in)::int  AS punch_in_h,
+           EXTRACT(MINUTE FROM a.punch_in)::int  AS punch_in_m,
+           EXTRACT(HOUR   FROM a.punch_out)::int AS punch_out_h,
+           EXTRACT(MINUTE FROM a.punch_out)::int AS punch_out_m,
+           a.working_hours
+    FROM attendance a
+    JOIN employees e ON e.id = a.employee_id
+    WHERE a.date BETWEEN $1 AND $2 AND e.client_id IS NOT NULL ${clientFilter}`,
+    [startStr, endStr]);
+  const punchMap = {};
+  for (const r of punchRes.rows) {
+    (punchMap[r.employee_id] ||= {})[r.date_str] = {
+      in: r.punch_in_fmt || '', out: r.punch_out_fmt || '',
+      inH: r.punch_in_h ?? -1, inM: r.punch_in_m ?? -1,
+      outH: r.punch_out_h ?? -1, outM: r.punch_out_m ?? -1,
+      status: r.status || '', hours: parseFloat(r.working_hours || 0),
+    };
+  }
+
+  // ── Holidays across both months of the window ─────────────────────────────
+  const holRes = await db.query(
+    `SELECT TO_CHAR(date,'YYYY-MM-DD') AS date_str, region FROM holidays WHERE date BETWEEN $1 AND $2`,
+    [startStr, endStr]);
+  const holsByRegion = { all: new Set(), north: new Set(), south_west: new Set() };
+  for (const h of holRes.rows) {
+    if (h.region==='all') { holsByRegion.all.add(h.date_str); holsByRegion.north.add(h.date_str); holsByRegion.south_west.add(h.date_str); }
+    else if (h.region==='north')      holsByRegion.north.add(h.date_str);
+    else if (h.region==='south_west') holsByRegion.south_west.add(h.date_str);
+  }
+
+  // Build date list
+  const days = [];
+  for (let dt = new Date(startDt); dt <= endDt; dt.setDate(dt.getDate()+1)) days.push(new Date(dt));
+  const N = days.length;
+  const dayNms = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const totalCols = 3 + N * 2 + 2; // 3 info + 2*days + 2 summary
+
+  const ws = wb.addWorksheet(`Client Punch 26${MONTH_NAMES[m-1].slice(0,3)}-25${MONTH_NAMES[(m%12)].slice(0,3)}`, {
+    views: [{ state: 'frozen', xSplit: 3, ySplit: 3 }]
+  });
+
+  // Row 1: Title
+  try { ws.mergeCells(1,1,1,totalCols); } catch(_) {}
+  const t = ws.getCell(1,1);
+  t.value = `KrishiHR — Client Punch Register | ${startStr} to ${endStr}`;
+  t.font  = { bold:true, size:13, color:{argb:'FFFFFFFF'} };
+  t.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0D47A1'} };
+  t.alignment = { horizontal:'center', vertical:'middle' };
+  ws.getRow(1).height = 28;
+
+  // Row 2: Legend
+  try { ws.mergeCells(2,1,2,totalCols); } catch(_) {}
+  const leg = ws.getCell(2,1);
+  leg.value = `Deployed manpower only • Cycle ${startStr} → ${endStr} • All Saturdays working • Only Sunday off  |  🟢 IN ≤10:30 On Time  🟠 IN >10:30 Late  🔵 OUT ≥18:30 Full Day  🟣 OUT <18:30 Early  WO=Sunday Off  HOL=Holiday`;
+  leg.font  = { size:8, italic:true, color:{argb:'FF37474F'} };
+  leg.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE3F2FD'} };
+  leg.alignment = { horizontal:'left', vertical:'middle', indent:1 };
+  ws.getRow(2).height = 16;
+
+  // Row 3: Headers
+  const hdrFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1565C0'} };
+  const hdrFont = { bold:true, size:9, color:{argb:'FFFFFFFF'} };
+  ['Emp Code','Name','Department'].forEach((h,i) => {
+    const c = ws.getCell(3, i+1);
+    c.value=h; c.font=hdrFont; c.fill=hdrFill;
+    c.alignment={horizontal:'center',vertical:'middle'};
+    c.border={bottom:{style:'medium',color:{argb:'FFFFFFFF'}}};
+  });
+
+  // Day headers — only Sunday tinted, all Saturdays normal working
+  days.forEach((dt, i) => {
+    const dow = dt.getDay();
+    const isSun = dow === 0;
+    const isMonthStart = dt.getDate() === 1;
+    const col = 4 + i*2;
+    try { ws.mergeCells(3, col, 3, col+1); } catch(_) {}
+    const dc = ws.getCell(3, col);
+    dc.value = `${dt.getDate()}
+${dayNms[dow]}`;
+    const hBg = isSun ? 'FF880E4F' : isMonthStart ? 'FF6A1B9A' : 'FF1565C0';
+    dc.font  = { bold:true, size:8, color:{argb:'FFFFFFFF'} };
+    dc.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:hBg} };
+    dc.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+    dc.border = { bottom:{style:'thin',color:{argb:'FFFFFFFF'}} };
+  });
+
+  // Summary headers
+  [['Total\nPresent','FF00695C'],['Total\nAbsent','FFD50000']].forEach(([h,bg],i) => {
+    const c = ws.getCell(3, 4+N*2+i);
+    c.value=h; c.font={bold:true,size:8,color:{argb:'FFFFFFFF'}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+    c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+  });
+  ws.getRow(3).height = 24;
+
+  // Column widths
+  ws.getColumn(1).width=10; ws.getColumn(2).width=22; ws.getColumn(3).width=16;
+  for (let i=0; i<N; i++) { ws.getColumn(4+i*2).width=9; ws.getColumn(4+i*2+1).width=9; }
+  ws.getColumn(4+N*2).width=13; ws.getColumn(4+N*2+1).width=13;
+
+  // ── Data rows ─────────────────────────────────────────────────────────────
+  let lastClient = '__UNSET__';
+  let grpOffset = 0;
+  let dataIdx = 0;
+
+  employees.forEach((e) => {
+    const clientKey = String(e.client_id);
+
+    // Client section header
+    if (clientKey !== lastClient) {
+      if (lastClient !== '__UNSET__') { ws.getRow(4+dataIdx+grpOffset).height=8; grpOffset++; }
+      const cRow = 4+dataIdx+grpOffset; grpOffset++;
+      try { ws.mergeCells(cRow,1,cRow,totalCols); } catch(_) {}
+      const cc = ws.getCell(cRow,1);
+      cc.value = `🏢 ${(e.client_name||'CLIENT').toUpperCase()} EMPLOYEES`;
+      cc.font={bold:true,size:11,color:{argb:'FFFFFFFF'}};
+      cc.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF0D47A1'}};
+      cc.alignment={horizontal:'left',vertical:'middle',indent:1};
+      ws.getRow(cRow).height=20;
+      lastClient=clientKey;
+    }
+
+    const row   = 4+dataIdx+grpOffset;
+    const isAlt = dataIdx % 2 === 1;
+    const rowBg = isAlt ? 'FFE3F2FD' : 'FFFFFFFF';
+
+    [e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(), e.department||''].forEach((v,ci) => {
+      const c=ws.getCell(row,ci+1);
+      c.value=v; c.font={size:9,bold:ci===1,color:{argb:'FF000000'}};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+      c.alignment={vertical:'middle'};
+      c.border={right:{style:'hair'},bottom:{style:'hair'}};
+    });
+
+    const empReg  = getEmployeeRegion(e.city||'', e.state||'');
+    const empHols = empReg==='north' ? holsByRegion.north : holsByRegion.south_west;
+    let totalPresent=0, totalAbsent=0;
+
+    days.forEach((dt, i) => {
+      const dateStr = fmt(dt);
+      const dow     = dt.getDay();
+      const isSun   = dow === 0;  // only Sunday off for client employees
+      const isHol   = empHols.has(dateStr);
+      const col     = 4+i*2;
+      const punch   = (punchMap[e.id]||{})[dateStr] || {in:'',out:'',inH:-1,inM:-1,outH:-1,outM:-1,status:'',hours:0};
+      const status  = punch.status;
+      const inC     = ws.getCell(row, col);
+      const outC    = ws.getCell(row, col+1);
+
+      if (isSun) {
+        inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFECE0E8'}};
+        inC.value='WO'; outC.value='';
+        inC.font={size:7,color:{argb:'FFB71C1C'},bold:true};
+        outC.font={size:7,color:{argb:'FFBDBDBD'}};
+
+      } else if (isHol) {
+        inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE0E5E8'}};
+        inC.value='HOL'; outC.value='';
+        inC.font={size:7,color:{argb:'FF546E7A'},bold:true};
+        outC.font={size:7,color:{argb:'FFBDBDBD'}};
+
+      } else if (status==='wfh') {
+        try { ws.mergeCells(row,col,row,col+1); } catch(_) {}
+        inC.value=punch.in?`🏠 IN:${punch.in}`:'🏠 WFH';
+        inC.font={bold:true,size:8,color:{argb:'FF006064'}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE0F7FA'}};
+        inC.alignment={horizontal:'center',vertical:'middle'};
+        inC.border={right:{style:'hair'},bottom:{style:'hair'}};
+        totalPresent++;
+        return;
+
+      } else if (status==='od') {
+        try { ws.mergeCells(row,col,row,col+1); } catch(_) {}
+        inC.value=punch.in?`🚗 IN:${punch.in}`:'🚗 OD';
+        inC.font={bold:true,size:8,color:{argb:'FF00695C'}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8F5E9'}};
+        inC.alignment={horizontal:'center',vertical:'middle'};
+        inC.border={right:{style:'hair'},bottom:{style:'hair'}};
+        totalPresent++;
+        return;
+
+      } else if (status==='on-leave'||status==='lwp'||status.startsWith('h-')) {
+        // CLIENT RULE: every leave = absent
+        try { ws.mergeCells(row,col,row,col+1); } catch(_) {}
+        inC.value = status==='lwp'?'💸 LWP':status==='on-leave'?'🏖 EL':'½ LEAVE';
+        inC.font={bold:true,size:8,color:{argb:'FF1A237E'}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFCE4EC'}};
+        inC.alignment={horizontal:'center',vertical:'middle'};
+        inC.border={right:{style:'hair'},bottom:{style:'hair'}};
+        totalAbsent++;
+        return;
+
+      } else if (status==='half-day') {
+        if (punch.in) {
+          const isOT=(punch.inH<10)||(punch.inH===10&&punch.inM<=30);
+          inC.value=punch.in;
+          inC.font={bold:true,size:8,color:{argb:isOT?'FF1B5E20':'FFE65100'}};
+          inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOT?'FFE8F5E9':'FFFFF3E0'}};
+          outC.value=punch.out||'½';
+          outC.font={bold:true,size:8,color:{argb:'FF6A1B9A'}};
+          outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3E5F5'}};
+          totalPresent++;
+        } else {
+          try { ws.mergeCells(row,col,row,col+1); } catch(_) {}
+          inC.value='½ DAY'; inC.font={bold:true,size:8,color:{argb:'FF6A1B9A'}};
+          inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3E5F5'}};
+          inC.alignment={horizontal:'center',vertical:'middle'};
+          inC.border={right:{style:'hair'},bottom:{style:'hair'}};
+          totalPresent++;
+          return;
+        }
+
+      } else if (status==='missing_punch_out') {
+        const isOT=(punch.inH<10)||(punch.inH===10&&punch.inM<=30);
+        inC.value=punch.in||'?';
+        inC.font={bold:true,size:8,color:{argb:isOT?'FF1B5E20':'FFE65100'}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOT?'FFE8F5E9':'FFFFF3E0'}};
+        if(punch.in) totalPresent++;
+        outC.value='MPO';
+        outC.font={bold:true,size:8,color:{argb:'FFFFFFFF'}};
+        outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFF6F00'}};
+
+      } else if (punch.in) {
+        const isOT=(punch.inH<10)||(punch.inH===10&&punch.inM<=30);
+        inC.value=punch.in;
+        inC.font={bold:true,size:8,color:{argb:isOT?'FF1B5E20':'FFE65100'}};
+        inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOT?'FFE8F5E9':'FFFFF3E0'}};
+        totalPresent++;
+        if (punch.out) {
+          const isFull=(punch.outH>18)||(punch.outH===18&&punch.outM>=30);
+          outC.value=punch.out;
+          outC.font={bold:true,size:8,color:{argb:isFull?'FF0D47A1':'FF6A1B9A'}};
+          outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isFull?'FFE3F2FD':'FFF3E5F5'}};
+        } else {
+          outC.value='—';
+          outC.font={bold:true,size:8,color:{argb:'FFBDBDBD'}};
+          outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFDE8E8'}};
+        }
+
+      } else {
+        // No record = absent
+        totalAbsent++;
+        inC.value=''; outC.value='';
+        inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+      }
+
+      [inC,outC].forEach(c => {
+        c.alignment={horizontal:'center',vertical:'middle'};
+        c.border={right:{style:'hair'},bottom:{style:'hair'}};
+      });
+    });
+
+    // Summary
+    [[totalPresent,'FF00695C'],[totalAbsent,'FFD50000']].forEach(([v,fg],i) => {
+      const c=ws.getCell(row,4+N*2+i);
+      c.value=v||'';
+      c.font={bold:true,size:9,color:{argb:v>0?fg:'FFBDBDBD'}};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+      c.alignment={horizontal:'center',vertical:'middle'};
+      c.border={right:{style:'thin'},bottom:{style:'hair'}};
+    });
+
+    ws.getRow(row).height=18;
+    dataIdx++;
+  });
+
+  return ws;
+}
+
 exports.exportMasterExcel = async (req, res) => {
   try {
     const ExcelJS = require('exceljs');
@@ -2021,8 +2328,11 @@ exports.exportMasterExcel = async (req, res) => {
     }));
     await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
 
-    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) — last sheet ──
+    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) ────────────
     await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
+
+    // ── Client Punch Register (26–25 cycle, all Sat working) ────────────────
+    await buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
 
     // ── Send response ────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
@@ -2188,7 +2498,7 @@ exports.exportAttendanceRegister = async (req, res) => {
           hours: parseFloat(row.working_hours || 0),
         };
       }
-      await buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, clientPunchMap, holidaysByRegion, getEmployeeRegion);
+      await buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
 
       const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_ClientAttendance_${MONTH_NAMES[m-1]}${y}.xlsx"`);
@@ -2504,8 +2814,11 @@ exports.exportAttendanceRegister = async (req, res) => {
 
     await buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMap, holidaysByRegion, getEmployeeRegion);
 
-    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) — last sheet ──
+    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) ────────────
     await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
+
+    // ── Client Punch Register (26–25 cycle, all Sat working) ────────────────
+    await buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
 
     // ── Send ─────────────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
