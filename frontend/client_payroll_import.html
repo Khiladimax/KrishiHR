@@ -3,66 +3,62 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KrishiHR - Client Payroll Import</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-.upload-zone{border:2px dashed var(--border2,#c7d2e2);border-radius:16px;padding:40px;text-align:center;background:#fff;transition:.2s;cursor:pointer}
-.upload-zone:hover,.upload-zone.drag{border-color:#1565C0;background:#E3F2FD}
-.steps{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
-.step{flex:1;min-width:140px;background:#fff;border:1.5px solid var(--border2,#e2e8f0);border-radius:12px;padding:16px;text-align:center}
-.step-num{width:32px;height:32px;border-radius:50%;background:#1565C0;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
-.step-label{font-size:12px;font-weight:600;color:#37474F}
-.step-sub{font-size:11px;color:#78909C;margin-top:4px}
-.summary-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-.summary-box{flex:1;min-width:100px;border-radius:12px;padding:14px 16px;text-align:center}
-.sum-green{background:#E8F5E9;} .sum-blue{background:#E3F2FD;} .sum-orange{background:#FFF3E0;} .sum-red{background:#FFEBEE;}
-.summary-num{font-size:26px;font-weight:800}
-.summary-label{font-size:11px;font-weight:600;color:#546E7A;margin-top:2px}
-.num-green{color:#2E7D32} .num-blue{color:#1565C0} .num-orange{color:#E65100} .num-red{color:#C62828}
-.result-table{width:100%;border-collapse:collapse;font-size:13px}
-.result-table th{background:#1565C0;color:#fff;padding:8px 10px;text-align:left;font-weight:600}
-.result-table td{padding:7px 10px;border-bottom:1px solid #EEF2F7}
-.result-table tr:nth-child(even) td{background:#F5F8FF}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
-.badge-green{background:#C8E6C9;color:#2E7D32}
-.badge-blue{background:#BBDEFB;color:#1565C0}
-.badge-red{background:#FFCDD2;color:#C62828}
-.month-select{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
-.month-select .field{display:flex;flex-direction:column;gap:4px}
-.month-select label{font-size:12px;font-weight:600;color:#546E7A}
-.month-select select,.month-select input{padding:9px 12px;border:1.5px solid #C7D2E2;border-radius:10px;font-size:13px;font-family:'DM Sans',sans-serif;background:#fff;outline:none}
-.overwrite-row{display:flex;align-items:center;gap:8px;margin-top:8px}
-.overwrite-row input[type=checkbox]{width:16px;height:16px;accent-color:#1565C0}
-.overwrite-row label{font-size:13px;color:#546E7A}
-.alert{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:16px;display:none}
-.alert-error{background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2}
-.alert-success{background:#E8F5E9;color:#2E7D32;border:1px solid #C8E6C9}
-.alert-info{background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB}
-.card{background:#fff;border-radius:16px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
-.card-title{font-size:15px;font-weight:700;margin-bottom:16px;color:#1A2332}
-.btn{padding:9px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:.15s}
-.btn-primary{background:#1565C0;color:#fff} .btn-primary:hover{background:#0D47A1}
-.btn-outline{background:#fff;color:#1565C0;border:1.5px solid #1565C0} .btn-outline:hover{background:#E3F2FD}
-.btn-green{background:#2E7D32;color:#fff} .btn-green:hover{background:#1B5E20}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.errors-list{background:#FFEBEE;border:1px solid #FFCDD2;border-radius:10px;padding:12px 16px;max-height:200px;overflow-y:auto;margin-top:12px}
-.errors-list li{font-size:12px;color:#C62828;margin-bottom:4px}
+.drop-zone{border:2px dashed var(--border2);border-radius:12px;padding:40px;text-align:center;cursor:pointer;background:var(--bg);transition:.2s}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:var(--accent-l)}
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.step-card{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+.step-label{font-size:12px;font-weight:700;color:var(--text)}
+.step-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.sum-box{border-radius:10px;padding:14px;text-align:center}
+.sum-num{font-size:28px;font-weight:800;line-height:1}
+.sum-lbl{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
+.result-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.result-tbl th{background:var(--accent);color:#fff;padding:9px 12px;text-align:left;font-weight:700;font-size:12px}
+.result-tbl td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.result-tbl tr:nth-child(even) td{background:var(--bg)}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.field-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
+.field-col{display:flex;flex-direction:column;gap:5px}
+.field-col label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.errors-box{background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;max-height:180px;overflow-y:auto;margin-top:12px}
+.errors-box li{font-size:12px;color:#b91c1c;margin-bottom:3px}
+.info-box{background:var(--accent-l);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--accent-h);line-height:1.7;margin-top:12px}
+.chk-row{display:flex;align-items:center;gap:8px;margin-top:14px}
+.chk-row input{width:15px;height:15px;accent-color:var(--accent)}
+.chk-row label{font-size:13px;color:var(--muted)}
 </style>
 </head>
 <body>
+
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-mark" id="sidebar-logo-mark"></div>
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div>
+    </div>
   </div>
   <nav id="sidebar-nav"></nav>
-  <div class="sidebar-footer"><div id="sidebar-user"></div></div>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
 </aside>
 
-<div class="main-content">
+<div class="main">
   <div class="topbar">
     <div class="topbar-left">
-      <button class="topbar-menu-btn" onclick="openSidebar()">☰</button>
+      <button class="hamburger-btn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
       <div class="topbar-title">💰 Client Payroll Import</div>
     </div>
     <div class="topbar-right">
@@ -71,24 +67,26 @@
     </div>
   </div>
 
-  <div class="page-body">
-    <div id="main-alert" class="alert"></div>
+  <div class="content fade-in">
 
     <!-- Steps -->
-    <div class="steps">
-      <div class="step"><div class="step-num">1</div><div class="step-label">Select Month</div><div class="step-sub">Choose salary payment month</div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-label">Download Template</div><div class="step-sub">Pre-filled with last cycle data</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-label">Fill Gross Salary</div><div class="step-sub">Only green column needs editing</div></div>
-      <div class="step"><div class="step-num">4</div><div class="step-label">Upload & Import</div><div class="step-sub">TDS auto-calculated @1%</div></div>
+    <div class="steps-grid">
+      <div class="step-card"><div class="step-num">1</div><div class="step-label">Select Month</div><div class="step-sub">Salary payment month</div></div>
+      <div class="step-card"><div class="step-num">2</div><div class="step-label">Download Template</div><div class="step-sub">Pre-filled with last cycle</div></div>
+      <div class="step-card"><div class="step-num">3</div><div class="step-label">Fill Gross Salary</div><div class="step-sub">Only green column</div></div>
+      <div class="step-card"><div class="step-num">4</div><div class="step-label">Upload & Import</div><div class="step-sub">TDS auto @1%</div></div>
     </div>
 
-    <!-- Month Picker + Template Download -->
+    <!-- Step 1 & 2 -->
     <div class="card">
-      <div class="card-title">📅 Step 1 & 2 — Select Cycle Month & Download Template</div>
-      <div class="month-select">
-        <div class="field">
-          <label>Salary Month (Payment Month)</label>
-          <select id="sel-month">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📅</span>Step 1 & 2 — Select Month & Download Template</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-col">
+          <label>Salary Month</label>
+          <select id="sel-month" class="form-control" style="width:150px">
             <option value="1">January</option><option value="2">February</option>
             <option value="3">March</option><option value="4">April</option>
             <option value="5">May</option><option value="6">June</option>
@@ -97,92 +95,94 @@
             <option value="11">November</option><option value="12">December</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field-col">
           <label>Year</label>
-          <input type="number" id="sel-year" value="" min="2020" max="2099" style="width:100px">
+          <input type="number" id="sel-year" class="form-control" style="width:100px" min="2020" max="2099">
         </div>
-        <button class="btn btn-outline" onclick="downloadTemplate()">⬇ Download Template</button>
+        <div class="field-col" style="justify-content:flex-end">
+          <button class="btn btn-primary" onclick="downloadTemplate()">⬇ Download Template</button>
+        </div>
       </div>
-      <div style="font-size:12px;color:#78909C">
-        💡 <strong>Cycle explained:</strong> If you select <strong>May 2026</strong>, the work period is
-        <strong>25 Apr → 24 May 2026</strong> (salary paid in May). Template is pre-filled with last cycle's gross salary.
+
+      <div class="info-box" id="cycle-info">
+        💡 Select a month above to see the work period.
       </div>
     </div>
 
-    <!-- Upload -->
+    <!-- Step 3 & 4 -->
     <div class="card">
-      <div class="card-title">⬆ Step 3 & 4 — Fill & Upload Template</div>
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">⬆</span>Step 3 & 4 — Fill & Upload</div>
+      </div>
 
-      <div class="upload-zone" id="drop-zone"
+      <div class="drop-zone" id="drop-zone"
         ondragover="event.preventDefault();this.classList.add('drag')"
         ondragleave="this.classList.remove('drag')"
         ondrop="handleDrop(event)"
         onclick="document.getElementById('file-input').click()">
         <div style="font-size:36px;margin-bottom:8px">📊</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:4px" id="drop-title">Click to select filled template or drag & drop</div>
-        <div style="font-size:12px;color:#78909C">Supports .xlsx, .xls, .csv · Max 10MB</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px" id="drop-title">Click to select filled template or drag & drop</div>
+        <div style="font-size:12px;color:var(--muted)">Supports .xlsx · Max 10MB</div>
         <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="fileSelected(this)">
       </div>
 
-      <div class="overwrite-row" style="margin-top:16px">
+      <div class="chk-row">
         <input type="checkbox" id="overwrite-chk">
-        <label for="overwrite-chk">Overwrite existing records for this month (if already imported before)</label>
+        <label for="overwrite-chk">Overwrite if already imported for this month</label>
       </div>
 
       <div style="margin-top:16px;display:flex;gap:12px;align-items:center">
         <button class="btn btn-primary" id="import-btn" onclick="doImport()" disabled>⬆ Import Payroll</button>
-        <button class="btn btn-outline" onclick="resetForm()">↺ Reset</button>
-        <span id="import-status" style="font-size:13px;color:#78909C"></span>
+        <button class="btn btn-secondary" onclick="resetForm()">↺ Reset</button>
+        <span id="import-status" style="font-size:13px;color:var(--muted)"></span>
       </div>
     </div>
 
     <!-- Results -->
     <div class="card" id="results-card" style="display:none">
-      <div class="card-title">✅ Import Results</div>
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">✅</span>Import Results</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" onclick="resetForm()">⬆ Import Another</button>
+          <button class="btn btn-primary" onclick="viewPayroll()">📋 View This Month</button>
+        </div>
+      </div>
+
       <div class="summary-row">
-        <div class="summary-box sum-green"><div class="summary-num num-green" id="r-imported">0</div><div class="summary-label">✅ Imported</div></div>
-        <div class="summary-box sum-blue"><div class="summary-num num-blue" id="r-updated">0</div><div class="summary-label">🔄 Updated</div></div>
-        <div class="summary-box sum-orange"><div class="summary-num num-orange" id="r-skipped">0</div><div class="summary-label">⚠ Skipped</div></div>
-        <div class="summary-box sum-red"><div class="summary-num num-red" id="r-errors">0</div><div class="summary-label">❌ Errors</div></div>
+        <div class="sum-box" style="background:var(--green-l)"><div class="sum-num" style="color:var(--green-d)" id="r-imported">0</div><div class="sum-lbl">✅ Imported</div></div>
+        <div class="sum-box" style="background:var(--accent-l)"><div class="sum-num" style="color:var(--accent)" id="r-updated">0</div><div class="sum-lbl">🔄 Updated</div></div>
+        <div class="sum-box" style="background:#fff8e1"><div class="sum-num" style="color:#e65100" id="r-skipped">0</div><div class="sum-lbl">⚠ Skipped</div></div>
+        <div class="sum-box" style="background:#fff5f5"><div class="sum-num" style="color:#b91c1c" id="r-errors">0</div><div class="sum-lbl">❌ Errors</div></div>
       </div>
 
       <div id="errors-section" style="display:none">
-        <div style="font-weight:600;color:#C62828;margin-bottom:6px">❌ Errors:</div>
-        <ul class="errors-list" id="errors-list"></ul>
+        <div style="font-weight:700;color:#b91c1c;font-size:13px;margin-bottom:6px">❌ Errors:</div>
+        <ul class="errors-box" id="errors-list"></ul>
       </div>
 
       <div style="overflow-x:auto;margin-top:16px">
-        <table class="result-table">
-          <thead><tr>
-            <th>Emp Code</th><th>Name</th><th>Client</th>
-            <th>Gross Salary</th><th>TDS @1%</th><th>Amount Payable</th><th>Status</th>
-          </tr></thead>
+        <table class="result-tbl">
+          <thead><tr><th>Emp Code</th><th>Name</th><th>Client</th><th>Gross Salary</th><th>TDS @1%</th><th>Amount Payable</th><th>Status</th></tr></thead>
           <tbody id="results-tbody"></tbody>
         </table>
-      </div>
-
-      <div style="margin-top:16px;display:flex;gap:12px">
-        <button class="btn btn-outline" onclick="resetForm()">⬆ Import Another</button>
-        <button class="btn btn-green" onclick="viewPayroll()">👁 View This Month's Payroll</button>
       </div>
     </div>
 
     <!-- View Payroll -->
     <div class="card" id="view-card" style="display:none">
-      <div class="card-title" id="view-title">📋 Client Payroll — </div>
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📋</span><span id="view-title">Client Payroll</span></div>
+      </div>
       <div style="overflow-x:auto">
-        <table class="result-table">
-          <thead><tr>
-            <th>Emp Code</th><th>Name</th><th>Client</th><th>Department</th>
-            <th>Gross Salary</th><th>TDS @1%</th><th>Amount Payable</th>
-          </tr></thead>
+        <table class="result-tbl">
+          <thead><tr><th>Emp Code</th><th>Name</th><th>Client</th><th>Department</th><th>Gross Salary</th><th>TDS @1%</th><th>Amount Payable</th></tr></thead>
           <tbody id="view-tbody"></tbody>
         </table>
       </div>
     </div>
 
-  </div><!-- page-body -->
-</div><!-- main-content -->
+  </div><!-- content -->
+</div><!-- main -->
 
 <script>
 const API   = window.CFG?.apiBase || 'https://krishihr-zuui.onrender.com/api';
@@ -190,168 +190,133 @@ const token = localStorage.getItem('krishihr_token');
 const user  = JSON.parse(localStorage.getItem('krishihr_user') || '{}');
 if (!token) location.href = 'login.html';
 if (!['admin','super_admin','hr','accounts'].includes(user.role)) {
-  alert('Access denied. HR/Accounts only.'); location.href = 'dashboard.html';
+  alert('Access denied.'); location.href = 'dashboard.html';
 }
 
-// Set current month/year as default
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const now = new Date();
 document.getElementById('sel-month').value = now.getMonth() + 1;
 document.getElementById('sel-year').value  = now.getFullYear();
+updateCycleInfo();
+
+document.getElementById('sel-month').addEventListener('change', updateCycleInfo);
+document.getElementById('sel-year').addEventListener('change', updateCycleInfo);
+
+function updateCycleInfo() {
+  const m = parseInt(document.getElementById('sel-month').value);
+  const y = parseInt(document.getElementById('sel-year').value);
+  if (!m || !y) return;
+  const prevM = m === 1 ? 12 : m - 1;
+  const prevY = m === 1 ? y - 1 : y;
+  const el = document.getElementById('cycle-info');
+  el.innerHTML = `💡 <strong>${MONTHS[m-1]} ${y}</strong> salary → work period <strong>25 ${MONTHS[prevM-1].slice(0,3)} ${prevY} → 24 ${MONTHS[m-1].slice(0,3)} ${y}</strong>. Template pre-filled with last cycle's gross salary.`;
+}
 
 let selectedFile = null;
 
-function getMonthYear() {
-  return {
-    month: parseInt(document.getElementById('sel-month').value),
-    year:  parseInt(document.getElementById('sel-year').value)
-  };
-}
-
-function showAlert(msg, type='info') {
-  const el = document.getElementById('main-alert');
-  el.className = `alert alert-${type}`;
-  el.textContent = msg;
-  el.style.display = 'block';
-  setTimeout(() => el.style.display='none', 5000);
-}
-
 async function downloadTemplate() {
-  const { month, year } = getMonthYear();
-  if (!month || !year) { showAlert('Select month and year first', 'error'); return; }
-  window.location.href = `${API}/client-payroll/template?month=${month}&year=${year}&token=${token}`;
-  // Fallback for auth header approach:
+  const m = document.getElementById('sel-month').value;
+  const y = document.getElementById('sel-year').value;
+  if (!m || !y) { alert('Select month and year first'); return; }
   try {
-    const res = await fetch(`${API}/client-payroll/template?month=${month}&year=${year}`, {
+    const res = await fetch(`${API}/client-payroll/template?month=${m}&year=${y}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error(await res.text());
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    a.href     = url;
-    a.download = `ClientPayroll_Template_${MONTHS[month-1]}${year}.xlsx`;
-    a.click();
+    a.href = url; a.download = `ClientPayroll_${MONTHS[m-1]}${y}.xlsx`; a.click();
     URL.revokeObjectURL(url);
-  } catch(e) { showAlert('Download failed: ' + e.message, 'error'); }
+  } catch(e) { alert('Download failed: ' + e.message); }
 }
 
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if (f) setFile(f);
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
 }
-
 function fileSelected(input) { if (input.files[0]) setFile(input.files[0]); }
-
 function setFile(f) {
-  if (!/\.(xlsx|xls|csv)$/i.test(f.name)) {
-    showAlert('Only .xlsx, .xls or .csv files allowed', 'error'); return;
-  }
+  if (!/\.(xlsx|xls|csv)$/i.test(f.name)) { alert('Only .xlsx/.xls/.csv files'); return; }
   selectedFile = f;
   document.getElementById('drop-title').textContent = `📄 ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
   document.getElementById('import-btn').disabled = false;
 }
 
 async function doImport() {
-  if (!selectedFile) { showAlert('Please select a file first', 'error'); return; }
-  const { month, year } = getMonthYear();
-  if (!month || !year) { showAlert('Select month and year first', 'error'); return; }
-
+  if (!selectedFile) { alert('Select a file first'); return; }
+  const m = document.getElementById('sel-month').value;
+  const y = document.getElementById('sel-year').value;
   const btn = document.getElementById('import-btn');
   const status = document.getElementById('import-status');
-  btn.disabled = true;
-  status.textContent = '⏳ Importing...';
+  btn.disabled = true; status.textContent = '⏳ Importing...';
 
   const fd = new FormData();
   fd.append('file', selectedFile);
-  fd.append('month', month);
-  fd.append('year', year);
+  fd.append('month', m); fd.append('year', y);
   fd.append('overwrite', document.getElementById('overwrite-chk').checked ? 'true' : 'false');
 
   try {
     const res  = await fetch(`${API}/client-payroll/import`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: fd
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd
     });
     const data = await res.json();
-
     if (!data.success) throw new Error(data.message);
 
-    // Summary
     document.getElementById('r-imported').textContent = data.summary.imported;
     document.getElementById('r-updated').textContent  = data.summary.updated;
     document.getElementById('r-skipped').textContent  = data.summary.skipped;
     document.getElementById('r-errors').textContent   = data.summary.errors;
 
-    // Errors
-    const errSec  = document.getElementById('errors-section');
-    const errList = document.getElementById('errors-list');
-    if (data.errors && data.errors.length) {
-      errList.innerHTML = data.errors.map(e => `<li>${e}</li>`).join('');
+    const errSec = document.getElementById('errors-section');
+    if (data.errors?.length) {
+      document.getElementById('errors-list').innerHTML = data.errors.map(e=>`<li>${e}</li>`).join('');
       errSec.style.display = 'block';
-    } else {
-      errSec.style.display = 'none';
-    }
+    } else { errSec.style.display = 'none'; }
 
-    // Results table
-    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const fmt = n => '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits:2});
-    const tbody = document.getElementById('results-tbody');
-    tbody.innerHTML = (data.results || []).map(r => `
+    const fmt = n => '₹' + Number(n).toLocaleString('en-IN',{minimumFractionDigits:2});
+    document.getElementById('results-tbody').innerHTML = (data.results||[]).map(r=>`
       <tr>
-        <td><strong>${r.emp_code}</strong></td>
-        <td>${r.name}</td>
-        <td>${r.client || ''}</td>
-        <td>${fmt(r.gross)}</td>
-        <td>${fmt(r.tds)}</td>
+        <td><strong style="color:var(--accent)">${r.emp_code}</strong></td>
+        <td>${r.name}</td><td>${r.client||''}</td>
+        <td>${fmt(r.gross)}</td><td>${fmt(r.tds)}</td>
         <td><strong>${fmt(r.payable)}</strong></td>
-        <td><span class="badge ${r.action==='imported'?'badge-green':'badge-blue'}">${r.action}</span></td>
+        <td><span class="badge" style="${r.action==='imported'?'background:var(--green-l);color:var(--green-d)':'background:var(--accent-l);color:var(--accent)'}">${r.action}</span></td>
       </tr>`).join('');
 
     document.getElementById('results-card').style.display = 'block';
-    document.getElementById('results-card').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('results-card').scrollIntoView({behavior:'smooth'});
     status.textContent = '';
-    showAlert(data.message, 'success');
-
-  } catch (err) {
-    showAlert('Import failed: ' + err.message, 'error');
     btn.disabled = false;
-    status.textContent = '';
+  } catch(e) {
+    alert('Import failed: ' + e.message);
+    btn.disabled = false; status.textContent = '';
   }
 }
 
 async function viewPayroll() {
-  const { month, year } = getMonthYear();
-  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const m = document.getElementById('sel-month').value;
+  const y = document.getElementById('sel-year').value;
   try {
-    const res  = await fetch(`${API}/client-payroll?month=${month}&year=${year}`, {
+    const res  = await fetch(`${API}/client-payroll?month=${m}&year=${y}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.message);
-
-    const fmt = n => '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits:2});
-    document.getElementById('view-title').textContent =
-      `📋 Client Payroll — ${MONTHS[month-1]} ${year} (${data.count} employees)`;
-
-    const tbody = document.getElementById('view-tbody');
-    tbody.innerHTML = (data.data || []).map((r,i) => `
+    const fmt = n => '₹' + Number(n).toLocaleString('en-IN',{minimumFractionDigits:2});
+    document.getElementById('view-title').textContent = `Client Payroll — ${MONTHS[m-1]} ${y} (${data.count} employees)`;
+    document.getElementById('view-tbody').innerHTML = (data.data||[]).map(r=>`
       <tr>
-        <td><strong>${r.employee_code}</strong></td>
+        <td><strong style="color:var(--accent)">${r.employee_code}</strong></td>
         <td>${r.first_name} ${r.last_name||''}</td>
-        <td>${r.client_name||''}</td>
-        <td>${r.department||''}</td>
-        <td>${fmt(r.gross_salary)}</td>
-        <td>${fmt(r.tds_amount)}</td>
-        <td><strong style="color:#1565C0">${fmt(r.amount_payable)}</strong></td>
+        <td>${r.client_name||''}</td><td>${r.department||''}</td>
+        <td>${fmt(r.gross_salary)}</td><td>${fmt(r.tds_amount)}</td>
+        <td><strong style="color:var(--accent)">${fmt(r.amount_payable)}</strong></td>
       </tr>`).join('');
-
     document.getElementById('view-card').style.display = 'block';
-    document.getElementById('view-card').scrollIntoView({ behavior: 'smooth' });
-  } catch(e) { showAlert('Failed to load: ' + e.message, 'error'); }
+    document.getElementById('view-card').scrollIntoView({behavior:'smooth'});
+  } catch(e) { alert('Failed: ' + e.message); }
 }
 
 function resetForm() {
