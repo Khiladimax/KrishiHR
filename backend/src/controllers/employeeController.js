@@ -1149,16 +1149,13 @@ async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployee
       cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
     });
 
-    const empReg    = getEmployeeRegion(e.city || '', e.state || '');
-    const empHolSet = empReg === 'north' ? holsByRegion.north : holsByRegion.south_west;
-
+    // No holiday concept for client employees — they work on all holidays
     let present = 0, absent = 0;
     days.forEach((dt, i) => {
       const dateStr   = fmtDate(dt);
-      const isWeekOff = isClientWeekOff(dt);   // all Saturdays working; Sunday off
+      const isWeekOff = isClientWeekOff(dt);
       let status;
       if (isWeekOff) status = 'weekend';
-      else if (empHolSet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) status = 'holiday';
       else status = (attMap[e.id] || {})[dateStr] || '';
 
       const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'E3F2FD' : 'FFFFFF', fg: '000000' };
@@ -1169,7 +1166,7 @@ async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployee
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
 
-      if (!isWeekOff && status !== 'holiday') {
+      if (!isWeekOff) {
         if (PRESENT_STATUSES.has(status))     present++;
         else if (ABSENT_STATUSES.has(status)) absent++;
         // Blank / unmarked days are left uncounted (data may still be pending).
@@ -1200,7 +1197,7 @@ async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployee
   const legendRow = 4 + dataRowIndex + rowOffset + 1;
   try { ws.mergeCells(legendRow, 1, legendRow, totalCols); } catch (_) {}
   const lc = ws.getCell(legendRow, 1);
-  lc.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Leave  LWP=Unpaid Leave  H=Half Day  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off (Sun)  HOL=Holiday   |   CLIENT RULE: all Saturdays working; only Sunday off. Present = worked days (P/L/OD/WFH/R). Absent = marked absent AND every leave (EL/LWP/half-day leave). Holidays not counted.';
+  lc.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Leave  LWP=Unpaid Leave  H=Half Day  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off (Sun only)   |   CLIENT RULE: all Saturdays working, no holidays. Present = worked days. Absent = absent + every leave type.';
   lc.font  = { italic: true, size: 8, color: { argb: 'FF37474F' } };
   lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECEFF1' } };
   lc.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -1267,16 +1264,7 @@ async function buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmplo
     };
   }
 
-  // ── Holidays across both months of the window ─────────────────────────────
-  const holRes = await db.query(
-    `SELECT TO_CHAR(date,'YYYY-MM-DD') AS date_str, region FROM holidays WHERE date BETWEEN $1 AND $2`,
-    [startStr, endStr]);
-  const holsByRegion = { all: new Set(), north: new Set(), south_west: new Set() };
-  for (const h of holRes.rows) {
-    if (h.region==='all') { holsByRegion.all.add(h.date_str); holsByRegion.north.add(h.date_str); holsByRegion.south_west.add(h.date_str); }
-    else if (h.region==='north')      holsByRegion.north.add(h.date_str);
-    else if (h.region==='south_west') holsByRegion.south_west.add(h.date_str);
-  }
+  // No holiday fetch — client employees work on all holidays
 
   // Build date list
   const days = [];
@@ -1382,15 +1370,13 @@ ${dayNms[dow]}`;
       c.border={right:{style:'hair'},bottom:{style:'hair'}};
     });
 
-    const empReg  = getEmployeeRegion(e.city||'', e.state||'');
-    const empHols = empReg==='north' ? holsByRegion.north : holsByRegion.south_west;
+    // No holiday concept for client employees
     let totalPresent=0, totalAbsent=0;
 
     days.forEach((dt, i) => {
       const dateStr = fmt(dt);
       const dow     = dt.getDay();
       const isSun   = dow === 0;  // only Sunday off for client employees
-      const isHol   = empHols.has(dateStr);
       const col     = 4+i*2;
       const punch   = (punchMap[e.id]||{})[dateStr] || {in:'',out:'',inH:-1,inM:-1,outH:-1,outM:-1,status:'',hours:0};
       const status  = punch.status;
@@ -1401,12 +1387,6 @@ ${dayNms[dow]}`;
         inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFECE0E8'}};
         inC.value='WO'; outC.value='';
         inC.font={size:7,color:{argb:'FFB71C1C'},bold:true};
-        outC.font={size:7,color:{argb:'FFBDBDBD'}};
-
-      } else if (isHol) {
-        inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE0E5E8'}};
-        inC.value='HOL'; outC.value='';
-        inC.font={size:7,color:{argb:'FF546E7A'},bold:true};
         outC.font={size:7,color:{argb:'FFBDBDBD'}};
 
       } else if (status==='wfh') {
@@ -1926,6 +1906,10 @@ exports.exportMasterExcel = async (req, res) => {
     // ════════════════════════════════════════════════════════════════════════
     // SHEET 2 — SALARY BREAKUP
     // ════════════════════════════════════════════════════════════════════════
+    // ── Sheet 2 — KCMS Punch Register ───────────────────────────────────────
+    await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
+
+    // ── Sheet 3 — Salary Breakup ─────────────────────────────────────────────
     const ws2 = wb.addWorksheet('Salary Breakup', {
       views: [{ state: 'frozen', xSplit: 4, ySplit: 2 }]
     });
@@ -2495,9 +2479,7 @@ exports.exportMasterExcel = async (req, res) => {
       client_id: e.client_id || null,
       client_name: e.client_name || null,
     }));
-    await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
-
-    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) ────────────
+    // ── Client Attendance (25→24 cycle, all Sat working) ──────────────────────
     await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
 
     // ── Client Punch Register (26–25 cycle, all Sat working) ────────────────
