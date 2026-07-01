@@ -615,7 +615,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   const ExcelJS = require('exceljs');
   const daysInMonth = new Date(y, m, 0).getDate();
   const dayNms = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const totalCols = 3 + daysInMonth * 2 + 3; // 3 info + 2*days + 3 summary cols
+  const totalCols = 3 + daysInMonth * 2 + 2; // 3 info + 2*days + 2 summary cols
 
   const ws = wb.addWorksheet(`Punch Register ${MONTH_NAMES[m-1]} ${y}`, {
     views: [{ state: 'frozen', xSplit: 3, ySplit: 3 }]
@@ -674,10 +674,10 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   }
 
   // Summary headers
-  ['Total\nDays', 'On\nTime', 'Late\nIN'].forEach((h,i) => {
+  [['Total\nPresent','FF00695C'], ['Total\nAbsent','FFD50000']].forEach(([h,bg],i) => {
     const c = ws.getCell(3, 3+daysInMonth*2+1+i);
     c.value=h; c.font={bold:true,size:8,color:{argb:'FFFFFFFF'}};
-    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF00695C'}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
     c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
   });
   ws.getRow(3).height = 24;
@@ -690,9 +690,8 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
     ws.getColumn(3+(d-1)*2+1).width = 9;
     ws.getColumn(3+(d-1)*2+2).width = 9;
   }
-  ws.getColumn(3+daysInMonth*2+1).width = 7;
-  ws.getColumn(3+daysInMonth*2+2).width = 7;
-  ws.getColumn(3+daysInMonth*2+3).width = 7;
+  ws.getColumn(3+daysInMonth*2+1).width = 12;
+  ws.getColumn(3+daysInMonth*2+2).width = 12;
 
   // ── Group separator: client section → KCMS sub-groups only ─────────────
   let lastClientPunch = '__UNSET__';
@@ -767,7 +766,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
     const empReg   = getEmployeeRegion(e.city||'', e.state||'');
     const empHols  = empReg==='north' ? holidaysByRegion.north : holidaysByRegion.south_west;
     let punchSatCnt = 0;
-    let totalPunched=0, onTimeCnt=0, lateCnt=0;
+    let totalPresent=0, totalAbsent=0;
 
     // For deactivated: find last punch day, merge rest
     const punchDays = Object.keys(empPunch).map(Number);
@@ -828,7 +827,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
         inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE0F7FA'}};
         inC.alignment = {horizontal:'center',vertical:'middle'};
         inC.border = {right:{style:'hair'},bottom:{style:'hair'}};
-        if (punch.in) { totalPunched++; const inH=punch.inH,inM=punch.inM; if((inH<10)||(inH===10&&inM<=30)) onTimeCnt++; else lateCnt++; }
+        totalPresent++;
         continue;
 
       } else if (status === 'od') {
@@ -839,7 +838,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
         inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE8F5E9'}};
         inC.alignment = {horizontal:'center',vertical:'middle'};
         inC.border = {right:{style:'hair'},bottom:{style:'hair'}};
-        if (punch.in) { totalPunched++; const inH=punch.inH,inM=punch.inM; if((inH<10)||(inH===10&&inM<=30)) onTimeCnt++; else lateCnt++; }
+        totalPresent++;
         continue;
 
       } else if (status === 'on-leave' || status === 'lwp') {
@@ -850,6 +849,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
         inC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EAF6'}};
         inC.alignment = {horizontal:'center',vertical:'middle'};
         inC.border = {right:{style:'hair'},bottom:{style:'hair'}};
+        if (status === 'on-leave') totalPresent++; else totalAbsent++; // lwp = absent
         continue;
 
       } else if (status === 'half-day') {
@@ -860,7 +860,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
           inC.value=punch.in;
           inC.font={bold:true,size:8,color:{argb:isOnTime?'FF1B5E20':'FFE65100'}};
           inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOnTime?'FFE8F5E9':'FFFFF3E0'}};
-          totalPunched++; if(isOnTime) onTimeCnt++; else lateCnt++;
+          totalPresent++;
           outC.value = punch.out || '½';
           outC.font  = {bold:true,size:8,color:{argb:'FF6A1B9A'}};
           outC.fill  = {type:'pattern',pattern:'solid',fgColor:{argb:'FFF3E5F5'}};
@@ -881,7 +881,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
         inC.value=punch.in||'?';
         inC.font={bold:true,size:8,color:{argb:isOnTime?'FF1B5E20':'FFE65100'}};
         inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:isOnTime?'FFE8F5E9':'FFFFF3E0'}};
-        if(punch.in){totalPunched++; if(isOnTime) onTimeCnt++; else lateCnt++;}
+        if(punch.in) totalPresent++;
         outC.value='MPO';
         outC.font={bold:true,size:8,color:{argb:'FFFFFFFF'}};
         outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFF6F00'}};
@@ -895,7 +895,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
         inC.value=punch.in;
         inC.font={bold:true,size:8,color:{argb:inFg}};
         inC.fill={type:'pattern',pattern:'solid',fgColor:{argb:inBg}};
-        totalPunched++; if(isOnTime) onTimeCnt++; else lateCnt++;
+        totalPresent++;
 
         if (punch.out) {
           const outH=punch.outH,outM=punch.outM;
@@ -912,6 +912,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
 
       } else {
         // ── No record for this working day ────────────────────────────────
+        totalAbsent++;
         inC.value=''; outC.value='';
         inC.fill=outC.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
       }
@@ -923,7 +924,7 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
     }
 
     // Summary cells
-    [[totalPunched,'FF00695C'],[onTimeCnt,'FF2E7D32'],[lateCnt,'FFE65100']].forEach(([v,fg],i) => {
+    [[totalPresent,'FF00695C'],[totalAbsent,'FFD50000']].forEach(([v,fg],i) => {
       const c = ws.getCell(row, 3+daysInMonth*2+1+i);
       c.value=v||'';
       c.font={bold:true,size:9,color:{argb:v>0?fg:'FFBDBDBD'}};
