@@ -211,7 +211,7 @@ Auth.guard();
 // Payroll is confidential — only accounts and super_admin allowed to process
 // hr can view list only
 const _userRole = Auth.getUser()?.role?.toLowerCase().trim();
-if (!['hr','accounts','super_admin'].includes(_userRole)) {
+if (!['hr','accounts','super_admin','client_admin'].includes(_userRole)) {
   window.location.href = 'attendance.html';
 }
 buildSidebar('payroll.html');
@@ -234,6 +234,14 @@ const NOW = new Date();
 
 // HR: List only (view payroll, no process/upload)
 if (user && user.role === 'hr') {
+  document.getElementById('list-tab').style.display = '';
+  document.getElementById('upload-tab').style.display = 'none';
+  document.getElementById('process-tab').style.display = 'none';
+  switchTab('list');
+}
+
+// Client Admin: List only — their own employees' payslips
+if (user && user.role === 'client_admin') {
   document.getElementById('list-tab').style.display = '';
   document.getElementById('upload-tab').style.display = 'none';
   document.getElementById('process-tab').style.display = 'none';
