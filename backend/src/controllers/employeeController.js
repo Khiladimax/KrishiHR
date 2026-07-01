@@ -960,10 +960,11 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
 // the selected month), flip getClientCycle() — it is the single source of truth.
 // ════════════════════════════════════════════════════════════════════════════
 function getClientCycle(m, y) {
-  const start = new Date(y, m - 1, 26);            // 26th of the selected month
-  const endM  = m === 12 ? 1     : m + 1;
-  const endY  = m === 12 ? y + 1 : y;
-  const end   = new Date(endY, endM - 1, 25);      // 25th of the following month
+  // Cycle: 25th of the PREVIOUS month → 24th of the SELECTED month
+  const startM = m === 1 ? 12 : m - 1;
+  const startY = m === 1 ? y - 1 : y;
+  const start  = new Date(startY, startM - 1, 25); // 25th of previous month
+  const end    = new Date(y, m - 1, 24);            // 24th of selected month
   return { start, end };
 }
 
@@ -1057,7 +1058,7 @@ async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployee
   const N = days.length;
   const totalCols = 5 + N + 2;
 
-  const ws = wb.addWorksheet(`Client Attn 26${MONTH_NAMES[m-1].slice(0,3)}-25${MONTH_NAMES[(m%12)].slice(0,3)}`, {
+  const ws = wb.addWorksheet(`Client Attn 25${MONTH_NAMES[m===1?11:m-2].slice(0,3)}-24${MONTH_NAMES[m-1].slice(0,3)}`, {
     views: [{ state: 'frozen', xSplit: 5, ySplit: 3 }]
   });
 
@@ -1216,10 +1217,11 @@ async function buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmplo
   const ExcelJS = require('exceljs');
 
   // Reuse cycle helper from buildClientAttendanceSheet scope
-  const startDt = new Date(y, m - 1, 26);
-  const endM    = m === 12 ? 1     : m + 1;
-  const endY    = m === 12 ? y + 1 : y;
-  const endDt   = new Date(endY, endM - 1, 25);
+  // Cycle: 25th of previous month → 24th of selected month
+  const startM2 = m === 1 ? 12 : m - 1;
+  const startY2 = m === 1 ? y - 1 : y;
+  const startDt = new Date(startY2, startM2 - 1, 25);
+  const endDt   = new Date(y, m - 1, 24);
   const fmt = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
   const startStr = fmt(startDt), endStr = fmt(endDt);
 
@@ -1283,7 +1285,7 @@ async function buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmplo
   const dayNms = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const totalCols = 3 + N * 2 + 2; // 3 info + 2*days + 2 summary
 
-  const ws = wb.addWorksheet(`Client Punch 26${MONTH_NAMES[m-1].slice(0,3)}-25${MONTH_NAMES[(m%12)].slice(0,3)}`, {
+  const ws = wb.addWorksheet(`Client Punch 25${MONTH_NAMES[m===1?11:m-2].slice(0,3)}-24${MONTH_NAMES[m-1].slice(0,3)}`, {
     views: [{ state: 'frozen', xSplit: 3, ySplit: 3 }]
   });
 
@@ -2191,6 +2193,114 @@ exports.exportMasterExcel = async (req, res) => {
       ws2.getColumn(i + 1).width = w;
     });
 
+    // ── Client Salary Section — appended below KCMS rows in same sheet ───────
+    if (!isClientAdmin) {
+      const clientEmpSal = await db.query(`
+        SELECT e.id, e.employee_code, e.first_name, e.last_name,
+               d.name AS department, des.title AS designation,
+               e.employee_category, e.city, e.state,
+               COALESCE(e.saturday_policy,'2nd_4th_off') AS saturday_policy,
+               COALESCE(s.basic,e.basic_salary,0) AS basic,
+               COALESCE(s.hra,e.hra,0) AS hra,
+               COALESCE(s.conveyance,e.conveyance,0) AS conveyance,
+               COALESCE(s.special_allowance,e.special_allowance,0) AS special_allowance,
+               COALESCE(s.gratuity,0) AS gratuity,
+               COALESCE(s.gross_salary,0) AS gross_salary,
+               COALESCE(s.pf_employee,0) AS pf_employee,
+               COALESCE(s.esi_employee,0) AS esi_employee,
+               COALESCE(s.professional_tax,0) AS professional_tax,
+               COALESCE(s.lwf,0) AS lwf,
+               COALESCE(s.tds,0) AS tds,
+               COALESCE(s.pf_employer,0) AS pf_employer,
+               COALESCE(s.esi_employer,0) AS esi_employer,
+               COALESCE(s.pf_admin,0) AS pf_admin,
+               COALESCE(s.total_deductions,0) AS total_deductions,
+               COALESCE(s.net_salary,0) AS net_salary,
+               COALESCE(s.ctc_monthly,0) AS ctc_monthly,
+               COALESCE(s.ctc_annual,e.ctc,0) AS ctc_annual,
+               e.client_id, cl.name AS client_name
+        FROM employees e
+        LEFT JOIN departments d   ON e.department_id  = d.id
+        LEFT JOIN designations des ON e.designation_id = des.id
+        LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
+        LEFT JOIN clients cl ON e.client_id = cl.id
+        WHERE e.client_id IS NOT NULL AND e.is_active = true
+        ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, []);
+
+      // Get current last row in ws2
+      let salClientRow = ws2.lastRow ? ws2.lastRow.number + 2 : employees.length + 6;
+      // Gap row
+      ws2.getRow(salClientRow - 1).height = 8;
+
+      let lastClientSal2 = '__UNSET__';
+      clientEmpSal.rows.forEach((e, ri) => {
+        const clientKey2 = String(e.client_id);
+        if (clientKey2 !== lastClientSal2) {
+          try { ws2.mergeCells(salClientRow, 1, salClientRow, 34); } catch(_) {}
+          const cc = ws2.getCell(salClientRow, 1);
+          cc.value = `🏢 ${(e.client_name||'CLIENT').toUpperCase()} EMPLOYEES`;
+          cc.font = { bold:true, size:11, color:{argb:'FFFFFFFF'} };
+          cc.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0D47A1'} };
+          cc.alignment = { horizontal:'left', vertical:'middle', indent:1 };
+          ws2.getRow(salClientRow).height = 20;
+          salClientRow++;
+          lastClientSal2 = clientKey2;
+        }
+        const isAlt2 = ri % 2 === 1;
+        const bgColor2 = isAlt2 ? 'FFE3F2FD' : 'FFFFFFFF';
+        // Use 26-24 cycle attendance for client salary
+        const { start: cStart, end: cEnd } = getClientCycle(m, y);
+        const cFmt = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        let cPresent = 0, cLop = 0, cWorkingDays = 0;
+        for (let dt = new Date(cStart); dt <= cEnd; dt.setDate(dt.getDate()+1)) {
+          const dow = dt.getDay();
+          if (dow === 0) continue; // Sunday off
+          cWorkingDays++;
+          const ds = cFmt(dt);
+          const st = (attMap[e.id]||{})[ds] || '';
+          if (['present','late','regularized','od','wfh','holiday','on-leave','half-day','h-el','h-cl','h-sl','h-wfh'].includes(st)) cPresent++;
+          else if (['lwp','absent','h-lwp'].includes(st) || st === 'missing_punch_out') cLop++;
+        }
+        const gross2    = parseFloat(e.gross_salary)||0;
+        const lwf2      = parseFloat(e.lwf)||0;
+        const totalDed2 = Math.max(0,(parseFloat(e.total_deductions)||0)-lwf2);
+        const netFull2  = gross2 - totalDed2;
+        const emiDed2   = emiMap[e.id]||0;
+        const earnedGross2 = cWorkingDays>0 ? Math.round((gross2   * cPresent)/cWorkingDays) : 0;
+        const earnedNet2   = cWorkingDays>0 ? Math.round((netFull2 * cPresent)/cWorkingDays) : 0;
+        const netPayable2  = Math.max(0, earnedNet2 - emiDed2);
+        const vals2 = [
+          e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(),
+          e.department||'', e.designation||'',
+          parseFloat(e.basic)||0, parseFloat(e.hra)||0, parseFloat(e.conveyance)||0,
+          parseFloat(e.special_allowance)||0, parseFloat(e.gratuity)||0, gross2,
+          parseFloat(e.pf_employee)||0, parseFloat(e.esi_employee)||0,
+          parseFloat(e.professional_tax)||0, parseFloat(e.tds)||0,
+          emiDed2, totalDed2,
+          parseFloat(e.pf_employer)||0, parseFloat(e.esi_employer)||0, parseFloat(e.pf_admin)||0,
+          (parseFloat(e.pf_employer)||0)+(parseFloat(e.esi_employer)||0)+(parseFloat(e.pf_admin)||0),
+          0, 0, 0, 0, // leave cols (no leave concept for client)
+          cPresent, cWorkingDays, cLop,
+          0, 0, 0, // punch cols (not tracked here)
+          earnedGross2, earnedNet2, emiDed2, netPayable2
+        ];
+        vals2.forEach((v, ci) => {
+          const cell = ws2.getCell(salClientRow, ci+1);
+          cell.value = v;
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bgColor2} };
+          cell.border = { right:{style:'hair'}, bottom:{style:'hair'} };
+          cell.font = { size:9 };
+          if (ci >= 4) {
+            cell.numFmt = (ci>=20&&ci<=23)?'0':(ci>=24&&ci<=29)?'0.0':'₹#,##0.00';
+            cell.alignment = { horizontal:'right', vertical:'middle' };
+            if (ci===33) { cell.font={bold:true,size:10,color:{argb:'FF1B5E20'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:isAlt2?'FFC8E6C9':'FFE8F5E9'}}; }
+          } else { cell.alignment={vertical:'middle'}; }
+        });
+        ws2.getRow(salClientRow).height = 16;
+        salClientRow++;
+      });
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // SHEET 3 — EMPLOYEE DIRECTORY
     // ════════════════════════════════════════════════════════════════════════
@@ -2273,6 +2383,65 @@ exports.exportMasterExcel = async (req, res) => {
     [10,22,28,13,8,12,12,16,22,10,12,7,14,14,14,16,14,18,20,20,13,22].forEach((w, i) => {
       ws3.getColumn(i + 1).width = w;
     });
+
+    // ── Client Directory Section — appended below KCMS rows ──────────────────
+    if (!isClientAdmin) {
+      const clientEmpDir = await db.query(`
+        SELECT e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone,
+               e.gender, e.date_of_birth, e.joining_date,
+               d.name AS department, des.title AS designation,
+               e.role, e.employee_category, e.level,
+               e.city, e.state,
+               e.pan_number, e.aadhar_number, e.uan_number, e.pf_number,
+               e.bank_name, e.bank_account, e.bank_ifsc,
+               CONCAT(m2.first_name,' ',m2.last_name) AS reporting_manager,
+               e.client_id, cl.name AS client_name
+        FROM employees e
+        LEFT JOIN departments d    ON e.department_id  = d.id
+        LEFT JOIN designations des ON e.designation_id = des.id
+        LEFT JOIN employees m2     ON e.reporting_manager_id = m2.id
+        LEFT JOIN clients cl       ON e.client_id = cl.id
+        WHERE e.client_id IS NOT NULL AND e.is_active = true
+        ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, []);
+
+      let dirClientRow = ws3.lastRow ? ws3.lastRow.number + 2 : employees.length + 5;
+      ws3.getRow(dirClientRow - 1).height = 8;
+      let lastClientDir2 = '__UNSET__';
+      clientEmpDir.rows.forEach((e, ri) => {
+        const clientKey3 = String(e.client_id);
+        if (clientKey3 !== lastClientDir2) {
+          try { ws3.mergeCells(dirClientRow,1,dirClientRow,22); } catch(_) {}
+          const cc = ws3.getCell(dirClientRow, 1);
+          cc.value = `🏢 ${(e.client_name||'CLIENT').toUpperCase()} EMPLOYEES`;
+          cc.font={bold:true,size:11,color:{argb:'FFFFFFFF'}};
+          cc.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF0D47A1'}};
+          cc.alignment={horizontal:'left',vertical:'middle',indent:1};
+          ws3.getRow(dirClientRow).height=20;
+          dirClientRow++;
+          lastClientDir2=clientKey3;
+        }
+        const isAlt3 = ri%2===1;
+        const vals3 = [
+          e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(), e.email||'', e.phone||'',
+          e.gender||'',
+          e.date_of_birth ? toISTDateString(new Date(e.date_of_birth)) : '',
+          e.joining_date  ? toISTDateString(new Date(e.joining_date))  : '',
+          e.department||'', e.designation||'', e.role||'', e.employee_category||'', e.level||'',
+          e.city||'', e.state||'',
+          e.pan_number||'', e.aadhar_number||'', e.uan_number||'', e.pf_number||'',
+          e.bank_name||'', e.bank_account||'', e.bank_ifsc||'', e.reporting_manager||''
+        ];
+        vals3.forEach((v, ci) => {
+          const cell = ws3.getCell(dirClientRow, ci+1);
+          cell.value=v; cell.font={size:9};
+          cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:isAlt3?'FFE3F2FD':'FFFFFFFF'}};
+          cell.alignment={vertical:'middle'};
+          cell.border={right:{style:'hair'},bottom:{style:'hair'}};
+        });
+        ws3.getRow(dirClientRow).height=16;
+        dirClientRow++;
+      });
+    }
 
     // ── Sheet 4: Punch Register ───────────────────────────────────────────────
     // Fetch punch data for master sheet
