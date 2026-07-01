@@ -27,21 +27,18 @@ CREATE INDEX IF NOT EXISTS idx_client_payroll_cycle  ON client_payroll_cycles(cy
 --   Mar-Apr 2026  → cycle_month=4, cycle_year=2026  (work: 25 Feb→24 Mar, paid in April)
 --   Apr-May 2026  → cycle_month=5, cycle_year=2026  (work: 25 Mar→24 Apr, paid in May)
 
-INSERT INTO client_payroll_cycles
-  (employee_id, cycle_month, cycle_year, gross_salary, tds_amount, amount_payable)
-SELECT e.id, 3, 2026, 20000, 200, 19800   FROM employees e WHERE e.employee_code = 'KC1886'
+INSERT INTO client_payroll_cycles (employee_id, cycle_month, cycle_year, gross_salary, tds_amount, amount_payable)
+SELECT e.id, 3, 2026, 20000, 200, 19800 FROM employees e WHERE e.employee_code = 'KC1886'
 ON CONFLICT (employee_id, cycle_month, cycle_year) DO UPDATE
   SET gross_salary=EXCLUDED.gross_salary, tds_amount=EXCLUDED.tds_amount, amount_payable=EXCLUDED.amount_payable, updated_at=NOW();
 
-INSERT INTO client_payroll_cycles
-  (employee_id, cycle_month, cycle_year, gross_salary, tds_amount, amount_payable)
-SELECT e.id, 4, 2026, 20000, 200, 19800   FROM employees e WHERE e.employee_code = 'KC1886'
+INSERT INTO client_payroll_cycles (employee_id, cycle_month, cycle_year, gross_salary, tds_amount, amount_payable)
+SELECT e.id, 4, 2026, 20000, 200, 19800 FROM employees e WHERE e.employee_code = 'KC1886'
 ON CONFLICT (employee_id, cycle_month, cycle_year) DO UPDATE
   SET gross_salary=EXCLUDED.gross_salary, tds_amount=EXCLUDED.tds_amount, amount_payable=EXCLUDED.amount_payable, updated_at=NOW();
 
-INSERT INTO client_payroll_cycles
-  (employee_id, cycle_month, cycle_year, gross_salary, tds_amount, amount_payable)
-SELECT e.id, 5, 2026, 18000, 180, 17820   FROM employees e WHERE e.employee_code = 'KC1886'
+INSERT INTO client_payroll_cycles (employee_id, cycle_month, cycle_year, gross_salary, tds_amount, amount_payable)
+SELECT e.id, 5, 2026, 18000, 180, 17820 FROM employees e WHERE e.employee_code = 'KC1886'
 ON CONFLICT (employee_id, cycle_month, cycle_year) DO UPDATE
   SET gross_salary=EXCLUDED.gross_salary, tds_amount=EXCLUDED.tds_amount, amount_payable=EXCLUDED.amount_payable, updated_at=NOW();
 
