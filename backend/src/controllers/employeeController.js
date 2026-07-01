@@ -2142,7 +2142,16 @@ exports.exportAttendanceRegister = async (req, res) => {
     wb.creator = 'KrishiHR';
     wb.created = new Date();
 
-    // ── Sheet 1 — Attendance Register (identical to exportMasterExcel Sheet 1) ─
+    // ── client_admin: ONLY Client Attendance sheet (no KCMS register, no Punch Register) ──
+    if (isClientAdmin) {
+      await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
+      const buf = await wb.xlsx.writeBuffer();
+      res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_ClientAttendance_${MONTH_NAMES[m-1]}${y}.xlsx"`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buf);
+    }
+
+    // ── Sheet 1 — Attendance Register (HR/accounts/super_admin only) ──────────
     const ws1 = wb.addWorksheet(`Attendance ${MONTH_NAMES[m-1]} ${y}`, {
       views: [{ state: 'frozen', xSplit: 5, ySplit: 2 }]
     });
