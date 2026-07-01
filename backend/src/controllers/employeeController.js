@@ -931,6 +931,275 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   return ws;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// CLIENT ATTENDANCE SHEET — deployed (client_id NOT NULL) manpower only.
+//
+// Period runs on the client payroll cycle: 26th of the selected month → 25th of
+// the FOLLOWING month (December rolls the end into January of the next year).
+// Simplified columns only: daily grid + Total Present + Total Absent
+// (no Paid/Unpaid Leave, Half-Day, Total Paid/Unpaid or Late breakup).
+//
+// CLIENT-SPECIFIC RULES:
+//   • All Saturdays are working days — only Sunday is a week-off.
+//   • No "leave" concept: every leave (paid, unpaid, half-day leave) is Absent.
+//     Present = worked days only; Absent = marked absent + all leaves.
+//
+// Added as the LAST sheet of both the Master export and the Attendance Register
+// export, so "client attendance comes in the next sheet" of either download.
+//
+// NOTE ON CYCLE DIRECTION: per spec "26-MONTH-YEAR TO 25-MONTH1-YEAR". If you
+// instead want the payroll-lag convention (26th of the PREVIOUS month → 25th of
+// the selected month), flip getClientCycle() — it is the single source of truth.
+// ════════════════════════════════════════════════════════════════════════════
+function getClientCycle(m, y) {
+  const start = new Date(y, m - 1, 26);            // 26th of the selected month
+  const endM  = m === 12 ? 1     : m + 1;
+  const endY  = m === 12 ? y + 1 : y;
+  const end   = new Date(endY, endM - 1, 25);      // 25th of the following month
+  return { start, end };
+}
+
+function fmtDate(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+// Client manpower work ALL Saturdays — only Sunday is a week-off.
+// (saturday_policy is intentionally ignored for the client register.)
+function isClientWeekOff(dt) {
+  return dt.getDay() === 0;
+}
+
+async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter) {
+  const { start, end } = getClientCycle(m, y);
+  const startStr = fmtDate(start), endStr = fmtDate(end);
+
+  // ── Deployed (client) employees only ──────────────────────────────────────
+  const empResult = await db.query(`
+    SELECT e.id, e.employee_code, e.first_name, e.last_name,
+           d.name AS department, des.title AS designation,
+           e.employee_category,
+           COALESCE(e.saturday_policy,'2nd_4th_off') AS saturday_policy,
+           e.city, e.state, e.is_active,
+           e.client_id, cl.name AS client_name
+    FROM employees e
+    LEFT JOIN departments  d   ON e.department_id  = d.id
+    LEFT JOIN designations des ON e.designation_id = des.id
+    LEFT JOIN clients      cl  ON e.client_id      = cl.id
+    WHERE e.client_id IS NOT NULL ${clientFilter}
+      AND (
+        e.is_active = true
+        OR EXISTS (SELECT 1 FROM attendance a
+                    WHERE a.employee_id = e.id AND a.date BETWEEN $1 AND $2)
+      )
+    ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [startStr, endStr]);
+  const employees = empResult.rows;
+
+  // No deployed manpower → skip the sheet entirely (don't leave an empty tab).
+  if (employees.length === 0) return null;
+
+  // ── Attendance + holidays across the (two-month-spanning) window ───────────
+  const attResult = await db.query(
+    `SELECT employee_id, TO_CHAR(date,'YYYY-MM-DD') AS date_str, status
+       FROM attendance WHERE date BETWEEN $1 AND $2`, [startStr, endStr]);
+  const attMap = {};
+  for (const r of attResult.rows) {
+    (attMap[r.employee_id] ||= {})[r.date_str] = r.status;
+  }
+
+  const holResult = await db.query(
+    `SELECT TO_CHAR(date,'YYYY-MM-DD') AS date_str, region
+       FROM holidays WHERE date BETWEEN $1 AND $2`, [startStr, endStr]);
+  const holsByRegion = { all: new Set(), north: new Set(), south_west: new Set() };
+  for (const h of holResult.rows) {
+    if (h.region === 'all') { holsByRegion.all.add(h.date_str); holsByRegion.north.add(h.date_str); holsByRegion.south_west.add(h.date_str); }
+    else if (h.region === 'north')      holsByRegion.north.add(h.date_str);
+    else if (h.region === 'south_west') holsByRegion.south_west.add(h.date_str);
+  }
+
+  const STATUS_STYLE = {
+    'present':     { label: 'P',    bg: '00C853', fg: 'FFFFFF' },
+    'late':        { label: 'L',    bg: 'FFD600', fg: '000000' },
+    'absent':      { label: 'A',    bg: 'D50000', fg: 'FFFFFF' },
+    'missing_punch_out': { label: 'MPO', bg: 'FF6F00', fg: 'FFFFFF' },
+    'on-leave':    { label: 'EL',   bg: '2962FF', fg: 'FFFFFF' },
+    'lwp':         { label: 'LWP',  bg: 'FF6D00', fg: 'FFFFFF' },
+    'half-day':    { label: 'H',    bg: 'AA00FF', fg: 'FFFFFF' },
+    'h-el':        { label: 'H-EL', bg: '7B1FA2', fg: 'FFFFFF' },
+    'h-cl':        { label: 'H-CL', bg: '880E4F', fg: 'FFFFFF' },
+    'h-sl':        { label: 'H-SL', bg: 'AD1457', fg: 'FFFFFF' },
+    'h-lwp':       { label: 'H-LWP',bg: 'BF360C', fg: 'FFFFFF' },
+    'h-wfh':       { label: 'H-WFH',bg: '00897B', fg: 'FFFFFF' },
+    'od':          { label: 'OD',   bg: '00BCD4', fg: 'FFFFFF' },
+    'wfh':         { label: 'WFH',  bg: '80CBC4', fg: '000000' },
+    'regularized': { label: 'R',    bg: '558B2F', fg: 'FFFFFF' },
+    'holiday':     { label: 'HOL',  bg: 'CFD8DC', fg: '37474F' },
+    'weekend':     { label: 'WO',   bg: 'ECEFF1', fg: '90A4AE' },
+  };
+  // Client rule: NO leave concept. Only "worked" days are Present; every leave
+  // (paid/unpaid/half) as well as marked absences count as Absent.
+  const PRESENT_STATUSES = new Set(['present','regularized','od','wfh','late','missing_punch_out','half-day','h-wfh']);
+  const ABSENT_STATUSES  = new Set(['absent','on-leave','lwp','h-el','h-cl','h-sl','h-lwp']);
+
+  // Build ordered list of dates in the window.
+  const days = [];
+  for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+    days.push(new Date(dt));
+  }
+  const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const N = days.length;
+  const totalCols = 5 + N + 2;
+
+  const ws = wb.addWorksheet(`Client Attn 26${MONTH_NAMES[m-1].slice(0,3)}-25${MONTH_NAMES[(m%12)].slice(0,3)}`, {
+    views: [{ state: 'frozen', xSplit: 5, ySplit: 3 }]
+  });
+
+  // Title
+  try { ws.mergeCells(1, 1, 1, totalCols); } catch (_) {}
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = `KrishiHR — Client Attendance | ${startStr} to ${endStr}`;
+  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D47A1' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 28;
+
+  // Sub-note (cycle explanation)
+  try { ws.mergeCells(2, 1, 2, totalCols); } catch (_) {}
+  const noteCell = ws.getCell(2, 1);
+  noteCell.value = `Deployed manpower only • Cycle 26 ${MONTH_NAMES[m-1]} → 25 ${MONTH_NAMES[(m%12)]} ${end.getFullYear()} • All Saturdays working (only Sunday off) • Any leave counts as Absent`;
+  noteCell.font = { italic: true, size: 9, color: { argb: 'FF37474F' } };
+  noteCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } };
+  noteCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+  ws.getRow(2).height = 16;
+
+  // Header row (row 3)
+  const headerFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } };
+  const headerFont  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+  const headerAlign = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  ['Emp Code','Name','Department','Designation','Category'].forEach((h, i) => {
+    const c = ws.getCell(3, i + 1);
+    c.value = h; c.font = headerFont; c.fill = headerFill; c.alignment = headerAlign;
+    c.border = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+  });
+  days.forEach((dt, i) => {
+    const dow = dt.getDay();
+    const isMonthStart = dt.getDate() === 1;                 // second month begins
+    const isSunday = dow === 0;   // only Sunday is a week-off for client staff
+    const c = ws.getCell(3, 6 + i);
+    c.value = `${dt.getDate()}\n${dayNames[dow]}`;
+    c.font = { bold: true, size: 9, color: { argb: isSunday ? 'FFFFF176' : 'FFFFFFFF' } };
+    c.fill = { type: 'pattern', pattern: 'solid',
+               fgColor: { argb: isMonthStart ? 'FF6A1B9A' : (isSunday ? 'FF0D47A1' : 'FF1565C0') } };
+    c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    c.border = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+  });
+  [['Total Present','FF00695C'], ['Total Absent','FFD50000']].forEach(([h, bg], i) => {
+    const c = ws.getCell(3, 6 + N + i);
+    c.value = h;
+    c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+    c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+  ws.getRow(3).height = 30;
+
+  // ── Rows, grouped by client ───────────────────────────────────────────────
+  let lastClient = '__UNSET__';
+  let rowOffset = 0;
+  let dataRowIndex = 0;
+
+  employees.forEach((e) => {
+    const clientKey = String(e.client_id);
+
+    if (clientKey !== lastClient) {
+      if (lastClient !== '__UNSET__') {
+        const gapRow = 4 + dataRowIndex + rowOffset;
+        rowOffset++;
+        ws.getRow(gapRow).height = 8;
+      }
+      const cRow = 4 + dataRowIndex + rowOffset;
+      rowOffset++;
+      try { ws.mergeCells(cRow, 1, cRow, totalCols); } catch (_) {}
+      const cc = ws.getCell(cRow, 1);
+      cc.value = `🏢 ${(e.client_name || 'CLIENT').toUpperCase()} EMPLOYEES`;
+      cc.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      cc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D47A1' } };
+      cc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+      ws.getRow(cRow).height = 20;
+      lastClient = clientKey;
+    }
+
+    const row   = 4 + dataRowIndex + rowOffset;
+    const isAlt = dataRowIndex % 2 === 1;
+    const rowBg = isAlt ? 'FFE3F2FD' : 'FFFFFFFF';
+
+    [e.employee_code, `${e.first_name} ${e.last_name || ''}`.trim(),
+     e.department || '', e.designation || '', e.employee_category || ''].forEach((v, ci) => {
+      const cell = ws.getCell(row, ci + 1);
+      cell.value = v; cell.font = { size: 9, color: { argb: 'FF000000' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+      cell.alignment = { vertical: 'middle' };
+      cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+    });
+
+    const empReg    = getEmployeeRegion(e.city || '', e.state || '');
+    const empHolSet = empReg === 'north' ? holsByRegion.north : holsByRegion.south_west;
+
+    let present = 0, absent = 0;
+    days.forEach((dt, i) => {
+      const dateStr   = fmtDate(dt);
+      const isWeekOff = isClientWeekOff(dt);   // all Saturdays working; Sunday off
+      let status;
+      if (isWeekOff) status = 'weekend';
+      else if (empHolSet.has(dateStr) && !((attMap[e.id] || {})[dateStr])) status = 'holiday';
+      else status = (attMap[e.id] || {})[dateStr] || '';
+
+      const style = STATUS_STYLE[status] || { label: '', bg: isAlt ? 'E3F2FD' : 'FFFFFF', fg: '000000' };
+      const cell  = ws.getCell(row, 6 + i);
+      cell.value = style.label;
+      cell.font  = { bold: true, size: 8, color: { argb: 'FF' + style.fg } };
+      cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + style.bg } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+
+      if (!isWeekOff && status !== 'holiday') {
+        if (PRESENT_STATUSES.has(status))     present++;
+        else if (ABSENT_STATUSES.has(status)) absent++;
+        // Blank / unmarked days are left uncounted (data may still be pending).
+        // Every leave type falls in ABSENT_STATUSES — no "leave" credit for clients.
+      }
+    });
+
+    [[present, 'FF00695C'], [absent, 'FFD50000']].forEach(([v, color], i) => {
+      const cell = ws.getCell(row, 6 + N + i);
+      cell.value = v;
+      cell.font  = { bold: true, size: 10, color: { argb: color } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFE3F2FD' : 'FFFFFFFF' } };
+      cell.border = { right: { style: 'thin' }, bottom: { style: 'hair' } };
+    });
+
+    ws.getRow(row).height = 18;
+    dataRowIndex++;
+  });
+
+  // Column widths
+  ws.getColumn(1).width = 10; ws.getColumn(2).width = 20;
+  ws.getColumn(3).width = 14; ws.getColumn(4).width = 20; ws.getColumn(5).width = 12;
+  for (let i = 0; i < N; i++) ws.getColumn(6 + i).width = 5;
+  ws.getColumn(6 + N).width = 13; ws.getColumn(6 + N + 1).width = 13;
+
+  // Legend
+  const legendRow = 4 + dataRowIndex + rowOffset + 1;
+  try { ws.mergeCells(legendRow, 1, legendRow, totalCols); } catch (_) {}
+  const lc = ws.getCell(legendRow, 1);
+  lc.value = 'LEGEND:  P=Present  A=Absent  L=Late  EL=Leave  LWP=Unpaid Leave  H=Half Day  OD=On Duty  WFH=Work From Home  R=Regularized  WO=Week Off (Sun)  HOL=Holiday   |   CLIENT RULE: all Saturdays working; only Sunday off. Present = worked days (P/L/OD/WFH/R). Absent = marked absent AND every leave (EL/LWP/half-day leave). Holidays not counted.';
+  lc.font  = { italic: true, size: 8, color: { argb: 'FF37474F' } };
+  lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECEFF1' } };
+  lc.alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.getRow(legendRow).height = 16;
+
+  return ws;
+}
+
 exports.exportMasterExcel = async (req, res) => {
   try {
     const ExcelJS = require('exceljs');
@@ -1742,6 +2011,9 @@ exports.exportMasterExcel = async (req, res) => {
     }));
     await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
 
+    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) — last sheet ──
+    await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
+
     // ── Send response ────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_Master_${MONTH_NAMES[m-1]}${y}.xlsx"`);
@@ -2177,6 +2449,9 @@ exports.exportAttendanceRegister = async (req, res) => {
     }
 
     await buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMap, holidaysByRegion, getEmployeeRegion);
+
+    // ── Client Attendance (deployed manpower, 26–25 payroll cycle) — last sheet ──
+    await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
 
     // ── Send ─────────────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
