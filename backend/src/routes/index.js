@@ -18,7 +18,8 @@ const payCtrl        = require('../controllers/payrollController');
 const geoCtrl        = require('../controllers/geofenceController');
 const sepCtrl        = require('../controllers/separationController');
 const empImportCtrl  = require('../controllers/employeeImportController');
-const attImportCtrl  = require('../controllers/attendanceImportController');
+const attImportCtrl      = require('../controllers/attendanceImportController');
+const clientPayrollCtrl  = require('../controllers/clientPayrollController');
 const annCtrl        = require('../controllers/announcementController');
 const gkCtrl         = require('../controllers/gkController');
 const provCtrl       = require('../controllers/provisionController');
@@ -54,6 +55,11 @@ router.post('/auth/update-photo',     authenticate, authCtrl.updatePhoto);
 router.get   ('/employees',               authenticate,                          empCtrl.getAll);
 router.get   ('/employees/export',        authenticate, authorize(...EMP_MGMT), empCtrl.exportExcel || ((req,res) => res.status(501).json({success:false,message:'Not implemented'})));
 router.get   ('/employees/export-master',        authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
+// ── Client Payroll Cycles ────────────────────────────────────────────────────
+router.get  ('/client-payroll/template', authenticate, authorize('hr','accounts','super_admin','client_admin'), clientPayrollCtrl.downloadTemplate);
+router.post ('/client-payroll/import',   authenticate, authorize('hr','accounts','super_admin'), clientPayrollCtrl.uploadMiddleware, clientPayrollCtrl.importPayroll);
+router.get  ('/client-payroll',          authenticate, authorize('hr','accounts','super_admin','client_admin'), clientPayrollCtrl.listPayroll);
+
 router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin','client_admin'), empCtrl.exportAttendanceRegister);
 router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
 router.get   ('/employees/contacts',      authenticate,                          empCtrl.getContacts);
