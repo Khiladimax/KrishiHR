@@ -2149,9 +2149,44 @@ exports.exportAttendanceRegister = async (req, res) => {
     wb.creator = 'KrishiHR';
     wb.created = new Date();
 
-    // ── client_admin: ONLY Client Attendance sheet (no KCMS register, no Punch Register) ──
+    // ── client_admin: Sheet 1 = Client Attendance, Sheet 2 = Punch Register (no KCMS register) ──
     if (isClientAdmin) {
+      // Sheet 1 — Client Attendance (26-25 cycle, all Sat working, leave=absent)
       await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
+
+      // Sheet 2 — Punch Register (client employees only)
+      const clientPunchResult = await db.query(`
+        SELECT a.employee_id,
+               EXTRACT(DAY FROM a.date)::int AS day,
+               a.status,
+               TO_CHAR(a.punch_in,  'HH12:MI AM') AS punch_in_fmt,
+               TO_CHAR(a.punch_out, 'HH12:MI AM') AS punch_out_fmt,
+               EXTRACT(HOUR   FROM a.punch_in)::int  AS punch_in_h,
+               EXTRACT(MINUTE FROM a.punch_in)::int  AS punch_in_m,
+               EXTRACT(HOUR   FROM a.punch_out)::int AS punch_out_h,
+               EXTRACT(MINUTE FROM a.punch_out)::int AS punch_out_m,
+               a.working_hours
+        FROM attendance a
+        JOIN employees e ON e.id = a.employee_id
+        WHERE EXTRACT(MONTH FROM a.date) = $1
+          AND EXTRACT(YEAR  FROM a.date) = $2
+          AND e.client_id = $3`, [m, y, req.user.client_id]);
+      const clientPunchMap = {};
+      for (const row of clientPunchResult.rows) {
+        if (!clientPunchMap[row.employee_id]) clientPunchMap[row.employee_id] = {};
+        clientPunchMap[row.employee_id][row.day] = {
+          in:   row.punch_in_fmt  || '',
+          out:  row.punch_out_fmt || '',
+          inH:  row.punch_in_h  ?? -1,
+          inM:  row.punch_in_m  ?? -1,
+          outH: row.punch_out_h ?? -1,
+          outM: row.punch_out_m ?? -1,
+          status: row.status || '',
+          hours: parseFloat(row.working_hours || 0),
+        };
+      }
+      await buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, clientPunchMap, holidaysByRegion, getEmployeeRegion);
+
       const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Disposition', `attachment; filename="KrishiHR_ClientAttendance_${MONTH_NAMES[m-1]}${y}.xlsx"`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
