@@ -1262,35 +1262,37 @@ exports.exportMasterExcel = async (req, res) => {
       LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
       LEFT JOIN clients      cl2 ON e.client_id = cl2.id
       WHERE (
-        e.is_active = true
-        ${clientFilter}
-        OR (
-          -- Include employees deactivated this month or later
-          e.is_active = false
-          ${clientFilter}
-          AND (
-            e.separation_date IS NULL
-            OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1)
+        -- KCMS employees only (client_id IS NULL) in the main attendance register;
+        -- client employees appear in the separate Client Attendance sheet (26-25 cycle).
+        e.client_id IS NULL
+        AND (
+          (e.is_active = true ${clientFilter})
+          OR (
+            -- Include employees deactivated this month or later
+            e.is_active = false
+            ${clientFilter}
+            AND (
+              e.separation_date IS NULL
+              OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1)
+            )
+            AND EXISTS (
+              SELECT 1 FROM attendance a
+              WHERE a.employee_id = e.id
+                AND EXTRACT(MONTH FROM a.date) = $2
+                AND EXTRACT(YEAR  FROM a.date) = $1
+            )
           )
-          AND EXISTS (
-            SELECT 1 FROM attendance a
-            WHERE a.employee_id = e.id
-              AND EXTRACT(MONTH FROM a.date) = $2
-              AND EXTRACT(YEAR  FROM a.date) = $1
-          )
-        )
-        OR (
-          -- Include future-LWD completed separations
-          EXISTS (
-            SELECT 1 FROM separations sep
-            WHERE sep.employee_id = e.id AND sep.status = 'completed'
-            AND sep.last_working_date >= MAKE_DATE($1::int, $2::int, 1)
+          OR (
+            -- Include future-LWD completed separations
+            EXISTS (
+              SELECT 1 FROM separations sep
+              WHERE sep.employee_id = e.id AND sep.status = 'completed'
+              AND sep.last_working_date >= MAKE_DATE($1::int, $2::int, 1)
+            )
           )
         )
       )
       ORDER BY
-        CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
-        COALESCE(cl2.name,''),
         CASE WHEN e.is_active = false THEN 2
              WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
@@ -2069,30 +2071,30 @@ exports.exportAttendanceRegister = async (req, res) => {
       LEFT JOIN designations des ON e.designation_id = des.id
       LEFT JOIN clients      cl  ON e.client_id = cl.id
       WHERE (
-        (e.is_active = true ${clientFilter})
-        OR (
-          e.is_active = false
-          ${clientFilter}
-          AND (e.separation_date IS NULL OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1))
-          AND EXISTS (
-            SELECT 1 FROM attendance a
-            WHERE a.employee_id = e.id
-              AND EXTRACT(MONTH FROM a.date) = $2
-              AND EXTRACT(YEAR  FROM a.date) = $1
+        -- KCMS employees only (client_id IS NULL); client employees are in Client Attendance sheet.
+        e.client_id IS NULL
+        AND (
+          (e.is_active = true)
+          OR (
+            e.is_active = false
+            AND (e.separation_date IS NULL OR e.separation_date >= MAKE_DATE($1::int, $2::int, 1))
+            AND EXISTS (
+              SELECT 1 FROM attendance a
+              WHERE a.employee_id = e.id
+                AND EXTRACT(MONTH FROM a.date) = $2
+                AND EXTRACT(YEAR  FROM a.date) = $1
+            )
           )
-        )
-        OR (
-          ${clientFilter.replace('AND e.','e.')||'TRUE'}
-          AND EXISTS (
-            SELECT 1 FROM separations sep
-            WHERE sep.employee_id = e.id AND sep.status = 'completed'
-            AND sep.last_working_date >= MAKE_DATE($1::int, $2::int, 1)
+          OR (
+            EXISTS (
+              SELECT 1 FROM separations sep
+              WHERE sep.employee_id = e.id AND sep.status = 'completed'
+              AND sep.last_working_date >= MAKE_DATE($1::int, $2::int, 1)
+            )
           )
         )
       )
       ORDER BY
-        CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
-        COALESCE(cl.name,''),
         CASE WHEN e.is_active = false THEN 2
              WHEN COALESCE(e.saturday_policy,'2nd_4th_off') = 'all_working' THEN 1
              ELSE 0 END,
