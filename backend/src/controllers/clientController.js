@@ -30,6 +30,25 @@ async function ensureSchema() {
       CREATE INDEX IF NOT EXISTS idx_employees_client_id ON employees(client_id)
     `);
 
+    // 4. Create client_payroll_cycles table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS client_payroll_cycles (
+        id              SERIAL PRIMARY KEY,
+        employee_id     INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        cycle_month     INT  NOT NULL CHECK (cycle_month BETWEEN 1 AND 12),
+        cycle_year      INT  NOT NULL,
+        gross_salary    NUMERIC(12,2) NOT NULL DEFAULT 0,
+        tds_amount      NUMERIC(12,2) NOT NULL DEFAULT 0,
+        amount_payable  NUMERIC(12,2) NOT NULL DEFAULT 0,
+        notes           TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (employee_id, cycle_month, cycle_year)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_client_payroll_emp   ON client_payroll_cycles(employee_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_client_payroll_cycle ON client_payroll_cycles(cycle_year, cycle_month)`);
+
     console.log('✅ Client deployment schema ready');
   } catch (err) {
     console.error('⚠️  Client schema migration error:', err.message);
