@@ -148,7 +148,7 @@ const NAV_GROUPS = [
     items: [
       { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl','client_admin'] },
       { href:'clients.html',        icon: '🏭',               label:'Clients',          roles:['admin','super_admin','hr'] },
-      { href:'client_payroll_import.html', icon: '💰',          label:'Client Payroll',   roles:['admin','super_admin','hr','accounts'] },
+      { href:'client_payroll_import.html', icon: '💰',          label:'Client Payroll',   roles:['super_admin','accounts'] },
       { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr'] },
       { href:'separation.html',     icon: ICONS.separation,   label:'Separation',       always:true },
       { href:'relieving-letter.html', icon: '📄',               label:'Relieving Letter', roles:['hr','admin','super_admin'] },
