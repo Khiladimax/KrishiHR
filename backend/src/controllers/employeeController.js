@@ -650,6 +650,8 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
   });
 
   // ── Row 3: Day date headers (merged IN+OUT per day) ──────────────────────
+  // Header uses 2nd/4th-off as default shade only; per-employee weekend is
+  // re-evaluated in the data loop using each employee's actual policy.
   let satCnt = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dow    = new Date(y, m-1, d).getDay();
@@ -771,10 +773,15 @@ async function buildPunchRegisterSheet(wb, employees, m, y, MONTH_NAMES, punchMa
     const punchDays = Object.keys(empPunch).map(Number);
     const lastPunchDay = punchDays.length ? Math.max(...punchDays) : 0;
 
+    // Client employees work ALL Saturdays; only Sunday is a week-off.
+    const isClientEmp = !!e.client_id;
+
     for (let d = 1; d <= daysInMonth; d++) {
       const dow = new Date(y,m-1,d).getDay();
       if (dow===6) punchSatCnt++;
-      const isWeekend = dow===0 || (dow===6 && (punchSatCnt===2||punchSatCnt===4));
+      const isWeekend = isClientEmp
+        ? dow === 0   // client: only Sunday off
+        : dow===0 || (dow===6 && (punchSatCnt===2||punchSatCnt===4));
       const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const isHol   = empHols.has(dateStr);
       const col     = 3+(d-1)*2+1;
