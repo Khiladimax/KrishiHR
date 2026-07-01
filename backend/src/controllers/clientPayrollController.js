@@ -265,7 +265,23 @@ exports.importPayroll = async (req, res) => {
 // ── GET /api/client-payroll — list records for a month ────────────────────────
 exports.listPayroll = async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const { month, year, employee_id } = req.query;
+
+    // Single employee lookup — returns last 6 cycles
+    if (employee_id) {
+      const result = await db.query(`
+        SELECT cp.id, cp.cycle_month, cp.cycle_year,
+               cp.gross_salary, cp.tds_amount, cp.amount_payable,
+               e.employee_code, cl.name AS client_name
+        FROM client_payroll_cycles cp
+        JOIN employees e ON e.id = cp.employee_id
+        LEFT JOIN clients cl ON e.client_id = cl.id
+        WHERE cp.employee_id = $1
+        ORDER BY cp.cycle_year DESC, cp.cycle_month DESC LIMIT 6`,
+        [parseInt(employee_id)]);
+      return res.json({ success: true, data: result.rows, count: result.rows.length });
+    }
+
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year)  || new Date().getFullYear();
 

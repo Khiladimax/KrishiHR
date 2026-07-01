@@ -2394,8 +2394,52 @@ async function openEditEmp(id) {
   // Show advance chain info based on role
   onRoleChange();
 
+  // Client employee: show simple payroll cycles view instead of KCMS salary form
+  if (e.client_id) {
+    const salTab = document.getElementById('etab-salary');
+    salTab.innerHTML =
+      '<div style="background:#E3F2FD;border:1.5px solid #BBDEFB;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#1565C0">' +
+        '&#127962; This is a <strong>client-deployed employee</strong>. Salary is managed via monthly payroll cycles. Use <strong>Client Payroll Import</strong> to update.' +
+      '</div>' +
+      '<div id="client-sal-history" style="background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px">' +
+        '<div style="font-size:12px;font-weight:800;color:var(--accent);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Recent Payroll Cycles</div>' +
+        '<div style="font-size:13px;color:var(--muted)">Loading...</div>' +
+      '</div>';
+
+    api('GET', '/client-payroll?employee_id=' + e.id).then(function(r) {
+      var rows = (r && r.data) || [];
+      var box = document.getElementById('client-sal-history');
+      if (!box) return;
+      var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      function fmtMoney(n) { return '\u20B9' + Number(n).toLocaleString('en-IN', {minimumFractionDigits:2}); }
+      var hdr = '<div style="font-size:12px;font-weight:800;color:var(--accent);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Recent Payroll Cycles</div>';
+      if (!rows.length) {
+        box.innerHTML = hdr + '<div style="font-size:13px;color:var(--muted)">No payroll cycles found. Use Client Payroll Import to add.</div>';
+        return;
+      }
+      var tblHdr = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        '<thead><tr>' +
+          '<th style="background:var(--accent);color:#fff;padding:8px 12px;text-align:left">Month</th>' +
+          '<th style="background:var(--accent);color:#fff;padding:8px 12px;text-align:right">Gross Salary</th>' +
+          '<th style="background:var(--accent);color:#fff;padding:8px 12px;text-align:right">TDS @1%</th>' +
+          '<th style="background:var(--accent);color:#fff;padding:8px 12px;text-align:right">Amount Payable</th>' +
+        '</tr></thead><tbody>';
+      var tblRows = rows.map(function(row, i) {
+        var bg = i % 2 ? 'var(--bg)' : '#fff';
+        return '<tr style="background:' + bg + '">' +
+          '<td style="padding:8px 12px;font-weight:600">' + MONTHS[row.cycle_month - 1] + ' ' + row.cycle_year + '</td>' +
+          '<td style="padding:8px 12px;text-align:right">' + fmtMoney(row.gross_salary) + '</td>' +
+          '<td style="padding:8px 12px;text-align:right;color:#b91c1c">' + fmtMoney(row.tds_amount) + '</td>' +
+          '<td style="padding:8px 12px;text-align:right;font-weight:700;color:var(--accent)">' + fmtMoney(row.amount_payable) + '</td>' +
+        '</tr>';
+      }).join('');
+      box.innerHTML = hdr + tblHdr + tblRows + '</tbody></table>' +
+        '<div style="margin-top:10px;font-size:11px;color:var(--muted)">Use Client Payroll Import to add or update cycles.</div>';
+    }).catch(function() {});
+  }
+
   switchEditTab('info');
-  recalcSalaryPreview();
+  if (!e.client_id) recalcSalaryPreview();
   openModal('edit-emp-modal');
 }
 
