@@ -133,7 +133,7 @@
 Auth.guard();
 buildSidebar('clients.html');
 const user = Auth.getUser();
-if (!user || !['admin','super_admin'].includes(user.role)) location.href = 'dashboard.html';
+if (!user || !['admin','super_admin','hr','accounts'].includes(user.role)) location.href = 'dashboard.html';
 
 let ALL = [];
 
