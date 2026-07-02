@@ -262,6 +262,194 @@ exports.importPayroll = async (req, res) => {
   }
 };
 
+// ── GET /api/client-payroll/export — download Excel for a month ──────────────
+exports.exportPayroll = async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { month, year } = req.query;
+    const m = parseInt(month) || new Date().getMonth() + 1;
+    const y = parseInt(year)  || new Date().getFullYear();
+    const MONTH_NAMES = ['January','February','March','April','May','June',
+      'July','August','September','October','November','December'];
+
+    const prevM = m === 1 ? 12 : m - 1;
+    const prevY = m === 1 ? y - 1 : y;
+    const cycleLabel = `${MONTH_NAMES[prevM-1].slice(0,3)}-${MONTH_NAMES[m-1].slice(0,3)} ${y}`;
+    const periodLabel = `25 ${MONTH_NAMES[prevM-1].slice(0,3)} ${prevY} → 24 ${MONTH_NAMES[m-1].slice(0,3)} ${y}`;
+
+    const isClientAdmin = req.user.role === 'client_admin';
+    const clientFilter  = isClientAdmin && req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+
+    const result = await db.query(`
+      SELECT cp.cycle_month, cp.cycle_year,
+             cp.gross_salary, cp.tds_amount, cp.amount_payable,
+             e.employee_code, e.first_name, e.last_name,
+             d.name AS department, des.title AS designation,
+             e.employee_category, e.joining_date,
+             e.bank_name, e.bank_account, e.bank_ifsc,
+             cl.name AS client_name
+      FROM client_payroll_cycles cp
+      JOIN employees e   ON e.id = cp.employee_id
+      LEFT JOIN departments  d   ON e.department_id  = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN clients      cl  ON e.client_id      = cl.id
+      WHERE cp.cycle_month=$1 AND cp.cycle_year=$2
+        AND e.client_id IS NOT NULL ${clientFilter}
+      ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [m, y]);
+
+    const rows = result.rows;
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'KrishiHR';
+    const ws = wb.addWorksheet(`Client Payroll ${MONTH_NAMES[m-1]} ${y}`, {
+      views: [{ state: 'frozen', xSplit: 4, ySplit: 3 }]
+    });
+
+    const COLS = [
+      { header: 'Emp Code',       width: 12 },
+      { header: 'Name',           width: 26 },
+      { header: 'Client',         width: 22 },
+      { header: 'Department',     width: 18 },
+      { header: 'Designation',    width: 20 },
+      { header: 'Category',       width: 14 },
+      { header: 'Gross Salary',   width: 15 },
+      { header: 'TDS @1%',        width: 12 },
+      { header: 'Amount Payable', width: 16 },
+      { header: 'Bank Name',      width: 18 },
+      { header: 'Account No.',    width: 20 },
+      { header: 'IFSC Code',      width: 14 },
+    ];
+    const NC = COLS.length;
+
+    // Row 1 — Title
+    ws.mergeCells(1, 1, 1, NC);
+    const t = ws.getCell(1, 1);
+    t.value = `KrishiHR — Client Salary Statement | ${cycleLabel} | Work Period: ${periodLabel}`;
+    t.font  = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+    t.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    t.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(1).height = 28;
+
+    // Row 2 — Sub info
+    ws.mergeCells(2, 1, 2, NC);
+    const s2 = ws.getCell(2, 1);
+    s2.value = `Payment Month: ${MONTH_NAMES[m-1]} ${y}  |  Employees: ${rows.length}  |  Total Gross: ₹${rows.reduce((a,r)=>a+parseFloat(r.gross_salary),0).toLocaleString('en-IN')}  |  Total TDS: ₹${rows.reduce((a,r)=>a+parseFloat(r.tds_amount),0).toLocaleString('en-IN')}  |  Total Payable: ₹${rows.reduce((a,r)=>a+parseFloat(r.amount_payable),0).toLocaleString('en-IN')}`;
+    s2.font  = { size: 10, italic: true, color: { argb: 'FF37474F' } };
+    s2.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+    s2.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    ws.getRow(2).height = 18;
+
+    // Row 3 — Headers
+    COLS.forEach((col, i) => {
+      const c = ws.getCell(3, i + 1);
+      c.value = col.header;
+      c.font  = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+      c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      c.border = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+      ws.getColumn(i + 1).width = col.width;
+    });
+    ws.getRow(3).height = 26;
+
+    // Data rows — grouped by client
+    let lastClient = '__UNSET__';
+    let rowIdx = 4;
+    let totalGross = 0, totalTds = 0, totalPayable = 0;
+
+    rows.forEach((r, i) => {
+      const clientName = r.client_name || 'CLIENT';
+      if (clientName !== lastClient) {
+        // Client group header
+        ws.mergeCells(rowIdx, 1, rowIdx, NC);
+        const cc = ws.getCell(rowIdx, 1);
+        cc.value = `\uD83C\uDFE2 ${clientName.toUpperCase()}`;
+        cc.font  = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        cc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF388E3C' } };
+        cc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws.getRow(rowIdx).height = 20;
+        rowIdx++;
+        lastClient = clientName;
+      }
+
+      const isAlt = i % 2 === 1;
+      const bg    = isAlt ? 'FFF1F8E9' : 'FFFFFFFF';
+      const gross   = parseFloat(r.gross_salary)   || 0;
+      const tds     = parseFloat(r.tds_amount)     || 0;
+      const payable = parseFloat(r.amount_payable) || 0;
+      totalGross   += gross;
+      totalTds     += tds;
+      totalPayable += payable;
+
+      const vals = [
+        r.employee_code,
+        `${r.first_name} ${r.last_name || ''}`.trim(),
+        r.client_name    || '',
+        r.department     || '',
+        r.designation    || '',
+        r.employee_category || '',
+        gross, tds, payable,
+        r.bank_name    || '',
+        r.bank_account || '',
+        r.bank_ifsc    || '',
+      ];
+
+      vals.forEach((v, ci) => {
+        const cell = ws.getCell(rowIdx, ci + 1);
+        cell.value = v;
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
+        cell.font  = { size: 9 };
+        if (ci >= 6 && ci <= 8) {
+          cell.numFmt = '\u20B9#,##0.00';
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          if (ci === 8) {
+            cell.font = { bold: true, size: 10, color: { argb: 'FF1B5E20' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFC8E6C9' : 'FFE8F5E9' } };
+          }
+        } else {
+          cell.alignment = { vertical: 'middle' };
+        }
+      });
+      ws.getRow(rowIdx).height = 17;
+      rowIdx++;
+    });
+
+    // Totals row
+    ws.mergeCells(rowIdx, 1, rowIdx, 6);
+    const totLabel = ws.getCell(rowIdx, 1);
+    totLabel.value = 'TOTAL';
+    totLabel.font  = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+    totLabel.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    totLabel.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
+
+    [[totalGross, 7], [totalTds, 8], [totalPayable, 9]].forEach(([v, col]) => {
+      const cell = ws.getCell(rowIdx, col);
+      cell.value  = v;
+      cell.numFmt = '\u20B9#,##0.00';
+      cell.font   = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+    });
+    // Empty remaining cols in total row
+    for (let ci = 10; ci <= NC; ci++) {
+      ws.getCell(rowIdx, ci).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    }
+    ws.getRow(rowIdx).height = 22;
+
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Disposition',
+      `attachment; filename="KrishiHR_ClientSalary_${MONTH_NAMES[m-1]}${y}.xlsx"`);
+    res.setHeader('Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+
+  } catch (err) {
+    console.error('[clientPayroll/export]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // ── GET /api/client-payroll — list records for a month ────────────────────────
 exports.listPayroll = async (req, res) => {
   try {

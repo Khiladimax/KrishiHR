@@ -57,6 +57,7 @@ router.get   ('/employees/export',        authenticate, authorize(...EMP_MGMT), 
 router.get   ('/employees/export-master',        authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
 // ── Client Payroll Cycles ────────────────────────────────────────────────────
 router.get  ('/client-payroll/template', authenticate, authorize('hr','accounts','super_admin','client_admin'), clientPayrollCtrl.downloadTemplate);
+router.get  ('/client-payroll/export',   authenticate, authorize('accounts','super_admin','client_admin'), clientPayrollCtrl.exportPayroll);
 router.post ('/client-payroll/import',   authenticate, authorize('hr','accounts','super_admin'), clientPayrollCtrl.uploadMiddleware, clientPayrollCtrl.importPayroll);
 router.get  ('/client-payroll',          authenticate, authorize('hr','accounts','super_admin','client_admin'), clientPayrollCtrl.listPayroll);
 

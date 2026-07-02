@@ -109,8 +109,38 @@
       </div>
     </div>
 
-    <!-- Step 3 & 4 -->
+    <!-- Download Salary Statement -->
     <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">⬇</span>Download Salary Statement</div>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        Download month-wise client employee salary statement as Excel — includes Gross Salary, TDS @1%, Amount Payable and bank details, grouped by client.
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field-col">
+          <label>Month</label>
+          <select id="dl-month" class="form-control" style="width:150px">
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+        <div class="field-col">
+          <label>Year</label>
+          <input type="number" id="dl-year" class="form-control" style="width:100px" min="2020" max="2099">
+        </div>
+        <div class="field-col" style="justify-content:flex-end">
+          <button class="btn btn-primary" onclick="downloadStatement()">⬇ Download Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 & 4 -->
+    <div class="card" id="import-card">
       <div class="card-header">
         <div class="card-title"><span class="card-title-icon">⬆</span>Step 3 & 4 — Fill & Upload</div>
       </div>
@@ -191,13 +221,27 @@ Auth.guard();
 const API   = window.CFG?.apiBase || 'https://krishihr-zuui.onrender.com/api';
 const token = localStorage.getItem('krishihr_token');
 const user  = JSON.parse(localStorage.getItem('krishihr_user') || '{}');
-if (!['super_admin','accounts'].includes(user.role)) {
-  alert('Access denied. Accounts/Super Admin only.'); location.href = 'dashboard.html';
+if (!['super_admin','accounts','client_admin'].includes(user.role)) {
+  alert('Access denied.'); location.href = 'dashboard.html';
 }
 buildSidebar('client_payroll_import.html');
 
+// Hide import steps for client_admin (download only)
+if (user.role === 'client_admin') {
+  document.querySelector('.steps-grid').style.display = 'none';
+  document.getElementById('import-card').style.display = 'none';
+  document.getElementById('results-card').style.display = 'none';
+  // Hide Step 1&2 card too (they have their own month picker in download section)
+  document.querySelectorAll('.card')[1].style.display = 'none';
+}
+
+// Sync dl-month/dl-year with sel-month/sel-year
+document.getElementById('dl-month').value = new Date().getMonth() + 1;
+document.getElementById('dl-year').value  = new Date().getFullYear();
+
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const now = new Date();
+// Set import month/year defaults
 document.getElementById('sel-month').value = now.getMonth() + 1;
 document.getElementById('sel-year').value  = now.getFullYear();
 updateCycleInfo();
@@ -216,6 +260,25 @@ function updateCycleInfo() {
 }
 
 let selectedFile = null;
+
+async function downloadStatement() {
+  const m = document.getElementById('dl-month').value;
+  const y = document.getElementById('dl-year').value;
+  if (!m || !y) { alert('Select month and year'); return; }
+  try {
+    const res = await fetch(`${API}/client-payroll/export?month=${m}&year=${y}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `KrishiHR_ClientSalary_${MONTHS[m-1]}${y}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Download failed: ' + e.message); }
+}
 
 async function downloadTemplate() {
   const m = document.getElementById('sel-month').value;
