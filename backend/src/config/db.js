@@ -16,10 +16,10 @@ require('dotenv').config();
 // ─────────────────────────────────────────────────────────────────────────────
 
 const baseConfig = {
-  max: 20,
+  max: 25,                        // bumped: morning rush (cron+GPS+HR exports) hits 20 simultaneously
   min: 2,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 8000,
+  connectionTimeoutMillis: 10000, // more time for Neon cold-start
   allowExitOnIdle: false,
 };
 
@@ -46,7 +46,7 @@ pool.on('error', (err) => console.error('[DB Pool] Unexpected error:', err.messa
 // Log pool stats every 5 min so we can spot exhaustion early
 setInterval(() => {
   console.log(`[DB Pool] total=${pool.totalCount} idle=${pool.idleCount} waiting=${pool.waitingCount}`);
-}, 5 * 60 * 1000);
+}, 2 * 60 * 1000);
 
 module.exports = {
   query: (text, params) => pool.query(text, params),

@@ -1166,9 +1166,9 @@ cron.schedule('0 10 * * 1-6', async () => {
       return;
     }
 
-    // Employees who are active, not WFH-permanent, not on approved leave, and have no punch-in today
+    // Fetch unpunched employees + FCM tokens in ONE query — avoids 40 per-employee DB calls at 10AM rush
     const result = await db.query(`
-      SELECT e.id, e.first_name
+      SELECT e.id, e.first_name, e.fcm_token
       FROM employees e
       WHERE e.is_active = true
         AND (e.is_wfh_permanent IS NULL OR e.is_wfh_permanent = false)
@@ -1186,15 +1186,29 @@ cron.schedule('0 10 * * 1-6', async () => {
         )
     `, [today]);
 
+    // Send FCM with no further DB calls — tokens already in result
+    const messaging = require('firebase-admin').messaging();
     let sent = 0;
     for (const emp of result.rows) {
-      await fcm.sendToEmployee(
-        db, emp.id,
-        '⏰ Punch-In Reminder',
-        `Hi ${emp.first_name}, you haven't punched in yet today. Please mark your attendance.`,
-        { screen: 'attendance', channel: 'krishihr_alerts' }
-      );
-      sent++;
+      if (!emp.fcm_token) {
+        console.log(`[FCM] No token for employee ${emp.id} — skipping push`);
+        continue;
+      }
+      try {
+        const msgId = await messaging.send({
+          token: emp.fcm_token,
+          notification: {
+            title: '⏰ Punch-In Reminder',
+            body: `Hi ${emp.first_name}, you haven't punched in yet today. Please mark your attendance.`,
+          },
+          data: { screen: 'attendance', channel: 'krishihr_alerts' },
+          android: { priority: 'high' },
+        });
+        console.log(`[FCM] ✅ Sent to employee ${emp.id}. Message ID: ${msgId}`);
+        sent++;
+      } catch (fcmErr) {
+        console.error(`[FCM] Failed for employee ${emp.id}: ${fcmErr.message}`);
+      }
     }
     console.log(`✅ [Punch-IN reminder] Sent to ${sent} employee(s)`);
   } catch (err) {
