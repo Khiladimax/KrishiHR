@@ -2395,7 +2395,9 @@ async function openEditEmp(id) {
   onRoleChange();
 
   // Client employee: show simple payroll cycles view instead of KCMS salary form
-  if (e.client_id) {
+  var salBtn = document.getElementById('etab-btn-salary');
+  if (e.client_id && parseInt(e.client_id) > 0) {
+    if (salBtn) salBtn.innerHTML = '<span style="font-size:15px">💰</span> Payroll Cycles';
     const salTab = document.getElementById('etab-salary');
     salTab.innerHTML =
       '<div style="background:#E3F2FD;border:1.5px solid #BBDEFB;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#1565C0">' +
@@ -2438,6 +2440,7 @@ async function openEditEmp(id) {
     }).catch(function() {});
   }
 
+  if (!e.client_id && salBtn) salBtn.innerHTML = '<span style="font-size:15px">💰</span> Salary Structure';
   switchEditTab('info');
   if (!e.client_id) recalcSalaryPreview();
   openModal('edit-emp-modal');
