@@ -8,6 +8,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const chatCtrl       = require('../controllers/chatController');
 
 const authCtrl       = require('../controllers/authController');
+const securityCtrl   = require('../controllers/securityController');
 const empCtrl        = require('../controllers/employeeController');
 const attCtrl        = require('../controllers/attendanceController');
 const alertsCtrl     = require('../controllers/movementAlertsController');
@@ -47,6 +48,15 @@ router.post('/auth/forgot-password/verify',     authCtrl.forgotVerify);
 router.post('/auth/forgot-password/verify-pan', authCtrl.forgotVerifyPAN);
 router.post('/auth/forgot-password/reset',      authCtrl.forgotReset);
 router.get ('/auth/me',          authenticate,  authCtrl.getMe);
+
+// ── Security / device-lock ──────────────────────────────────────────────────
+const SEC_ADMIN = ['super_admin','admin','hr','client_admin'];
+router.post('/security/report-violation', authenticate,                       securityCtrl.reportViolation);
+router.get ('/security/logs',             authenticate, authorize(...SEC_ADMIN), securityCtrl.getSecurityLogs);
+router.post('/security/:id/reset-device', authenticate, authorize(...SEC_ADMIN), securityCtrl.resetDevice);
+router.post('/security/:id/block',        authenticate, authorize(...SEC_ADMIN), securityCtrl.blockAccount);
+router.post('/security/:id/unblock',      authenticate, authorize(...SEC_ADMIN), securityCtrl.unblockAccount);
+router.post('/security/:id/multi-device', authenticate, authorize(...SEC_ADMIN), securityCtrl.setMultiDevice);
 router.post('/auth/change-password', authenticate, authCtrl.changePassword);
 router.post('/auth/fcm-token',   authenticate,  authCtrl.updateFcmToken);
 router.post('/auth/update-photo',     authenticate, authCtrl.updatePhoto);

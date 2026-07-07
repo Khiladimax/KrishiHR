@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishiHR - Security Logs</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.sec-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.sec-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px}
+.sec-card .sc-val{font-size:26px;font-weight:800;line-height:1.1}
+.sec-card .sc-lbl{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
+.sec-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow-x:auto}
+table.sec{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+table.sec th{background:#1e293b;color:#fff;text-align:left;padding:11px 12px;font-size:12px;font-weight:700;white-space:nowrap}
+table.sec td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.sec tr:hover td{background:var(--surface2)}
+.dev-id{font-family:ui-monospace,monospace;font-size:11px;background:rgba(99,102,241,.12);color:#6366f1;padding:2px 7px;border-radius:6px}
+.muted{color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.pill.ok{background:rgba(16,185,129,.14);color:#10b981}
+.pill.warn{background:rgba(245,158,11,.15);color:#f59e0b}
+.pill.bad{background:rgba(239,68,68,.14);color:#ef4444}
+.act-btn{border:none;border-radius:8px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.act-btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-reset{background:rgba(239,68,68,.12);color:#ef4444}
+.btn-multi{background:rgba(16,185,129,.12);color:#10b981}
+.btn-multi.off{background:rgba(107,114,128,.14);color:#6b7280}
+.btn-block{background:rgba(245,158,11,.15);color:#b45309}
+.sec-search{width:100%;max-width:420px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:14px;box-sizing:border-box;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark" id="sidebar-logo-mark">
+      <svg class="logo-mark-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div><div class="logo-text-wrap"><div class="logo-text">Krishi<span>HR</span></div></div></div>
+  </div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div id="sidebar-user"></div>
+    <button class="logout-btn" onclick="Auth.logout()">Sign Out</button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="topbar-title">🔒 Security Logs</div>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-icon-btn" href="dashboard.html" title="Dashboard">🏠</a>
+    </div>
+  </div>
+
+  <div style="padding:18px 20px">
+    <p class="muted" style="margin:0 0 16px;font-size:13px">Manage devices · Detect fake GPS · Spot account sharing</p>
+    <div class="sec-cards" id="secCards"></div>
+    <input class="sec-search" id="secSearch" placeholder="Search by name, phone, employee ID or device ID…">
+    <div class="sec-table-wrap">
+      <table class="sec">
+        <thead><tr>
+          <th>#&nbsp;Surveyor</th><th>Phone</th><th>Emp ID</th><th>Locked Device ID</th>
+          <th>Phone Model</th><th>Last Login (IST)</th><th>Violations</th><th>Mock GPS</th>
+          <th>Other Device Logins</th><th>Status</th><th>Reset</th><th>Multi-Device</th>
+        </tr></thead>
+        <tbody id="secBody"><tr><td colspan="12" class="muted" style="text-align:center;padding:24px">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let ROWS = [];
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderCards(sum){
+  const c = [
+    ['👥', sum.total_surveyors, 'Total Surveyors', '#6366f1'],
+    ['🔒', sum.device_locked,   'Device Locked',   '#6366f1'],
+    ['🚫', sum.blocked,         'Blocked Accounts','#ef4444'],
+    ['⚠️', sum.total_violations,'Total Violations','#f59e0b'],
+    ['🎭', sum.mock_gps,        'Mock GPS Attempts','#8b5cf6'],
+    ['📱', sum.multi_device,    'Multi-Device Accounts','#3b82f6'],
+  ];
+  document.getElementById('secCards').innerHTML = c.map(([ic,v,l,col])=>
+    `<div class="sec-card"><div style="font-size:20px">${ic}</div><div class="sc-val" style="color:${col}">${v||0}</div><div class="sc-lbl">${l}</div></div>`).join('');
+}
+
+function statusPill(r){
+  if (r.is_blocked) return '<span class="pill bad">Blocked</span>';
+  return '<span class="pill ok">● Active</span>';
+}
+
+function renderRows(rows){
+  if (!rows.length){ document.getElementById('secBody').innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">No surveyors</td></tr>'; return; }
+  document.getElementById('secBody').innerHTML = rows.map((r,i)=>`
+    <tr>
+      <td><b>${i+1}. ${esc(r.name)}</b><br><span class="muted" style="font-size:11px">${esc(r.role)}</span></td>
+      <td>${esc(r.phone)||'—'}</td>
+      <td>${esc(r.employee_code)||'—'}</td>
+      <td>${r.locked_device_id?`<span class="dev-id">${esc(r.locked_device_id)}</span>`:'<span class="muted">Not set yet</span>'}</td>
+      <td>${r.last_login_model?esc(r.last_login_model):(r.last_login_device?esc(r.last_login_device):'<span class="muted">—</span>')}</td>
+      <td>${r.last_login?esc(r.last_login):'<span class="muted">—</span>'}</td>
+      <td><span class="pill ${r.violations>0?'warn':'ok'}">${r.violations}</span></td>
+      <td><span class="pill ${r.mock_gps>0?'bad':'ok'}">${r.mock_gps}</span></td>
+      <td>${r.other_device_logins||0}</td>
+      <td>${statusPill(r)}${r.is_blocked?` <button class="act-btn btn-multi" onclick="doAct('unblock',${r.id})">Unblock</button>`:` <button class="act-btn btn-block" onclick="doAct('block',${r.id})">Block</button>`}</td>
+      <td><button class="act-btn btn-reset" onclick="doAct('reset',${r.id})" ${r.locked_device_id?'':'disabled'}>Reset</button></td>
+      <td><button class="act-btn btn-multi ${r.allow_multi_device?'':'off'}" onclick="doAct('multi',${r.id},${!r.allow_multi_device})">${r.allow_multi_device?'ALLOWED':'LOCKED'}</button></td>
+    </tr>`).join('');
+}
+
+async function load(){
+  const q = document.getElementById('secSearch').value.trim();
+  try {
+    const res = await api('GET', '/security/logs' + (q?('?q='+encodeURIComponent(q)):''));
+    ROWS = res.data || [];
+    renderCards(res.summary || {});
+    renderRows(ROWS);
+  } catch(e){
+    document.getElementById('secBody').innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">Failed to load: '+esc(e.message)+'</td></tr>';
+  }
+}
+
+async function doAct(kind, id, arg){
+  const msg = { reset:'Reset this device lock? The user can then log in on a new phone.',
+                block:'Block this account for 24 hours?',
+                unblock:'Unblock this account now?',
+                multi: (arg?'Allow this user on multiple devices?':'Lock this user to a single device?') }[kind];
+  if (!confirm(msg)) return;
+  try {
+    if (kind==='reset')   await api('POST', `/security/${id}/reset-device`, {});
+    if (kind==='block')   await api('POST', `/security/${id}/block`, { hours:24 });
+    if (kind==='unblock') await api('POST', `/security/${id}/unblock`, {});
+    if (kind==='multi')   await api('POST', `/security/${id}/multi-device`, { allow: arg });
+    await load();
+  } catch(e){ alert('Failed: '+e.message); }
+}
+
+let searchT;
+document.getElementById('secSearch').addEventListener('input', ()=>{ clearTimeout(searchT); searchT=setTimeout(load, 350); });
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildSidebar('security-logs.html');
+  load();
+});
+</script>
+</body>
+</html>

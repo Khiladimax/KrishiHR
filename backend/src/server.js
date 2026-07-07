@@ -866,6 +866,16 @@ async function start() {
         `).catch(() => {});
         // ── FCM token column ──────────────────────────────────────────────
         await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS fcm_token TEXT`).catch(() => {});
+        // ── Device-lock / security columns (Security Logs) ───────────────────
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS locked_device_id  VARCHAR(255) DEFAULT NULL`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS allow_multi_device BOOLEAN     DEFAULT FALSE`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS blocked_until      TIMESTAMP    DEFAULT NULL`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS security_violations INTEGER    DEFAULT 0`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS mock_gps_attempts   INTEGER    DEFAULT 0`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS other_device_logins INTEGER    DEFAULT 0`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_violation_type VARCHAR(64) DEFAULT NULL`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_violation_at   TIMESTAMP   DEFAULT NULL`).catch(() => {});
+        await db.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_login_model    VARCHAR(128) DEFAULT NULL`).catch(() => {});
         // ── late_marks column for new late-penalty rules (July 2026) ─────────
         await db.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_marks SMALLINT DEFAULT 0`).catch(() => {});
         // ── movement_alerts table (created here so server never errors on cold DB) ──

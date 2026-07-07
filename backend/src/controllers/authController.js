@@ -38,30 +38,51 @@ exports.login = async (req, res) => {
     if (!valid)
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    // ── Fix 3: Single-device enforcement (mobile only) ────────────────────────
-    // device_id is only sent by the Android app. Web logins don't send it,
-    // so web is never blocked. If a mobile device_id is provided, save it —
-    // the middleware will reject any request from a different device_id.
+    // ── Security: 24h block + single-device lock (mobile only) ────────────────
+    // device_id is sent only by the Android app; web logins are never blocked.
+    // Privileged roles (admin/super_admin/client_admin/accounts/hr) and anyone
+    // an admin has exempted (allow_multi_device) may use multiple devices.
+    // Everyone else is locked to the first device they log in from.
+    const PRIV_ROLES = ['super_admin', 'admin', 'client_admin', 'accounts', 'hr'];
     const isWebLogin = !device_id;
+    const multiDeviceAllowed = isWebLogin || PRIV_ROLES.includes(emp.role) || emp.allow_multi_device === true;
+    const device_model = req.body.device_model || null;
+
+    // 24-hour security block (set when a violation is reported)
+    if (emp.blocked_until && new Date(emp.blocked_until) > new Date()) {
+      const hrs = Math.max(1, Math.ceil((new Date(emp.blocked_until) - new Date()) / 3_600_000));
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_BLOCKED',
+        message: `Your account has been blocked due to security violations. Try again in ~${hrs} hour(s).\n\nContact Admin to unlock: Akshay Rai (7651900038)`
+      });
+    }
 
     if (!isWebLogin) {
-      // Save the new device_id — this kicks out any previously logged-in device
+      // Single-device lock: a different device is refused, not swapped in.
+      if (!multiDeviceAllowed && emp.locked_device_id && emp.locked_device_id !== device_id) {
+        await db.query(`UPDATE employees SET other_device_logins = COALESCE(other_device_logins,0)+1 WHERE id=$1`, [emp.id]).catch(() => {});
+        return res.status(403).json({
+          success: false,
+          code: 'DEVICE_LOCKED',
+          message: 'This account is already active on another device.\n\n' +
+                   'One account can only be used on one mobile device at a time. This prevents duplicate or fake submissions.\n\n' +
+                   'Contact Admin to unlock your account: Akshay Rai (7651900038)\n\n' +
+                   'Ek account keval ek mobile par hi istemal ho sakta hai.\n' +
+                   'Account unlock karvane ke liye Akshay Rai (7651900038) se sampark karein.'
+        });
+      }
       const updateFields = [device_id, emp.id];
       let updateQuery = `UPDATE employees SET device_token=$1, last_login_at=NOW()`;
-      if (app_version) { updateQuery += `, app_version=$3`; updateFields.push(app_version); }
-      if (device_name) {
-        const idx = updateFields.length + 1;
-        updateQuery += `, last_login_device=$${idx}`;
-        updateFields.push(device_name);
-      }
+      // Bind the lock to this device on first login for single-device users.
+      if (!multiDeviceAllowed) updateQuery += `, locked_device_id=COALESCE(locked_device_id,$1)`;
+      if (app_version)  { updateQuery += `, app_version=$${updateFields.length + 1}`;       updateFields.push(app_version); }
+      if (device_name)  { updateQuery += `, last_login_device=$${updateFields.length + 1}`;  updateFields.push(device_name); }
+      if (device_model) { updateQuery += `, last_login_model=$${updateFields.length + 1}`;   updateFields.push(device_model); }
       updateQuery += ` WHERE id=$2`;
       await db.query(updateQuery, updateFields);
     } else {
-      // Web login — just track version/time if provided
-      await db.query(
-        `UPDATE employees SET last_login_at=NOW() WHERE id=$1`,
-        [emp.id]
-      );
+      await db.query(`UPDATE employees SET last_login_at=NOW() WHERE id=$1`, [emp.id]);
     }
 
     const token = signToken({ id: emp.id, role: emp.role, email: emp.email, device_id: device_id || null, client_id: emp.client_id || null });
