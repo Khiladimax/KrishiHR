@@ -53,6 +53,7 @@ router.get ('/auth/me',          authenticate,  authCtrl.getMe);
 const SEC_ADMIN = ['super_admin','admin','hr','client_admin'];
 router.post('/security/report-violation', authenticate,                       securityCtrl.reportViolation);
 router.get ('/security/logs',             authenticate, authorize(...SEC_ADMIN), securityCtrl.getSecurityLogs);
+router.get ('/security/logs/export',      authenticate, authorize(...SEC_ADMIN), securityCtrl.exportExcel);
 router.post('/security/:id/reset-device', authenticate, authorize(...SEC_ADMIN), securityCtrl.resetDevice);
 router.post('/security/:id/block',        authenticate, authorize(...SEC_ADMIN), securityCtrl.blockAccount);
 router.post('/security/:id/unblock',      authenticate, authorize(...SEC_ADMIN), securityCtrl.unblockAccount);

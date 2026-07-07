@@ -86,7 +86,6 @@ table.sec tr:hover td{background:rgba(99,102,241,.07)}
 </div>
 
 <script src="app.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let ROWS = [];
 let TYPE = 'kc';
@@ -167,30 +166,20 @@ async function doAct(kind, id, arg){
   } catch(e){ alert('Failed: '+e.message); }
 }
 
-function exportExcel(){
-  if (!ROWS.length){ alert('Nothing to export'); return; }
-  const rows = ROWS.map((r,i)=>({
-    '#': i+1,
-    'Surveyor': r.name,
-    'Role': r.role,
-    'Client': r.client_name || '',
-    'Phone': r.phone || '',
-    'Emp ID': r.employee_code || '',
-    'Locked Device ID': r.locked_device_id || 'Not set',
-    'Phone Model': r.last_login_model || r.last_login_device || '',
-    'App Version': r.app_version || '',
-    'Last Login (IST)': r.last_login || '',
-    'Violations': r.violations,
-    'Mock GPS': r.mock_gps,
-    'Other Device Logins': r.other_device_logins || 0,
-    'Status': r.is_blocked ? 'Blocked' : 'Active',
-    'Multi-Device': r.allow_multi_device ? 'Allowed' : 'Locked'
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Security Logs');
-  const stamp = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `security-logs-${TYPE}-${stamp}.xlsx`);
+async function exportExcel(){
+  try {
+    const token = (window.Auth && Auth.getToken) ? Auth.getToken() : localStorage.getItem('krishihr_token');
+    const q = document.getElementById('secSearch').value.trim();
+    const url = API_BASE + '/security/logs/export?type=' + TYPE + (q ? '&q=' + encodeURIComponent(q) : '');
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `security-logs-${TYPE}-${new Date().toISOString().slice(0,10)}.xlsx`
+    });
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch(e){ alert('Export failed: ' + e.message); }
 }
 
 let searchT;

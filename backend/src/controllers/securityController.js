@@ -118,6 +118,95 @@ exports.getSecurityLogs = async (req, res) => {
   }
 };
 
+// Shared scope/query used by both the JSON list and the Excel export.
+async function fetchSecurityRows(req) {
+  const q    = (req.query.q || '').trim();
+  const role = (req.user.role || '').toLowerCase();
+  const type = (req.query.type || 'kc').toLowerCase();
+  const params = [];
+  let where = `WHERE e.is_active = true AND LOWER(e.role) <> 'super_admin'`;
+  if (role === 'client_admin') { params.push(req.user.client_id || 0); where += ` AND e.client_id = $${params.length}`; }
+  else if (type === 'client')  { where += ` AND e.client_id IS NOT NULL`; }
+  else                          { where += ` AND e.client_id IS NULL`; }
+  if (q) {
+    params.push(`%${q}%`); const p = params.length;
+    where += ` AND (e.first_name ILIKE $${p} OR e.last_name ILIKE $${p} OR e.employee_code ILIKE $${p}
+                    OR e.phone ILIKE $${p} OR e.locked_device_id ILIKE $${p})`;
+  }
+  return (await db.query(
+    `SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.role, e.phone,
+            e.employee_code, e.locked_device_id, e.last_login_model, e.last_login_device, e.app_version,
+            TO_CHAR(e.last_login_at,'DD/MM/YYYY HH24:MI:SS') AS last_login,
+            COALESCE(e.security_violations,0) AS violations, COALESCE(e.mock_gps_attempts,0) AS mock_gps,
+            COALESCE(e.other_device_logins,0) AS other_device_logins, e.allow_multi_device, e.blocked_until,
+            c.name AS client_name,
+            (e.blocked_until IS NOT NULL AND e.blocked_until > NOW()) AS is_blocked
+       FROM employees e
+       LEFT JOIN clients c ON c.id = e.client_id
+       ${where} ORDER BY e.first_name`, params)).rows;
+}
+
+const verNum = (v) => { if (!v) return 0; const m = String(v).match(/(\d+)(?:\.(\d+))?/); return m ? parseFloat(m[1] + '.' + (m[2] || 0)) : 0; };
+
+// ── Admin: colourful Excel export ───────────────────────────────────────────────
+exports.exportExcel = async (req, res) => {
+  try {
+    const rows = await fetchSecurityRows(req);
+    const latest = rows.reduce((mx, r) => Math.max(mx, verNum(r.app_version)), 0);
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Security Logs');
+
+    const cols = [
+      ['#', 5], ['Surveyor', 24], ['Role', 12], ['Client', 22], ['Phone', 14], ['Emp ID', 10],
+      ['Locked Device ID', 26], ['Phone Model', 18], ['App Version', 18], ['Last Login (IST)', 20],
+      ['Violations', 11], ['Mock GPS', 10], ['Other Logins', 12], ['Status', 10], ['Multi-Device', 13]
+    ];
+    ws.columns = cols.map(([h, w]) => ({ header: h, width: w }));
+
+    const border = { top:{style:'thin',color:{argb:'FFCBD5E1'}}, left:{style:'thin',color:{argb:'FFCBD5E1'}}, bottom:{style:'thin',color:{argb:'FFCBD5E1'}}, right:{style:'thin',color:{argb:'FFCBD5E1'}} };
+    const hdr = ws.getRow(1);
+    hdr.height = 22;
+    hdr.eachCell(c => {
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1E293B'} };
+      c.font = { color:{argb:'FFFFFFFF'}, bold:true, size:11 };
+      c.alignment = { vertical:'middle', horizontal:'left' };
+      c.border = border;
+    });
+
+    rows.forEach((r, i) => {
+      const isOld = r.app_version && verNum(r.app_version) < latest;
+      const row = ws.addRow([
+        i + 1, r.name || '', r.role || '', r.client_name || '', r.phone || '', r.employee_code || '',
+        r.locked_device_id || 'Not set', r.last_login_model || r.last_login_device || '',
+        (r.app_version || '') + (isOld ? '  · old' : ''), r.last_login || '',
+        Number(r.violations), Number(r.mock_gps), Number(r.other_device_logins),
+        r.is_blocked ? 'Blocked' : 'Active', r.allow_multi_device ? 'Allowed' : 'Locked'
+      ]);
+      row.eachCell(c => { c.border = border; c.alignment = { vertical:'middle' }; });
+      // zebra
+      if (i % 2 === 1) row.eachCell(c => { if (!c.fill || c.fill.fgColor?.argb === undefined) c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF1F5F9'} }; });
+      const paint = (col, argb, fontArgb) => { const c = row.getCell(col); c.fill = { type:'pattern', pattern:'solid', fgColor:{argb} }; c.font = { bold:true, color:{argb: fontArgb || 'FF1A1A1A'} }; };
+      if (isOld) paint(9, 'FFFCE7C3', 'FF92400E');                                   // App Version
+      if (Number(r.violations) > 0) paint(11, 'FFFDE1E1', 'FF991B1B');                // Violations
+      if (Number(r.mock_gps)   > 0) paint(12, 'FFFDE1E1', 'FF991B1B');                // Mock GPS
+      paint(14, r.is_blocked ? 'FFFDE1E1' : 'FFDCFCE7', r.is_blocked ? 'FF991B1B' : 'FF166534'); // Status
+      paint(15, r.allow_multi_device ? 'FFDCFCE7' : 'FFF1F5F9', r.allow_multi_device ? 'FF166534' : 'FF6B7280'); // Multi-Device
+    });
+
+    ws.autoFilter = 'A1:O1';
+    ws.views = [{ state:'frozen', ySplit:1 }];
+    const buf = await wb.xlsx.writeBuffer();
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Disposition', `attachment; filename="security-logs-${(req.query.type||'kc')}-${stamp}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.end(Buffer.from(buf));
+  } catch (err) {
+    console.error('[exportExcel]', err.message);
+    res.status(500).json({ success: false, message: 'Export failed' });
+  }
+};
+
 // ── Admin: clear the locked device so the user can log in on a new phone ────────
 exports.resetDevice = async (req, res) => {
   try {
