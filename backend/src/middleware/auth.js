@@ -36,6 +36,26 @@ exports.authenticate = async (req, res, next) => {
 
     req.user = result.rows[0];
     req.user.role = req.user.role?.toLowerCase().trim(); // normalize role casing
+
+    // ── Single-device enforcement (every request) ─────────────────────────────
+    // If this token was issued to a different device than the one the account is
+    // locked to, reject it — kicks a second device even if it slipped past login.
+    // Privileged/office roles and admin-exempted users are never blocked; web
+    // tokens carry no device_id so they are unaffected.
+    const PRIV_ROLES = ['super_admin', 'admin', 'client_admin', 'accounts', 'hr'];
+    const tokenDeviceId = decoded.device_id;
+    if (tokenDeviceId
+        && !PRIV_ROLES.includes(req.user.role)
+        && req.user.allow_multi_device !== true
+        && req.user.locked_device_id
+        && req.user.locked_device_id !== tokenDeviceId) {
+      return res.status(401).json({
+        success: false,
+        code: 'DEVICE_LOCKED',
+        message: 'This account is now active on another device.\n\nContact Admin to unlock: Akshay Rai (7651900038)'
+      });
+    }
+
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError')
