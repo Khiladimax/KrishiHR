@@ -71,6 +71,7 @@ table.sec tr:hover td{background:rgba(99,102,241,.07)}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <input class="sec-search" id="secSearch" style="margin-bottom:0" placeholder="Search by name, phone, employee ID or device ID…">
       <button class="sec-tab" style="margin-bottom:16px" onclick="exportExcel()">⬇ Export Excel</button>
+      <button class="sec-tab" style="margin-bottom:16px;border-color:#ef4444;color:#ef4444" onclick="resetAll()">↻ Reset All</button>
     </div>
     <div class="sec-table-wrap">
       <table class="sec">
@@ -176,6 +177,16 @@ async function exportExcel(){
     });
     document.body.appendChild(a); a.click(); a.remove();
   } catch(e){ alert('Export failed: ' + e.message); }
+}
+
+async function resetAll(){
+  const label = TYPE === 'client' ? 'Client Employees' : 'KC Employees';
+  if (!confirm(`Reset ALL ${label}?\n\nThis clears every device lock, unblocks all accounts and zeroes all violation counts. Everyone re-registers their device on next login.`)) return;
+  try {
+    const res = await api('POST', '/security/reset-all', { type: TYPE });
+    alert(res.message || 'Reset done');
+    await load();
+  } catch(e){ alert('Reset all failed: ' + e.message); }
 }
 
 let searchT;

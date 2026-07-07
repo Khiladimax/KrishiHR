@@ -238,6 +238,31 @@ exports.resetDevice = async (req, res) => {
   }
 };
 
+// ── Admin: reset EVERYONE in the current view (fresh start on a new version) ────
+exports.resetAll = async (req, res) => {
+  try {
+    const role = (req.user.role || '').toLowerCase();
+    const type = (req.body.type || req.query.type || 'kc').toLowerCase();
+    const params = [];
+    let where = `WHERE is_active = true AND LOWER(role) <> 'super_admin'`;
+    if (role === 'client_admin') { params.push(req.user.client_id || 0); where += ` AND client_id = $${params.length}`; }
+    else if (type === 'client')  { where += ` AND client_id IS NOT NULL`; }
+    else                          { where += ` AND client_id IS NULL`; }
+    const r = await db.query(
+      `UPDATE employees
+          SET locked_device_id=NULL, device_token=NULL, blocked_until=NULL,
+              security_violations=0, mock_gps_attempts=0, other_device_logins=0,
+              last_violation_type=NULL, last_violation_at=NULL
+        ${where}`,
+      params
+    );
+    res.json({ success: true, count: r.rowCount, message: `Reset ${r.rowCount} users — they re-register on next login` });
+  } catch (err) {
+    console.error('[resetAll]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── Admin: block / unblock account ──────────────────────────────────────────────
 exports.blockAccount = async (req, res) => {
   try {
