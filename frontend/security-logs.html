@@ -130,8 +130,8 @@ function renderRows(rows){
       <td><span class="pill ${r.violations>0?'warn':'ok'}">${r.violations}</span></td>
       <td><span class="pill ${r.mock_gps>0?'bad':'ok'}">${r.mock_gps}</span></td>
       <td>${r.other_device_logins||0}</td>
-      <td>${statusPill(r)}${r.is_blocked?` <button class="act-btn btn-multi" onclick="doAct('unblock',${r.id})">Unblock</button>`:` <button class="act-btn btn-block" onclick="doAct('block',${r.id})">Block</button>`}</td>
-      <td><button class="act-btn btn-reset" onclick="doAct('reset',${r.id})" ${r.locked_device_id?'':'disabled'}>Reset</button></td>
+      <td>${statusPill(r)}</td>
+      <td><button class="act-btn btn-reset" onclick="doAct('reset',${r.id})" ${(r.is_blocked||r.locked_device_id)?'':'disabled'}>Reset</button></td>
       <td><button class="act-btn btn-multi ${r.allow_multi_device?'':'off'}" onclick="doAct('multi',${r.id},${!r.allow_multi_device})">${r.allow_multi_device?'ALLOWED':'LOCKED'}</button></td>
     </tr>`).join('');
 }
@@ -152,16 +152,12 @@ async function load(){
 }
 
 async function doAct(kind, id, arg){
-  const msg = { reset:'Reset this device lock? The user can then log in on a new phone.',
-                block:'Block this account for 24 hours?',
-                unblock:'Unblock this account now?',
+  const msg = { reset:'Reset this user? This unblocks the account, clears the device lock and resets violation counts.',
                 multi: (arg?'Allow this user on multiple devices?':'Lock this user to a single device?') }[kind];
   if (!confirm(msg)) return;
   try {
-    if (kind==='reset')   await api('POST', `/security/${id}/reset-device`, {});
-    if (kind==='block')   await api('POST', `/security/${id}/block`, { hours:24 });
-    if (kind==='unblock') await api('POST', `/security/${id}/unblock`, {});
-    if (kind==='multi')   await api('POST', `/security/${id}/multi-device`, { allow: arg });
+    if (kind==='reset') await api('POST', `/security/${id}/reset-device`, {});
+    if (kind==='multi') await api('POST', `/security/${id}/multi-device`, { allow: arg });
     await load();
   } catch(e){ alert('Failed: '+e.message); }
 }

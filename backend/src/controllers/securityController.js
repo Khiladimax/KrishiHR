@@ -213,12 +213,19 @@ exports.exportExcel = async (req, res) => {
   }
 };
 
-// ── Admin: clear the locked device so the user can log in on a new phone ────────
+// ── Admin: full reset — unblock, clear device lock, zero the violation counts ───
 exports.resetDevice = async (req, res) => {
   try {
     const id = req.params.id || req.body.employee_id;
-    await db.query(`UPDATE employees SET locked_device_id=NULL, device_token=NULL WHERE id=$1`, [id]);
-    res.json({ success: true, message: 'Device reset — user can now log in on a new device' });
+    await db.query(
+      `UPDATE employees
+          SET locked_device_id=NULL, device_token=NULL, blocked_until=NULL,
+              security_violations=0, mock_gps_attempts=0, other_device_logins=0,
+              last_violation_type=NULL, last_violation_at=NULL
+        WHERE id=$1`,
+      [id]
+    );
+    res.json({ success: true, message: 'Reset done — account unblocked, device cleared, counters reset' });
   } catch (err) {
     console.error('[resetDevice]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
