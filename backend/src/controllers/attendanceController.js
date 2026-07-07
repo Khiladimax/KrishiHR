@@ -1098,9 +1098,11 @@ exports.getRegularizations = async (req, res) => {
               a.regularization_requested_at,
               a.regularization_requested_at                            AS created_at,
               a.regularization_remarks,
+              CONCAT(ab.first_name,' ',ab.last_name)                   AS approver_name,
               a.status                                                 AS attendance_status
        FROM attendance a
        JOIN employees   e ON e.id = a.employee_id
+       LEFT JOIN employees ab ON ab.id = a.regularization_actioned_by
        LEFT JOIN departments d ON d.id = e.department_id
        WHERE a.regularization_status = $1 ${scopeCond}
        ORDER BY a.regularization_requested_at DESC`,
@@ -1457,9 +1459,11 @@ exports.getODRequests = async (req, res) => {
     const result = await db.query(`
       SELECT o.id, TO_CHAR(o.date,'YYYY-MM-DD') AS date,
              CONCAT(e.first_name,' ',e.last_name) AS emp_name,
-             e.employee_code, d.name AS dept, o.reason, o.location, o.status, o.remarks, o.applied_at
+             e.employee_code, d.name AS dept, o.reason, o.location, o.status, o.remarks, o.applied_at,
+             CONCAT(ab.first_name,' ',ab.last_name) AS actioned_by_name
       FROM od_requests o JOIN employees e ON e.id=o.employee_id
       LEFT JOIN departments d ON d.id=e.department_id
+      LEFT JOIN employees ab ON ab.id=o.actioned_by
       WHERE 1=1 ${scopeCond} ${statusCond} ORDER BY o.applied_at DESC`, params);
     res.json({ success: true, data: result.rows });
   } catch (err) { console.error(err); res.status(500).json({ success: false, message: 'Server error' }); }
@@ -1681,9 +1685,11 @@ exports.getWFHRequests = async (req, res) => {
              TO_CHAR(w.to_date,'YYYY-MM-DD') AS to_date,
              TO_CHAR(w.from_date,'YYYY-MM-DD') AS date,
              CONCAT(e.first_name,' ',e.last_name) AS emp_name,
-             e.employee_code, d.name AS dept, w.reason, w.status, w.remarks, w.applied_at
+             e.employee_code, d.name AS dept, w.reason, w.status, w.remarks, w.applied_at,
+             CONCAT(ab.first_name,' ',ab.last_name) AS actioned_by_name
       FROM wfh_requests w JOIN employees e ON e.id=w.employee_id
       LEFT JOIN departments d ON d.id=e.department_id
+      LEFT JOIN employees ab ON ab.id=w.actioned_by
       WHERE 1=1 ${scopeCond} ${statusCond} ORDER BY w.applied_at DESC`, params);
     res.json({ success: true, data: result.rows });
   } catch (err) { console.error(err); res.status(500).json({ success: false, message: 'Server error' }); }

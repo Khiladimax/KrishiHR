@@ -362,7 +362,11 @@ exports.getMine = async (req, res) => {
     const result = await db.query(
       `SELECT a.*,
               CONCAT(e.first_name,' ',e.last_name) AS employee_name,
-              e.employee_code, d.name AS department_name
+              e.employee_code, d.name AS department_name,
+              (SELECT CONCAT(e2.first_name,' ',e2.last_name)
+                 FROM advance_approvals aa2 JOIN employees e2 ON e2.id=aa2.approver_id
+                WHERE aa2.advance_id=a.id AND aa2.action='approve'
+                ORDER BY aa2.id DESC LIMIT 1)                          AS approver_name
        FROM advance_salary a
        JOIN employees e ON a.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
@@ -505,7 +509,11 @@ exports.getAll = async (req, res) => {
       `SELECT a.*,
               COALESCE(NULLIF(a.purpose,''), a.amount::text)::numeric AS original_requested_amount,
               CONCAT(e.first_name,' ',e.last_name) AS employee_name,
-              e.employee_code, d.name AS department_name
+              e.employee_code, d.name AS department_name,
+              (SELECT CONCAT(e2.first_name,' ',e2.last_name)
+                 FROM advance_approvals aa2 JOIN employees e2 ON e2.id=aa2.approver_id
+                WHERE aa2.advance_id=a.id AND aa2.action='approve'
+                ORDER BY aa2.id DESC LIMIT 1)                          AS approver_name
        FROM advance_salary a
        JOIN employees e ON a.employee_id = e.id
        LEFT JOIN departments d ON e.department_id = d.id
