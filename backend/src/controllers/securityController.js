@@ -7,6 +7,12 @@ const fcm = require('../services/fcmService');
 const ADMIN_CONTACT = 'Akshay Rai (7651900038)';
 const BLOCK_HOURS = 24;
 
+// Role display order: admin → accounts → hr → manager → tl → employee → others
+const ROLE_RANK = `CASE LOWER(e.role)
+  WHEN 'admin' THEN 1 WHEN 'accounts' THEN 2 WHEN 'hr' THEN 3
+  WHEN 'manager' THEN 4 WHEN 'tl' THEN 5 WHEN 'employee' THEN 6
+  WHEN 'client_admin' THEN 7 ELSE 8 END`;
+
 // ── Mobile: report a security violation (mock GPS, dev options, mock time) ──────
 // Blocks the account for 24h and notifies the reporting manager.
 const PRIV_ROLES = ['super_admin', 'admin', 'client_admin', 'accounts', 'hr'];
@@ -105,7 +111,7 @@ exports.getSecurityLogs = async (req, res) => {
          FROM employees e
          LEFT JOIN clients c ON c.id = e.client_id
          ${where}
-         ORDER BY e.first_name`,
+         ORDER BY ${ROLE_RANK}, e.first_name`,
       params
     )).rows;
 
@@ -149,7 +155,7 @@ async function fetchSecurityRows(req) {
             (e.blocked_until IS NOT NULL AND e.blocked_until > NOW()) AS is_blocked
        FROM employees e
        LEFT JOIN clients c ON c.id = e.client_id
-       ${where} ORDER BY e.first_name`, params)).rows;
+       ${where} ORDER BY ${ROLE_RANK}, e.first_name`, params)).rows;
 }
 
 const verNum = (v) => { if (!v) return 0; const m = String(v).match(/(\d+)(?:\.(\d+))?/); return m ? parseFloat(m[1] + '.' + (m[2] || 0)) : 0; };
