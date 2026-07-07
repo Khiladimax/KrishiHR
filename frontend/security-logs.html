@@ -28,6 +28,9 @@ table.sec tr:hover td{background:var(--surface2)}
 .btn-multi.off{background:rgba(107,114,128,.14);color:#6b7280}
 .btn-block{background:rgba(245,158,11,.15);color:#b45309}
 .sec-search{width:100%;max-width:420px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:14px;box-sizing:border-box;margin-bottom:16px}
+.sec-tabs{display:flex;gap:8px;margin-bottom:16px}
+.sec-tab{border:1.5px solid var(--border);background:var(--surface);color:var(--muted);border-radius:10px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.sec-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -60,6 +63,10 @@ table.sec tr:hover td{background:var(--surface2)}
   <div style="padding:18px 20px">
     <p class="muted" style="margin:0 0 16px;font-size:13px">Manage devices · Detect fake GPS · Spot account sharing</p>
     <div class="sec-cards" id="secCards"></div>
+    <div class="sec-tabs" id="secTabs">
+      <button class="sec-tab active" data-type="kc"     onclick="switchTab('kc')">🌾 KC Employees</button>
+      <button class="sec-tab"        data-type="client" onclick="switchTab('client')">🏭 Client Employees</button>
+    </div>
     <input class="sec-search" id="secSearch" placeholder="Search by name, phone, employee ID or device ID…">
     <div class="sec-table-wrap">
       <table class="sec">
@@ -77,7 +84,13 @@ table.sec tr:hover td{background:var(--surface2)}
 <script src="app.js"></script>
 <script>
 let ROWS = [];
+let TYPE = 'kc';
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function switchTab(t){
+  TYPE = t;
+  document.querySelectorAll('.sec-tab').forEach(b => b.classList.toggle('active', b.dataset.type === t));
+  load();
+}
 
 function renderCards(sum){
   const c = [
@@ -101,7 +114,7 @@ function renderRows(rows){
   if (!rows.length){ document.getElementById('secBody').innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">No surveyors</td></tr>'; return; }
   document.getElementById('secBody').innerHTML = rows.map((r,i)=>`
     <tr>
-      <td><b>${i+1}. ${esc(r.name)}</b><br><span class="muted" style="font-size:11px">${esc(r.role)}</span></td>
+      <td><b>${i+1}. ${esc(r.name)}</b><br><span class="muted" style="font-size:11px">${esc(r.role)}${r.client_name?(' · '+esc(r.client_name)):''}</span></td>
       <td>${esc(r.phone)||'—'}</td>
       <td>${esc(r.employee_code)||'—'}</td>
       <td>${r.locked_device_id?`<span class="dev-id">${esc(r.locked_device_id)}</span>`:'<span class="muted">Not set yet</span>'}</td>
@@ -119,7 +132,10 @@ function renderRows(rows){
 async function load(){
   const q = document.getElementById('secSearch').value.trim();
   try {
-    const res = await api('GET', '/security/logs' + (q?('?q='+encodeURIComponent(q)):''));
+    const qs = '?type=' + TYPE + (q ? '&q=' + encodeURIComponent(q) : '');
+    const res = await api('GET', '/security/logs' + qs);
+    // Client admins see only their own manpower — hide the KC/Client tabs.
+    if (res.is_client_admin) document.getElementById('secTabs').style.display = 'none';
     ROWS = res.data || [];
     renderCards(res.summary || {});
     renderRows(ROWS);

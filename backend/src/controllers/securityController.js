@@ -61,13 +61,28 @@ exports.reportViolation = async (req, res) => {
 // ── Admin: Security Logs listing ────────────────────────────────────────────────
 exports.getSecurityLogs = async (req, res) => {
   try {
-    const q = (req.query.q || '').trim();
+    const q    = (req.query.q || '').trim();
+    const role = (req.user.role || '').toLowerCase();
+    const type = (req.query.type || 'kc').toLowerCase();   // 'kc' | 'client'
+    const isClientAdmin = role === 'client_admin';
     const params = [];
-    let where = `WHERE e.is_active = true AND LOWER(e.role) NOT IN ('super_admin')`;
+    let where = `WHERE e.is_active = true AND LOWER(e.role) <> 'super_admin'`;
+
+    if (isClientAdmin) {
+      // Client admin sees ONLY their own client's manpower.
+      params.push(req.user.client_id || 0);
+      where += ` AND e.client_id = $${params.length}`;
+    } else if (type === 'client') {
+      where += ` AND e.client_id IS NOT NULL`;   // Client Employee tab
+    } else {
+      where += ` AND e.client_id IS NULL`;        // KC Employee tab
+    }
+
     if (q) {
       params.push(`%${q}%`);
-      where += ` AND (e.first_name ILIKE $1 OR e.last_name ILIKE $1 OR e.employee_code ILIKE $1
-                      OR e.phone ILIKE $1 OR e.locked_device_id ILIKE $1)`;
+      const p = params.length;
+      where += ` AND (e.first_name ILIKE $${p} OR e.last_name ILIKE $${p} OR e.employee_code ILIKE $${p}
+                      OR e.phone ILIKE $${p} OR e.locked_device_id ILIKE $${p})`;
     }
     const rows = (await db.query(
       `SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.role, e.phone,
@@ -78,8 +93,10 @@ exports.getSecurityLogs = async (req, res) => {
               COALESCE(e.other_device_logins,0)  AS other_device_logins,
               e.allow_multi_device,
               e.blocked_until,
+              c.name AS client_name,
               (e.blocked_until IS NOT NULL AND e.blocked_until > NOW()) AS is_blocked
          FROM employees e
+         LEFT JOIN clients c ON c.id = e.client_id
          ${where}
          ORDER BY e.first_name`,
       params
@@ -93,7 +110,7 @@ exports.getSecurityLogs = async (req, res) => {
       mock_gps:        rows.reduce((s, r) => s + Number(r.mock_gps), 0),
       multi_device:    rows.filter(r => r.allow_multi_device).length
     };
-    res.json({ success: true, data: rows, summary });
+    res.json({ success: true, data: rows, summary, is_client_admin: isClientAdmin });
   } catch (err) {
     console.error('[getSecurityLogs]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
