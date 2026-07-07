@@ -24,8 +24,19 @@ function getISTTimeParts() {
   return {
     hour:    parseInt(parts.hour),
     minute:  parseInt(parts.minute),
+    second:  parseInt(parts.second),
     timeStr: `${parts.hour}:${parts.minute}:${parts.second}` // "HH:MM:SS"
   };
+}
+
+// Extract seconds-since-midnight from any stored time/timestamp value.
+// Handles "HH:mm:ss", "HH:mm", "YYYY-MM-DD HH:mm:ss" and ISO "…THH:mm:ss".
+// Returns null if no time can be parsed.
+function timeToSecondsOfDay(val) {
+  if (!val) return null;
+  const m = String(val).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  return (+m[1]) * 3600 + (+m[2]) * 60 + (+(m[3] || 0));
 }
 
 function toLocalDateString(date) {
@@ -180,18 +191,22 @@ exports.punchOut = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Already punched out today' });
 
     // ── 5-minute cooldown: prevent punch-out within 5 minutes of punch-in ────
-    const punchInTime = existing.rows[0].punch_in; // e.g. "09:40:00"
-    const [piH, piM, piS] = punchInTime.split(':').map(Number);
-    const serverIST0 = getISTTimeParts();
-    const punchInTotalSecs  = piH * 3600 + piM * 60 + (piS || 0);
-    const serverTotalSecs   = serverIST0.hour * 3600 + serverIST0.minute * 60 + serverIST0.second;
-    const diffSecs = serverTotalSecs - punchInTotalSecs;
-    if (diffSecs < 300) { // less than 5 minutes
-      const remaining = Math.ceil((300 - diffSecs) / 60);
-      return res.status(400).json({
-        success: false,
-        message: `Please wait ${remaining} more minute${remaining > 1 ? 's' : ''} before punching out`
-      });
+    // Compare seconds-of-day for punch-in vs current IST time. Both are parsed
+    // defensively so a full-timestamp value (or missing seconds) can never make
+    // the diff NaN and silently skip the cooldown.
+    const punchInTotalSecs = timeToSecondsOfDay(existing.rows[0].punch_in);
+    const serverTotalSecs  = timeToSecondsOfDay(getISTTimeParts().timeStr);
+    if (punchInTotalSecs !== null && serverTotalSecs !== null) {
+      const diffSecs = serverTotalSecs - punchInTotalSecs;
+      // diffSecs < 0 => clock crossed midnight since punch-in; not a real
+      // sub-5-minute case, so don't falsely block.
+      if (diffSecs >= 0 && diffSecs < 300) { // less than 5 minutes
+        const remaining = Math.ceil((300 - diffSecs) / 60);
+        return res.status(400).json({
+          success: false,
+          message: `Please wait ${remaining} more minute${remaining > 1 ? 's' : ''} before punching out`
+        });
+      }
     }
 
     // ── Geo-boundary validation ───────────────────────────────────────────────
