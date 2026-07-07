@@ -1086,13 +1086,17 @@ exports.getRegularizations = async (req, res) => {
       `SELECT a.id,
               TO_CHAR(a.date,'YYYY-MM-DD')                            AS date,
               CONCAT(e.first_name,' ',e.last_name)                    AS emp_name,
+              CONCAT(e.first_name,' ',e.last_name)                    AS employee_name,
               e.employee_code,
               d.name                                                   AS dept,
               a.regularization_status                                  AS status,
               a.regularization_reason                                  AS reason,
               TO_CHAR(a.regularization_punch_in,'HH24:MI')            AS punch_in,
+              TO_CHAR(a.regularization_punch_in,'HH24:MI')            AS requested_punch_in,
               TO_CHAR(a.regularization_punch_out,'HH24:MI')           AS punch_out,
+              TO_CHAR(a.regularization_punch_out,'HH24:MI')           AS requested_punch_out,
               a.regularization_requested_at,
+              a.regularization_requested_at                            AS created_at,
               a.regularization_remarks,
               a.status                                                 AS attendance_status
        FROM attendance a
