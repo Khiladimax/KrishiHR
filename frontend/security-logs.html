@@ -10,11 +10,12 @@
 .sec-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px}
 .sec-card .sc-val{font-size:26px;font-weight:800;line-height:1.1}
 .sec-card .sc-lbl{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
-.sec-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow-x:auto}
-table.sec{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
-table.sec th{background:#1e293b;color:#fff;text-align:left;padding:11px 12px;font-size:12px;font-weight:700;white-space:nowrap}
-table.sec td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
-table.sec tr:hover td{background:var(--surface2)}
+.sec-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto}
+table.sec{width:100%;border-collapse:collapse;font-size:13px;min-width:1000px}
+table.sec th{background:#1e293b;color:#fff;text-align:left;padding:10px 12px;font-size:12px;font-weight:700;white-space:nowrap;border:1px solid #334155}
+table.sec td{padding:9px 12px;border:1px solid var(--border);vertical-align:middle}
+table.sec tr:nth-child(even) td{background:var(--surface2)}
+table.sec tr:hover td{background:rgba(99,102,241,.07)}
 .dev-id{font-family:ui-monospace,monospace;font-size:11px;background:rgba(99,102,241,.12);color:#6366f1;padding:2px 7px;border-radius:6px}
 .muted{color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
@@ -67,7 +68,10 @@ table.sec tr:hover td{background:var(--surface2)}
       <button class="sec-tab active" data-type="kc"     onclick="switchTab('kc')">🌾 KC Employees</button>
       <button class="sec-tab"        data-type="client" onclick="switchTab('client')">🏭 Client Employees</button>
     </div>
-    <input class="sec-search" id="secSearch" placeholder="Search by name, phone, employee ID or device ID…">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input class="sec-search" id="secSearch" style="margin-bottom:0" placeholder="Search by name, phone, employee ID or device ID…">
+      <button class="sec-tab" style="margin-bottom:16px" onclick="exportExcel()">⬇ Export Excel</button>
+    </div>
     <div class="sec-table-wrap">
       <table class="sec">
         <thead><tr>
@@ -82,6 +86,7 @@ table.sec tr:hover td{background:var(--surface2)}
 </div>
 
 <script src="app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let ROWS = [];
 let TYPE = 'kc';
@@ -157,6 +162,31 @@ async function doAct(kind, id, arg){
     if (kind==='multi')   await api('POST', `/security/${id}/multi-device`, { allow: arg });
     await load();
   } catch(e){ alert('Failed: '+e.message); }
+}
+
+function exportExcel(){
+  if (!ROWS.length){ alert('Nothing to export'); return; }
+  const rows = ROWS.map((r,i)=>({
+    '#': i+1,
+    'Surveyor': r.name,
+    'Role': r.role,
+    'Client': r.client_name || '',
+    'Phone': r.phone || '',
+    'Emp ID': r.employee_code || '',
+    'Locked Device ID': r.locked_device_id || 'Not set',
+    'Phone Model': r.last_login_model || r.last_login_device || '',
+    'Last Login (IST)': r.last_login || '',
+    'Violations': r.violations,
+    'Mock GPS': r.mock_gps,
+    'Other Device Logins': r.other_device_logins || 0,
+    'Status': r.is_blocked ? 'Blocked' : 'Active',
+    'Multi-Device': r.allow_multi_device ? 'Allowed' : 'Locked'
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Security Logs');
+  const stamp = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `security-logs-${TYPE}-${stamp}.xlsx`);
 }
 
 let searchT;
