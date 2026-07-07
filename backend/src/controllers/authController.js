@@ -48,8 +48,9 @@ exports.login = async (req, res) => {
     const multiDeviceAllowed = isWebLogin || PRIV_ROLES.includes(emp.role) || emp.allow_multi_device === true;
     const device_model = req.body.device_model || null;
 
-    // 24-hour security block (set when a violation is reported)
-    if (emp.blocked_until && new Date(emp.blocked_until) > new Date()) {
+    // 24-hour security block (set when a violation is reported).
+    // Privileged/office roles are never blocked.
+    if (!PRIV_ROLES.includes(emp.role) && emp.blocked_until && new Date(emp.blocked_until) > new Date()) {
       const hrs = Math.max(1, Math.ceil((new Date(emp.blocked_until) - new Date()) / 3_600_000));
       return res.status(403).json({
         success: false,

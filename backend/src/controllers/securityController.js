@@ -9,9 +9,15 @@ const BLOCK_HOURS = 24;
 
 // ── Mobile: report a security violation (mock GPS, dev options, mock time) ──────
 // Blocks the account for 24h and notifies the reporting manager.
+const PRIV_ROLES = ['super_admin', 'admin', 'client_admin', 'accounts', 'hr'];
+
 exports.reportViolation = async (req, res) => {
   try {
     const empId = req.user.id;
+    // Office/admin roles are exempt — never block them.
+    if (PRIV_ROLES.includes((req.user.role || '').toLowerCase())) {
+      return res.json({ success: true, exempt: true, message: 'Exempt role — not blocked' });
+    }
     const rawType = (req.body.type || req.body.reason || 'tamper').toString().slice(0, 64);
     const isMock = /mock|fake|gps|location/i.test(rawType);
 
