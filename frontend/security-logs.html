@@ -131,7 +131,7 @@ function renderRows(rows){
       <td><span class="pill ${r.mock_gps>0?'bad':'ok'}">${r.mock_gps}</span></td>
       <td>${r.other_device_logins||0}</td>
       <td>${statusPill(r)}</td>
-      <td><button class="act-btn btn-reset" onclick="doAct('reset',${r.id})" ${(r.is_blocked||r.locked_device_id)?'':'disabled'}>Reset</button></td>
+      <td><button class="act-btn btn-reset" onclick="doAct('reset',${r.id})" ${(r.is_blocked||r.locked_device_id||r.violations>0||r.mock_gps>0||r.other_device_logins>0)?'':'disabled'}>Reset</button></td>
       <td><button class="act-btn btn-multi ${r.allow_multi_device?'':'off'}" onclick="doAct('multi',${r.id},${!r.allow_multi_device})">${r.allow_multi_device?'ALLOWED':'LOCKED'}</button></td>
     </tr>`).join('');
 }
