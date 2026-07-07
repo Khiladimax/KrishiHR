@@ -76,10 +76,10 @@ table.sec tr:hover td{background:rgba(99,102,241,.07)}
       <table class="sec">
         <thead><tr>
           <th>#&nbsp;Surveyor</th><th>Phone</th><th>Emp ID</th><th>Locked Device ID</th>
-          <th>Phone Model</th><th>Last Login (IST)</th><th>Violations</th><th>Mock GPS</th>
+          <th>Phone Model</th><th>App Version</th><th>Last Login (IST)</th><th>Violations</th><th>Mock GPS</th>
           <th>Other Device Logins</th><th>Status</th><th>Reset</th><th>Multi-Device</th>
         </tr></thead>
-        <tbody id="secBody"><tr><td colspan="12" class="muted" style="text-align:center;padding:24px">Loading…</td></tr></tbody>
+        <tbody id="secBody"><tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -115,8 +115,10 @@ function statusPill(r){
   return '<span class="pill ok">● Active</span>';
 }
 
+function verNum(v){ if(!v) return 0; const m=String(v).match(/(\d+)(?:\.(\d+))?/); return m?parseFloat(m[1]+'.'+(m[2]||0)):0; }
 function renderRows(rows){
-  if (!rows.length){ document.getElementById('secBody').innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">No surveyors</td></tr>'; return; }
+  if (!rows.length){ document.getElementById('secBody').innerHTML = '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">No surveyors</td></tr>'; return; }
+  const latest = Math.max(0, ...rows.map(r=>verNum(r.app_version)));
   document.getElementById('secBody').innerHTML = rows.map((r,i)=>`
     <tr>
       <td><b>${i+1}. ${esc(r.name)}</b><br><span class="muted" style="font-size:11px">${esc(r.role)}${r.client_name?(' · '+esc(r.client_name)):''}</span></td>
@@ -124,6 +126,7 @@ function renderRows(rows){
       <td>${esc(r.employee_code)||'—'}</td>
       <td>${r.locked_device_id?`<span class="dev-id">${esc(r.locked_device_id)}</span>`:'<span class="muted">Not set yet</span>'}</td>
       <td>${r.last_login_model?esc(r.last_login_model):(r.last_login_device?esc(r.last_login_device):'<span class="muted">—</span>')}</td>
+      <td>${r.app_version?`<span class="pill ${verNum(r.app_version)<latest?'warn':'ok'}">${esc(r.app_version)}${verNum(r.app_version)<latest?' · old':''}</span>`:'<span class="muted">—</span>'}</td>
       <td>${r.last_login?esc(r.last_login):'<span class="muted">—</span>'}</td>
       <td><span class="pill ${r.violations>0?'warn':'ok'}">${r.violations}</span></td>
       <td><span class="pill ${r.mock_gps>0?'bad':'ok'}">${r.mock_gps}</span></td>
@@ -145,7 +148,7 @@ async function load(){
     renderCards(res.summary || {});
     renderRows(ROWS);
   } catch(e){
-    document.getElementById('secBody').innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">Failed to load: '+esc(e.message)+'</td></tr>';
+    document.getElementById('secBody').innerHTML = '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Failed to load: '+esc(e.message)+'</td></tr>';
   }
 }
 
@@ -175,6 +178,7 @@ function exportExcel(){
     'Emp ID': r.employee_code || '',
     'Locked Device ID': r.locked_device_id || 'Not set',
     'Phone Model': r.last_login_model || r.last_login_device || '',
+    'App Version': r.app_version || '',
     'Last Login (IST)': r.last_login || '',
     'Violations': r.violations,
     'Mock GPS': r.mock_gps,

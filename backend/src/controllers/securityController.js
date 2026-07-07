@@ -87,6 +87,7 @@ exports.getSecurityLogs = async (req, res) => {
     const rows = (await db.query(
       `SELECT e.id, CONCAT(e.first_name,' ',e.last_name) AS name, e.role, e.phone,
               e.employee_code, e.locked_device_id, e.last_login_model, e.last_login_device,
+              e.app_version,
               TO_CHAR(e.last_login_at,'DD/MM/YYYY HH24:MI:SS') AS last_login,
               COALESCE(e.security_violations,0)  AS violations,
               COALESCE(e.mock_gps_attempts,0)    AS mock_gps,
