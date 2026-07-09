@@ -145,6 +145,16 @@
         <div class="card-title"><span class="card-title-icon">⬆</span>Step 3 & 4 — Fill & Upload</div>
       </div>
 
+      <!-- Target month is shown & editable right here so it can't be missed -->
+      <div style="background:#FFF3E0;border:1px solid #FFCC80;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:8px">📅 This upload will be saved into salary month — confirm before importing:</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="imp-month" class="form-control" style="width:150px"></select>
+          <input type="number" id="imp-year" class="form-control" style="width:100px" min="2020" max="2099">
+          <span id="imp-cycle" style="font-size:12px;color:#5D4037"></span>
+        </div>
+      </div>
+
       <div class="drop-zone" id="drop-zone"
         ondragover="event.preventDefault();this.classList.add('drag')"
         ondragleave="this.classList.remove('drag')"
@@ -249,6 +259,24 @@ updateCycleInfo();
 document.getElementById('sel-month').addEventListener('change', updateCycleInfo);
 document.getElementById('sel-year').addEventListener('change', updateCycleInfo);
 
+// ── Import-step month selector (mirror of Step 1 so the target month is
+//    visible right where you upload and can never silently default to "today") ──
+const impMonthEl = document.getElementById('imp-month');
+if (impMonthEl) {
+  MONTHS.forEach((name, i) => {
+    const o = document.createElement('option'); o.value = i + 1; o.textContent = name; impMonthEl.appendChild(o);
+  });
+  impMonthEl.value = now.getMonth() + 1;
+  document.getElementById('imp-year').value = now.getFullYear();
+  const syncFromImport = () => {
+    document.getElementById('sel-month').value = impMonthEl.value;
+    document.getElementById('sel-year').value  = document.getElementById('imp-year').value;
+    updateCycleInfo();
+  };
+  impMonthEl.addEventListener('change', syncFromImport);
+  document.getElementById('imp-year').addEventListener('change', syncFromImport);
+}
+
 function updateCycleInfo() {
   const m = parseInt(document.getElementById('sel-month').value);
   const y = parseInt(document.getElementById('sel-year').value);
@@ -257,6 +285,11 @@ function updateCycleInfo() {
   const prevY = m === 1 ? y - 1 : y;
   const el = document.getElementById('cycle-info');
   el.innerHTML = `💡 <strong>${MONTHS[m-1]} ${y}</strong> salary → work period <strong>25 ${MONTHS[prevM-1].slice(0,3)} ${prevY} → 24 ${MONTHS[m-1].slice(0,3)} ${y}</strong>. Template pre-filled with last cycle's gross salary.`;
+  const im = document.getElementById('imp-month'), iy = document.getElementById('imp-year');
+  if (im && iy) {
+    im.value = m; iy.value = y;
+    document.getElementById('imp-cycle').innerHTML = `→ saved as <strong>${MONTHS[m-1]} ${y}</strong> (work period 25 ${MONTHS[prevM-1].slice(0,3)} → 24 ${MONTHS[m-1].slice(0,3)})`;
+  }
 }
 
 let selectedFile = null;
@@ -312,8 +345,12 @@ function setFile(f) {
 
 async function doImport() {
   if (!selectedFile) { alert('Select a file first'); return; }
-  const m = document.getElementById('sel-month').value;
-  const y = document.getElementById('sel-year').value;
+  // Read the month from the import-step selector (falls back to Step 1).
+  const m = document.getElementById('imp-month').value || document.getElementById('sel-month').value;
+  const y = document.getElementById('imp-year').value  || document.getElementById('sel-year').value;
+  if (!m || !y) { alert('Select the salary month & year first'); return; }
+  // Explicit confirmation so payroll can never land in the wrong month by accident.
+  if (!confirm(`Import this payroll into ${MONTHS[m-1]} ${y}?\n\nDouble-check the month — data is saved to that salary cycle.`)) return;
   const btn = document.getElementById('import-btn');
   const status = document.getElementById('import-status');
   btn.disabled = true; status.textContent = '⏳ Importing...';
