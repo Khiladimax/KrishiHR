@@ -1508,6 +1508,9 @@ exports.exportMasterExcel = async (req, res) => {
     const isClientAdmin = req.user.role === 'client_admin';
     const clientId      = req.user.client_id;
     const clientFilter  = isClientAdmin && clientId ? `AND e.client_id = ${parseInt(clientId)}` : '';
+    // Scope anchor: main users (HR/Accounts/Super) see own-company staff (client_id IS NULL);
+    // a client_admin sees ONLY their own client's employees — never main-company rows.
+    const scopeAnchor   = isClientAdmin && clientId ? `e.client_id = ${parseInt(clientId)}` : `e.client_id IS NULL`;
 
     // ── 1. Employees + salary structure ─────────────────────────────────────
     const empResult = await db.query(`
@@ -1551,11 +1554,11 @@ exports.exportMasterExcel = async (req, res) => {
       LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
       LEFT JOIN clients      cl2 ON e.client_id = cl2.id
       WHERE (
-        -- KCMS employees only (client_id IS NULL) in the main attendance register;
-        -- client employees appear in the separate Client Attendance sheet (26-25 cycle).
-        e.client_id IS NULL
+        -- Main users: own-company staff (client_id IS NULL). Client admins: ONLY
+        -- their own client's staff (scopeAnchor) — never main-company employees.
+        ${scopeAnchor}
         AND (
-          (e.is_active = true ${clientFilter})
+          (e.is_active = true)
           OR (
             -- Include employees deactivated this month or later
             e.is_active = false
@@ -2509,8 +2512,10 @@ exports.exportAttendanceRegister = async (req, res) => {
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
     const isClientAdmin = req.user.role === 'client_admin';
-    const clientFilter  = isClientAdmin && req.user.client_id
-      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+    // Scope anchor: main users see own-company staff (client_id IS NULL); a
+    // client_admin sees ONLY their own client's employees — never main-company rows.
+    const scopeAnchor   = isClientAdmin && req.user.client_id
+      ? `e.client_id = ${parseInt(req.user.client_id)}` : `e.client_id IS NULL`;
 
     // ── Employees (basic info only — no salary data needed) ─────────────────
     const empResult = await db.query(`
@@ -2531,8 +2536,9 @@ exports.exportAttendanceRegister = async (req, res) => {
       LEFT JOIN designations des ON e.designation_id = des.id
       LEFT JOIN clients      cl  ON e.client_id = cl.id
       WHERE (
-        -- KCMS employees only (client_id IS NULL); client employees are in Client Attendance sheet.
-        e.client_id IS NULL
+        -- Main users: own-company staff (client_id IS NULL). Client admins: ONLY
+        -- their own client's staff (scopeAnchor) — never main-company employees.
+        ${scopeAnchor}
         AND (
           (e.is_active = true)
           OR (
