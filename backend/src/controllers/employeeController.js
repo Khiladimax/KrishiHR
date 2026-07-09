@@ -1797,6 +1797,7 @@ exports.exportMasterExcel = async (req, res) => {
     // Salary data rows
     let salLastClient = '__UNSET__';
     let salRowOffset = 0;
+    let salDeactShown = false;
     const isClientAdminSal = isClientAdmin;
 
     employees.forEach((e, ri) => {
@@ -1823,6 +1824,20 @@ exports.exportMasterExcel = async (req, res) => {
         ccSal.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
         ws2.getRow(cRowSal).height = 20;
         salLastClient = clientKeySal;
+      }
+
+      // ── Deactivated Employees separator (once, before the first inactive) ──
+      if (!isClientAdminSal && e.is_active === false && !salDeactShown) {
+        salDeactShown = true;
+        const dRowSal = ri + 4 + salRowOffset;
+        salRowOffset++;
+        try { ws2.mergeCells(dRowSal, 1, dRowSal, 34); } catch (_) {}
+        const dcSal = ws2.getCell(dRowSal, 1);
+        dcSal.value = '  ❌ Deactivated Employees';
+        dcSal.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        dcSal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6D1A1A' } };
+        dcSal.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws2.getRow(dRowSal).height = 18;
       }
 
       const row = ri + 4 + salRowOffset;
@@ -2104,6 +2119,7 @@ exports.exportMasterExcel = async (req, res) => {
 
     let dirLastClient = '__UNSET__';
     let dirRowOffset = 0;
+    let dirDeactShown = false;
     const isClientAdminDir = isClientAdmin;
 
     employees.forEach((e, ri) => {
@@ -2129,6 +2145,20 @@ exports.exportMasterExcel = async (req, res) => {
         ccDir.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
         ws3.getRow(cRowDir).height = 20;
         dirLastClient = clientKeyDir;
+      }
+
+      // ── Deactivated Employees separator (once, before the first inactive) ──
+      if (!isClientAdminDir && e.is_active === false && !dirDeactShown) {
+        dirDeactShown = true;
+        const dRowDir = ri + 3 + dirRowOffset;
+        dirRowOffset++;
+        try { ws3.mergeCells(dRowDir, 1, dRowDir, 22); } catch (_) {}
+        const dcDir = ws3.getCell(dRowDir, 1);
+        dcDir.value = '  ❌ Deactivated Employees';
+        dcDir.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        dcDir.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6D1A1A' } };
+        dcDir.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        ws3.getRow(dRowDir).height = 18;
       }
 
       const row = ri + 3 + dirRowOffset;
