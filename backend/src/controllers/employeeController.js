@@ -2525,6 +2525,9 @@ exports.exportAttendanceRegister = async (req, res) => {
     // client_admin sees ONLY their own client's employees — never main-company rows.
     const scopeAnchor   = isClientAdmin && req.user.client_id
       ? `e.client_id = ${parseInt(req.user.client_id)}` : `e.client_id IS NULL`;
+    // Passed to the client-sheet builders (Client Attn / Client Punch).
+    const clientFilter  = isClientAdmin && req.user.client_id
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
 
     // ── Employees (basic info only — no salary data needed) ─────────────────
     const empResult = await db.query(`
