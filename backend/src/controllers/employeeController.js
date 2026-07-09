@@ -2478,14 +2478,23 @@ exports.exportMasterExcel = async (req, res) => {
     legendCell.alignment = { horizontal: 'left', vertical: 'middle' };
     ws1.getRow(legendRow).height = 16;
 
-    // ── Sheet 4 — KCMS Punch Register ────────────────────────────────────────
-    await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
+    // ── Sheet 4 — KCMS Punch Register (main company only) ─────────────────────
+    if (!isClientAdmin) {
+      await buildPunchRegisterSheet(wb, masterEmpForPunch, m, y, MONTH_NAMES, masterPunchMap, masterHolsByRegion, getEmployeeRegion);
+    }
 
     // ── Client Attendance (25→24 cycle, all Sat working) ──────────────────────
     await buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
 
     // ── Client Punch Register (26–25 cycle, all Sat working) ────────────────
     await buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmployeeRegion, clientFilter);
+
+    // A client_admin gets only the client sheets (+ Salary Breakup, Employee
+    // Directory). Drop the main-company "Attendance {Month}" register built inline.
+    if (isClientAdmin) {
+      const mainAtt = wb.getWorksheet(`Attendance ${MONTH_NAMES[m-1]} ${y}`);
+      if (mainAtt) wb.removeWorksheet(mainAtt.id);
+    }
 
     // ── Send response ────────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer();
