@@ -1653,6 +1653,52 @@ exports.exportMasterExcel = async (req, res) => {
     // ══════════════════════════════════════════════════════════════════════
     // SHEET 1 — SALARY BREAKUP
     // ══════════════════════════════════════════════════════════════════════
+    if (isClientAdmin) {
+      // Client (deployed) employees are paid a flat gross — show only
+      // Gross / TDS@1% / Amount Payable from client_payroll_cycles, not the
+      // 34-column KCMS salary structure (which is all zeros for them).
+      const cs = wb.addWorksheet('Salary Breakup', { views: [{ state: 'frozen', ySplit: 3 }] });
+      try { cs.mergeCells(1, 1, 1, 5); } catch (_) {}
+      const ct = cs.getCell(1, 1);
+      ct.value = `KrishiHR — Client Salary | ${MONTH_NAMES[m - 1]} ${y}`;
+      ct.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+      ct.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D47A1' } };
+      ct.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+      cs.getRow(1).height = 24;
+      try { cs.mergeCells(2, 1, 2, 5); } catch (_) {}
+      const cnote = cs.getCell(2, 1);
+      cnote.value = 'Deployed manpower — flat gross, TDS 1% deducted. Figures from Client Payroll for this month.';
+      cnote.font = { italic: true, size: 9, color: { argb: 'FF5D4037' } };
+      ['Emp Code', 'Name', 'Gross Salary', 'TDS @1%', 'Amount Payable'].forEach((h, i) => {
+        const c = cs.getCell(3, i + 1);
+        c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } };
+        c.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      [16, 26, 16, 14, 18].forEach((w, i) => { cs.getColumn(i + 1).width = w; });
+      const cpay = await db.query(`
+        SELECT e.employee_code, CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) AS name,
+               cp.gross_salary, cp.tds_amount, cp.amount_payable
+        FROM client_payroll_cycles cp
+        JOIN employees e ON e.id = cp.employee_id
+        WHERE cp.cycle_month = $1 AND cp.cycle_year = $2 AND e.client_id IS NOT NULL ${clientFilter}
+        ORDER BY e.employee_code`, [m, y]);
+      let cr = 4;
+      cpay.rows.forEach(row => {
+        cs.getCell(cr, 1).value = row.employee_code;
+        cs.getCell(cr, 2).value = row.name;
+        cs.getCell(cr, 3).value = Number(row.gross_salary) || 0;
+        cs.getCell(cr, 4).value = Number(row.tds_amount) || 0;
+        cs.getCell(cr, 5).value = Number(row.amount_payable) || 0;
+        [3, 4, 5].forEach(c => { cs.getCell(cr, c).numFmt = '#,##0'; });
+        cr++;
+      });
+      if (!cpay.rows.length) {
+        try { cs.mergeCells(4, 1, 4, 5); } catch (_) {}
+        cs.getCell(4, 1).value = `No client payroll found for ${MONTH_NAMES[m - 1]} ${y}. Import it in Client Payroll first.`;
+        cs.getCell(4, 1).alignment = { horizontal: 'center' };
+      }
+    } else {
     const ws2 = wb.addWorksheet('Salary Breakup', {
       views: [{ state: 'frozen', xSplit: 4, ySplit: 2 }]
     });
@@ -2027,6 +2073,7 @@ exports.exportMasterExcel = async (req, res) => {
         salClientRow++;
       });
     }
+    } // end else (main-company Salary Breakup; client version built above)
 
     // ══════════════════════════════════════════════════════════════════════
     // SHEET 2 — EMPLOYEE DIRECTORY
