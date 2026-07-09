@@ -2016,14 +2016,18 @@ exports.exportMasterExcel = async (req, res) => {
                COALESCE(s.net_salary,0) AS net_salary,
                COALESCE(s.ctc_monthly,0) AS ctc_monthly,
                COALESCE(s.ctc_annual,e.ctc,0) AS ctc_annual,
+               COALESCE(cp.gross_salary,0)   AS cp_gross,
+               COALESCE(cp.tds_amount,0)     AS cp_tds,
+               COALESCE(cp.amount_payable,0) AS cp_payable,
                e.client_id, cl.name AS client_name
         FROM employees e
         LEFT JOIN departments d   ON e.department_id  = d.id
         LEFT JOIN designations des ON e.designation_id = des.id
         LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
         LEFT JOIN clients cl ON e.client_id = cl.id
+        LEFT JOIN client_payroll_cycles cp ON cp.employee_id = e.id AND cp.cycle_month = $1 AND cp.cycle_year = $2
         WHERE e.client_id IS NOT NULL AND e.is_active = true
-        ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, []);
+        ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [m, y]);
 
       // Get current last row in ws2
       let salClientRow = ws2.lastRow ? ws2.lastRow.number + 2 : employees.length + 6;
@@ -2059,21 +2063,23 @@ exports.exportMasterExcel = async (req, res) => {
           if (['present','late','regularized','od','wfh','holiday','on-leave','half-day','h-el','h-cl','h-sl','h-wfh'].includes(st)) cPresent++;
           else if (['lwp','absent','h-lwp'].includes(st) || st === 'missing_punch_out') cLop++;
         }
-        const gross2    = parseFloat(e.gross_salary)||0;
-        const lwf2      = parseFloat(e.lwf)||0;
-        const totalDed2 = Math.max(0,(parseFloat(e.total_deductions)||0)-lwf2);
-        const netFull2  = gross2 - totalDed2;
-        const emiDed2   = emiMap[e.id]||0;
-        const earnedGross2 = cWorkingDays>0 ? Math.round((gross2   * cPresent)/cWorkingDays) : 0;
-        const earnedNet2   = cWorkingDays>0 ? Math.round((netFull2 * cPresent)/cWorkingDays) : 0;
-        const netPayable2  = Math.max(0, earnedNet2 - emiDed2);
+        // Client employees are paid a flat monthly gross from Client Payroll
+        // (TDS 1%, payable = gross - TDS) — NOT attendance-prorated like KCMS.
+        const gross2     = parseFloat(e.cp_gross)||0;
+        const cpTds2     = parseFloat(e.cp_tds)||0;
+        const cpPayable2 = parseFloat(e.cp_payable)||0;
+        const emiDed2    = emiMap[e.id]||0;
+        const totalDed2  = cpTds2;
+        const earnedGross2 = gross2;
+        const earnedNet2   = cpPayable2;
+        const netPayable2  = Math.max(0, cpPayable2 - emiDed2);
         const vals2 = [
           e.employee_code, `${e.first_name} ${e.last_name||''}`.trim(),
           e.department||'', e.designation||'',
           parseFloat(e.basic)||0, parseFloat(e.hra)||0, parseFloat(e.conveyance)||0,
           parseFloat(e.special_allowance)||0, parseFloat(e.gratuity)||0, gross2,
           parseFloat(e.pf_employee)||0, parseFloat(e.esi_employee)||0,
-          parseFloat(e.professional_tax)||0, parseFloat(e.tds)||0,
+          parseFloat(e.professional_tax)||0, cpTds2,
           emiDed2, totalDed2,
           parseFloat(e.pf_employer)||0, parseFloat(e.esi_employer)||0, parseFloat(e.pf_admin)||0,
           (parseFloat(e.pf_employer)||0)+(parseFloat(e.esi_employer)||0)+(parseFloat(e.pf_admin)||0),
