@@ -2191,12 +2191,22 @@ exports.exportMasterExcel = async (req, res) => {
         cell.alignment = { vertical: 'middle' };
         cell.border = { right: { style: 'hair' }, bottom: { style: 'hair' } };
       });
+      // Deactivation reason at the end of the row (mirrors Attendance/Salary Breakup)
+      if (e.is_active === false) {
+        const rc = ws3.getCell(row, 23);
+        rc.value = e.deactivation_remark
+          ? `❌ ${e.deactivation_remark}`
+          : `❌ Account deactivated${e.separation_date ? ' on ' + e.separation_date : ''}`;
+        rc.font = { italic: true, size: 9, color: { argb: 'FFB71C1C' } };
+        rc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+      }
       ws3.getRow(row).height = 16;
     });
 
     [10,22,28,13,8,12,12,16,22,10,12,7,14,14,14,16,14,18,20,20,13,22].forEach((w, i) => {
       ws3.getColumn(i + 1).width = w;
     });
+    ws3.getColumn(23).width = 60; // deactivation reason column
 
     // ── Client Directory Section — appended below KCMS rows ──────────────────
     if (!isClientAdmin) {
