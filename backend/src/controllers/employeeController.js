@@ -1973,6 +1973,15 @@ exports.exportMasterExcel = async (req, res) => {
           cell.alignment = { vertical: 'middle' };
         }
       });
+      // Deactivation reason at the end of the row (mirrors the Attendance register)
+      if (e.is_active === false) {
+        const rc = ws2.getCell(row, 35);
+        rc.value = e.deactivation_remark
+          ? `❌ ${e.deactivation_remark}`
+          : `❌ Account deactivated${e.separation_date ? ' on ' + e.separation_date : ''}`;
+        rc.font = { italic: true, size: 9, color: { argb: 'FFB71C1C' } };
+        rc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+      }
       ws2.getRow(row).height = 16;
     });
 
@@ -1980,6 +1989,7 @@ exports.exportMasterExcel = async (req, res) => {
     [10,22,14,22, 12,10,12,14,10,13, 10,10,9,10,12,15, 13,13,10,16, 10,10,10,10, 10,11,9, 11,12,13, 13,13,11,14].forEach((w, i) => {
       ws2.getColumn(i + 1).width = w;
     });
+    ws2.getColumn(35).width = 60; // deactivation reason column
 
     // ── Client Salary Section — appended below KCMS rows in same sheet ───────
     if (!isClientAdmin) {
