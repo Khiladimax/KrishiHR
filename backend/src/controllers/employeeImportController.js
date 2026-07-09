@@ -70,10 +70,14 @@ exports.importEmployees = async (req, res) => {
     console.log(`[Import] Row 0 (header):`, rows[0]?.slice(0,6));
     console.log(`[Import] Row 1 (first data):`, rows[1]?.slice(0,6));
 
-    // Skip header row only (row 1) = data starts at index 1 (row 2)
+    // A real employee row needs a code AND an email that looks like an email.
+    // This drops the template's banner, header row ("Employee Code" / "Email")
+    // and hint row ("Unique code e.g. KC001" / "Required, unique") so they can
+    // never be imported as fake employees, regardless of how many such rows exist.
     const dataRows = rows.slice(1).filter(r => {
-      const code = clean(r[COL.employee_code]);
-      return code && !code.toLowerCase().startsWith('emp code') && !code.toLowerCase().startsWith('kcms00');
+      const code  = clean(r[COL.employee_code]);
+      const email = clean(r[COL.email]);
+      return code && email && email.includes('@');
     });
     console.log(`[Import] Data rows found: ${dataRows.length}`);
 
