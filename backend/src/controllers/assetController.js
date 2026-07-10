@@ -96,6 +96,43 @@ exports.listAll = async (req, res) => {
   }
 };
 
+// ── GET /assets/matrix?scope=main|client — employees × items, count per cell ──
+exports.matrix = async (req, res) => {
+  try {
+    await ensureSchema();
+    if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
+    const scope = req.query.scope === 'client' ? 'client' : 'main';
+
+    const emps = await db.query(
+      `SELECT id, employee_code, CONCAT(first_name,' ',COALESCE(last_name,'')) AS emp_name
+         FROM employees
+        WHERE is_active = true AND (${scopeWhere(req.user, scope, 'client_id')})
+        ORDER BY employee_code`);
+
+    // Currently-allocated (not returned) quantities per employee per item.
+    const allocs = await db.query(
+      `SELECT a.employee_id, a.item_name, SUM(a.quantity)::int AS qty
+         FROM asset_allocations a
+         JOIN employees e ON e.id = a.employee_id
+        WHERE a.status = 'allocated' AND (${scopeWhere(req.user, scope, 'e.client_id')})
+        GROUP BY a.employee_id, a.item_name`);
+
+    // Columns: the catalogue first, then any custom item names that appear.
+    const extra = [...new Set(allocs.rows.map(r => r.item_name).filter(n => !DEFAULT_ITEMS.includes(n)))];
+    const items = [...DEFAULT_ITEMS, ...extra];
+
+    const byEmp = {};
+    allocs.rows.forEach(r => { (byEmp[r.employee_id] = byEmp[r.employee_id] || {})[r.item_name] = r.qty; });
+    const rows = emps.rows.map(e => ({
+      employee_code: e.employee_code, emp_name: e.emp_name, counts: byEmp[e.id] || {},
+    }));
+    res.json({ success: true, items, rows });
+  } catch (err) {
+    console.error('[assets/matrix]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── GET /assets/export?scope=main|client — colourful Excel ────────────────────
 exports.exportExcel = async (req, res) => {
   try {

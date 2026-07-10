@@ -1083,6 +1083,7 @@ router.get   ('/assets/items',     authenticate,                        assetCtr
 router.get   ('/assets/employees', authenticate, authorize(...EMP_MGMT), assetCtrl.getEmployees);
 router.get   ('/assets/my',        authenticate,                        assetCtrl.myAssets);
 router.get   ('/assets/all',       authenticate, authorize(...EMP_MGMT), assetCtrl.listAll);
+router.get   ('/assets/matrix',    authenticate, authorize(...EMP_MGMT), assetCtrl.matrix);
 router.get   ('/assets/export',    authenticate, authorize(...EMP_MGMT), assetCtrl.exportExcel);
 router.get   ('/assets',           authenticate,                        assetCtrl.list);
 router.post  ('/assets',           authenticate, authorize(...EMP_MGMT), assetCtrl.create);

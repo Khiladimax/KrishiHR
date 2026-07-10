@@ -38,6 +38,13 @@ table.aa-tbl td { padding:10px 12px;border-bottom:1px solid #f0f5e8;vertical-ali
 h2.aa-h { font-size:15px;font-weight:800;color:#3a4a28;margin:22px 0 8px; }
 .aa-tab { padding:8px 18px;border:1.5px solid #d7e6c4;background:#f7faf3;border-radius:8px;font-size:13px;font-weight:700;color:#5a7a42;cursor:pointer; }
 .aa-tab.active { background:#4a8c1c;color:#fff;border-color:#4a8c1c; }
+.mx-wrap { overflow-x:auto;border:1px solid #e3eed3;border-radius:10px; }
+table.mx { border-collapse:collapse;font-size:12.5px;min-width:100%; }
+table.mx th, table.mx td { padding:8px 10px;border:1px solid #eef4e5;text-align:center;white-space:nowrap; }
+table.mx thead th { background:#2e7d32;color:#fff;font-size:11px;font-weight:700;position:sticky;top:0; }
+table.mx th.sticky, table.mx td.sticky { position:sticky;left:0;background:#f2f7ea;text-align:left;font-weight:700;z-index:2; }
+table.mx td.cnt { font-weight:800;color:#1b5e20;background:#e8f5e9; }
+table.mx td.zero { color:#c9d6bb; }
 </style>
 </head>
 <body>
@@ -110,6 +117,7 @@ h2.aa-h { font-size:15px;font-weight:800;color:#3a4a28;margin:22px 0 8px; }
             <button class="btn btn-primary btn-sm" onclick="submitAlloc()" id="submit-btn">✅ Allocate <span id="stage-count">0</span> item(s)</button>
             <button class="btn btn-outline btn-sm" onclick="clearStage()">Clear</button>
           </div>
+          <div id="emp-detail" style="margin-top:16px"></div>
         </div>
 
         <!-- Allocations table -->
@@ -165,7 +173,7 @@ window.addEventListener('load', async () => {
   } else {
     currentEmployeeId = user.id;
     document.getElementById('tbl-title').textContent = 'My allocated assets';
-    loadFullList();
+    loadMyList();
   }
 });
 
@@ -177,9 +185,9 @@ function switchTab(scope) {
   currentScope = scope;
   renderTabs();
   clearEmp();
-  document.getElementById('tbl-title').textContent = 'All allocations — ' + (scope === 'client' ? 'Client Employees' : 'Main Employees');
+  document.getElementById('tbl-title').textContent = 'All employees — item counts (' + (scope === 'client' ? 'Client' : 'Main') + ')';
   loadEmployees();
-  loadFullList();
+  loadMatrix();
 }
 async function downloadExcel() {
   try {
@@ -232,6 +240,7 @@ function selectEmp(id, label) {
   document.getElementById('emp-badge').style.display = '';
   document.getElementById('alloc-form').style.display = 'block';
   clearStage();
+  loadEmpDetail();
 }
 function clearEmp() {
   currentEmployeeId = null; currentLabel = '';
@@ -273,46 +282,83 @@ async function submitAlloc() {
     await api('/assets', { method: 'POST', body: JSON.stringify({ employee_id: currentEmployeeId, items: stage }) });
     toast('Assets allocated ✅');
     clearStage();
-    loadFullList();
+    loadMatrix();
+    loadEmpDetail();
   } catch (e) { toast(e.message, 'error'); }
   btn.disabled = false;
 }
 
-// ── Full allocations list (numbered, with Emp ID + Name + date) ───────────────
-async function loadFullList() {
+// ── Matrix: all employees (rows) × items (columns), count per cell ────────────
+async function loadMatrix() {
   const box = document.getElementById('alloc-table');
   box.innerHTML = '<div class="muted">Loading…</div>';
   try {
-    const path = isManager ? ('/assets/all?scope=' + currentScope) : '/assets/my';
-    const r = await api(path);
+    const r = await api('/assets/matrix?scope=' + currentScope);
+    const items = r.items || [], rows = r.rows || [];
+    if (!rows.length) { box.innerHTML = '<div class="muted">No employees in this list.</div>'; return; }
+    box.innerHTML = `<div class="mx-wrap"><table class="mx"><thead><tr>
+      <th class="sticky">#</th><th class="sticky" style="left:44px">Emp ID</th><th class="sticky" style="left:132px">Employee</th>
+      ${items.map(it => `<th title="${esc(it)}">${esc(it)}</th>`).join('')}
+      </tr></thead><tbody>${rows.map((row, i) => `<tr>
+        <td class="sticky">${i + 1}</td>
+        <td class="sticky" style="left:44px"><b>${esc(row.employee_code)}</b></td>
+        <td class="sticky" style="left:132px;text-align:left">${esc(row.emp_name)}</td>
+        ${items.map(it => { const c = row.counts[it] || 0; return `<td class="${c ? 'cnt' : 'zero'}">${c || '·'}</td>`; }).join('')}
+      </tr>`).join('')}</tbody></table></div>
+      <div class="muted" style="margin-top:6px">Numbers = quantity currently allocated (returned items excluded). Select an employee above to add/return items.</div>`;
+  } catch (e) { box.innerHTML = `<div class="muted">Failed: ${esc(e.message)}</div>`; }
+}
+
+// ── Selected employee's item detail (with Return / Delete) ────────────────────
+async function loadEmpDetail() {
+  const box = document.getElementById('emp-detail');
+  if (!currentEmployeeId) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="muted">Loading…</div>';
+  try {
+    const r = await api('/assets?employee_id=' + currentEmployeeId);
     const rows = r.data || [];
-    if (!rows.length) { box.innerHTML = '<div class="muted">No assets allocated yet.</div>'; return; }
-    const act = isManager, showEmp = isManager;
-    box.innerHTML = `<table class="aa-tbl"><thead><tr>
-      <th>#</th>${showEmp ? '<th>Emp ID</th><th>Employee</th>' : ''}<th>Item</th><th>Qty</th><th>Serial</th><th>Remark</th><th>Status</th><th>Date of Allotment</th>${act ? '<th>Actions</th>' : ''}
-      </tr></thead><tbody>${rows.map((a, i) => `<tr>
-        <td>${i + 1}</td>
-        ${showEmp ? `<td><b>${esc(a.employee_code)}</b></td><td>${esc(a.emp_name)}</td>` : ''}
-        <td><b>${esc(a.item_name)}</b></td>
-        <td>${a.quantity}</td>
+    if (!rows.length) { box.innerHTML = '<div class="muted">No assets allocated to this employee yet.</div>'; return; }
+    box.innerHTML = `<h2 class="aa-h" style="margin:6px 0 6px">Items with ${esc(currentLabel)}</h2>
+      <table class="aa-tbl"><thead><tr><th>Item</th><th>Qty</th><th>Serial</th><th>Remark</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody>${rows.map(a => `<tr>
+        <td><b>${esc(a.item_name)}</b></td><td>${a.quantity}</td>
         <td>${a.serial_no ? esc(a.serial_no) : '<span class="muted">—</span>'}</td>
         <td>${a.remark ? esc(a.remark) : '<span class="muted">—</span>'}</td>
         <td><span class="pill ${a.status === 'returned' ? 'ret' : 'alloc'}">${a.status === 'returned' ? 'Returned' : 'Allocated'}</span></td>
         <td class="muted">${a.allocated_at ? new Date(a.allocated_at).toLocaleDateString('en-IN') : ''}</td>
-        ${act ? `<td style="white-space:nowrap">${a.status === 'returned'
+        <td style="white-space:nowrap">${a.status === 'returned'
             ? `<button class="btn btn-outline btn-sm" onclick="setStatus(${a.id},'allocated')">↩ Undo</button>`
             : `<button class="btn btn-outline btn-sm" onclick="setStatus(${a.id},'returned')">Returned</button>`}
-          <button class="btn btn-outline btn-sm" style="color:#c0392b" onclick="delAlloc(${a.id})">🗑</button></td>` : ''}
+          <button class="btn btn-outline btn-sm" style="color:#c0392b" onclick="delAlloc(${a.id})">🗑</button></td>
       </tr>`).join('')}</tbody></table>`;
   } catch (e) { box.innerHTML = `<div class="muted">Failed: ${esc(e.message)}</div>`; }
 }
+
+// ── Plain employee: their own assets (read-only list) ─────────────────────────
+async function loadMyList() {
+  const box = document.getElementById('alloc-table');
+  box.innerHTML = '<div class="muted">Loading…</div>';
+  try {
+    const r = await api('/assets/my');
+    const rows = r.data || [];
+    if (!rows.length) { box.innerHTML = '<div class="muted">No assets allocated to you yet.</div>'; return; }
+    box.innerHTML = `<table class="aa-tbl"><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Serial</th><th>Status</th><th>Date of Allotment</th></tr></thead>
+      <tbody>${rows.map((a, i) => `<tr>
+        <td>${i + 1}</td><td><b>${esc(a.item_name)}</b></td><td>${a.quantity}</td>
+        <td>${a.serial_no ? esc(a.serial_no) : '<span class="muted">—</span>'}</td>
+        <td><span class="pill ${a.status === 'returned' ? 'ret' : 'alloc'}">${a.status === 'returned' ? 'Returned' : 'Allocated'}</span></td>
+        <td class="muted">${a.allocated_at ? new Date(a.allocated_at).toLocaleDateString('en-IN') : ''}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (e) { box.innerHTML = `<div class="muted">Failed: ${esc(e.message)}</div>`; }
+}
+
 async function setStatus(id, status) {
-  try { await api('/assets/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); loadFullList(); }
+  try { await api('/assets/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); loadMatrix(); loadEmpDetail(); }
   catch (e) { toast(e.message, 'error'); }
 }
 async function delAlloc(id) {
   if (!confirm('Delete this asset record?')) return;
-  try { await api('/assets/' + id, { method: 'DELETE' }); toast('Deleted'); loadFullList(); }
+  try { await api('/assets/' + id, { method: 'DELETE' }); toast('Deleted'); loadMatrix(); loadEmpDetail(); }
   catch (e) { toast(e.message, 'error'); }
 }
 </script>
