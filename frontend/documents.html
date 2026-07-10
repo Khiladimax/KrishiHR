@@ -818,7 +818,12 @@ async function downloadZip() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url;
-    a.download = `employee_${currentEmployeeId}_documents.zip`;
+    // Name the ZIP by the employee (code + name) from the selected label,
+    // e.g. "KC1234 — Ramesh Kumar" -> "KC1234_Ramesh_Kumar_Documents.zip",
+    // instead of the internal id.
+    const lbl  = (document.getElementById('hr-selected-label')?.textContent || '').trim();
+    const safe = lbl ? lbl.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') : `employee_${currentEmployeeId}`;
+    a.download = `${safe}_Documents.zip`;
     a.click();
     URL.revokeObjectURL(url);
     toast('ZIP downloaded ✅');

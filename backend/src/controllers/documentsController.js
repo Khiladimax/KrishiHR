@@ -339,8 +339,9 @@ exports.downloadZip = async (req, res) => {
     const archiver = require('archiver');
     const archive  = archiver('zip', { zlib:{ level:6 } });
 
+    const empCode = (emp.employee_code || 'EMP').replace(/[^a-zA-Z0-9_-]/g, '_');
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${empName}_documents.zip"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${empCode}_${empName}_Documents.zip"`);
     archive.pipe(res);
 
     // Add uploaded files into Documents/ folder
