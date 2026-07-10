@@ -2117,7 +2117,7 @@ exports.exportMasterExcel = async (req, res) => {
     const dirTitle = ws3.getCell(1, 1);
     dirTitle.value = `KrishiHR — Employee Directory | Generated ${new Date().toLocaleDateString('en-IN')}`;
     dirTitle.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
-    dirTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4E342E' } };
+    dirTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF283593' } };
     dirTitle.alignment = { horizontal: 'center', vertical: 'middle' };
     ws3.getRow(1).height = 26;
 
@@ -2128,7 +2128,7 @@ exports.exportMasterExcel = async (req, res) => {
       const cell = ws3.getCell(2, i + 1);
       cell.value = h;
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6D4C41' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F51B5' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     });
     ws3.getRow(2).height = 22;
