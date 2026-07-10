@@ -42,9 +42,9 @@ h2.aa-h { font-size:16px;font-weight:800;color:#000;margin:22px 0 8px; }
 table.mx { border-collapse:collapse;font-size:12.5px;min-width:100%; }
 table.mx th, table.mx td { padding:8px 10px;border:1px solid #000;text-align:center;white-space:nowrap; }
 table.mx thead th { color:#fff;font-size:11px;font-weight:800;position:sticky;top:0; }
-table.mx thead th.sticky { background:#111 !important; }
-table.mx th.sticky, table.mx td.sticky { position:sticky;left:0;text-align:left;font-weight:700;z-index:2;color:#000; }
-table.mx td.sticky { background:#fdfbe9; }
+table.mx thead th.sticky { background:#111 !important; color:#fff !important; }
+table.mx th.sticky, table.mx td.sticky { position:sticky;left:0;text-align:left;font-weight:700;z-index:2; }
+table.mx td.sticky { color:#000;background:#fdfbe9; }
 table.mx tbody tr:nth-child(even) td.sticky { background:#f4f0d8; }
 table.mx td.cnt { font-weight:800;color:#0d3d10;background:#c8e6c9; }
 table.mx td.zero { color:#bbb;background:#fff; }
@@ -73,6 +73,7 @@ table.aa-tbl th { color:#000; }
   </div>
 </aside>
 
+<div class="main">
 <div class="topbar">
   <div class="topbar-left">
     <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
@@ -141,6 +142,8 @@ table.aa-tbl th { color:#000; }
 
     </div>
   </div>
+</div>
+
 </div>
 
 <script src="app.js"></script>
