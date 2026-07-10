@@ -1075,6 +1075,7 @@ router.post  ('/documents/upload-multi',   authenticate, (req, res, next) => {
   });
 }, docsCtrl.uploadMultiDocument);
 router.get   ('/documents/file/:id',       authenticate,                    docsCtrl.getFile);
+router.post  ('/documents/:id/submit',     authenticate,                    docsCtrl.submitDocument);
 router.delete('/documents/:id',            authenticate,                    docsCtrl.deleteDocument);
 
 // ── Asset Allocation module ───────────────────────────────────────────────────
