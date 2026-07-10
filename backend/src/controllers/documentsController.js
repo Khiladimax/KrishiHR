@@ -384,15 +384,26 @@ exports.getMatrix = async (req, res) => {
       });
     });
 
-    // verification status per employee
-    const ver = await db.query(
-      `SELECT v.employee_id, v.verified, v.verified_at,
-              TRIM(CONCAT(b.first_name,' ',COALESCE(b.last_name,''))) AS verified_by_name
-         FROM employee_doc_verification v
-         LEFT JOIN employees b ON b.id = v.verified_by
-        WHERE v.employee_id = ANY($1::int[])`, [ids]);
+    // verification status per employee (table may not exist yet on older DBs)
     const vmap = {};
-    ver.rows.forEach(v => { vmap[v.employee_id] = v; });
+    try {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS employee_doc_verification (
+          employee_id  INTEGER PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+          verified     BOOLEAN NOT NULL DEFAULT false,
+          verified_by  INTEGER REFERENCES employees(id),
+          verified_at  TIMESTAMP
+        )`);
+      const ver = await db.query(
+        `SELECT v.employee_id, v.verified, v.verified_at,
+                TRIM(CONCAT(b.first_name,' ',COALESCE(b.last_name,''))) AS verified_by_name
+           FROM employee_doc_verification v
+           LEFT JOIN employees b ON b.id = v.verified_by
+          WHERE v.employee_id = ANY($1::int[])`, [ids]);
+      ver.rows.forEach(v => { vmap[v.employee_id] = v; });
+    } catch (e) {
+      console.error('[getMatrix] verification lookup skipped:', e.message);
+    }
 
     const rows = emps.rows.map(e => ({
       id: e.id, employee_code: e.employee_code, emp_name: e.emp_name,
