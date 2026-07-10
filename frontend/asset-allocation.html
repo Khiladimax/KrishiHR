@@ -35,16 +35,23 @@ table.aa-tbl td { padding:10px 12px;border-bottom:1px solid #f0f5e8;vertical-ali
 .pill.alloc { background:#e8f5e9;color:#2e7d32; }
 .pill.ret { background:#fff3e0;color:#e65100; }
 .muted { color:#8aaa6a;font-size:12px; }
-h2.aa-h { font-size:15px;font-weight:800;color:#3a4a28;margin:22px 0 8px; }
-.aa-tab { padding:8px 18px;border:1.5px solid #d7e6c4;background:#f7faf3;border-radius:8px;font-size:13px;font-weight:700;color:#5a7a42;cursor:pointer; }
-.aa-tab.active { background:#4a8c1c;color:#fff;border-color:#4a8c1c; }
-.mx-wrap { overflow-x:auto;border:1px solid #e3eed3;border-radius:10px; }
+h2.aa-h { font-size:16px;font-weight:800;color:#000;margin:22px 0 8px; }
+.aa-tab { padding:8px 18px;border:1.5px solid #000;background:#f7faf3;border-radius:8px;font-size:13px;font-weight:700;color:#333;cursor:pointer; }
+.aa-tab.active { background:#4a8c1c;color:#fff;border-color:#000; }
+.mx-wrap { overflow-x:auto;border:2px solid #000;border-radius:6px; }
 table.mx { border-collapse:collapse;font-size:12.5px;min-width:100%; }
-table.mx th, table.mx td { padding:8px 10px;border:1px solid #eef4e5;text-align:center;white-space:nowrap; }
-table.mx thead th { background:#2e7d32;color:#fff;font-size:11px;font-weight:700;position:sticky;top:0; }
-table.mx th.sticky, table.mx td.sticky { position:sticky;left:0;background:#f2f7ea;text-align:left;font-weight:700;z-index:2; }
-table.mx td.cnt { font-weight:800;color:#1b5e20;background:#e8f5e9; }
-table.mx td.zero { color:#c9d6bb; }
+table.mx th, table.mx td { padding:8px 10px;border:1px solid #000;text-align:center;white-space:nowrap; }
+table.mx thead th { color:#fff;font-size:11px;font-weight:800;position:sticky;top:0; }
+table.mx thead th.sticky { background:#111 !important; }
+table.mx th.sticky, table.mx td.sticky { position:sticky;left:0;text-align:left;font-weight:700;z-index:2;color:#000; }
+table.mx td.sticky { background:#fdfbe9; }
+table.mx tbody tr:nth-child(even) td.sticky { background:#f4f0d8; }
+table.mx td.cnt { font-weight:800;color:#0d3d10;background:#c8e6c9; }
+table.mx td.zero { color:#bbb;background:#fff; }
+table.mx tbody tr:nth-child(even) td.zero { background:#f6f8f3; }
+/* black borders on the detail/list table too */
+table.aa-tbl th, table.aa-tbl td { border:1px solid #000; }
+table.aa-tbl th { color:#000; }
 </style>
 </head>
 <body>
@@ -80,6 +87,10 @@ table.mx td.zero { color:#c9d6bb; }
       <!-- Employee picker (managers only) -->
       <div class="aa-topbar" id="picker-bar" style="display:none">
         <div class="aa-tabs" id="aa-tabs" style="display:flex;gap:6px;margin-bottom:14px"></div>
+        <div id="client-filter-wrap" style="display:none;align-items:center;gap:10px;margin-bottom:12px">
+          <span class="aa-label">Client:</span>
+          <select id="client-filter" class="aa-input" style="width:auto;min-width:240px;padding-left:12px" onchange="onClientChange()"></select>
+        </div>
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
           <span class="aa-label">Allocate for:</span>
           <div class="aa-searchbar">
@@ -152,6 +163,30 @@ const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'
 
 let currentScope = 'main';
 let scopes = [];
+let currentClientId = '';
+function scopeQS() { return 'scope=' + currentScope + (currentClientId ? '&client_id=' + encodeURIComponent(currentClientId) : ''); }
+async function loadClients() {
+  try {
+    const r = await api('/assets/clients');
+    const clients = r.data || [];
+    const wrap = document.getElementById('client-filter-wrap');
+    const sel = document.getElementById('client-filter');
+    if (clients.length <= 1) {
+      wrap.style.display = 'none';
+      currentClientId = clients.length === 1 ? String(clients[0].id) : '';
+    } else {
+      sel.innerHTML = '<option value="">— All clients —</option>' + clients.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      sel.value = currentClientId;
+      wrap.style.display = 'flex';
+    }
+  } catch (e) { /* ignore */ }
+}
+function onClientChange() {
+  currentClientId = document.getElementById('client-filter').value;
+  clearEmp();
+  loadEmployees();
+  loadMatrix();
+}
 
 window.addEventListener('load', async () => {
   buildSidebar('asset-allocation.html');
@@ -183,15 +218,18 @@ function renderTabs() {
 }
 function switchTab(scope) {
   currentScope = scope;
+  currentClientId = '';
   renderTabs();
   clearEmp();
+  if (scope === 'client') loadClients();
+  else document.getElementById('client-filter-wrap').style.display = 'none';
   document.getElementById('tbl-title').textContent = 'All employees — item counts (' + (scope === 'client' ? 'Client' : 'Main') + ')';
   loadEmployees();
   loadMatrix();
 }
 async function downloadExcel() {
   try {
-    const res = await fetch(API_BASE + '/assets/export?scope=' + currentScope,
+    const res = await fetch(API_BASE + '/assets/export?' + scopeQS(),
       { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const blob = await res.blob();
@@ -216,7 +254,7 @@ function onItemChange() {
 
 // ── Employee picker ───────────────────────────────────────────────────────────
 async function loadEmployees() {
-  try { const r = await api('/assets/employees?scope=' + currentScope); allEmployees = r.data || []; } catch (e) { allEmployees = []; }
+  try { const r = await api('/assets/employees?' + scopeQS()); allEmployees = r.data || []; } catch (e) { allEmployees = []; }
 }
 function onSearch() {
   const q = document.getElementById('emp-search').value.trim().toLowerCase();
@@ -293,12 +331,13 @@ async function loadMatrix() {
   const box = document.getElementById('alloc-table');
   box.innerHTML = '<div class="muted">Loading…</div>';
   try {
-    const r = await api('/assets/matrix?scope=' + currentScope);
+    const r = await api('/assets/matrix?' + scopeQS());
     const items = r.items || [], rows = r.rows || [];
     if (!rows.length) { box.innerHTML = '<div class="muted">No employees in this list.</div>'; return; }
+    const PAL = ['#2E7D32','#1565C0','#6A1B9A','#EF6C00','#00838F','#AD1457','#4527A0','#558B2F','#C62828','#00695C','#5D4037','#283593'];
     box.innerHTML = `<div class="mx-wrap"><table class="mx"><thead><tr>
       <th class="sticky">#</th><th class="sticky" style="left:44px">Emp ID</th><th class="sticky" style="left:132px">Employee</th>
-      ${items.map(it => `<th title="${esc(it)}">${esc(it)}</th>`).join('')}
+      ${items.map((it, ix) => `<th title="${esc(it)}" style="background:${PAL[ix % PAL.length]}">${esc(it)}</th>`).join('')}
       </tr></thead><tbody>${rows.map((row, i) => `<tr>
         <td class="sticky">${i + 1}</td>
         <td class="sticky" style="left:44px"><b>${esc(row.employee_code)}</b></td>

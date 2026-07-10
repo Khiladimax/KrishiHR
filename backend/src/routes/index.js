@@ -1081,6 +1081,7 @@ router.delete('/documents/:id',            authenticate,                    docs
 const assetCtrl = require('../controllers/assetController');
 router.get   ('/assets/items',     authenticate,                        assetCtrl.getItems);
 router.get   ('/assets/employees', authenticate, authorize(...EMP_MGMT), assetCtrl.getEmployees);
+router.get   ('/assets/clients',   authenticate, authorize(...EMP_MGMT), assetCtrl.getClients);
 router.get   ('/assets/my',        authenticate,                        assetCtrl.myAssets);
 router.get   ('/assets/all',       authenticate, authorize(...EMP_MGMT), assetCtrl.listAll);
 router.get   ('/assets/matrix',    authenticate, authorize(...EMP_MGMT), assetCtrl.matrix);

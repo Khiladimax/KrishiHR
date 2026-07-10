@@ -38,11 +38,29 @@ const canManage = (u) => HR_ROLES.includes(u.role);
 const canAccess = (u, empId) => canManage(u) || parseInt(empId) === parseInt(u.id);
 
 // Tab scoping: "main" = own-company staff (client_id IS NULL); "client" =
-// deployed staff. A client_admin is always locked to their own client.
-function scopeWhere(reqUser, scope, col) {
+// deployed staff (optionally a single client via clientId). A client_admin is
+// always locked to their own client.
+function scopeWhere(reqUser, scope, col, clientId) {
   if (reqUser.role === 'client_admin') return reqUser.client_id ? `${col} = ${parseInt(reqUser.client_id)}` : '1=0';
-  return scope === 'client' ? `${col} IS NOT NULL` : `${col} IS NULL`;
+  if (scope === 'client') return clientId ? `${col} = ${parseInt(clientId)}` : `${col} IS NOT NULL`;
+  return `${col} IS NULL`;
 }
+
+// ── GET /assets/clients — clients for the dropdown (client tab) ────────────────
+exports.getClients = async (req, res) => {
+  try {
+    if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
+    if (req.user.role === 'client_admin') {
+      const r = await db.query('SELECT id, name FROM clients WHERE id = $1', [req.user.client_id]);
+      return res.json({ success: true, data: r.rows });
+    }
+    const r = await db.query('SELECT id, name FROM clients ORDER BY name');
+    res.json({ success: true, data: r.rows });
+  } catch (err) {
+    console.error('[assets/getClients]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 
 // A client_admin may only touch their own client's employees.
 async function inClientScope(reqUser, employeeId) {
@@ -62,7 +80,7 @@ exports.getEmployees = async (req, res) => {
   try {
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
     const scope = req.query.scope === 'client' ? 'client' : 'main';
-    const cond  = scopeWhere(req.user, scope, 'client_id');
+    const cond  = scopeWhere(req.user, scope, 'client_id', req.query.client_id);
     const r = await db.query(
       `SELECT id, employee_code, first_name, last_name
          FROM employees WHERE is_active = true AND (${cond}) ORDER BY first_name ASC`);
@@ -79,7 +97,7 @@ exports.listAll = async (req, res) => {
     await ensureSchema();
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
     const scope = req.query.scope === 'client' ? 'client' : 'main';
-    const cond  = scopeWhere(req.user, scope, 'e.client_id');
+    const cond  = scopeWhere(req.user, scope, 'e.client_id', req.query.client_id);
     const r = await db.query(
       `SELECT a.*, e.employee_code,
               CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) AS emp_name,
@@ -106,7 +124,7 @@ exports.matrix = async (req, res) => {
     const emps = await db.query(
       `SELECT id, employee_code, CONCAT(first_name,' ',COALESCE(last_name,'')) AS emp_name
          FROM employees
-        WHERE is_active = true AND (${scopeWhere(req.user, scope, 'client_id')})
+        WHERE is_active = true AND (${scopeWhere(req.user, scope, 'client_id', req.query.client_id)})
         ORDER BY employee_code`);
 
     // Currently-allocated (not returned) qty + serials per employee per item.
@@ -115,7 +133,7 @@ exports.matrix = async (req, res) => {
               STRING_AGG(NULLIF(a.serial_no,''), ', ') AS serials
          FROM asset_allocations a
          JOIN employees e ON e.id = a.employee_id
-        WHERE a.status = 'allocated' AND (${scopeWhere(req.user, scope, 'e.client_id')})
+        WHERE a.status = 'allocated' AND (${scopeWhere(req.user, scope, 'e.client_id', req.query.client_id)})
         GROUP BY a.employee_id, a.item_name`);
 
     // Columns: the catalogue first, then any custom item names that appear.
@@ -142,7 +160,7 @@ exports.exportExcel = async (req, res) => {
     await ensureSchema();
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
     const scope = req.query.scope === 'client' ? 'client' : 'main';
-    const cond  = scopeWhere(req.user, scope, 'e.client_id');
+    const cond  = scopeWhere(req.user, scope, 'e.client_id', req.query.client_id);
     const r = await db.query(
       `SELECT a.item_name, a.quantity, a.serial_no, a.remark, a.status, a.allocated_at,
               e.employee_code,
