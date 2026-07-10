@@ -14,8 +14,11 @@ exports.uploadMiddleware = multer({
   }
 }).single('file');
 
-// Column mapping from our Excel template (0-indexed)
-// Column A = Client Name (blank = own employee, filled = deployed to that client)
+// Column mapping — MUST match KrishiHR_Employee_Import.xlsx header row exactly
+// (0-indexed). Column A = Client Name (blank = own employee, filled = deployed).
+// NOTE: columns 19–21 (Probation End Date / Office Location / Shift) sit BEFORE
+// the salary block in the template; an earlier map omitted them, which shifted
+// every field from index 19 onward by 3 (City←Bank IFSC, Bank←PAN, etc.).
 const COL = {
   client_name: 0,
   employee_code: 1, password: 2, first_name: 3, last_name: 4,
@@ -23,11 +26,11 @@ const COL = {
   blood_group: 10, marital_status: 11, joining_date: 12, employment_type: 13,
   role: 14, department_id: 15, designation_id: 16,
   reporting_manager_id: 17, team_leader_id: 18,
-  basic_salary: 19, hra: 20, special_allowance: 21, travel_allowance: 22,
-  ctc: 23, pan_number: 24, aadhar_number: 25, uan_number: 26,
-  bank_name: 27, bank_account: 28, bank_ifsc: 29, bank_branch: 30,
-  address_line1: 31, city: 32, state: 33, pincode: 34,
-  probation_end_date: 35, notes: 36
+  probation_end_date: 19, office_location: 20, shift: 21,
+  basic_salary: 22, hra: 23, special_allowance: 24, travel_allowance: 25,
+  ctc: 26, pan_number: 27, aadhar_number: 28, uan_number: 29,
+  bank_name: 30, bank_account: 31, bank_ifsc: 32, bank_branch: 33,
+  address_line1: 34, city: 35, state: 36, pincode: 37,
 };
 
 const { findOrCreateClient } = require('./clientController');
