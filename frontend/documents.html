@@ -83,6 +83,42 @@ textarea.fc { resize:vertical;min-height:80px; }
 .modal-box{background:#fff;border-radius:16px;width:min(640px,95vw);max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
 .modal-box h3{font-size:17px;font-weight:700;margin-bottom:16px;color:#1b4332}
 .modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:#888;margin-top:-4px}
+
+/* ── Scope tabs (Main / Client) ── */
+.scope-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.scope-tab{padding:9px 20px;border:1.5px solid #b8d49a;background:#f7faf3;border-radius:8px;font-weight:700;font-size:13px;color:#5a7a42;cursor:pointer;transition:all .15s}
+.scope-tab:hover{background:#eaf3d8}
+.scope-tab.active{background:#111;color:#fff;border-color:#111}
+
+/* ── Documents matrix (employees × doc types) ── */
+.dmatrix-wrap{overflow-x:auto;overflow-y:visible;border:2px solid #111;border-radius:10px;background:#fff}
+.dmatrix{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:12px}
+.dmatrix th,.dmatrix td{border-right:1px solid #111;border-bottom:1px solid #111;padding:6px 8px;text-align:center;vertical-align:middle}
+.dmatrix thead th{color:#fff;font-weight:700;font-size:10.5px;line-height:1.25;position:sticky;top:0;z-index:2;white-space:normal;min-width:74px;max-width:96px}
+.dmatrix tbody td{background:#fff}
+.dmatrix tbody tr:nth-child(even) td{background:#f7faf3}
+/* sticky left columns */
+.dmatrix .c0{min-width:42px;width:42px;left:0}
+.dmatrix .c1{min-width:92px;width:92px;left:42px}
+.dmatrix .c2{min-width:170px;width:170px;left:134px;text-align:left;font-weight:700}
+.dmatrix .stickcol{position:sticky;z-index:1}
+.dmatrix thead .stickcol{z-index:5;background:#111}
+.dmatrix tbody .stickcol{background:#fff}
+.dmatrix tbody tr:nth-child(even) .stickcol{background:#f1f6e8}
+.dmatrix .zipcol{position:sticky;right:0;min-width:96px;background:#111;z-index:5}
+.dmatrix tbody .zipcol{background:#fff;z-index:1}
+.dmatrix tbody tr:nth-child(even) .zipcol{background:#f7faf3}
+.dcellwrap{display:inline-flex;align-items:center;justify-content:center;gap:3px;position:relative}
+.dthumb{width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid #cbd5e1;cursor:pointer;background:#eef2f7;display:inline-block}
+.dthumb:hover{border-color:#111}
+.dfile{cursor:pointer;font-size:19px;line-height:1}
+.dcount{font-size:10px;font-weight:700;color:#3a7015;background:#eaf3d8;border:1px solid #b8d49a;border-radius:8px;padding:1px 5px}
+.dmiss{color:#d1d5db;font-size:14px}
+.dlock{position:absolute;top:-5px;right:-6px;font-size:10px}
+.zipbtn{display:inline-flex;align-items:center;gap:4px;background:#1b5e20;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.zipbtn:hover{background:#154a19}
+.mgbtn{display:inline-flex;align-items:center;background:#eef2f7;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;margin-top:4px}
+.mgbtn:hover{background:#e2e8f0}
 </style>
 </head>
 <body>
@@ -137,7 +173,7 @@ textarea.fc { resize:vertical;min-height:80px; }
             <div id="hr-selected-badge" style="display:none">
               <span class="hr-selected-badge">
                 👤 <span id="hr-selected-label"></span>
-                <span class="badge-clear" onclick="clearEmployeeSelection()" title="Clear">×</span>
+                <span class="badge-clear" onclick="backToOverview()" title="Clear">×</span>
               </span>
             </div>
             <div id="zip-btn-wrap" style="display:none">
@@ -156,9 +192,25 @@ textarea.fc { resize:vertical;min-height:80px; }
 
       <!-- ═══════ TAB 1: Documents ═══════ -->
       <div id="tab-documents" class="doc-tab-body">
-        <div id="table-wrap"><div class="loader"><div class="spinner"></div></div></div>
-        <div style="margin-top:18px;display:flex;justify-content:flex-end">
-          <button class="btn btn-primary" id="save-btn" onclick="saveAll()">💾 Save Documents</button>
+
+        <!-- HR overview matrix (employees × document types) -->
+        <div id="doc-matrix-section" style="display:none">
+          <div class="scope-tabs" id="doc-scope-tabs">
+            <button class="scope-tab active" id="scope-main"   onclick="switchDocScope('main')">🏢 Main (KCMS)</button>
+            <button class="scope-tab"        id="scope-client" onclick="switchDocScope('client')">🤝 Client</button>
+          </div>
+          <div id="doc-matrix-wrap"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+
+        <!-- Single-employee checklist (upload) -->
+        <div id="doc-single-section">
+          <div id="single-back" style="display:none;margin-bottom:14px">
+            <button class="btn btn-outline btn-sm" onclick="backToOverview()">← Back to overview</button>
+          </div>
+          <div id="table-wrap"><div class="loader"><div class="spinner"></div></div></div>
+          <div style="margin-top:18px;display:flex;justify-content:flex-end">
+            <button class="btn btn-primary" id="save-btn" onclick="saveAll()">💾 Save Documents</button>
+          </div>
         </div>
       </div>
 
@@ -261,6 +313,10 @@ let checklistData = [];
 let pendingFiles   = {};
 let allEmployees   = [];
 let currentTab     = 'documents';
+let currentScope   = 'main';   // matrix scope: 'main' | 'client'
+
+// Colour palette for the document-type column headers (cycled)
+const COLP = ['#2E7D32','#1565C0','#6A1B9A','#EF6C00','#00838F','#AD1457','#4527A0','#558B2F','#C62828','#00695C','#5D4037','#283593'];
 
 /* ── Populate year dropdown ── */
 (function(){
@@ -281,16 +337,45 @@ window.addEventListener('load', async () => {
   if (isHR) {
     document.getElementById('hr-search-section').style.display = 'block';
     loadAllEmployees();
-  }
-
-  if (currentEmployeeId) {
+    // client_admin only ever sees their own client's staff → no Main/Client tabs
+    if (user.role === 'client_admin') {
+      currentScope = 'client';
+      document.getElementById('doc-scope-tabs').style.display = 'none';
+    }
+    // Show the overview matrix; the emp/qual tabs wait for a selection.
+    showMatrixMode();
+    loadMatrix();
+    document.getElementById('emp-records').innerHTML  = pickerHint();
+    document.getElementById('qual-records').innerHTML = pickerHint();
+  } else {
     loadDocuments();
     loadEmploymentRecords();
     loadQualificationRecords();
-  } else {
-    showEmptyPicker();
   }
 });
+
+function pickerHint() {
+  return `<div class="empty-state" style="padding:60px 24px">
+    <div class="empty-icon">🔍</div>
+    <p style="color:var(--muted);font-size:14px">Search and select an employee above to view their records.</p>
+  </div>`;
+}
+
+// ── Overview (matrix) vs single-employee view toggling ────────────────────────
+function showMatrixMode() {
+  document.getElementById('doc-matrix-section').style.display = 'block';
+  document.getElementById('doc-single-section').style.display = 'none';
+}
+function showSingleMode() {
+  document.getElementById('doc-matrix-section').style.display = 'none';
+  document.getElementById('doc-single-section').style.display = 'block';
+  document.getElementById('single-back').style.display = isHR ? 'block' : 'none';
+}
+function backToOverview() {
+  clearEmployeeSelection();
+  showMatrixMode();
+  loadMatrix();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB SWITCHING
@@ -304,9 +389,99 @@ function switchDocTab(name) {
 }
 
 function refreshCurrentTab() {
-  if (currentTab === 'documents')  loadDocuments();
+  if (currentTab === 'documents') {
+    if (isHR && !currentEmployeeId) loadMatrix();
+    else loadDocuments();
+  }
   if (currentTab === 'employment') loadEmploymentRecords();
   if (currentTab === 'quals')      loadQualificationRecords();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OVERVIEW MATRIX  (employees × document types, Main / Client scope)
+// ══════════════════════════════════════════════════════════════════════════════
+function switchDocScope(scope) {
+  currentScope = scope;
+  document.getElementById('scope-main').classList.toggle('active',   scope === 'main');
+  document.getElementById('scope-client').classList.toggle('active', scope === 'client');
+  loadMatrix();
+}
+
+async function loadMatrix() {
+  const wrap = document.getElementById('doc-matrix-wrap');
+  wrap.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  const res = await api('GET', `/documents/matrix?scope=${currentScope}`);
+  if (!res?.success) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${res?.message || 'Failed to load'}</p></div>`;
+    return;
+  }
+  renderMatrix(res.cols || [], res.rows || []);
+}
+
+function renderMatrix(cols, rows) {
+  const wrap = document.getElementById('doc-matrix-wrap');
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty-state" style="padding:50px 24px">
+      <div class="empty-icon">📭</div>
+      <p style="color:var(--muted)">No ${currentScope === 'client' ? 'client' : 'main'} employees found.</p></div>`;
+    return;
+  }
+
+  const head = `<tr>
+    <th class="stickcol c0" style="background:#111">#</th>
+    <th class="stickcol c1" style="background:#111">Emp ID</th>
+    <th class="stickcol c2" style="background:#111">Employee</th>
+    ${cols.map((c, i) => `<th style="background:${COLP[i % COLP.length]}">${c.label}${c.mandatory ? ' <span style="color:#ffd54f">*</span>' : ''}</th>`).join('')}
+    <th class="zipcol" style="background:#111">ZIP</th>
+  </tr>`;
+
+  const body = rows.map((r, idx) => {
+    const label = `${escAttr(r.employee_code)} — ${escAttr(r.emp_name)}`;
+    return `<tr>
+      <td class="stickcol c0">${idx + 1}</td>
+      <td class="stickcol c1" style="font-weight:600;color:#1b5e20">${r.employee_code || ''}</td>
+      <td class="stickcol c2">${r.emp_name || ''}
+        <div><button class="mgbtn" onclick="selectEmployee(${r.id},'${label}')">⚙ Manage</button></div></td>
+      ${cols.map(c => `<td>${matrixCell(r, c.key)}</td>`).join('')}
+      <td class="zipcol"><button class="zipbtn" onclick="downloadZipFor(${r.id},'${label}',this)">⬇ ZIP</button></td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<div class="dmatrix-wrap"><table class="dmatrix"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  hydrateThumbs();
+}
+
+function matrixCell(row, key) {
+  const files = (row.docs && row.docs[key]) || [];
+  if (!files.length) return `<span class="dmiss">—</span>`;
+  const f0    = files[0];
+  const isImg = (f0.mime || '').startsWith('image/');
+  const lock  = files.some(f => f.submitted) ? `<span class="dlock" title="Submitted">🔒</span>` : '';
+  const more  = files.length > 1 ? `<span class="dcount">+${files.length - 1}</span>` : '';
+  const view  = `viewAttachment(${f0.id},'${escAttr(f0.name)}','${escAttr(f0.mime)}')`;
+  const inner = isImg
+    ? `<img class="dthumb" data-docid="${f0.id}" alt="" title="${escAttr(f0.name)}" onclick="${view}">`
+    : `<span class="dfile" title="${escAttr(f0.name)}" onclick="${view}">📄</span>`;
+  return `<span class="dcellwrap">${inner}${lock}${more}</span>`;
+}
+
+// Lazy-load image thumbnails (authenticated fetch → blob URL) as they scroll in.
+function hydrateThumbs() {
+  const imgs = document.querySelectorAll('#doc-matrix-wrap img.dthumb');
+  if (!imgs.length) return;
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach(en => { if (en.isIntersecting) { obs.unobserve(en.target); loadThumb(en.target); } });
+  }, { rootMargin: '250px' });
+  imgs.forEach(i => io.observe(i));
+}
+
+async function loadThumb(img) {
+  const id = img.getAttribute('data-docid');
+  try {
+    const res = await fetch(`${API_BASE}/documents/file/${id}`, { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
+    if (!res.ok) return;
+    img.src = URL.createObjectURL(await res.blob());
+  } catch (_) {}
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -362,6 +537,7 @@ function selectEmployee(id, label) {
   pendingFiles = {};
   resetEmpForm();
   resetQualForm();
+  showSingleMode();
   loadDocuments();
   loadEmploymentRecords();
   loadQualificationRecords();
@@ -806,31 +982,32 @@ async function deleteQualification(id) {
 }
 
 // ── ZIP Download ──────────────────────────────────────────────────────────────
-async function downloadZip() {
+// Top-bar button (single-employee view) — uses the selected employee.
+function downloadZip() {
   if (!currentEmployeeId) { toast('No employee selected', 'error'); return; }
-  const btn = document.querySelector('[onclick="downloadZip()"]');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparing…'; }
+  const lbl = (document.getElementById('hr-selected-label')?.textContent || '').trim();
+  downloadZipFor(currentEmployeeId, lbl || `employee_${currentEmployeeId}`,
+    document.querySelector('[onclick="downloadZip()"]'));
+}
+
+// Reusable — used by both the top bar and each matrix row.
+async function downloadZipFor(empId, label, btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳'; }
   try {
-    const res = await fetch(`${API_BASE}/documents/download-zip/${currentEmployeeId}`,
+    const res = await fetch(`${API_BASE}/documents/download-zip/${empId}`,
       { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(await res.blob());
+    const safe = (label || `employee_${empId}`).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
     const a    = document.createElement('a');
-    a.href = url;
-    // Name the ZIP by the employee (code + name) from the selected label,
-    // e.g. "KC1234 — Ramesh Kumar" -> "KC1234_Ramesh_Kumar_Documents.zip",
-    // instead of the internal id.
-    const lbl  = (document.getElementById('hr-selected-label')?.textContent || '').trim();
-    const safe = lbl ? lbl.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') : `employee_${currentEmployeeId}`;
-    a.download = `${safe}_Documents.zip`;
-    a.click();
+    a.href = url; a.download = `${safe}_Documents.zip`; a.click();
     URL.revokeObjectURL(url);
     toast('ZIP downloaded ✅');
   } catch(err) {
     toast('Download failed: ' + err.message, 'error');
   }
-  if (btn) { btn.disabled = false; btn.textContent = '⬇️ Download ZIP'; }
+  if (btn) { btn.disabled = false; btn.innerHTML = orig; }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

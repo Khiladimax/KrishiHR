@@ -326,6 +326,65 @@ exports.getEmployeesForPicker = async (req, res) => {
   }
 };
 
+// ── Tab scoping (same rule as Asset Allocation) ───────────────────────────────
+// "main" = own-company staff (client_id IS NULL); "client" = deployed staff
+// (client_id IS NOT NULL). A client_admin is always locked to their own client.
+function docScopeWhere(reqUser, scope) {
+  if (reqUser.role === 'client_admin')
+    return reqUser.client_id ? `client_id = ${parseInt(reqUser.client_id)}` : '1=0';
+  return scope === 'client' ? 'client_id IS NOT NULL' : 'client_id IS NULL';
+}
+
+// ── GET /documents/matrix?scope=main|client ───────────────────────────────────
+// Grid of employees × document types. Each cell lists the uploaded file(s)
+// (id + name + mime) so the UI can show a thumbnail/chip; last column = ZIP.
+exports.getMatrix = async (req, res) => {
+  try {
+    if (!HR_ROLES.includes(req.user.role) && !['admin','super_admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const scope = req.query.scope === 'client' ? 'client' : 'main';
+    const cond  = docScopeWhere(req.user, scope);
+
+    const emps = await db.query(
+      `SELECT id, employee_code,
+              TRIM(CONCAT(first_name,' ',COALESCE(last_name,''))) AS emp_name
+         FROM employees
+        WHERE is_active = true AND (${cond})
+        ORDER BY employee_code`);
+
+    if (!emps.rows.length) {
+      return res.json({ success: true, cols: DOCUMENT_DEFS, rows: [] });
+    }
+
+    const ids  = emps.rows.map(e => e.id);
+    const docs = await db.query(
+      `SELECT id, employee_id, doc_key, original_name, mime_type, is_submitted
+         FROM employee_doc_checklist
+        WHERE employee_id = ANY($1::int[])
+        ORDER BY doc_key, uploaded_at DESC`, [ids]);
+
+    // group: employee_id -> doc_key -> [files]
+    const byEmp = {};
+    docs.rows.forEach(d => {
+      const e = (byEmp[d.employee_id] = byEmp[d.employee_id] || {});
+      (e[d.doc_key] = e[d.doc_key] || []).push({
+        id: d.id, name: d.original_name, mime: d.mime_type, submitted: d.is_submitted,
+      });
+    });
+
+    const rows = emps.rows.map(e => ({
+      id: e.id, employee_code: e.employee_code, emp_name: e.emp_name,
+      docs: byEmp[e.id] || {},
+    }));
+
+    res.json({ success: true, cols: DOCUMENT_DEFS, rows });
+  } catch (err) {
+    console.error('[getMatrix]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── GET /documents/download-zip/:employee_id — zip of all docs + excel sheets ─
 exports.downloadZip = async (req, res) => {
   try {
