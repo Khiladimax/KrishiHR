@@ -18,6 +18,9 @@ const DOCUMENT_TYPES = [
 
 async function ensureTables() {
   await db.query(`ALTER TABLE employee_documents ALTER COLUMN file_path TYPE TEXT`).catch(()=>{});
+  // Submit-lock: once an employee submits a document they can no longer delete
+  // it — only HR/Admin/Accounts can. Deleting frees the slot to re-upload.
+  await db.query(`ALTER TABLE employee_documents ADD COLUMN IF NOT EXISTS is_submitted BOOLEAN DEFAULT false`).catch(()=>{});
   await db.query(`CREATE TABLE IF NOT EXISTS employee_documents (
     id SERIAL PRIMARY KEY,
     employee_id INT REFERENCES employees(id) ON DELETE CASCADE,
@@ -52,6 +55,7 @@ exports.getDocumentTypes = (req, res) => res.json({ success: true, data: DOCUMEN
 
 exports.getDocuments = async (req, res) => {
   try {
+    await ensureTables();
     const empId = req.params.employee_id || req.user.id;
     if (parseInt(empId) !== req.user.id && !['hr','admin','super_admin','accounts','client_admin'].includes(req.user.role))
       return res.status(403).json({ success: false, message: 'Access denied' });
@@ -111,12 +115,33 @@ exports.getFile = async (req, res) => {
 
 exports.deleteDocument = async (req, res) => {
   try {
+    await ensureTables();
     const doc = await db.query(`SELECT * FROM employee_documents WHERE id=$1`, [req.params.id]);
     if (!doc.rows[0]) return res.status(404).json({ success: false, message: 'Not found' });
     const d = doc.rows[0];
-    if (parseInt(d.employee_id) !== parseInt(req.user.id) && !['hr','admin','super_admin'].includes(req.user.role))
+    const isOwner = parseInt(d.employee_id) === parseInt(req.user.id);
+    const isAdmin = ['hr', 'admin', 'super_admin', 'accounts'].includes(req.user.role);
+    if (!isOwner && !isAdmin)
       return res.status(403).json({ success: false, message: 'Access denied' });
+    // Once submitted, the employee can no longer delete — only HR/Admin/Accounts.
+    if (d.is_submitted && !isAdmin)
+      return res.status(403).json({ success: false, message: 'Document already submitted — ask HR/Admin to remove it before re-uploading.' });
     await db.query(`DELETE FROM employee_documents WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// ── POST /emp-documents/:id/submit — lock a document (owner or HR) ─────────────
+exports.submitDocument = async (req, res) => {
+  try {
+    await ensureTables();
+    const doc = await db.query(`SELECT * FROM employee_documents WHERE id=$1`, [req.params.id]);
+    if (!doc.rows[0]) return res.status(404).json({ success: false, message: 'Not found' });
+    const d = doc.rows[0];
+    const isOwner = parseInt(d.employee_id) === parseInt(req.user.id);
+    if (!isOwner && !['hr', 'admin', 'super_admin', 'accounts'].includes(req.user.role))
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    await db.query(`UPDATE employee_documents SET is_submitted=true WHERE id=$1`, [req.params.id]);
     res.json({ success: true });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 };
