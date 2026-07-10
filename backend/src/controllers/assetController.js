@@ -37,6 +37,13 @@ async function ensureSchema() {
 const canManage = (u) => HR_ROLES.includes(u.role);
 const canAccess = (u, empId) => canManage(u) || parseInt(empId) === parseInt(u.id);
 
+// Tab scoping: "main" = own-company staff (client_id IS NULL); "client" =
+// deployed staff. A client_admin is always locked to their own client.
+function scopeWhere(reqUser, scope, col) {
+  if (reqUser.role === 'client_admin') return reqUser.client_id ? `${col} = ${parseInt(reqUser.client_id)}` : '1=0';
+  return scope === 'client' ? `${col} IS NOT NULL` : `${col} IS NULL`;
+}
+
 // A client_admin may only touch their own client's employees.
 async function inClientScope(reqUser, employeeId) {
   if (reqUser.role !== 'client_admin') return true;
@@ -54,14 +61,119 @@ exports.getItems = async (_req, res) => {
 exports.getEmployees = async (req, res) => {
   try {
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
-    const clientFilter = (req.user.role === 'client_admin' && req.user.client_id)
-      ? `AND client_id = ${parseInt(req.user.client_id)}` : '';
+    const scope = req.query.scope === 'client' ? 'client' : 'main';
+    const cond  = scopeWhere(req.user, scope, 'client_id');
     const r = await db.query(
       `SELECT id, employee_code, first_name, last_name
-         FROM employees WHERE is_active = true ${clientFilter} ORDER BY first_name ASC`);
+         FROM employees WHERE is_active = true AND (${cond}) ORDER BY first_name ASC`);
     res.json({ success: true, data: r.rows });
   } catch (err) {
     console.error('[assets/getEmployees]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── GET /assets/all?scope=main|client — every allocation in the scope ─────────
+exports.listAll = async (req, res) => {
+  try {
+    await ensureSchema();
+    if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
+    const scope = req.query.scope === 'client' ? 'client' : 'main';
+    const cond  = scopeWhere(req.user, scope, 'e.client_id');
+    const r = await db.query(
+      `SELECT a.*, e.employee_code,
+              CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) AS emp_name,
+              CONCAT(b.first_name,' ',b.last_name) AS allocated_by_name
+         FROM asset_allocations a
+         JOIN employees e ON e.id = a.employee_id
+         LEFT JOIN employees b ON b.id = a.allocated_by
+        WHERE ${cond}
+        ORDER BY e.employee_code, a.allocated_at DESC`);
+    res.json({ success: true, data: r.rows });
+  } catch (err) {
+    console.error('[assets/listAll]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── GET /assets/export?scope=main|client — colourful Excel ────────────────────
+exports.exportExcel = async (req, res) => {
+  try {
+    await ensureSchema();
+    if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
+    const scope = req.query.scope === 'client' ? 'client' : 'main';
+    const cond  = scopeWhere(req.user, scope, 'e.client_id');
+    const r = await db.query(
+      `SELECT a.item_name, a.quantity, a.serial_no, a.remark, a.status, a.allocated_at,
+              e.employee_code,
+              CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) AS emp_name
+         FROM asset_allocations a
+         JOIN employees e ON e.id = a.employee_id
+        WHERE ${cond}
+        ORDER BY e.employee_code, a.allocated_at DESC`);
+
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'KrishiHR';
+    const ws = wb.addWorksheet('Asset Allocation');
+    const HEADERS = ['S.No', 'Employee ID', 'Employee Name', 'Item', 'Qty', 'Serial / Asset Tag', 'Remark', 'Status', 'Date of Allotment'];
+    const scopeLabel = scope === 'client' ? 'Client Employees' : 'Main (KCMS) Employees';
+
+    // Title
+    ws.mergeCells(1, 1, 1, HEADERS.length);
+    const t = ws.getCell(1, 1);
+    t.value = `KrishiHR — Asset Allocation | ${scopeLabel}`;
+    t.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    t.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(1).height = 26;
+
+    // Header row
+    HEADERS.forEach((h, i) => {
+      const c = ws.getCell(2, i + 1);
+      c.value = h;
+      c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      c.border = { bottom: { style: 'thin', color: { argb: 'FFBBBBBB' } } };
+    });
+    ws.getRow(2).height = 20;
+    [6, 14, 26, 30, 6, 20, 26, 12, 18].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    ws.views = [{ state: 'frozen', ySplit: 2 }];
+
+    r.rows.forEach((row, idx) => {
+      const rn = idx + 3;
+      const alt = idx % 2 === 1;
+      const bg = alt ? 'FFF1F8E9' : 'FFFFFFFF';
+      const vals = [
+        idx + 1, row.employee_code, row.emp_name, row.item_name, row.quantity,
+        row.serial_no || '', row.remark || '',
+        row.status === 'returned' ? 'Returned' : 'Allocated',
+        row.allocated_at ? new Date(row.allocated_at).toLocaleDateString('en-IN') : '',
+      ];
+      vals.forEach((v, i) => {
+        const c = ws.getCell(rn, i + 1);
+        c.value = v;
+        c.font = { size: 10 };
+        c.alignment = { vertical: 'middle', horizontal: (i === 0 || i === 4) ? 'center' : 'left' };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        c.border = { bottom: { style: 'hair', color: { argb: 'FFDDDDDD' } } };
+      });
+      // Colour the Status cell
+      const sc = ws.getCell(rn, 8);
+      const returned = row.status === 'returned';
+      sc.font = { size: 10, bold: true, color: { argb: returned ? 'FFE65100' : 'FF2E7D32' } };
+      sc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: returned ? 'FFFFF3E0' : 'FFE8F5E9' } };
+      sc.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    const buf = await wb.xlsx.writeBuffer();
+    const fname = `Asset_Allocation_${scope === 'client' ? 'Client' : 'Main'}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(Buffer.from(buf));
+  } catch (err) {
+    console.error('[assets/exportExcel]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
