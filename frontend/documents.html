@@ -105,9 +105,17 @@ textarea.fc { resize:vertical;min-height:80px; }
 .dmatrix thead .stickcol{z-index:5;background:#111}
 .dmatrix tbody .stickcol{background:#fff}
 .dmatrix tbody tr:nth-child(even) .stickcol{background:#f1f6e8}
-.dmatrix .zipcol{position:sticky;right:0;min-width:96px;background:#111;z-index:5}
+.dmatrix .zipcol{position:sticky;right:0;min-width:84px;width:84px;background:#111;z-index:5}
 .dmatrix tbody .zipcol{background:#fff;z-index:1}
 .dmatrix tbody tr:nth-child(even) .zipcol{background:#f7faf3}
+.dmatrix .vercol{position:sticky;right:84px;min-width:118px;width:118px;background:#111;z-index:5}
+.dmatrix tbody .vercol{background:#fff;z-index:1}
+.dmatrix tbody tr:nth-child(even) .vercol{background:#f7faf3}
+.vbadge{display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;white-space:nowrap}
+.verifybtn{background:#0f766e;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11.5px;font-weight:700;cursor:pointer}
+.verifybtn:hover{background:#0b5b54}
+.reopenbtn{background:none;border:none;color:#94a3b8;font-size:10px;cursor:pointer;text-decoration:underline;margin-top:3px}
+.reopenbtn:hover{color:#475569}
 .dcellwrap{display:inline-flex;align-items:center;justify-content:center;gap:3px;position:relative}
 .dthumb{width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid #cbd5e1;cursor:pointer;background:#eef2f7;display:inline-block}
 .dthumb:hover{border-color:#111}
@@ -432,6 +440,7 @@ function renderMatrix(cols, rows) {
     <th class="stickcol c1" style="background:#111">Emp ID</th>
     <th class="stickcol c2" style="background:#111">Employee</th>
     ${cols.map((c, i) => `<th style="background:${COLP[i % COLP.length]}">${c.label}${c.mandatory ? ' <span style="color:#ffd54f">*</span>' : ''}</th>`).join('')}
+    <th class="vercol" style="background:#0f766e">Verified</th>
     <th class="zipcol" style="background:#111">ZIP</th>
   </tr>`;
 
@@ -443,6 +452,7 @@ function renderMatrix(cols, rows) {
       <td class="stickcol c2">${r.emp_name || ''}
         <div><button class="mgbtn" onclick="selectEmployee(${r.id},'${label}')">⚙ Manage</button></div></td>
       ${cols.map(c => `<td>${matrixCell(r, c.key)}</td>`).join('')}
+      <td class="vercol">${verifyCell(r)}</td>
       <td class="zipcol"><button class="zipbtn" onclick="downloadZipFor(${r.id},'${label}',this)">⬇ ZIP</button></td>
     </tr>`;
   }).join('');
@@ -463,6 +473,29 @@ function matrixCell(row, key) {
     ? `<img class="dthumb" data-docid="${f0.id}" alt="" title="${escAttr(f0.name)}" onclick="${view}">`
     : `<span class="dfile" title="${escAttr(f0.name)}" onclick="${view}">📄</span>`;
   return `<span class="dcellwrap">${inner}${lock}${more}</span>`;
+}
+
+function verifyCell(r) {
+  if (r.verified) {
+    const meta = [r.verified_by, r.verified_at ? fmt.date(r.verified_at) : '']
+      .filter(Boolean).join(' • ');
+    return `<span class="vbadge" title="${escAttr(meta ? 'Verified by ' + meta : 'Verified')}">✔ Verified</span>
+      <div><button class="reopenbtn" onclick="toggleVerify(${r.id},false,this)">reopen</button></div>`;
+  }
+  return `<button class="verifybtn" onclick="toggleVerify(${r.id},true,this)">Verify</button>`;
+}
+
+async function toggleVerify(empId, makeVerified, btn) {
+  if (makeVerified && !confirm('Mark all documents for this employee as VERIFIED?')) return;
+  btn.disabled = true;
+  const res = await api('POST', '/documents/verify', { employee_id: empId, verified: makeVerified });
+  if (!res?.success) { toast(res?.message || 'Failed', 'error'); btn.disabled = false; return; }
+  toast(makeVerified ? 'Marked verified ✅' : 'Re-opened for review');
+  const td = btn.closest('td');
+  if (td) td.innerHTML = verifyCell({
+    id: empId, verified: makeVerified, verified_by: 'you',
+    verified_at: makeVerified ? new Date().toISOString() : null,
+  });
 }
 
 // Lazy-load image thumbnails (authenticated fetch → blob URL) as they scroll in.

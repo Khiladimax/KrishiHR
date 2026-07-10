@@ -1067,6 +1067,7 @@ router.get   ('/documents/checklist',     authenticate,                    docsC
 router.get   ('/documents/employees',     authenticate, authorize('hr','admin','super_admin'), docsCtrl.getEmployeesForPicker);
 router.get   ('/documents/download-zip/:employee_id', authenticate,        docsCtrl.downloadZip);
 router.get   ('/documents/matrix',         authenticate, authorize(...EMP_MGMT), docsCtrl.getMatrix);
+router.post  ('/documents/verify',         authenticate, authorize(...EMP_MGMT), docsCtrl.setVerify);
 router.get   ('/documents',                authenticate,                    docsCtrl.getDocuments);
 router.post  ('/documents/upload',         authenticate, docsCtrl.uploadMiddleware, docsCtrl.uploadDocument);
 router.post  ('/documents/upload-multi',   authenticate, (req, res, next) => {

@@ -80,6 +80,17 @@ exports.initTables = async () => {
     // it — only HR/Admin/Accounts can. Deleting frees the slot to re-upload.
     await db.query(`ALTER TABLE employee_doc_checklist ADD COLUMN IF NOT EXISTS is_submitted BOOLEAN DEFAULT false`).catch(() => {});
 
+    // Per-employee document verification — HR marks an employee's docs "verified"
+    // once reviewed. Shown as a status in the HR documents matrix.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS employee_doc_verification (
+        employee_id  INTEGER PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+        verified     BOOLEAN NOT NULL DEFAULT false,
+        verified_by  INTEGER REFERENCES employees(id),
+        verified_at  TIMESTAMP
+      )
+    `).catch(() => {});
+
     // Deployments created before this change have the old UNIQUE(employee_id, doc_key)
     // constraint, which blocks multiple files per doc type. Drop it if present.
     // The name below is Postgres' default auto-generated name for this constraint;
@@ -373,14 +384,61 @@ exports.getMatrix = async (req, res) => {
       });
     });
 
+    // verification status per employee
+    const ver = await db.query(
+      `SELECT v.employee_id, v.verified, v.verified_at,
+              TRIM(CONCAT(b.first_name,' ',COALESCE(b.last_name,''))) AS verified_by_name
+         FROM employee_doc_verification v
+         LEFT JOIN employees b ON b.id = v.verified_by
+        WHERE v.employee_id = ANY($1::int[])`, [ids]);
+    const vmap = {};
+    ver.rows.forEach(v => { vmap[v.employee_id] = v; });
+
     const rows = emps.rows.map(e => ({
       id: e.id, employee_code: e.employee_code, emp_name: e.emp_name,
       docs: byEmp[e.id] || {},
+      verified:      !!(vmap[e.id] && vmap[e.id].verified),
+      verified_by:   vmap[e.id] ? vmap[e.id].verified_by_name : null,
+      verified_at:   vmap[e.id] ? vmap[e.id].verified_at : null,
     }));
 
     res.json({ success: true, cols: DOCUMENT_DEFS, rows });
   } catch (err) {
     console.error('[getMatrix]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── POST /documents/verify — mark an employee's documents verified / re-open ──
+// body: { employee_id, verified: true|false }
+exports.setVerify = async (req, res) => {
+  try {
+    if (!HR_ROLES.includes(req.user.role) && !['admin','super_admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const empId    = parseInt(req.body.employee_id);
+    const verified = !(req.body.verified === false || req.body.verified === 'false');
+    if (!empId) return res.status(400).json({ success: false, message: 'employee_id required' });
+
+    // client_admin may only verify their own client's staff
+    if (req.user.role === 'client_admin') {
+      const chk = await db.query('SELECT client_id FROM employees WHERE id = $1', [empId]);
+      if (!chk.rows[0] || parseInt(chk.rows[0].client_id) !== parseInt(req.user.client_id)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
+    await db.query(
+      `INSERT INTO employee_doc_verification (employee_id, verified, verified_by, verified_at)
+         VALUES ($1, $2, $3, CASE WHEN $2 THEN NOW() ELSE NULL END)
+       ON CONFLICT (employee_id) DO UPDATE
+         SET verified = $2, verified_by = $3,
+             verified_at = CASE WHEN $2 THEN NOW() ELSE NULL END`,
+      [empId, verified, req.user.id]);
+
+    res.json({ success: true, verified });
+  } catch (err) {
+    console.error('[setVerify]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
