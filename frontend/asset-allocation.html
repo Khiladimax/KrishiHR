@@ -303,7 +303,7 @@ async function loadMatrix() {
         <td class="sticky">${i + 1}</td>
         <td class="sticky" style="left:44px"><b>${esc(row.employee_code)}</b></td>
         <td class="sticky" style="left:132px;text-align:left">${esc(row.emp_name)}</td>
-        ${items.map(it => { const c = row.counts[it] || 0; return `<td class="${c ? 'cnt' : 'zero'}">${c || '·'}</td>`; }).join('')}
+        ${items.map(it => { const c = row.counts[it]; if (!c || !c.qty) return `<td class="zero">·</td>`; return `<td class="cnt">${c.qty}${c.serials ? `<div style="font-size:10px;color:#2e7d32;font-weight:600;margin-top:2px">${esc(c.serials)}</div>` : ''}</td>`; }).join('')}
       </tr>`).join('')}</tbody></table></div>
       <div class="muted" style="margin-top:6px">Numbers = quantity currently allocated (returned items excluded). Select an employee above to add/return items.</div>`;
   } catch (e) { box.innerHTML = `<div class="muted">Failed: ${esc(e.message)}</div>`; }

@@ -109,9 +109,10 @@ exports.matrix = async (req, res) => {
         WHERE is_active = true AND (${scopeWhere(req.user, scope, 'client_id')})
         ORDER BY employee_code`);
 
-    // Currently-allocated (not returned) quantities per employee per item.
+    // Currently-allocated (not returned) qty + serials per employee per item.
     const allocs = await db.query(
-      `SELECT a.employee_id, a.item_name, SUM(a.quantity)::int AS qty
+      `SELECT a.employee_id, a.item_name, SUM(a.quantity)::int AS qty,
+              STRING_AGG(NULLIF(a.serial_no,''), ', ') AS serials
          FROM asset_allocations a
          JOIN employees e ON e.id = a.employee_id
         WHERE a.status = 'allocated' AND (${scopeWhere(req.user, scope, 'e.client_id')})
@@ -122,7 +123,9 @@ exports.matrix = async (req, res) => {
     const items = [...DEFAULT_ITEMS, ...extra];
 
     const byEmp = {};
-    allocs.rows.forEach(r => { (byEmp[r.employee_id] = byEmp[r.employee_id] || {})[r.item_name] = r.qty; });
+    allocs.rows.forEach(r => {
+      (byEmp[r.employee_id] = byEmp[r.employee_id] || {})[r.item_name] = { qty: r.qty, serials: r.serials || '' };
+    });
     const rows = emps.rows.map(e => ({
       employee_code: e.employee_code, emp_name: e.emp_name, counts: byEmp[e.id] || {},
     }));
