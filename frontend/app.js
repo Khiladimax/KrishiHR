@@ -147,6 +147,7 @@ const NAV_GROUPS = [
     label: 'Organisation',
     items: [
       { href:'employees.html',      icon: ICONS.employees,    label:'Employees',        roles:['admin','super_admin','hr','accounts','manager','tl','client_admin'] },
+      { href:'asset-allocation.html', icon:'💻',              label:'Asset Allocation', always:true },
       { href:'clients.html',        icon: '🏭',               label:'Clients',          roles:['admin','super_admin','hr'] },
       { href:'client_payroll_import.html', icon: '💰',          label:'Client Payroll',   roles:['super_admin','accounts','client_admin'] },
       { href:'offer-letter.html',   icon: ICONS.offerletter,  label:'Offer Letter',     roles:['hr'] },

@@ -1077,6 +1077,16 @@ router.post  ('/documents/upload-multi',   authenticate, (req, res, next) => {
 router.get   ('/documents/file/:id',       authenticate,                    docsCtrl.getFile);
 router.delete('/documents/:id',            authenticate,                    docsCtrl.deleteDocument);
 
+// ── Asset Allocation module ───────────────────────────────────────────────────
+const assetCtrl = require('../controllers/assetController');
+router.get   ('/assets/items',     authenticate,                        assetCtrl.getItems);
+router.get   ('/assets/employees', authenticate, authorize(...EMP_MGMT), assetCtrl.getEmployees);
+router.get   ('/assets/my',        authenticate,                        assetCtrl.myAssets);
+router.get   ('/assets',           authenticate,                        assetCtrl.list);
+router.post  ('/assets',           authenticate, authorize(...EMP_MGMT), assetCtrl.create);
+router.patch ('/assets/:id',       authenticate, authorize(...EMP_MGMT), assetCtrl.update);
+router.delete('/assets/:id',       authenticate, authorize(...EMP_MGMT), assetCtrl.remove);
+
 // ── Employee Documents (new) ─────────────────────────────────────────────────
 const empDocsCtrl = require('../controllers/empDocsController');
 router.get   ('/emp-documents/types',                                         authenticate, empDocsCtrl.getDocumentTypes);
