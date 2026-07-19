@@ -69,6 +69,8 @@ exports.initTables = async () => {
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS sig1_image TEXT`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS sig2_image TEXT`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS professional_tax_monthly NUMERIC(12,2) DEFAULT 0`);
+    await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS esi_employee_monthly NUMERIC(12,2) DEFAULT 0`);
+    await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS esi_employer_monthly NUMERIC(12,2) DEFAULT 0`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS employment_type VARCHAR(20) DEFAULT 'permanent'`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS contract_months INT DEFAULT 0`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS employee_code VARCHAR(50)`);
@@ -170,12 +172,14 @@ function buildOfferLetterHTML(ol) {
   const pfEmp    = parseFloat(ol.pf_employee_monthly||0);
   const pfEmpr   = parseFloat(ol.pf_employer_monthly||0);
   const pfAdmin  = parseFloat(ol.pf_admin_monthly||0);
+  const esiEmp   = parseFloat(ol.esi_employee_monthly||0);
+  const esiEmpr  = parseFloat(ol.esi_employer_monthly||0);
   const pt       = parseFloat(ol.professional_tax_monthly||0);
 
   const gross      = basic + hra + conv + other + gratuity;
-  const totalDed   = pfEmp + pt;
+  const totalDed   = pfEmp + esiEmp + pt;
   const netSalary  = gross - totalDed;
-  const ctcMonthly = gross + pfEmpr + pfAdmin;
+  const ctcMonthly = gross + pfEmpr + esiEmpr + pfAdmin;
   const ctcAnnual  = parseFloat(ol.ctc_annual || (ctcMonthly * 12));
 
   const fmtV = v => Number(Math.round(v)).toLocaleString('en-IN');
@@ -406,12 +410,14 @@ try {
       <tr><td class="col-sr">4</td><td class="col-part">Gratuity</td><td class="col-num">${fmtV(gratuity)}</td><td class="col-num">${fmtV(gratuity*12)}</td></tr>
       <tr class="highlight"><td class="col-sr">5</td><td class="col-part">Gross Pay</td><td class="col-num">${fmtV(gross)}</td><td class="col-num">${fmtV(gross*12)}</td></tr>
       <tr><td class="col-sr">6</td><td class="col-part">Provident Fund</td><td class="col-num">${pfEmp>0?fmtV(pfEmp):''}</td><td class="col-num">${pfEmp>0?fmtV(pfEmp*12):''}</td></tr>
-      <tr><td class="col-sr">7</td><td class="col-part">Professional Tax</td><td class="col-num">${pt>0?fmtV(pt):''}</td><td class="col-num">${pt>0?fmtV(pt*12):''}</td></tr>
+      <tr><td class="col-sr">7</td><td class="col-part">ESIC (Employee)</td><td class="col-num">${esiEmp>0?fmtV(esiEmp):''}</td><td class="col-num">${esiEmp>0?fmtV(esiEmp*12):''}</td></tr>
+      <tr><td class="col-sr">8</td><td class="col-part">Professional Tax</td><td class="col-num">${pt>0?fmtV(pt):''}</td><td class="col-num">${pt>0?fmtV(pt*12):''}</td></tr>
       <tr class="highlight"><td class="col-sr">8</td><td class="col-part">Total Deduction</td><td class="col-num">${totalDed>0?fmtV(totalDed):''}</td><td class="col-num">${totalDed>0?fmtV(totalDed*12):''}</td></tr>
       <tr class="highlight"><td class="col-sr">9</td><td class="col-part">Net Salary (Gross - Total Deduction)</td><td class="col-num">${fmtV(netSalary)}</td><td class="col-num">${fmtV(netSalary*12)}</td></tr>
       <tr><td class="col-sr">10</td><td class="col-part">Employer PF contribution</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr):''}</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr*12):''}</td></tr>
-      <tr><td class="col-sr">11</td><td class="col-part">Employer PF contribution Admin charges</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin):''}</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin*12):''}</td></tr>
-      <tr class="highlight"><td class="col-sr">12</td><td class="col-part">Total Compensation Package</td><td class="col-num">${fmtV(ctcMonthly)}</td><td class="col-num">${fmtV(ctcAnnual)}</td></tr>
+      <tr><td class="col-sr">11</td><td class="col-part">Employer ESIC contribution</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr):''}</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr*12):''}</td></tr>
+      <tr><td class="col-sr">12</td><td class="col-part">Employer PF contribution Admin charges</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin):''}</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr">13</td><td class="col-part">Total Compensation Package</td><td class="col-num">${fmtV(ctcMonthly)}</td><td class="col-num">${fmtV(ctcAnnual)}</td></tr>
     </tbody>
   </table>
   <div style="margin-top:15px;">
@@ -486,14 +492,15 @@ async function applyOfferToStructure(offer, userId, overwrite = false) {
     const pfEmp       = num(offer.pf_employee_monthly);
     const pfEr        = num(offer.pf_employer_monthly);
     const pfAdmin     = num(offer.pf_admin_monthly);
+    const esiEmp      = num(offer.esi_employee_monthly);
+    const esiEr       = num(offer.esi_employer_monthly);
     const pt          = num(offer.professional_tax_monthly);
-    // Offer letters don't carry ESIC yet — left 0, Accounts can add it.
     const gross    = basic + hra + conveyance + other + gratuity;
-    const totalDed = pfEmp + pt;
+    const totalDed = pfEmp + esiEmp + pt;
     const net      = gross - totalDed;
-    const ctc      = gross + pfEr + pfAdmin;
+    const ctc      = gross + pfEr + esiEr + pfAdmin;
     const ctcAnnual = num(offer.ctc_annual) || ctc * 12;
-    const totalEmployerCost = pfEr + pfAdmin;
+    const totalEmployerCost = pfEr + esiEr + pfAdmin;
 
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`).catch(() => {});
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`).catch(() => {});
@@ -502,8 +509,8 @@ async function applyOfferToStructure(offer, userId, overwrite = false) {
     const conflict = overwrite
       ? `ON CONFLICT(employee_id) DO UPDATE SET
            basic=$2, hra=$3, conveyance=$4, special_allowance=0, gratuity=$5, other_allowance=$6, gross_salary=$7,
-           pf_applicable=$8, esi_applicable=false, pt_applicable=true, lwf_applicable=false, tds_applicable=false,
-           pf_employee=$9, pf_employer=$10, pf_admin=$11, professional_tax=$12,
+           pf_applicable=$8, esi_applicable=$21, pt_applicable=true, lwf_applicable=false, tds_applicable=false,
+           pf_employee=$9, pf_employer=$10, pf_admin=$11, esi_employee=$19, esi_employer=$20, professional_tax=$12,
            total_employer_cost=$13, total_deductions=$14, net_salary=$15, ctc_monthly=$16, ctc_annual=$17,
            updated_by=$18, updated_at=NOW()`
       : `ON CONFLICT(employee_id) DO NOTHING`;
@@ -515,11 +522,12 @@ async function applyOfferToStructure(offer, userId, overwrite = false) {
           pf_employee, pf_employer, pf_admin, esi_employee, esi_employer,
           professional_tax, lwf, tds, loan_emi_recovery, total_employer_cost,
           total_deductions, net_salary, ctc_monthly, ctc_annual, updated_by, updated_at)
-       VALUES($1,$2,$3,$4,0,$5,$6,$7,$8,false,true,false,false,$9,$10,$11,0,0,$12,0,0,0,$13,$14,$15,$16,$17,$18,NOW())
+       VALUES($1,$2,$3,$4,0,$5,$6,$7,$8,$21,true,false,false,$9,$10,$11,$19,$20,$12,0,0,0,$13,$14,$15,$16,$17,$18,NOW())
        ${conflict}`,
       [empId, basic, hra, conveyance, gratuity, other, gross,
        (pfEmp > 0 || pfEr > 0), pfEmp, pfEr, pfAdmin, pt,
-       totalEmployerCost, totalDed, net, ctc, ctcAnnual, userId]);
+       totalEmployerCost, totalDed, net, ctc, ctcAnnual, userId,
+       esiEmp, esiEr, (esiEmp > 0 || esiEr > 0)]);
     return true;
   } catch (err) {
     console.error('[applyOfferToStructure]', err.message);
@@ -535,6 +543,7 @@ exports.create = async (req, res) => {
       ctc_annual, basic_monthly, hra_monthly, conveyance_monthly = 0,
       other_allowance_monthly, gratuity_monthly = 0,
       pf_employee_monthly = 0, pf_employer_monthly = 0, pf_admin_monthly = 0,
+      esi_employee_monthly = 0, esi_employer_monthly = 0,
       professional_tax_monthly = 0,
       probation_months = 6, notice_period_months = 3, custom_clauses, employee_id, employment_type = 'permanent', contract_months = 0,
       employee_code,
@@ -552,8 +561,9 @@ exports.create = async (req, res) => {
         gratuity_monthly, pf_employee_monthly, pf_employer_monthly, pf_admin_monthly,
         professional_tax_monthly, employee_code,
         probation_months, notice_period_months, custom_clauses, sig1_image, sig2_image, employment_type, contract_months,
+        esi_employee_monthly, esi_employer_monthly,
         created_by, updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,NOW())
       RETURNING *`,
       [employee_id||null, candidate_name, candidate_email||null, candidate_address||null, candidate_mobile||null,
        designation, location, joining_date||null, offer_date||null, offer_valid_days,
@@ -561,6 +571,7 @@ exports.create = async (req, res) => {
        gratuity_monthly, pf_employee_monthly, pf_employer_monthly, pf_admin_monthly,
        professional_tax_monthly||0, employee_code||null,
        probation_months, notice_period_months, custom_clauses||null, sig1_image||null, sig2_image||null, employment_type||'permanent', contract_months||0,
+       esi_employee_monthly||0, esi_employer_monthly||0,
        req.user.id]
     );
     // If this offer already links to an existing employee, seed their salary
@@ -596,6 +607,7 @@ exports.update = async (req, res) => {
       'designation','location','joining_date','offer_date','offer_valid_days',
       'ctc_annual','basic_monthly','hra_monthly','conveyance_monthly','other_allowance_monthly',
       'gratuity_monthly','pf_employee_monthly','pf_employer_monthly','pf_admin_monthly',
+      'esi_employee_monthly','esi_employer_monthly',
       'professional_tax_monthly','employee_code',
       'probation_months','notice_period_months','custom_clauses','sig1_image','sig2_image','employment_type','contract_months'];
     const sets = [], params = [];
@@ -832,6 +844,8 @@ exports.bulkSend = async (req, res) => {
       const pfEmployer   = parseFloat(String(row['PF Employer']        || row['pf_employer_monthly'] || 0).replace(/,/g,'')) || 0;
       const pfAdmin      = parseFloat(String(row['PF Admin']           || row['pf_admin_monthly']   || 0).replace(/,/g,'')) || 0;
       const profTax      = parseFloat(String(row['Professional Tax']   || row['professional_tax_monthly'] || 0).replace(/,/g,'')) || 0;
+      const esiEmployee  = parseFloat(String(row['ESIC Employee']      || row['ESI Employee'] || row['esi_employee_monthly'] || 0).replace(/,/g,'')) || 0;
+      const esiEmployer  = parseFloat(String(row['ESIC Employer']      || row['ESI Employer'] || row['esi_employer_monthly'] || 0).replace(/,/g,'')) || 0;
 
       // Validation
       if (!candidateName || !candidateEmail || !designation) {
@@ -876,6 +890,8 @@ exports.bulkSend = async (req, res) => {
         pf_employee_monthly:     pfEmployee,
         pf_employer_monthly:     pfEmployer,
         pf_admin_monthly:        pfAdmin,
+        esi_employee_monthly:    esiEmployee,
+        esi_employer_monthly:    esiEmployer,
         professional_tax_monthly: profTax,
         custom_clauses:          customClauses || null,
         employment_type:         employmentType,
