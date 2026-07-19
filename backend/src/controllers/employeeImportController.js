@@ -14,29 +14,72 @@ exports.uploadMiddleware = multer({
   }
 }).single('file');
 
-// Column mapping — MUST match KrishiHR_Employee_Import.xlsx header row exactly
-// (0-indexed). Column A = Client Name (blank = own employee, filled = deployed).
-// NOTE: columns 19–21 (Probation End Date / Office Location / Shift) sit BEFORE
-// the salary block in the template; an earlier map omitted them, which shifted
-// every field from index 19 onward by 3 (City←Bank IFSC, Bank←PAN, etc.).
-const COL = {
-  client_name: 0,
-  employee_code: 1, password: 2, first_name: 3, last_name: 4,
-  email: 5, phone: 6, alternate_phone: 7, gender: 8, date_of_birth: 9,
-  blood_group: 10, marital_status: 11, joining_date: 12, employment_type: 13,
-  role: 14, department_id: 15, designation_id: 16,
-  reporting_manager_id: 17, team_leader_id: 18,
-  probation_end_date: 19, office_location: 20, shift: 21,
-  basic_salary: 22, hra: 23, special_allowance: 24, travel_allowance: 25,
-  ctc: 26, pan_number: 27, aadhar_number: 28, uan_number: 29,
-  bank_name: 30, bank_account: 31, bank_ifsc: 32, bank_branch: 33,
-  address_line1: 34, city: 35, state: 36, pincode: 37,
-  // ── Optional salary-structure columns (appended; blank/absent = 0) ──
-  // These let you define the full pay (incl. ESIC) right at import. They are
-  // written into employee_salary_structure so payroll pre-fills from them.
-  st_gratuity: 38, st_pf_employee: 39, st_pf_employer: 40, st_pf_admin: 41,
-  st_esi_employee: 42, st_esi_employer: 43, st_professional_tax: 44,
+// Columns are matched BY HEADER NAME (not by fixed position) — so the template
+// can be re-ordered freely and a shuffled/renamed sheet can't silently scramble
+// fields (which is exactly the bug that shifted City←IFSC, Bank←PAN earlier).
+// Each field lists header substrings to look for, in priority order.
+const FIELD_ALIASES = {
+  client_name:        ['client name', 'client'],
+  employee_code:      ['employee code', 'emp code'],
+  password:           ['password'],
+  first_name:         ['first name'],
+  last_name:          ['last name'],
+  email:              ['email'],
+  phone:              ['alternate']            ,  // placeholder replaced below
+  alternate_phone:    ['alternate phone', 'alternate'],
+  gender:             ['gender'],
+  date_of_birth:      ['date of birth', 'dob'],
+  blood_group:        ['blood'],
+  marital_status:     ['marital'],
+  joining_date:       ['joining'],
+  employment_type:    ['employment type', 'employment'],
+  role:               ['role'],
+  department_id:      ['department'],
+  designation_id:     ['designation'],
+  reporting_manager_id: ['reporting manager', 'manager code'],
+  team_leader_id:     ['team leader', 'tl code'],
+  probation_end_date: ['probation'],
+  office_location:    ['office'],
+  shift:              ['shift'],
+  basic_salary:       ['basic'],
+  hra:                ['hra'],
+  special_allowance:  ['special allow'],
+  travel_allowance:   ['travel allow', 'conveyance'],
+  st_gratuity:        ['gratuity'],
+  st_pf_employee:     ['pf employee', 'pf (employee)'],
+  st_pf_employer:     ['pf employer', 'pf (employer)'],
+  st_pf_admin:        ['pf admin'],
+  st_esi_employee:    ['esic employee', 'esi employee', 'esi (employee)'],
+  st_esi_employer:    ['esic employer', 'esi employer', 'esi (employer)'],
+  st_professional_tax:['professional tax', 'prof tax'],
+  ctc:                ['ctc'],
+  pan_number:         ['pan'],
+  aadhar_number:      ['aadhaar', 'aadhar'],
+  uan_number:         ['uan'],
+  bank_name:          ['bank name'],
+  bank_account:       ['bank account', 'account no'],
+  bank_ifsc:          ['ifsc'],
+  bank_branch:        ['branch'],
+  address_line1:      ['address'],
+  city:               ['city'],
+  state:              ['state'],
+  pincode:            ['pincode', 'pin'],
 };
+
+// Build a field→columnIndex map from the actual header row. "Phone" is resolved
+// specially so it doesn't collide with "Alternate Phone".
+function buildColMap(headerRow) {
+  const H = (headerRow || []).map(h => String(h || '').toLowerCase().replace(/\s+/g, ' ').trim());
+  const find = (aliases) => {
+    for (const a of aliases) { const i = H.findIndex(h => h.includes(a)); if (i !== -1) return i; }
+    return -1;
+  };
+  const COL = {};
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) COL[field] = find(aliases);
+  // Phone = the "phone" header that is NOT "alternate phone"
+  COL.phone = H.findIndex(h => h.includes('phone') && !h.includes('alternate'));
+  return { COL, H };
+}
 
 const { findOrCreateClient } = require('./clientController');
 
@@ -74,15 +117,20 @@ exports.importEmployees = async (req, res) => {
     const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
     const ws = wb.Sheets['Employee Import'] || wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    console.log(`[Import] Total rows in sheet: ${rows.length}`);
-    console.log(`[Import] Row 0 (header):`, rows[0]?.slice(0,6));
-    console.log(`[Import] Row 1 (first data):`, rows[1]?.slice(0,6));
 
-    // A real employee row needs a code AND an email that looks like an email.
-    // This drops the template's banner, header row ("Employee Code" / "Email")
-    // and hint row ("Unique code e.g. KC001" / "Required, unique") so they can
-    // never be imported as fake employees, regardless of how many such rows exist.
-    const dataRows = rows.slice(1).filter(r => {
+    // Locate the header row (the one containing "Employee Code") and resolve every
+    // column BY NAME — so the sheet's column order no longer matters.
+    let headerIdx = rows.findIndex(r =>
+      Array.isArray(r) && r.some(c => String(c || '').toLowerCase().replace(/\s+/g, ' ').includes('employee code')));
+    if (headerIdx === -1) headerIdx = 1;   // fallback to the classic layout
+    const { COL, H } = buildColMap(rows[headerIdx]);
+    console.log(`[Import] Total rows: ${rows.length}, header at row ${headerIdx}`);
+    if (COL.employee_code === -1 || COL.email === -1)
+      return res.status(400).json({ success: false, message: 'Could not find "Employee Code"/"Email" columns in the sheet header.' });
+
+    // A real employee row needs a code AND an email that looks like an email —
+    // this drops the banner/header/hint rows regardless of position.
+    const dataRows = rows.slice(headerIdx + 1).filter(r => {
       const code  = clean(r[COL.employee_code]);
       const email = clean(r[COL.email]);
       return code && email && email.includes('@');
@@ -96,7 +144,7 @@ exports.importEmployees = async (req, res) => {
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
-      const rowNum = i + 3; // Excel row number for reporting (row 1=header, 2=hints, 3+=data)
+      const rowNum = headerIdx + 2 + i; // approx Excel row for reporting
 
       const employee_code = clean(row[COL.employee_code])?.toUpperCase();
       const first_name    = clean(row[COL.first_name]);
@@ -293,7 +341,7 @@ exports.importEmployees = async (req, res) => {
         console.error(`[Import] Row ${rowNum} error:`, rowErr.message);
         // Log all values to find which is too long
         if (rowErr.message.includes('too long')) {
-          row.forEach((v,i) => { if (String(v).length > 0) console.log(`  col${i} (${headers[i]||'?'})=${String(v)}`); });
+          row.forEach((v,ci) => { if (String(v).length > 0) console.log(`  col${ci} (${H[ci]||'?'})=${String(v)}`); });
         }
         results.errors.push(`Row ${rowNum} (${employee_code}): ${rowErr.message}`);
       }
