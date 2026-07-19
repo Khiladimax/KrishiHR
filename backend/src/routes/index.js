@@ -98,6 +98,7 @@ router.post('/provision/:id/approve',    authenticate, authorize(...PROVISION_AP
 router.post('/provision/monthly-accrual', authenticate, authorize('hr','admin','super_admin'), provCtrl.runMonthlyAccrual);
 
 // ── Employee Bulk Import (Excel) ──────────────────────────────────────────────
+router.get('/employees/import-template', authenticate, authorize(...EMP_MGMT), empImportCtrl.downloadTemplate);
 router.post('/employees/import',
   authenticate, authorize(...EMP_MGMT),
   empImportCtrl.uploadMiddleware,

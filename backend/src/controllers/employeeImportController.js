@@ -107,6 +107,70 @@ function toNum(val) {
   return isNaN(n) ? 0 : n;
 }
 
+// ── GET /employees/import-template — always-current 45-column template ────────
+exports.downloadTemplate = async (_req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const H = [
+      ['Client Name','Blank=main / Client name=deployed'],['Employee Code','Unique e.g. KC001'],['Password','Min 6 chars'],
+      ['First Name','Required'],['Last Name','Optional'],['Email','Required, unique'],['Phone','10 digits'],['Alternate Phone','Optional'],
+      ['Gender','Male/Female/Other'],['Date of Birth','YYYY-MM-DD'],['Blood Group','A+/B+/O+'],['Marital Status','Single/Married'],
+      ['Joining Date','YYYY-MM-DD'],['Employment Type','Full-Time/Part-Time/Contract'],['Role','employee/tl/manager/hr/accounts/admin'],
+      ['Department','Name or ID'],['Designation','Name or ID'],['Reporting Manager Code','Manager emp code'],['Team Leader Code','TL emp code'],
+      ['Probation End Date','YYYY-MM-DD'],['Office Location','Office name'],['Shift','Day/Night/Rotational'],
+      ['Basic Salary','Monthly Rs'],['HRA','Monthly Rs'],['Special Allowance','Monthly Rs'],['Travel Allowance','Monthly Rs (=Conveyance)'],
+      ['Gratuity Monthly','Monthly Rs'],['PF Employee','Monthly Rs'],['PF Employer','Monthly Rs'],['PF Admin','Monthly Rs'],
+      ['ESIC Employee','Monthly Rs'],['ESIC Employer','Monthly Rs'],['Professional Tax','Monthly Rs'],['CTC','Annual Rs'],
+      ['PAN Number','ABCDE1234F'],['Aadhar Number','12 digits'],['UAN Number','optional'],['Bank Name','Bank name'],
+      ['Bank Account No','Account no'],['Bank IFSC','SBIN0001234'],['Bank Branch','Branch'],['Address','Street address'],
+      ['City','City'],['State','State'],['Pincode','6-digit PIN'],
+    ];
+    const ex1 = ['','KC9001','Krishi@123','Anita','Sharma','anita.sharma@krishicare.in','9876500001','','Female','1995-03-12','B+','Married','2024-04-01','Full-Time','hr','HR','HR Executive','','','2024-10-01','Head Office','Day',15000,6000,2000,1600,722,1800,1950,150,180,780,200,360000,'ABCDE1234F','123456789012','100200300400','State Bank of India','30012345678','SBIN0001234','Bengaluru MG Road','12 MG Road','Bengaluru','Karnataka','560001'];
+    const ex2 = ['IFFCO Tokio','KC9101','Krishi@123','Suresh','Gowda','suresh.gowda@gmail.com','9876500101','','Male','1990-01-15','A+','Married','2024-05-01','Full-Time','employee','Field','Sales Executive','','','2024-11-01','Chikmagalur','Day',12000,4000,0,1000,577,1800,1950,150,144,624,200,240000,'CDEFG3456H','323456789012','','State Bank of India','33326768763','SBIN0011260','Tarikere','Dornalu','Tarikere','Karnataka','577228'];
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Employee Import');
+    ws.mergeCells(1, 1, 1, H.length);
+    const t = ws.getCell(1, 1);
+    t.value = 'KrishiHR — Employee Import Template (Client Deployment & Salary Structure incl. ESIC)';
+    t.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 24;
+    H.forEach(([h], i) => {
+      const c = ws.getCell(2, i + 1); c.value = h;
+      c.font = { bold: true, size: 9.5, color: { argb: 'FFFFFFFF' } };
+      const salary = i >= 22 && i <= 33;
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: salary ? 'FF00695C' : 'FF2E7D32' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      ws.getColumn(i + 1).width = Math.max(11, Math.min(22, h.length + 2));
+    });
+    ws.getRow(2).height = 30;
+    H.forEach(([, hint], i) => {
+      const c = ws.getCell(3, i + 1); c.value = hint;
+      c.font = { italic: true, size: 8, color: { argb: 'FF607D8B' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F8E9' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    });
+    ws.getRow(3).height = 24;
+    [ex1, ex2].forEach((row, ri) => {
+      row.forEach((v, ci) => {
+        const c = ws.getCell(4 + ri, ci + 1); c.value = v; c.font = { size: 9 };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ri % 2 ? 'FFF3F6FB' : 'FFFFFFFF' } };
+        c.alignment = { vertical: 'middle', horizontal: typeof v === 'number' ? 'right' : 'left' };
+      });
+    });
+    ws.views = [{ state: 'frozen', ySplit: 3, xSplit: 2 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Disposition', 'attachment; filename="KrishiHR_Employee_Import_Template.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(Buffer.from(buf));
+  } catch (err) {
+    console.error('[downloadTemplate]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.importEmployees = async (req, res) => {
   const client = await db.getClient();
   try {

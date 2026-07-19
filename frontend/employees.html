@@ -320,7 +320,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">📥 Bulk Import Employees</div>
-          <a href="/employee_import_template.xlsx" download class="btn btn-outline btn-sm">⬇ Download Template</a>
+          <button type="button" onclick="downloadImportTemplate(this)" class="btn btn-outline btn-sm">⬇ Download Template</button>
         </div>
         <div class="card-body" style="padding:24px">
           <div id="import-drop-zone" style="border:2px dashed #c7d2fe;border-radius:14px;padding:40px;text-align:center;background:#f8f9ff;cursor:pointer"
@@ -2163,6 +2163,22 @@ async function saveChangeManager() {
 }
 
 // ── Excel Export / Import ─────────────────────────────────────────────────────
+async function downloadImportTemplate(btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Preparing…'; }
+  try {
+    const res = await fetch(`${API_BASE}/employees/import-template`, { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: 'KrishiHR_Employee_Import_Template.xlsx' });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('✅ Template downloaded');
+  } catch (e) {
+    toast('Download failed: ' + e.message, 'error');
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+}
+
 async function downloadMasterExcel() {
   toast('Preparing Excel…');
   const token = Auth.getToken();
