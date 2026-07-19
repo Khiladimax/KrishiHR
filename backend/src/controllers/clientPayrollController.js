@@ -60,7 +60,7 @@ function labels(m, y) {
 const HEADERS = [
   'Emp Code', 'Name', 'Client', 'Department',
   'Working Days', 'Present Days', 'LOP Days', 'Paid Days',
-  'Basic + VDA', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
+  'Basic + VDA', 'HRA', 'Conveyance', 'Special Allowance', 'Gratuity', 'Gross Salary',
   'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'TDS', 'LWF', 'Loan/EMI', 'Total Deductions',
   'Net Salary',
   'PF (Employer)', 'ESI (Employer)', 'PF Admin', 'CTC (Monthly)',
@@ -83,7 +83,7 @@ exports.downloadTemplate = async (req, res) => {
              COALESCE(s.basic,           e.basic_salary,       0) AS basic,
              COALESCE(s.hra,             e.hra,                0) AS hra,
              COALESCE(s.conveyance,                            0) AS conveyance,
-             COALESCE(s.other_allowance, e.special_allowance,  0) AS other_allowance,
+             COALESCE(s.special_allowance, e.special_allowance, 0) AS other_allowance,
              COALESCE(s.gratuity,                              0) AS gratuity,
              COALESCE(s.gross_salary,                          0) AS gross_salary,
              COALESCE(s.pf_employee,                           0) AS pf_employee,
@@ -204,7 +204,7 @@ exports.importPayroll = async (req, res) => {
     const col = (...names) => { for (const n of names) { const i = H.findIndex(h => h.includes(n)); if (i !== -1) return i; } return -1; };
     const iCode   = 0;
     const iWork   = col('working'),  iPresent = col('present'), iLOP = col('lop'), iPaid = col('paid days');
-    const iBasic  = col('basic'),    iHRA = col('hra'), iConv = col('conveyance'), iOther = col('other allow'), iGrat = col('gratuity'), iGross = col('gross');
+    const iBasic  = col('basic'),    iHRA = col('hra'), iConv = col('conveyance'), iOther = col('special allow','other allow'), iGrat = col('gratuity'), iGross = col('gross');
     const iPFEmp  = col('pf (employee)','pf employee'), iESIEmp = col('esi (employee)','esi employee'), iPT = col('prof tax','professional tax','pt'), iTDS = col('tds'), iLWF = col('lwf'), iEMI = col('loan','emi'), iTotDed = col('total deduction');
     const iNet    = col('net'),      iPFEr = col('pf (employer)','pf employer'), iESIEr = col('esi (employer)','esi employer'), iPFAdmin = col('pf admin'), iCTC = col('ctc');
     const iStatus = col('payment status','status'), iRemarks = col('remarks');
@@ -317,7 +317,7 @@ exports.exportPayroll = async (req, res) => {
     const COLS = [
       'Emp Code','Name','Client','Department',
       'Work Days','Present','LOP','Paid Days',
-      'Basic + VDA','HRA','Conveyance','Other','Gratuity','Gross',
+      'Basic + VDA','HRA','Conveyance','Special Allow','Gratuity','Gross',
       'PF (Emp)','ESI (Emp)','Prof Tax','TDS','LWF','Loan/EMI','Total Ded',
       'Net Salary','PF (Employer)','ESI (Employer)','PF Admin','CTC',
       'Bank','Account No.','IFSC','Status',

@@ -240,7 +240,7 @@ exports.uploadPayroll = async (req, res) => {
     const iHRA        = col('hra');
     const iConveyance = col('conveyance') !== -1 ? col('conveyance') : col('travel');
     const iGratuity   = col('gratuity');
-    const iOtherAllow = col('other');
+    const iOtherAllow = col('special allow') !== -1 ? col('special allow') : col('other');
     const iPFEmp      = col('pf employee') !== -1 ? col('pf employee') : col('pf emp');
     const iESIEmp     = col('esi employee') !== -1 ? col('esi employee') : col('esi');
     const iPT         = col('professional') !== -1 ? col('professional') : col('prof');
@@ -889,7 +889,7 @@ exports.downloadPayrollTemplate = async (req, res) => {
     const HEADERS = [
       'Emp Code', 'Full Name', 'Department', 'Designation', 'Category',
       'Working Days', 'Present Days', 'LOP Days', 'Paid Days',
-      'Basic', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
+      'Basic', 'HRA', 'Conveyance', 'Special Allowance', 'Gratuity', 'Gross Salary',
       'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'LWF', 'TDS',
       'Loan/EMI Deduction (Active EMI)', 'EMI Progress', 'Total Deductions',
       'Net Pay',

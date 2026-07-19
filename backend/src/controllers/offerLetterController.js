@@ -506,9 +506,11 @@ async function applyOfferToStructure(offer, userId, overwrite = false) {
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`).catch(() => {});
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS tds NUMERIC(12,2) DEFAULT 0`).catch(() => {});
 
+    // Extra allowance goes into special_allowance so it matches the employee
+    // import (which also uses special_allowance). other_allowance stays 0.
     const conflict = overwrite
       ? `ON CONFLICT(employee_id) DO UPDATE SET
-           basic=$2, hra=$3, conveyance=$4, special_allowance=0, gratuity=$5, other_allowance=$6, gross_salary=$7,
+           basic=$2, hra=$3, conveyance=$4, special_allowance=$6, gratuity=$5, other_allowance=0, gross_salary=$7,
            pf_applicable=$8, esi_applicable=$21, pt_applicable=true, lwf_applicable=false, tds_applicable=false,
            pf_employee=$9, pf_employer=$10, pf_admin=$11, esi_employee=$19, esi_employer=$20, professional_tax=$12,
            total_employer_cost=$13, total_deductions=$14, net_salary=$15, ctc_monthly=$16, ctc_annual=$17,
@@ -522,7 +524,7 @@ async function applyOfferToStructure(offer, userId, overwrite = false) {
           pf_employee, pf_employer, pf_admin, esi_employee, esi_employer,
           professional_tax, lwf, tds, loan_emi_recovery, total_employer_cost,
           total_deductions, net_salary, ctc_monthly, ctc_annual, updated_by, updated_at)
-       VALUES($1,$2,$3,$4,0,$5,$6,$7,$8,$21,true,false,false,$9,$10,$11,$19,$20,$12,0,0,0,$13,$14,$15,$16,$17,$18,NOW())
+       VALUES($1,$2,$3,$4,$6,$5,0,$7,$8,$21,true,false,false,$9,$10,$11,$19,$20,$12,0,0,0,$13,$14,$15,$16,$17,$18,NOW())
        ${conflict}`,
       [empId, basic, hra, conveyance, gratuity, other, gross,
        (pfEmp > 0 || pfEr > 0), pfEmp, pfEr, pfAdmin, pt,
@@ -833,12 +835,12 @@ exports.bulkSend = async (req, res) => {
       const employmentType = String(row['Employment Type'] || row['employment_type'] || 'permanent').trim().toLowerCase();
       const contractMon    = parseInt(row['Contract Months'] || row['contract_months'] || 0) || 0;
 
-      // Salary fields
-      const ctcAnnual    = parseFloat(String(row['CTC Annual']         || row['ctc_annual']         || 0).replace(/,/g,'')) || 0;
-      const basic        = parseFloat(String(row['Basic Monthly']      || row['basic_monthly']      || 0).replace(/,/g,'')) || 0;
-      const hra          = parseFloat(String(row['HRA Monthly']        || row['hra_monthly']        || 0).replace(/,/g,'')) || 0;
-      const conveyance   = parseFloat(String(row['Conveyance Monthly'] || row['conveyance_monthly'] || 0).replace(/,/g,'')) || 0;
-      const otherAllow   = parseFloat(String(row['Other Allowance']    || row['other_allowance_monthly'] || 0).replace(/,/g,'')) || 0;
+      // Salary fields — accept the canonical (employee-import) names too
+      const ctcAnnual    = parseFloat(String(row['CTC']              || row['CTC Annual']         || row['ctc_annual']         || 0).replace(/,/g,'')) || 0;
+      const basic        = parseFloat(String(row['Basic Salary']     || row['Basic Monthly']      || row['basic_monthly']      || 0).replace(/,/g,'')) || 0;
+      const hra          = parseFloat(String(row['HRA']              || row['HRA Monthly']        || row['hra_monthly']        || 0).replace(/,/g,'')) || 0;
+      const conveyance   = parseFloat(String(row['Travel Allowance'] || row['Conveyance Monthly'] || row['conveyance_monthly'] || 0).replace(/,/g,'')) || 0;
+      const otherAllow   = parseFloat(String(row['Special Allowance']|| row['Other Allowance']    || row['other_allowance_monthly'] || 0).replace(/,/g,'')) || 0;
       const gratuity     = parseFloat(String(row['Gratuity Monthly']   || row['gratuity_monthly']   || 0).replace(/,/g,'')) || 0;
       const pfEmployee   = parseFloat(String(row['PF Employee']        || row['pf_employee_monthly'] || 0).replace(/,/g,'')) || 0;
       const pfEmployer   = parseFloat(String(row['PF Employer']        || row['pf_employer_monthly'] || 0).replace(/,/g,'')) || 0;
