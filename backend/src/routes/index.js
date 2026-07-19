@@ -78,6 +78,7 @@ router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), 
 router.get   ('/employees/contacts',      authenticate,                          empCtrl.getContacts);
 // All active employees — open to any authenticated user (for chat DM picker, employee search)
 router.get   ('/employees/for-chat',      authenticate,                          empCtrl.getAllForChat);
+router.get   ('/employees/import-template', authenticate, authorize(...EMP_MGMT), empImportCtrl.downloadTemplate);
 router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
 router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
 router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);
@@ -98,7 +99,6 @@ router.post('/provision/:id/approve',    authenticate, authorize(...PROVISION_AP
 router.post('/provision/monthly-accrual', authenticate, authorize('hr','admin','super_admin'), provCtrl.runMonthlyAccrual);
 
 // ── Employee Bulk Import (Excel) ──────────────────────────────────────────────
-router.get('/employees/import-template', authenticate, authorize(...EMP_MGMT), empImportCtrl.downloadTemplate);
 router.post('/employees/import',
   authenticate, authorize(...EMP_MGMT),
   empImportCtrl.uploadMiddleware,
