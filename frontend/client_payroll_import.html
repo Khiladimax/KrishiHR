@@ -72,9 +72,9 @@
     <!-- Steps -->
     <div class="steps-grid">
       <div class="step-card"><div class="step-num">1</div><div class="step-label">Select Month</div><div class="step-sub">Salary payment month</div></div>
-      <div class="step-card"><div class="step-num">2</div><div class="step-label">Download Template</div><div class="step-sub">Pre-filled with last cycle</div></div>
-      <div class="step-card"><div class="step-num">3</div><div class="step-label">Fill Gross Salary</div><div class="step-sub">Only green column</div></div>
-      <div class="step-card"><div class="step-num">4</div><div class="step-label">Upload & Import</div><div class="step-sub">TDS auto @1%</div></div>
+      <div class="step-card"><div class="step-num">2</div><div class="step-label">Download Template</div><div class="step-sub">Pre-filled from salary structure</div></div>
+      <div class="step-card"><div class="step-num">3</div><div class="step-label">Fill Present/LOP</div><div class="step-sub">Adjust any figure incl. ESIC</div></div>
+      <div class="step-card"><div class="step-num">4</div><div class="step-label">Upload & Import</div><div class="step-sub">Imported = final (no auto-calc)</div></div>
     </div>
 
     <!-- Step 1 & 2 -->
@@ -115,7 +115,7 @@
         <div class="card-title"><span class="card-title-icon">⬇</span>Download Salary Statement</div>
       </div>
       <div style="font-size:13px;color:var(--muted);margin-bottom:14px">
-        Download month-wise client employee salary statement as Excel — includes Gross Salary, TDS @1%, Amount Payable and bank details, grouped by client.
+        Download month-wise client employee salary statement as Excel — full breakup (Basic, HRA, PF, ESIC, Gratuity, deductions, Net Salary, CTC) and bank details, grouped by client.
       </div>
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div class="field-col">
@@ -202,7 +202,7 @@
 
       <div style="overflow-x:auto;margin-top:16px">
         <table class="result-tbl">
-          <thead><tr><th>Emp Code</th><th>Name</th><th>Client</th><th>Gross Salary</th><th>TDS @1%</th><th>Amount Payable</th><th>Status</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Name</th><th>Client</th><th>Gross Salary</th><th>Net Salary</th><th>Status</th></tr></thead>
           <tbody id="results-tbody"></tbody>
         </table>
       </div>
@@ -215,7 +215,7 @@
       </div>
       <div style="overflow-x:auto">
         <table class="result-tbl">
-          <thead><tr><th>Emp Code</th><th>Name</th><th>Client</th><th>Department</th><th>Gross Salary</th><th>TDS @1%</th><th>Amount Payable</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Name</th><th>Client</th><th>Gross</th><th>PF</th><th>ESIC</th><th>PT</th><th>Total Ded</th><th>Net Salary</th><th>CTC</th></tr></thead>
           <tbody id="view-tbody"></tbody>
         </table>
       </div>
@@ -383,8 +383,8 @@ async function doImport() {
       <tr>
         <td><strong style="color:var(--accent)">${r.emp_code}</strong></td>
         <td>${r.name}</td><td>${r.client||''}</td>
-        <td>${fmt(r.gross)}</td><td>${fmt(r.tds)}</td>
-        <td><strong>${fmt(r.payable)}</strong></td>
+        <td>${fmt(r.gross)}</td>
+        <td><strong style="color:var(--accent)">${fmt(r.net)}</strong></td>
         <td><span class="badge" style="${r.action==='imported'?'background:var(--green-l);color:var(--green-d)':'background:var(--accent-l);color:var(--accent)'}">${r.action}</span></td>
       </tr>`).join('');
 
@@ -413,9 +413,14 @@ async function viewPayroll() {
       <tr>
         <td><strong style="color:var(--accent)">${r.employee_code}</strong></td>
         <td>${r.first_name} ${r.last_name||''}</td>
-        <td>${r.client_name||''}</td><td>${r.department||''}</td>
-        <td>${fmt(r.gross_salary)}</td><td>${fmt(r.tds_amount)}</td>
-        <td><strong style="color:var(--accent)">${fmt(r.amount_payable)}</strong></td>
+        <td>${r.client_name||''}</td>
+        <td>${fmt(r.gross_salary)}</td>
+        <td>${fmt(r.pf_employee||0)}</td>
+        <td>${fmt(r.esi_employee||0)}</td>
+        <td>${fmt(r.professional_tax||0)}</td>
+        <td>${fmt(r.total_deductions||0)}</td>
+        <td><strong style="color:var(--accent)">${fmt(r.net_salary||r.amount_payable)}</strong></td>
+        <td>${fmt(r.ctc_monthly||0)}</td>
       </tr>`).join('');
     document.getElementById('view-card').style.display = 'block';
     document.getElementById('view-card').scrollIntoView({behavior:'smooth'});
