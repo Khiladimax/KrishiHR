@@ -891,6 +891,7 @@ router.get   ('/offer-letters/:id',          authenticate, authorize('hr'), offe
 router.put   ('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.update);
 router.delete('/offer-letters/:id',          authenticate, authorize('hr'), offerCtrl.remove);
 router.post  ('/offer-letters/:id/send',     authenticate, authorize('hr'), offerCtrl.sendEmail);
+router.post  ('/offer-letters/:id/apply-structure', authenticate, authorize(...HR_ADMIN), offerCtrl.applyToStructure);
 
 // Bulk send — multipart Excel upload
 const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });

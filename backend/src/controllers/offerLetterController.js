@@ -459,6 +459,74 @@ exports.getOne = async (req, res) => {
 };
 
 // ── POST /offer-letters — create ─────────────────────────────────────────────
+// ── Push an offer letter's pay into employee_salary_structure ────────────────
+// Resolves the employee from employee_id → employee_code → candidate_email.
+// overwrite=false seeds a structure only if none exists (never clobbers an
+// Accounts-edited one); overwrite=true force-applies the offer's numbers.
+// Returns true if a structure was written.
+async function applyOfferToStructure(offer, userId, overwrite = false) {
+  try {
+    let empId = offer.employee_id || null;
+    if (!empId && offer.employee_code) {
+      const r = await db.query('SELECT id FROM employees WHERE UPPER(employee_code)=UPPER($1)', [offer.employee_code]);
+      if (r.rows[0]) empId = r.rows[0].id;
+    }
+    if (!empId && offer.candidate_email) {
+      const r = await db.query('SELECT id FROM employees WHERE LOWER(email)=LOWER($1)', [offer.candidate_email]);
+      if (r.rows[0]) empId = r.rows[0].id;
+    }
+    if (!empId) return false;   // candidate isn't an employee yet
+
+    const num = v => parseFloat(v) || 0;
+    const basic       = num(offer.basic_monthly);
+    const hra         = num(offer.hra_monthly);
+    const conveyance  = num(offer.conveyance_monthly);
+    const other       = num(offer.other_allowance_monthly);
+    const gratuity    = num(offer.gratuity_monthly);
+    const pfEmp       = num(offer.pf_employee_monthly);
+    const pfEr        = num(offer.pf_employer_monthly);
+    const pfAdmin     = num(offer.pf_admin_monthly);
+    const pt          = num(offer.professional_tax_monthly);
+    // Offer letters don't carry ESIC yet — left 0, Accounts can add it.
+    const gross    = basic + hra + conveyance + other + gratuity;
+    const totalDed = pfEmp + pt;
+    const net      = gross - totalDed;
+    const ctc      = gross + pfEr + pfAdmin;
+    const ctcAnnual = num(offer.ctc_annual) || ctc * 12;
+    const totalEmployerCost = pfEr + pfAdmin;
+
+    await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+    await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+    await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS tds NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+
+    const conflict = overwrite
+      ? `ON CONFLICT(employee_id) DO UPDATE SET
+           basic=$2, hra=$3, conveyance=$4, special_allowance=0, gratuity=$5, other_allowance=$6, gross_salary=$7,
+           pf_applicable=$8, esi_applicable=false, pt_applicable=true, lwf_applicable=false, tds_applicable=false,
+           pf_employee=$9, pf_employer=$10, pf_admin=$11, professional_tax=$12,
+           total_employer_cost=$13, total_deductions=$14, net_salary=$15, ctc_monthly=$16, ctc_annual=$17,
+           updated_by=$18, updated_at=NOW()`
+      : `ON CONFLICT(employee_id) DO NOTHING`;
+
+    await db.query(
+      `INSERT INTO employee_salary_structure
+         (employee_id, basic, hra, conveyance, special_allowance, gratuity, other_allowance, gross_salary,
+          pf_applicable, esi_applicable, pt_applicable, lwf_applicable, tds_applicable,
+          pf_employee, pf_employer, pf_admin, esi_employee, esi_employer,
+          professional_tax, lwf, tds, loan_emi_recovery, total_employer_cost,
+          total_deductions, net_salary, ctc_monthly, ctc_annual, updated_by, updated_at)
+       VALUES($1,$2,$3,$4,0,$5,$6,$7,$8,false,true,false,false,$9,$10,$11,0,0,$12,0,0,0,$13,$14,$15,$16,$17,$18,NOW())
+       ${conflict}`,
+      [empId, basic, hra, conveyance, gratuity, other, gross,
+       (pfEmp > 0 || pfEr > 0), pfEmp, pfEr, pfAdmin, pt,
+       totalEmployerCost, totalDed, net, ctc, ctcAnnual, userId]);
+    return true;
+  } catch (err) {
+    console.error('[applyOfferToStructure]', err.message);
+    return false;
+  }
+}
+
 exports.create = async (req, res) => {
   try {
     const {
@@ -495,9 +563,28 @@ exports.create = async (req, res) => {
        probation_months, notice_period_months, custom_clauses||null, sig1_image||null, sig2_image||null, employment_type||'permanent', contract_months||0,
        req.user.id]
     );
-    res.json({ success: true, data: result.rows[0], message: 'Offer letter created!' });
+    // If this offer already links to an existing employee, seed their salary
+    // structure from it (won't overwrite an existing/edited one).
+    const seeded = await applyOfferToStructure(result.rows[0], req.user.id, false);
+    res.json({ success: true, data: result.rows[0], seeded_structure: seeded, message: 'Offer letter created!' });
   } catch (err) {
     console.error('[offerLetter.create]', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ── POST /offer-letters/:id/apply-structure — force-apply offer pay → structure
+// Explicit action for HR/Accounts to push this offer's numbers into the linked
+// employee's salary structure (overwrites what's there).
+exports.applyToStructure = async (req, res) => {
+  try {
+    const r = await db.query('SELECT * FROM offer_letters WHERE id=$1', [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Offer letter not found' });
+    const ok = await applyOfferToStructure(r.rows[0], req.user.id, true);
+    if (!ok) return res.status(400).json({ success: false, message: 'No matching employee (set Employee Code, or create the employee first).' });
+    res.json({ success: true, message: 'Salary structure updated from this offer letter.' });
+  } catch (err) {
+    console.error('[offerLetter.applyToStructure]', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

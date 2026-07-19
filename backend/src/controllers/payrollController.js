@@ -865,8 +865,12 @@ exports.downloadPayrollTemplate = async (req, res) => {
              COALESCE(s.professional_tax,                      0) AS professional_tax,
              COALESCE(s.lwf,                                   0) AS lwf,
              COALESCE(s.tds,                                   0) AS tds,
+             COALESCE(s.pf_employer,                           0) AS pf_employer,
+             COALESCE(s.esi_employer,                          0) AS esi_employer,
+             COALESCE(s.pf_admin,                              0) AS pf_admin,
              COALESCE(s.total_deductions,                      0) AS total_deductions,
-             COALESCE(s.net_salary,                            0) AS net_salary
+             COALESCE(s.net_salary,                            0) AS net_salary,
+             COALESCE(s.ctc_monthly,                           0) AS ctc_monthly
       FROM employees e
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
@@ -886,7 +890,9 @@ exports.downloadPayrollTemplate = async (req, res) => {
       'Basic', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
       'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'LWF', 'TDS',
       'Loan/EMI Deduction (Active EMI)', 'EMI Progress', 'Total Deductions',
-      'Net Pay', 'Payment Status', 'Remarks'
+      'Net Pay',
+      'PF (Employer)', 'ESI (Employer)', 'PF Admin', 'CTC (Monthly)',
+      'Payment Status', 'Remarks'
     ];
 
     const rows = [
@@ -942,6 +948,10 @@ exports.downloadPayrollTemplate = async (req, res) => {
             : '',
           totalDed,
           net,
+          parseFloat(e.pf_employer)  || 0,
+          parseFloat(e.esi_employer) || 0,
+          parseFloat(e.pf_admin)     || 0,
+          parseFloat(e.ctc_monthly)  || 0,
           'Paid',    // Payment Status default
           '',        // Remarks
         ];
@@ -957,7 +967,9 @@ exports.downloadPayrollTemplate = async (req, res) => {
       {wch:10},{wch:8},{wch:10},{wch:14},{wch:9},{wch:12},
       {wch:12},{wch:12},{wch:9},{wch:6},{wch:8},
       {wch:16},{wch:12},{wch:14},
-      {wch:10},{wch:14},{wch:20}
+      {wch:10},
+      {wch:12},{wch:12},{wch:9},{wch:14},
+      {wch:14},{wch:20}
     ];
 
     // Freeze top 4 rows and first 2 cols
