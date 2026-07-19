@@ -31,6 +31,11 @@ const COL = {
   ctc: 26, pan_number: 27, aadhar_number: 28, uan_number: 29,
   bank_name: 30, bank_account: 31, bank_ifsc: 32, bank_branch: 33,
   address_line1: 34, city: 35, state: 36, pincode: 37,
+  // ── Optional salary-structure columns (appended; blank/absent = 0) ──
+  // These let you define the full pay (incl. ESIC) right at import. They are
+  // written into employee_salary_structure so payroll pre-fills from them.
+  st_gratuity: 38, st_pf_employee: 39, st_pf_employer: 40, st_pf_admin: 41,
+  st_esi_employee: 42, st_esi_employer: 43, st_professional_tax: 44,
 };
 
 const { findOrCreateClient } = require('./clientController');
@@ -235,6 +240,51 @@ exports.importEmployees = async (req, res) => {
                 );
               }
             }
+          }
+        }
+
+        // ── Define pay at import → employee_salary_structure (single source of
+        //    truth that payroll pre-fills from). Every figure is taken as given;
+        //    Accounts can edit it later on the Salary Structure page. ──────────
+        {
+          const basic       = toNum(row[COL.basic_salary]);
+          const hra         = toNum(row[COL.hra]);
+          const conveyance  = toNum(row[COL.travel_allowance]);   // Travel Allowance ≈ Conveyance
+          const special     = toNum(row[COL.special_allowance]);
+          const gratuity    = toNum(row[COL.st_gratuity]);
+          const pfEmp       = toNum(row[COL.st_pf_employee]);
+          const pfEr        = toNum(row[COL.st_pf_employer]);
+          const pfAdmin     = toNum(row[COL.st_pf_admin]);
+          const esiEmp      = toNum(row[COL.st_esi_employee]);
+          const esiEr       = toNum(row[COL.st_esi_employer]);
+          const pt          = toNum(row[COL.st_professional_tax]);
+
+          // Only create a structure if there is any pay data at all
+          if (basic || hra || conveyance || special || gratuity || toNum(row[COL.ctc])) {
+            const gross    = basic + hra + conveyance + special + gratuity;
+            const totalDed = pfEmp + esiEmp + pt;
+            const net      = gross - totalDed;
+            const ctc      = gross + pfEr + esiEr + pfAdmin;
+            const totalEmployerCost = pfEr + esiEr + pfAdmin;
+
+            await client.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+            await client.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+            await client.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS tds NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+
+            await client.query(
+              `INSERT INTO employee_salary_structure
+                 (employee_id, basic, hra, conveyance, special_allowance, gratuity, other_allowance, gross_salary,
+                  pf_applicable, esi_applicable, pt_applicable, lwf_applicable, tds_applicable,
+                  pf_employee, pf_employer, pf_admin, esi_employee, esi_employer,
+                  professional_tax, lwf, tds, loan_emi_recovery, total_employer_cost,
+                  total_deductions, net_salary, ctc_monthly, ctc_annual, updated_by, updated_at)
+               VALUES($1,$2,$3,$4,$5,$6,0,$7,$8,$9,true,false,false,$10,$11,$12,$13,$14,$15,0,0,0,$16,$17,$18,$19,$20,$21,NOW())
+               ON CONFLICT(employee_id) DO NOTHING`,
+              [newEmp.id, basic, hra, conveyance, special, gratuity, gross,
+               pfEmp > 0 || pfEr > 0, esiEmp > 0 || esiEr > 0,
+               pfEmp, pfEr, pfAdmin, esiEmp, esiEr, pt, totalEmployerCost,
+               totalDed, net, ctc, ctc * 12, req.user.id]
+            );
           }
         }
 
