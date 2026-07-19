@@ -211,12 +211,14 @@ exports.uploadPayroll = async (req, res) => {
     }
     console.log(`[uploadPayroll] Header found at row ${headerIdx}`);
 
-    // ✅ Clean headers: remove newlines and extra spaces
-    const headers = rows[headerIdx].map(h => 
+    // ✅ Clean headers: lowercase, drop newlines AND parentheses, collapse spaces.
+    // Parens must go so "PF (Employee)" matches the col('pf employee') lookups.
+    const headers = rows[headerIdx].map(h =>
       String(h || '')
         .toLowerCase()
-        .replace(/\n/g, ' ')  // Remove newlines
-        .replace(/\s+/g, ' ') // Collapse multiple spaces
+        .replace(/\n/g, ' ')   // newlines → space
+        .replace(/[()]/g, ' ') // parentheses → space
+        .replace(/\s+/g, ' ')  // collapse multiple spaces
         .trim()
     );
     const col = (name) => headers.findIndex(h => h.includes(name));
