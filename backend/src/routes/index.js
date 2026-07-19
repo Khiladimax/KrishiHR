@@ -79,6 +79,7 @@ router.get   ('/employees/contacts',      authenticate,                         
 // All active employees — open to any authenticated user (for chat DM picker, employee search)
 router.get   ('/employees/for-chat',      authenticate,                          empCtrl.getAllForChat);
 router.get   ('/employees/import-template', authenticate, authorize(...EMP_MGMT), empImportCtrl.downloadTemplate);
+router.get   ('/templates/all',           authenticate, authorize(...EMP_MGMT), require('../controllers/templatesController').downloadAll);
 router.get   ('/employees/:id',           authenticate,                          empCtrl.getOne);
 router.post  ('/employees',               authenticate, authorize(...EMP_MGMT),  empCtrl.create);
 router.put   ('/employees/:id',           authenticate, authorize(...EMP_MGMT),  empCtrl.update);

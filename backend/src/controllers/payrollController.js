@@ -889,7 +889,7 @@ exports.downloadPayrollTemplate = async (req, res) => {
     const HEADERS = [
       'Emp Code', 'Full Name', 'Department', 'Designation', 'Category',
       'Working Days', 'Present Days', 'LOP Days', 'Paid Days',
-      'Basic', 'HRA', 'Conveyance', 'Special Allowance', 'Gratuity', 'Gross Salary',
+      'Basic', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
       'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'LWF', 'TDS',
       'Loan/EMI Deduction (Active EMI)', 'EMI Progress', 'Total Deductions',
       'Net Pay',

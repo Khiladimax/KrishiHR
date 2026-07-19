@@ -321,6 +321,7 @@
         <div class="card-header">
           <div class="card-title">📥 Bulk Import Employees</div>
           <button type="button" onclick="downloadImportTemplate(this)" class="btn btn-outline btn-sm">⬇ Download Template</button>
+          <button type="button" onclick="downloadAllTemplates(this)" class="btn btn-outline btn-sm" title="Employee, Offer Letter, Main Payroll, Client Payroll — all in one ZIP">⬇ All Templates (ZIP)</button>
         </div>
         <div class="card-body" style="padding:24px">
           <div id="import-drop-zone" style="border:2px dashed #c7d2fe;border-radius:14px;padding:40px;text-align:center;background:#f8f9ff;cursor:pointer"
@@ -2173,6 +2174,22 @@ async function downloadImportTemplate(btn) {
     a.click();
     URL.revokeObjectURL(a.href);
     toast('✅ Template downloaded');
+  } catch (e) {
+    toast('Download failed: ' + e.message, 'error');
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+}
+
+async function downloadAllTemplates(btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Zipping…'; }
+  try {
+    const res = await fetch(`${API_BASE}/templates/all`, { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: 'KrishiHR_All_Templates.zip' });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('✅ All templates downloaded');
   } catch (e) {
     toast('Download failed: ' + e.message, 'error');
   }

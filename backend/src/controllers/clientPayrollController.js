@@ -60,7 +60,7 @@ function labels(m, y) {
 const HEADERS = [
   'Emp Code', 'Name', 'Client', 'Department',
   'Working Days', 'Present Days', 'LOP Days', 'Paid Days',
-  'Basic + VDA', 'HRA', 'Conveyance', 'Special Allowance', 'Gratuity', 'Gross Salary',
+  'Basic + VDA', 'HRA', 'Conveyance', 'Other Allowance', 'Gratuity', 'Gross Salary',
   'PF (Employee)', 'ESI (Employee)', 'Prof Tax', 'TDS', 'LWF', 'Loan/EMI', 'Total Deductions',
   'Net Salary',
   'PF (Employer)', 'ESI (Employer)', 'PF Admin', 'CTC (Monthly)',
@@ -317,7 +317,7 @@ exports.exportPayroll = async (req, res) => {
     const COLS = [
       'Emp Code','Name','Client','Department',
       'Work Days','Present','LOP','Paid Days',
-      'Basic + VDA','HRA','Conveyance','Special Allow','Gratuity','Gross',
+      'Basic + VDA','HRA','Conveyance','Other Allow','Gratuity','Gross',
       'PF (Emp)','ESI (Emp)','Prof Tax','TDS','LWF','Loan/EMI','Total Ded',
       'Net Salary','PF (Employer)','ESI (Employer)','PF Admin','CTC',
       'Bank','Account No.','IFSC','Status',
