@@ -826,7 +826,13 @@ exports.bulkSend = async (req, res) => {
     // Parse Excel
     const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const ws   = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    // Find the real header row (some templates have a title row on top), then parse
+    // from there — otherwise sheet_to_json would treat the title as the headers.
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    let hdrIdx = grid.findIndex(r => Array.isArray(r) &&
+      r.some(c => String(c || '').toLowerCase().includes('candidate name')));
+    if (hdrIdx < 0) hdrIdx = 0;
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '', range: hdrIdx });
 
     if (!rows.length) return res.status(400).json({ success: false, message: 'Excel is empty' });
 

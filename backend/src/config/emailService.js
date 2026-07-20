@@ -8,7 +8,7 @@
 
 const db = require('./db');
 
-const FROM_NAME  = process.env.EMAIL_FROM_NAME || 'KrishiHR';
+const FROM_NAME  = process.env.EMAIL_FROM_NAME || 'Krishi Care & Management Services Pvt. Ltd.';
 const FROM_EMAIL = process.env.EMAIL_FROM      || 'anonymous.agritech@gmail.com';
 const ENABLED    = process.env.EMAIL_ENABLED === 'true';
 
@@ -21,9 +21,9 @@ const ENABLED    = process.env.EMAIL_ENABLED === 'true';
 //   EMAIL_FROM_ADMIN=admin@krishicare.in
 //   EMAIL_FROM_SYSTEM=no-reply@krishicare.in
 const SENDERS = {
-  hr:       { email: process.env.EMAIL_FROM_HR       || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_HR       || 'KrishiHR — HR' },
-  accounts: { email: process.env.EMAIL_FROM_ACCOUNTS || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_ACCOUNTS || 'KrishiHR — Accounts' },
-  admin:    { email: process.env.EMAIL_FROM_ADMIN    || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_ADMIN    || 'KrishiHR — Admin' },
+  hr:       { email: process.env.EMAIL_FROM_HR       || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_HR       || FROM_NAME },
+  accounts: { email: process.env.EMAIL_FROM_ACCOUNTS || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_ACCOUNTS || FROM_NAME },
+  admin:    { email: process.env.EMAIL_FROM_ADMIN    || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_ADMIN    || FROM_NAME },
   system:   { email: process.env.EMAIL_FROM_SYSTEM   || FROM_EMAIL, name: FROM_NAME },
 };
 function resolveSender(category) {
