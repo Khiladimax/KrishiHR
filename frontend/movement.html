@@ -149,7 +149,7 @@ buildSidebar('movement.html');
   loadNotifBadge();
 
 const user = Auth.getUser();
-const allowed = ['admin','super_admin','hr','manager','tl','client_admin'];
+const allowed = ['admin','super_admin','hr','manager','tl','client_admin','super_admin_client'];
 if (!user || !allowed.includes(user.role)) window.location.href = 'attendance.html';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ const todayIST = () => new Intl.DateTimeFormat('en-CA', {
 (async function init() {
   const isKC718       = user && user.employee_code === 'KC718';
   const seeAll        = isKC718 || ['super_admin','hr','admin'].includes(user.role);
-  const isClientAdmin = user.role === 'client_admin';
+  const isClientAdmin = ['client_admin','super_admin_client'].includes(user.role);
 
   if (!seeAll) {
     // Hide client filter for non-KC-admin roles
@@ -194,7 +194,7 @@ async function onMvClientChange() {
 async function loadMvEmployees() {
   const isKC718       = user && user.employee_code === 'KC718';
   const seeAll        = isKC718 || ['super_admin','hr','admin'].includes(user.role);
-  const isClientAdmin = user.role === 'client_admin';
+  const isClientAdmin = ['client_admin','super_admin_client'].includes(user.role);
   const clientFilter  = document.getElementById('mv-client')?.value || 'kc';
 
   let endpoint;

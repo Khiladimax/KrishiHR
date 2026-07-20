@@ -231,13 +231,13 @@ Auth.guard();
 const API   = window.CFG?.apiBase || 'https://krishihr-zuui.onrender.com/api';
 const token = localStorage.getItem('krishihr_token');
 const user  = JSON.parse(localStorage.getItem('krishihr_user') || '{}');
-if (!['super_admin','accounts','client_admin'].includes(user.role)) {
+if (!['super_admin','accounts','client_admin','super_admin_client'].includes(user.role)) {
   alert('Access denied.'); location.href = 'dashboard.html';
 }
 buildSidebar('client_payroll_import.html');
 
 // Hide import steps for client_admin (download only)
-if (user.role === 'client_admin') {
+if (['client_admin','super_admin_client'].includes(user.role)) {
   document.querySelector('.steps-grid').style.display = 'none';
   document.getElementById('import-card').style.display = 'none';
   document.getElementById('results-card').style.display = 'none';

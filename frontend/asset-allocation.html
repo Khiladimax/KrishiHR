@@ -149,7 +149,7 @@ table.aa-tbl th { color:#000; }
 <script src="app.js"></script>
 <script>
 Auth.guard();
-const MANAGE_ROLES = ['hr','accounts','admin','super_admin','client_admin'];
+const MANAGE_ROLES = ['hr','accounts','admin','super_admin','client_admin','super_admin_client'];
 let isManager = false, currentEmployeeId = null, currentLabel = '';
 let allEmployees = [], itemCatalogue = [], stage = [];
 
@@ -202,7 +202,7 @@ window.addEventListener('load', async () => {
     document.getElementById('picker-bar').style.display = 'block';
     document.getElementById('dl-btn').style.display = '';
     // A client_admin only has the Client tab; everyone else gets both.
-    scopes = (user.role === 'client_admin')
+    scopes = (['client_admin','super_admin_client'].includes(user.role))
       ? [{ id: 'client', label: 'Client Employees' }]
       : [{ id: 'main', label: 'Main Employees' }, { id: 'client', label: 'Client Employees' }];
     currentScope = scopes[0].id;

@@ -1932,7 +1932,7 @@ async function loadTeamToday() {
 // ── Initialize team client dropdown (admin/super_admin/hr only) ──
 async function initTeamClientFilter() {
   const isKC718       = user && user.employee_code === 'KC718';
-  const seeAll        = isKC718 || ['super_admin','hr','admin','all_admin','accounts','client_admin'].includes(user.role);
+  const seeAll        = isKC718 || ['super_admin','hr','admin','all_admin','accounts','client_admin','super_admin_client'].includes(user.role);
   const teamClientWrap = document.getElementById('team-client-wrap');
 
   if (!seeAll) {

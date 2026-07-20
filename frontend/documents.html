@@ -314,7 +314,7 @@ textarea.fc { resize:vertical;min-height:80px; }
 <script>
 Auth.guard();
 
-const HR_ROLES = ['hr','accounts','client_admin'];
+const HR_ROLES = ['hr','accounts','client_admin','super_admin_client'];
 let isHR = false;
 let currentEmployeeId = null;
 let checklistData = [];
@@ -346,7 +346,7 @@ window.addEventListener('load', async () => {
     document.getElementById('hr-search-section').style.display = 'block';
     loadAllEmployees();
     // client_admin only ever sees their own client's staff → no Main/Client tabs
-    if (user.role === 'client_admin') {
+    if (['client_admin','super_admin_client'].includes(user.role)) {
       currentScope = 'client';
       document.getElementById('doc-scope-tabs').style.display = 'none';
     }

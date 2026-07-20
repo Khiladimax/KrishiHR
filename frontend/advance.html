@@ -468,7 +468,7 @@ const isSuperAdmin = user.role === 'super_admin' || user.employee_code === 'KC03
 const isAccounts   = user.role === 'accounts';
 const isAdmin      = user.role === 'admin';
 const isManagerTL  = ['manager', 'tl'].includes(user.role);
-const isClientAdmin = user.role === 'client_admin';
+const isClientAdmin = ['client_admin','super_admin_client'].includes(user.role);
 
 // Show "Pending Approval" tab — approvers only (NOT hr)
 const canSeePending = isAdmin || isSuperAdmin || isAccounts || isManagerTL || isClientAdmin;

@@ -75,7 +75,12 @@ const fmt = {
 };
 
 const Role = {
-  is:            (...r) => r.includes(Auth.getUser()?.role),
+  // super_admin_client is a client-side admin — it satisfies any 'client_admin' check.
+  is:            (...r) => {
+    const role = Auth.getUser()?.role;
+    if (role === 'super_admin_client' && r.includes('client_admin')) return true;
+    return r.includes(role);
+  },
   isAdminOrHR: () => Role.is('admin','super_admin','hr','accounts'),          // super_admin EXCLUDED — view only
   // Only HR, Accounts, KC718 (Gurudutt Dureja), and Super Admin can view salary/compensation
   canViewSalary: () => Role.is('super_admin','hr','accounts') || Auth.getUser()?.employee_code === 'KC718',
@@ -87,7 +92,7 @@ const Role = {
   canApproveLeave: ()   => Role.is('admin','manager','tl','client_admin'),
   canUploadPayroll: ()  => Role.is('accounts'),                        // only accounts can upload payroll
   canProcessAdvancePayment: () => Role.is('accounts'),                 // only accounts can mark advance paid
-  badge: r => ({admin:'#ef4444',super_admin:'#7c3aed',hr:'#10b981',accounts:'#f59e0b',manager:'#4361ee',tl:'#f59e0b',employee:'#6b7280',client_admin:'#0891b2'})[r]||'#6b7280',
+  badge: r => ({admin:'#ef4444',super_admin:'#7c3aed',hr:'#10b981',accounts:'#f59e0b',manager:'#4361ee',tl:'#f59e0b',employee:'#6b7280',client_admin:'#0891b2',super_admin_client:'#0369a1'})[r]||'#6b7280',
 };
 
 // SVG icons — consistent, clean, professional
