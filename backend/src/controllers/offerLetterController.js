@@ -190,10 +190,12 @@ function buildOfferLetterHTML(ol) {
   const esiEmpr  = parseFloat(ol.esi_employer_monthly||0);
   const pt       = parseFloat(ol.professional_tax_monthly||0);
 
-  const gross      = basic + hra + conv + other + gratuity;
+  // Gratuity is an employer retiral cost — part of CTC, NOT of gross earnings and
+  // NOT a take-home deduction. So it's excluded from gross and added into CTC.
+  const gross      = basic + hra + conv + other;
   const totalDed   = pfEmp + esiEmp + pt;
   const netSalary  = gross - totalDed;
-  const ctcMonthly = gross + pfEmpr + esiEmpr + pfAdmin;
+  const ctcMonthly = gross + gratuity + pfEmpr + esiEmpr + pfAdmin;
   const ctcAnnual  = parseFloat(ol.ctc_annual || (ctcMonthly * 12));
 
   const fmtV = v => Number(Math.round(v)).toLocaleString('en-IN');
@@ -450,16 +452,16 @@ try {
       <tr><td class="col-sr">2</td><td class="col-part">HRA</td><td class="col-num">${fmtV(hra)}</td><td class="col-num">${fmtV(hra*12)}</td></tr>
       ${convRow}
       <tr><td class="col-sr">3</td><td class="col-part">Other Allowances</td><td class="col-num">${fmtV(other)}</td><td class="col-num">${fmtV(other*12)}</td></tr>
-      <tr><td class="col-sr">4</td><td class="col-part">Gratuity</td><td class="col-num">${fmtV(gratuity)}</td><td class="col-num">${fmtV(gratuity*12)}</td></tr>
-      <tr class="highlight"><td class="col-sr">5</td><td class="col-part">Gross Pay</td><td class="col-num">${fmtV(gross)}</td><td class="col-num">${fmtV(gross*12)}</td></tr>
-      <tr><td class="col-sr">6</td><td class="col-part">Provident Fund</td><td class="col-num">${pfEmp>0?fmtV(pfEmp):''}</td><td class="col-num">${pfEmp>0?fmtV(pfEmp*12):''}</td></tr>
-      <tr><td class="col-sr">7</td><td class="col-part">ESIC (Employee)</td><td class="col-num">${esiEmp>0?fmtV(esiEmp):''}</td><td class="col-num">${esiEmp>0?fmtV(esiEmp*12):''}</td></tr>
-      <tr><td class="col-sr">8</td><td class="col-part">Professional Tax</td><td class="col-num">${pt>0?fmtV(pt):''}</td><td class="col-num">${pt>0?fmtV(pt*12):''}</td></tr>
-      <tr class="highlight"><td class="col-sr">9</td><td class="col-part">Total Deduction</td><td class="col-num">${totalDed>0?fmtV(totalDed):''}</td><td class="col-num">${totalDed>0?fmtV(totalDed*12):''}</td></tr>
-      <tr class="highlight"><td class="col-sr">10</td><td class="col-part">Net Salary (Gross - Total Deduction)</td><td class="col-num">${fmtV(netSalary)}</td><td class="col-num">${fmtV(netSalary*12)}</td></tr>
-      <tr><td class="col-sr">11</td><td class="col-part">Employer PF contribution</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr):''}</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr*12):''}</td></tr>
-      <tr><td class="col-sr">12</td><td class="col-part">Employer ESIC contribution</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr):''}</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr*12):''}</td></tr>
-      <tr><td class="col-sr">13</td><td class="col-part">Employer PF contribution Admin charges</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin):''}</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr">4</td><td class="col-part">Gross Pay</td><td class="col-num">${fmtV(gross)}</td><td class="col-num">${fmtV(gross*12)}</td></tr>
+      <tr><td class="col-sr">5</td><td class="col-part">Provident Fund</td><td class="col-num">${pfEmp>0?fmtV(pfEmp):''}</td><td class="col-num">${pfEmp>0?fmtV(pfEmp*12):''}</td></tr>
+      <tr><td class="col-sr">6</td><td class="col-part">ESIC (Employee)</td><td class="col-num">${esiEmp>0?fmtV(esiEmp):''}</td><td class="col-num">${esiEmp>0?fmtV(esiEmp*12):''}</td></tr>
+      <tr><td class="col-sr">7</td><td class="col-part">Professional Tax</td><td class="col-num">${pt>0?fmtV(pt):''}</td><td class="col-num">${pt>0?fmtV(pt*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr">8</td><td class="col-part">Total Deduction</td><td class="col-num">${totalDed>0?fmtV(totalDed):''}</td><td class="col-num">${totalDed>0?fmtV(totalDed*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr">9</td><td class="col-part">Net Salary (Gross - Total Deduction)</td><td class="col-num">${fmtV(netSalary)}</td><td class="col-num">${fmtV(netSalary*12)}</td></tr>
+      <tr><td class="col-sr">10</td><td class="col-part">Employer PF contribution</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr):''}</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr*12):''}</td></tr>
+      <tr><td class="col-sr">11</td><td class="col-part">Employer ESIC contribution</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr):''}</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr*12):''}</td></tr>
+      <tr><td class="col-sr">12</td><td class="col-part">Employer PF contribution Admin charges</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin):''}</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin*12):''}</td></tr>
+      <tr><td class="col-sr">13</td><td class="col-part">Gratuity (Employer contribution)</td><td class="col-num">${gratuity>0?fmtV(gratuity):''}</td><td class="col-num">${gratuity>0?fmtV(gratuity*12):''}</td></tr>
       <tr class="highlight"><td class="col-sr">14</td><td class="col-part">Total Compensation Package</td><td class="col-num">${fmtV(ctcMonthly)}</td><td class="col-num">${fmtV(ctcAnnual)}</td></tr>
     </tbody>
   </table>
@@ -538,12 +540,12 @@ async function applyOfferToStructure(offer, userId, overwrite = false) {
     const esiEmp      = num(offer.esi_employee_monthly);
     const esiEr       = num(offer.esi_employer_monthly);
     const pt          = num(offer.professional_tax_monthly);
-    const gross    = basic + hra + conveyance + other + gratuity;
+    const gross    = basic + hra + conveyance + other;   // gratuity = employer cost, not gross
     const totalDed = pfEmp + esiEmp + pt;
     const net      = gross - totalDed;
-    const ctc      = gross + pfEr + esiEr + pfAdmin;
+    const ctc      = gross + gratuity + pfEr + esiEr + pfAdmin;
     const ctcAnnual = num(offer.ctc_annual) || ctc * 12;
-    const totalEmployerCost = pfEr + esiEr + pfAdmin;
+    const totalEmployerCost = pfEr + esiEr + pfAdmin + gratuity;
 
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`).catch(() => {});
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`).catch(() => {});

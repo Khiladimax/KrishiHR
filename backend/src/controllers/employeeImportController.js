@@ -373,11 +373,11 @@ exports.importEmployees = async (req, res) => {
 
           // Only create a structure if there is any pay data at all
           if (basic || hra || conveyance || special || gratuity || toNum(row[COL.ctc])) {
-            const gross    = basic + hra + conveyance + special + gratuity;
+            const gross    = basic + hra + conveyance + special;   // gratuity = employer cost, not gross
             const totalDed = pfEmp + esiEmp + pt;
             const net      = gross - totalDed;
-            const ctc      = gross + pfEr + esiEr + pfAdmin;
-            const totalEmployerCost = pfEr + esiEr + pfAdmin;
+            const ctc      = gross + gratuity + pfEr + esiEr + pfAdmin;
+            const totalEmployerCost = pfEr + esiEr + pfAdmin + gratuity;
 
             await client.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`).catch(() => {});
             await client.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS loan_emi_recovery NUMERIC(12,2) DEFAULT 0`).catch(() => {});

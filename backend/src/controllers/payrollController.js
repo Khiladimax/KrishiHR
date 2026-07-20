@@ -70,9 +70,10 @@ exports.upsertSalaryStructure = async (req, res) => {
     if (!employee_id)
       return res.status(400).json({ success: false, message: 'employee_id required' });
 
-    // Use HR-provided amounts (fall back to 0 if not provided)
+    // Use HR-provided amounts (fall back to 0 if not provided).
+    // Gratuity is an employer retiral cost → part of CTC, NOT of gross earnings.
     const gross        = parseFloat(basic) + parseFloat(hra) + parseFloat(conveyance)
-                       + parseFloat(special_allowance) + parseFloat(gratuity) + parseFloat(other_allowance || 0);
+                       + parseFloat(special_allowance) + parseFloat(other_allowance || 0);
     const pf_employee  = pf_applicable  ? parseFloat(pf_emp_in  || 0) : 0;
     const pf_employer  = pf_applicable  ? parseFloat(pf_emr_in  || 0) : 0;
     const pf_admin     = pf_applicable  ? parseFloat(pf_admin_in || 150) : 0;
@@ -85,10 +86,10 @@ exports.upsertSalaryStructure = async (req, res) => {
 
     const total_ded   = pf_employee + esi_employee + pt + lwf + tds + emi;
     const net         = gross - total_ded;
-    const ctc         = gross + pf_employer + esi_employer + pf_admin;
+    const ctc         = gross + parseFloat(gratuity || 0) + pf_employer + esi_employer + pf_admin;
     const ctc_monthly = ctc;
     const ctc_annual  = ctc * 12;
-    const total_employer_cost = pf_employer + esi_employer + pf_admin;
+    const total_employer_cost = pf_employer + esi_employer + pf_admin + parseFloat(gratuity || 0);
 
     // Check if other_allowance column exists; add via ALTER if needed
     await db.query(`ALTER TABLE employee_salary_structure ADD COLUMN IF NOT EXISTS other_allowance NUMERIC(12,2) DEFAULT 0`);
