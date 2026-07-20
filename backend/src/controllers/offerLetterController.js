@@ -783,9 +783,12 @@ exports.sendEmail = async (req, res) => {
     }
 
     // ── Brevo payload with all attachments ───────────────────────────────────
+    const hrFrom     = process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com';
+    const senderName = process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.';
     const payload = {
-      sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+      sender:      { name: senderName, email: hrFrom },
       to:          [{ email: ol.candidate_email, name: ol.candidate_name }],
+      replyTo:     { email: hrFrom, name: senderName },   // replies come back to HR
       subject:     `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
       htmlContent: coverHtml,
       attachment:  attachments,
@@ -793,6 +796,9 @@ exports.sendEmail = async (req, res) => {
 
     const cleanCc  = (Array.isArray(cc)  ? cc  : []).map(e => (e||'').trim()).filter(e => e && e.includes('@'));
     const cleanBcc = (Array.isArray(bcc) ? bcc : []).map(e => (e||'').trim()).filter(e => e && e.includes('@'));
+    // Auto-archive a copy in the HR mailbox so the sent history + replies thread there.
+    const archive = (process.env.EMAIL_ARCHIVE_BCC || hrFrom).trim();
+    if (archive.includes('@') && !cleanBcc.includes(archive)) cleanBcc.push(archive);
     if (cleanCc.length)  payload.cc  = cleanCc.map(e => ({ email: e }));
     if (cleanBcc.length) payload.bcc = cleanBcc.map(e => ({ email: e }));
 
@@ -1012,15 +1018,22 @@ exports.bulkSend = async (req, res) => {
         attachments.push({ name: 'Joining_Form_Krishi_Care.pdf', content: fs.readFileSync(joiningFormPath).toString('base64') });
       }
 
+      const hrFrom     = process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com';
+      const senderName = process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.';
       const payload = {
-        sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+        sender:      { name: senderName, email: hrFrom },
         to:          [{ email: candidateEmail, name: candidateName }],
+        replyTo:     { email: hrFrom, name: senderName },   // replies come back to HR
         subject:     `Offer Letter — ${designation} | Krishi Care & Management Services`,
         htmlContent: coverHtml,
         attachment:  attachments,
       };
-      if (ccRaw.length)  payload.cc  = ccRaw.map(e => ({ email: e }));
-      if (bccRaw.length) payload.bcc = bccRaw.map(e => ({ email: e }));
+      // Auto-archive a copy in the HR mailbox for the sent history + reply threading.
+      const archive  = (process.env.EMAIL_ARCHIVE_BCC || hrFrom).trim();
+      const bccList  = [...bccRaw];
+      if (archive.includes('@') && !bccList.includes(archive)) bccList.push(archive);
+      if (ccRaw.length)   payload.cc  = ccRaw.map(e => ({ email: e }));
+      if (bccList.length) payload.bcc = bccList.map(e => ({ email: e }));
 
       // Send email
       if (!BREVO_KEY || !emailEnabled) {
