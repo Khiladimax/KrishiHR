@@ -84,6 +84,7 @@ exports.initTables = async () => {
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS professional_tax_monthly NUMERIC(12,2) DEFAULT 0`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS esi_employee_monthly NUMERIC(12,2) DEFAULT 0`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS esi_employer_monthly NUMERIC(12,2) DEFAULT 0`);
+    await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS client_name VARCHAR(200)`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS employment_type VARCHAR(20) DEFAULT 'permanent'`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS contract_months INT DEFAULT 0`);
     await db.query(`ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS employee_code VARCHAR(50)`);
@@ -216,6 +217,12 @@ function buildOfferLetterHTML(ol) {
     // Permanent is the default/implied employment type — no need to call it out.
     empTypeLabel = '';
   }
+
+  // ── Client deployment clause (shown only for deployed staff) ──────────────
+  const clientName = String(ol.client_name || '').trim();
+  const clientClause = clientName
+    ? `<p>You will be deployed by the Company to render services on its behalf to our client, <strong>${clientName}</strong>. While you will discharge your duties at / for the said client, you will at all times remain on the rolls of and be an employee of <strong>Krishi Care &amp; Management Services Private Limited</strong>, and shall be governed by its terms, conditions, policies and directions. This deployment may be changed at the sole discretion of the Company.</p>`
+    : '';
 
   function joiningDateHTML(d) {
     if (!d) return '';
@@ -372,6 +379,7 @@ try {
   <p>Dear ${(ol.candidate_name||'').split(' ')[0]},</p>
   <div class="subject-line">Sub: Letter of offer/Appointment for the position of &ldquo;${ol.designation||''}&rdquo;</div>
   <p>In reference to our discussions, we are pleased to offer you the position of <strong>&ldquo;${ol.designation||''}&rdquo;</strong> in Krishi Care &amp; Management Services Private Limited${empTypeLabel}, to be based at our <strong>${ol.location||'Mumbai'} Office${ol.joining_date ? ' as from <strong>' + joiningDateHTML(ol.joining_date) + '</strong>' : ''}.</strong></p>
+  ${clientClause}
   <p>The offer letter is valid for <strong>${ol.offer_valid_days||7} days</strong> by which time we must be informed of your decision; the said offer letter shall stand cancelled after the above-mentioned date.</p>
   <p>We are pleased to issue this letter of offer on the following terms &amp; conditions:</p>
   <p><u><strong>EMOLUMENTS:</strong></u><br>
@@ -583,7 +591,7 @@ exports.create = async (req, res) => {
       esi_employee_monthly = 0, esi_employer_monthly = 0,
       professional_tax_monthly = 0,
       probation_months = 6, notice_period_months = 3, custom_clauses, employee_id, employment_type = 'permanent', contract_months = 0,
-      employee_code,
+      employee_code, client_name,
       sig1_image, sig2_image
     } = req.body;
 
@@ -598,9 +606,9 @@ exports.create = async (req, res) => {
         gratuity_monthly, pf_employee_monthly, pf_employer_monthly, pf_admin_monthly,
         professional_tax_monthly, employee_code,
         probation_months, notice_period_months, custom_clauses, sig1_image, sig2_image, employment_type, contract_months,
-        esi_employee_monthly, esi_employer_monthly,
+        esi_employee_monthly, esi_employer_monthly, client_name,
         created_by, updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,NOW())
       RETURNING *`,
       [employee_id||null, candidate_name, candidate_email||null, candidate_address||null, candidate_mobile||null,
        designation, location, joining_date||null, offer_date||null, offer_valid_days,
@@ -608,7 +616,7 @@ exports.create = async (req, res) => {
        gratuity_monthly, pf_employee_monthly, pf_employer_monthly, pf_admin_monthly,
        professional_tax_monthly||0, employee_code||null,
        probation_months, notice_period_months, custom_clauses||null, sig1_image||null, sig2_image||null, employment_type||'permanent', contract_months||0,
-       esi_employee_monthly||0, esi_employer_monthly||0,
+       esi_employee_monthly||0, esi_employer_monthly||0, client_name||null,
        req.user.id]
     );
     // If this offer already links to an existing employee, seed their salary
@@ -644,7 +652,7 @@ exports.update = async (req, res) => {
       'designation','location','joining_date','offer_date','offer_valid_days',
       'ctc_annual','basic_monthly','hra_monthly','conveyance_monthly','other_allowance_monthly',
       'gratuity_monthly','pf_employee_monthly','pf_employer_monthly','pf_admin_monthly',
-      'esi_employee_monthly','esi_employer_monthly',
+      'esi_employee_monthly','esi_employer_monthly','client_name',
       'professional_tax_monthly','employee_code',
       'probation_months','notice_period_months','custom_clauses','sig1_image','sig2_image','employment_type','contract_months'];
     const sets = [], params = [];
@@ -875,6 +883,7 @@ exports.bulkSend = async (req, res) => {
       const customClauses  = String(row['Custom Clauses']  || row['custom_clauses']  || '').trim();
       const employmentType = String(row['Employment Type'] || row['employment_type'] || 'permanent').trim().toLowerCase();
       const contractMon    = parseInt(row['Contract Months'] || row['contract_months'] || 0) || 0;
+      const clientName     = String(row['Client Name'] || row['Client'] || row['client_name'] || '').trim();
 
       // Salary fields — accept the canonical (employee-import) names too
       const ctcAnnual    = parseFloat(String(row['CTC']              || row['CTC Annual']         || row['ctc_annual']         || 0).replace(/,/g,'')) || 0;
@@ -936,6 +945,7 @@ exports.bulkSend = async (req, res) => {
         esi_employee_monthly:    esiEmployee,
         esi_employer_monthly:    esiEmployer,
         professional_tax_monthly: profTax,
+        client_name:             clientName || null,
         custom_clauses:          customClauses || null,
         employment_type:         employmentType,
         contract_months:         contractMon,

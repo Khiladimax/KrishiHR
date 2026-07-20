@@ -51,9 +51,9 @@ const empMain = ['','KC9001','Krishi@123','Anita','Sharma','anita.sharma@krishic
 const empCli = ['IFFCO Tokio','KC9101','Krishi@123','Suresh','Gowda','suresh.gowda@gmail.com','9876500101','','Male','1990-01-15','A+','Married','2024-05-01','Full-Time','employee','Field','Sales Executive','','','2024-11-01','Chikmagalur','Day',12000,4000,0,1000,577,1800,1950,150,144,624,200,240000,'CDEFG3456H','323456789012','','State Bank of India','33326768763','SBIN0011260','Tarikere','Dornalu','Tarikere','Karnataka','577228'];
 
 // ── OFFER LETTER (matches in-app offer-letter.html bulk template) ──────────────
-const OL_H = ['Candidate Name','Email','Mobile','Address','Designation','Location','Joining Date','Offer Valid Days','Probation Months','Notice Period Months','Employee Code','Employment Type','Contract Months','CTC','Basic Salary','HRA','Travel Allowance','Other Allowance','Gratuity Monthly','PF Employee','PF Employer','PF Admin','ESIC Employee','ESIC Employer','Professional Tax','Custom Clauses','CC','BCC'];
-const olMain = ['Mr. Kiran Rao','kiran.rao@example.com','9800000001','12 MG Road, Bengaluru','Field Officer','Bengaluru','2026-08-01',7,6,3,'','permanent',0,360000,15000,6000,1600,2000,722,1800,1950,150,180,780,200,'','hr@krishicare.in',''];
-const olCli = ['Ms. Lakshmi Bai','lakshmi.bai@example.com','9800000102','Sankalpura, Sringeri','Field Officer','Sringeri','2026-08-10',7,3,1,'','contract',12,240000,12000,4000,1000,0,577,1800,1950,150,144,624,200,'Deployed at IFFCO Tokio','hr@krishicare.in',''];
+const OL_H = ['Candidate Name','Email','Mobile','Address','Designation','Location','Joining Date','Offer Valid Days','Probation Months','Notice Period Months','Employee Code','Client Name','Employment Type','Contract Months','CTC','Basic Salary','HRA','Travel Allowance','Other Allowance','Gratuity Monthly','PF Employee','PF Employer','PF Admin','ESIC Employee','ESIC Employer','Professional Tax','Custom Clauses','CC','BCC'];
+const olMain = ['Mr. Kiran Rao','kiran.rao@example.com','9800000001','12 MG Road, Bengaluru','Field Officer','Bengaluru','2026-08-01',7,6,3,'','','permanent',0,360000,15000,6000,1600,2000,722,1800,1950,150,180,780,200,'','hr@krishicare.in',''];
+const olCli = ['Ms. Lakshmi Bai','lakshmi.bai@example.com','9800000102','Sankalpura, Sringeri','Field Officer','Sringeri','2026-08-10',7,3,1,'','IFFCO Tokio General Insurance','contract',12,240000,12000,4000,1000,0,577,1800,1950,150,144,624,200,'','hr@krishicare.in',''];
 
 // ── MAIN PAYROLL (30 cols) ────────────────────────────────────────────────────
 const MP_H = ['Emp Code','Full Name','Department','Designation','Category','Working Days','Present Days','LOP Days','Paid Days','Basic','HRA','Conveyance','Other Allowance','Gratuity','Gross Salary','PF (Employee)','ESI (Employee)','Prof Tax','LWF','TDS','Loan/EMI Deduction (Active EMI)','EMI Progress','Total Deductions','Net Pay','PF (Employer)','ESI (Employer)','PF Admin','CTC (Monthly)','Payment Status','Remarks'];
@@ -71,7 +71,7 @@ exports.downloadAll = async (_req, res) => {
     const files = [
       ['1_Main_Employee_Import.xlsx',    await sheetBuffer('Employee Import','KrishiHR - Main Employee Import (own KCMS staff)', EMP_H, EMP_HINT, [empMain], [22,33])],
       ['2_Client_Employee_Import.xlsx',  await sheetBuffer('Employee Import','KrishiHR - Client Employee Import (deployed staff)', EMP_H, EMP_HINT, [empCli], [22,33])],
-      ['3_Offer_Letter_Import.xlsx',     await sheetBuffer('Offer Letters','KrishiHR - Offer Letter Bulk Import (with ESIC)', OL_H, null, [olMain, olCli], [13,24])],
+      ['3_Offer_Letter_Import.xlsx',     await sheetBuffer('Offer Letters','KrishiHR - Offer Letter Bulk Import (with ESIC)', OL_H, null, [olMain, olCli], [14,25])],
       ['4_Main_Payroll_Import.xlsx',     await sheetBuffer('Payroll','KrishiHR - Main Payroll Import (imported = final)', MP_H, null, [mp1, mp2], [9,27])],
       ['5_Client_Payroll_Import.xlsx',   await sheetBuffer('Client Payroll','KrishiHR - Client Payroll Import (imported = final)', CP_H, null, [cp1, cp2], [8,25])],
     ];

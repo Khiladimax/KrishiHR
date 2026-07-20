@@ -204,6 +204,10 @@
               <label>Contract Duration (months)</label>
               <input type="number" id="ol-contract-months" value="0" min="0">
             </div>
+            <div class="form-group">
+              <label>Client Name (deployment)</label>
+              <input type="text" id="ol-client-name" placeholder="e.g. IFFCO Tokio General Insurance — leave blank for own staff">
+            </div>
           </div>
 
           <!-- SALARY STRUCTURE -->
@@ -477,6 +481,7 @@ async function loadForm(id) {
   document.getElementById('ol-notice').value       = ol.notice_period_months || 3;
   document.getElementById('ol-emp-type').value       = ol.employment_type || 'permanent';
   document.getElementById('ol-contract-months').value = ol.contract_months || 0;
+  document.getElementById('ol-client-name').value    = ol.client_name || '';
   toggleContractMonths();
   document.getElementById('ol-ctc').value          = ol.ctc_annual || '';
   document.getElementById('ol-basic').value        = ol.basic_monthly || '';
@@ -521,6 +526,7 @@ async function saveOL() {
     notice_period_months:     parseInt(document.getElementById('ol-notice').value) || 3,
     employment_type:          document.getElementById('ol-emp-type').value || 'permanent',
     contract_months:          parseInt(document.getElementById('ol-contract-months').value) || 0,
+    client_name:              document.getElementById('ol-client-name').value.trim() || null,
     ctc_annual:               parseFloat(document.getElementById('ol-ctc').value) || 0,
     basic_monthly:            parseFloat(document.getElementById('ol-basic').value) || 0,
     hra_monthly:              parseFloat(document.getElementById('ol-hra').value) || 0,
@@ -647,6 +653,7 @@ function resetForm() {
   document.getElementById('ol-probation').value  = 6;
   document.getElementById('ol-notice').value     = 3;
   document.getElementById('ol-emp-type').value     = 'permanent';
+  document.getElementById('ol-client-name').value  = '';
   document.getElementById('ol-contract-months').value = 0;
   toggleContractMonths();
   document.getElementById('ol-conv').value       = 0;
@@ -797,7 +804,7 @@ function downloadBulkTemplate() {
   const headers = [
     'Candidate Name','Email','Mobile','Address','Designation','Location',
     'Joining Date','Offer Valid Days','Probation Months','Notice Period Months',
-    'Employee Code','Employment Type','Contract Months',
+    'Employee Code','Client Name','Employment Type','Contract Months',
     'CTC','Basic Salary','HRA','Travel Allowance',
     'Other Allowance','Gratuity Monthly','PF Employee','PF Employer','PF Admin',
     'ESIC Employee','ESIC Employer','Professional Tax','Custom Clauses','CC','BCC'
@@ -805,14 +812,14 @@ function downloadBulkTemplate() {
   const sample1 = [
     'Rahul Sharma','rahul@example.com','9876543210','B-12, Andheri West, Mumbai',
     'Senior GIS Analyst','Mumbai','2026-08-01',7,6,3,
-    'KCMS-001','permanent',0,
+    'KCMS-001','','permanent',0,
     1500000,30000,15000,0,76818,1442,1800,1800,150,0,0,200,
     '','hr@krishicare.in',''
   ];
   const sample2 = [
     'Amit Kumar','amit@example.com','8877665544','D-78, Jogeshwari East, Mumbai',
     'Field Survey Executive','Mumbai','2026-07-15',7,0,1,
-    'KCMS-002','contract',12,
+    'KCMS-002','IFFCO Tokio General Insurance','contract',12,
     600000,12000,6000,0,30350,577,1080,1080,90,0,0,0,
     '','hr@krishicare.in',''
   ];
