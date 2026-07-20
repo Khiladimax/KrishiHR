@@ -729,7 +729,7 @@ exports.sendEmail = async (req, res) => {
 
     // ── Brevo payload with all attachments ───────────────────────────────────
     const payload = {
-      sender:      { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+      sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'KrishiHR — HR', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
       to:          [{ email: ol.candidate_email, name: ol.candidate_name }],
       subject:     `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
       htmlContent: coverHtml,
@@ -944,7 +944,7 @@ exports.bulkSend = async (req, res) => {
       }
 
       const payload = {
-        sender:      { name: process.env.EMAIL_FROM_NAME || 'KrishiHR', email: process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+        sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'KrishiHR — HR', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
         to:          [{ email: candidateEmail, name: candidateName }],
         subject:     `Offer Letter — ${designation} | Krishi Care & Management Services`,
         htmlContent: coverHtml,

@@ -12,6 +12,24 @@ const FROM_NAME  = process.env.EMAIL_FROM_NAME || 'KrishiHR';
 const FROM_EMAIL = process.env.EMAIL_FROM      || 'anonymous.agritech@gmail.com';
 const ENABLED    = process.env.EMAIL_ENABLED === 'true';
 
+// ── Role-based senders ────────────────────────────────────────────────────────
+// Each mail can pick a sender by category. Every entry falls back to the default
+// EMAIL_FROM until you set the matching env var, so nothing breaks before the
+// krishicare.in domain + these addresses are verified in Brevo.
+//   EMAIL_FROM_HR=HR_KCMS@krishicare.in
+//   EMAIL_FROM_ACCOUNTS=accounts@krishicare.in
+//   EMAIL_FROM_ADMIN=admin@krishicare.in
+//   EMAIL_FROM_SYSTEM=no-reply@krishicare.in
+const SENDERS = {
+  hr:       { email: process.env.EMAIL_FROM_HR       || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_HR       || 'KrishiHR — HR' },
+  accounts: { email: process.env.EMAIL_FROM_ACCOUNTS || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_ACCOUNTS || 'KrishiHR — Accounts' },
+  admin:    { email: process.env.EMAIL_FROM_ADMIN    || FROM_EMAIL, name: process.env.EMAIL_FROM_NAME_ADMIN    || 'KrishiHR — Admin' },
+  system:   { email: process.env.EMAIL_FROM_SYSTEM   || FROM_EMAIL, name: FROM_NAME },
+};
+function resolveSender(category) {
+  return SENDERS[category] || { email: FROM_EMAIL, name: FROM_NAME };
+}
+
 // ── Base HTML Template ────────────────────────────────────────────────────────
 function baseTemplate(title, bodyHtml, previewText = '') {
   return `<!DOCTYPE html>
@@ -88,7 +106,7 @@ function baseTemplate(title, bodyHtml, previewText = '') {
 }
 
 // ── Send helper ───────────────────────────────────────────────────────────────
-async function send({ to, toName, subject, html, preview }) {
+async function send({ to, toName, subject, html, preview, category = 'hr', replyTo, replyToName, cc, bcc }) {
   if (!ENABLED) {
     console.log(`[Email DISABLED] Would send to ${to}: ${subject}`);
     return;
@@ -99,12 +117,19 @@ async function send({ to, toName, subject, html, preview }) {
     return;
   }
   try {
-    const body = JSON.stringify({
-      sender:  { name: FROM_NAME, email: FROM_EMAIL },
+    const sender  = resolveSender(category);
+    const payload = {
+      sender,
       to:      [{ email: to, name: toName || to }],
       subject,
       htmlContent: baseTemplate(subject, html, preview || subject),
-    });
+    };
+    // Manager/owner replies should reach the real person, even though the mail is
+    // sent from a verified role address (Brevo can't send "from" a personal inbox).
+    if (replyTo) payload.replyTo = { email: replyTo, name: replyToName || replyTo };
+    if (cc && cc.length)  payload.cc  = cc.map(e => (typeof e === 'string' ? { email: e } : e));
+    if (bcc && bcc.length) payload.bcc = bcc.map(e => (typeof e === 'string' ? { email: e } : e));
+    const body = JSON.stringify(payload);
 
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method:  'POST',
@@ -442,6 +467,7 @@ async function notifyPayslipReleased(employeeId, monthName, year) {
     await send({
       to:      emp.email,
       toName:  `${emp.first_name} ${emp.last_name}`,
+      category: 'accounts',
       subject: `💰 Your ${monthName} ${year} Payslip is Ready`,
       preview: `Your payslip for ${monthName} ${year} has been generated`,
       html: `
@@ -473,6 +499,7 @@ async function notifyBirthday(employeeId) {
     await send({
       to:      emp.email,
       toName:  `${emp.first_name} ${emp.last_name}`,
+      category: 'admin',
       subject: `🎂 Happy Birthday, ${emp.first_name}! 🎉`,
       preview: `Wishing you a wonderful birthday from the entire Krishi team!`,
       html: `
@@ -511,6 +538,7 @@ async function notifyAnniversary(employeeId, yearsCompleted) {
     await send({
       to:      emp.email,
       toName:  `${emp.first_name} ${emp.last_name}`,
+      category: 'admin',
       subject: `${emoji} ${yearsCompleted} Year${yearsCompleted>1?'s':''} at Krishi Care! Happy Work Anniversary`,
       preview: `Celebrating ${yearsCompleted} year${yearsCompleted>1?'s':''} of your amazing journey with us!`,
       html: `
@@ -613,6 +641,7 @@ async function notifyAdvanceRequested(advanceId) {
         await send({
           to:      ap.email,
           toName:  `${ap.first_name} ${ap.last_name}`,
+          category: 'accounts',
           subject: `💸 Advance Salary Request — ${a.first_name} ${a.last_name}`,
           preview: `${a.first_name} has requested an advance of ₹${parseInt(a.amount).toLocaleString('en-IN')}`,
           html: `
@@ -646,6 +675,7 @@ async function notifyAdvanceApproved(advanceId) {
     await send({
       to:      a.email,
       toName:  `${a.first_name} ${a.last_name}`,
+      category: 'accounts',
       subject: `✅ Advance Salary Approved — ₹${parseInt(a.amount).toLocaleString('en-IN')}`,
       preview: `Your advance salary request has been fully approved`,
       html: `
@@ -693,6 +723,7 @@ async function notifyAdvanceRejected(advanceId, remarks) {
     await send({
       to:      a.email,
       toName:  `${a.first_name} ${a.last_name}`,
+      category: 'accounts',
       subject: `\u274C Advance Salary Request Rejected`,
       preview: `Your advance salary request of \u20B9${parseInt(a.amount).toLocaleString('en-IN')} has been rejected`,
       html: `
@@ -731,6 +762,7 @@ async function notifyAnnouncement(announcementId) {
       await send({
         to:      emp.email,
         toName:  `${emp.first_name} ${emp.last_name}`,
+        category: 'admin',
         subject: `📢 ${ann.title}`,
         preview: ann.content?.slice(0, 100),
         html: `
@@ -1405,6 +1437,7 @@ async function notifyProvisionManagerApprovalNeeded(employeeId, emp) {
     await send({
       to:      m.email,
       toName:  `${m.first_name} ${m.last_name}`,
+      category: 'accounts',
       subject: `🎯 Confirmation Approval Needed — ${emp.first_name} ${emp.last_name}`,
       preview: `Please review and approve the permanent confirmation for ${emp.first_name} ${emp.last_name}`,
       html: `
@@ -1453,6 +1486,7 @@ async function notifyProvisionInitiated(employeeId, confirmationDate) {
 
     await send({
       to: e.email, toName: `${e.first_name} ${e.last_name}`,
+      category: 'accounts',
       subject: `🎉 Confirmation Process Initiated`,
       preview: `Your employment confirmation process has been initiated`,
       html: `
