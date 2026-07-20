@@ -353,13 +353,13 @@ try {
   ul { margin-top: 0; padding-left: 25px; }
   li { margin-bottom: 3px; text-align: justify; font-size: 13px; }
   .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-family: 'Arial',sans-serif; border: 1px solid #000; }
-  .data-table th, .data-table td { border: 1px solid #000; padding: 8px 8px; font-size: 12px; }
+  .data-table th, .data-table td { border: 1px solid #000; padding: 3px 8px; font-size: 11px; }
   .data-table th { background-color: #1a4d2e; color: #fff; font-weight: bold; text-transform: uppercase; }
   .col-sr { width: 8%; text-align: center; }
   .col-part { width: 48%; text-align: left; }
   .col-num { width: 22%; text-align: right; }
   .data-table tr.highlight td { font-weight: bold; background-color: #f2f2f2; }
-  .data-table tr.section td { font-weight: bold; font-size: 11px; text-transform: uppercase; background-color: #dfe7e2; color: #1a4d2e; letter-spacing: .03em; padding: 5px 8px; }
+  .data-table tr.section td { font-weight: bold; font-size: 10.5px; text-transform: uppercase; background-color: #dfe7e2; color: #1a4d2e; letter-spacing: .03em; padding: 3px 8px; }
   .main-signature-block { margin-top: 20px; font-size: 14px; }
   .dual-signature { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px; }
   .company-stamp { position: absolute; left: 8px; bottom: 6px; opacity: 0.9; transform: rotate(-8deg); pointer-events: none; }
@@ -475,10 +475,10 @@ try {
       <tr class="highlight"><td class="col-sr"></td><td class="col-part">Total Compensation Package (CTC = A + C)</td><td class="col-num">${fmtV(ctcMonthly)}</td><td class="col-num">${fmtV(ctcAnnual)}</td></tr>
     </tbody>
   </table>
-  <div style="margin-top:15px;">
-    <h4 style="margin-bottom:5px;font-size:14px;text-decoration:underline;">Acknowledgement &amp; Acceptance</h4>
+  <div style="margin-top:10px;">
+    <h4 style="margin-bottom:4px;font-size:14px;text-decoration:underline;">Acknowledgement &amp; Acceptance</h4>
     <p style="margin-top:0;font-size:13px;">I have read understood, agree to the above terms and conditions, and hereby sign my acceptance of the same.</p>
-    <div style="margin-top:15px;font-size:14px;line-height:2.0;font-weight:bold;">
+    <div style="margin-top:10px;font-size:14px;line-height:1.7;font-weight:bold;">
       Signature: _____________________________________________________<br>
       Name: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_____________________________________________________<br>
       Date: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_____________________________________________________<br>
@@ -784,7 +784,7 @@ exports.sendEmail = async (req, res) => {
 
     // ── Brevo payload with all attachments ───────────────────────────────────
     const payload = {
-      sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'KrishiHR — HR', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+      sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
       to:          [{ email: ol.candidate_email, name: ol.candidate_name }],
       subject:     `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
       htmlContent: coverHtml,
@@ -1013,7 +1013,7 @@ exports.bulkSend = async (req, res) => {
       }
 
       const payload = {
-        sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'KrishiHR — HR', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
+        sender:      { name: process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.', email: process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com' },
         to:          [{ email: candidateEmail, name: candidateName }],
         subject:     `Offer Letter — ${designation} | Krishi Care & Management Services`,
         htmlContent: coverHtml,
