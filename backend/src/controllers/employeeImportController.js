@@ -234,7 +234,7 @@ exports.importEmployees = async (req, res) => {
 
       const hash = await bcrypt.hash(password, 10);
       const role_val = clean(row[COL.role]) || 'employee';
-      const valid_roles = ['employee','tl','manager','hr','accounts','admin','client_admin'];
+      const valid_roles = ['employee','tl','manager','hr','accounts','admin','client_admin','super_admin_client'];
       const role = valid_roles.includes(role_val) ? role_val : 'employee';
 
       // ── Client deployment: resolve client_name → client_id ────────────────

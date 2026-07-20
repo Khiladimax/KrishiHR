@@ -30,7 +30,7 @@ const compoffCtrl    = require('../controllers/compoffController');
 const clientCtrl     = require('../controllers/clientController');
 
 const ADMIN      = ['admin','super_admin'];
-const HR_ADMIN   = ['hr','admin','super_admin','accounts','client_admin'];
+const HR_ADMIN   = ['hr','admin','super_admin','accounts','client_admin','super_admin_client'];
 const ACCOUNTS   = ['accounts','super_admin'];
 const ADMIN_ONLY = ['admin','super_admin'];
 // KC346 geofence access — hardcoded north zone manager
@@ -38,7 +38,7 @@ const authorizeGeofence = (req, res, next) => {
   if (['admin','super_admin','client_admin'].includes(req.user.role) || req.user.employee_code === 'KC346') return next();
   return res.status(403).json({ success: false, message: 'Access denied. Required: admin or super_admin' });
 };
-const EMP_MGMT   = ['hr','accounts','admin','super_admin','client_admin'];
+const EMP_MGMT   = ['hr','accounts','admin','super_admin','client_admin','super_admin_client'];
 const PROVISION_APPROVERS = ['hr','admin','super_admin','manager','tl'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ router.post('/auth/forgot-password/reset',      authCtrl.forgotReset);
 router.get ('/auth/me',          authenticate,  authCtrl.getMe);
 
 // ── Security / device-lock ──────────────────────────────────────────────────
-const SEC_ADMIN = ['super_admin','admin','hr','client_admin'];
+const SEC_ADMIN = ['super_admin','admin','hr','client_admin','super_admin_client'];
 router.post('/security/report-violation', authenticate,                       securityCtrl.reportViolation);
 router.get ('/security/logs',             authenticate, authorize(...SEC_ADMIN), securityCtrl.getSecurityLogs);
 router.get ('/security/logs/export',      authenticate, authorize(...SEC_ADMIN), securityCtrl.exportExcel);
@@ -68,12 +68,12 @@ router.get   ('/employees',               authenticate,                         
 router.get   ('/employees/export',        authenticate, authorize(...EMP_MGMT), empCtrl.exportExcel || ((req,res) => res.status(501).json({success:false,message:'Not implemented'})));
 router.get   ('/employees/export-master',        authenticate, authorize(...EMP_MGMT), empCtrl.exportMasterExcel);
 // ── Client Payroll Cycles ────────────────────────────────────────────────────
-router.get  ('/client-payroll/template', authenticate, authorize('hr','accounts','super_admin','client_admin'), clientPayrollCtrl.downloadTemplate);
-router.get  ('/client-payroll/export',   authenticate, authorize('accounts','super_admin','client_admin'), clientPayrollCtrl.exportPayroll);
+router.get  ('/client-payroll/template', authenticate, authorize('hr','accounts','super_admin','client_admin','super_admin_client'), clientPayrollCtrl.downloadTemplate);
+router.get  ('/client-payroll/export',   authenticate, authorize('accounts','super_admin','client_admin','super_admin_client'), clientPayrollCtrl.exportPayroll);
 router.post ('/client-payroll/import',   authenticate, authorize('hr','accounts','super_admin'), clientPayrollCtrl.uploadMiddleware, clientPayrollCtrl.importPayroll);
-router.get  ('/client-payroll',          authenticate, authorize('hr','accounts','super_admin','client_admin'), clientPayrollCtrl.listPayroll);
+router.get  ('/client-payroll',          authenticate, authorize('hr','accounts','super_admin','client_admin','super_admin_client'), clientPayrollCtrl.listPayroll);
 
-router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin','client_admin'), empCtrl.exportAttendanceRegister);
+router.get   ('/attendance/export-register',     authenticate, authorize('hr','accounts','super_admin','client_admin','super_admin_client'), empCtrl.exportAttendanceRegister);
 router.get   ('/employees/code-preview',  authenticate, authorize(...EMP_MGMT), empCtrl.previewNextCode);
 router.get   ('/employees/contacts',      authenticate,                          empCtrl.getContacts);
 // All active employees — open to any authenticated user (for chat DM picker, employee search)
@@ -138,7 +138,7 @@ router.post('/attendance/regularize/action',authenticate, attCtrl.actionRegulari
 
 // ── Attendance Bulk Import (Excel) — kept here for reference (defined above) ──
 
-router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts','client_admin'), attImportCtrl.downloadAttendanceReport);
+router.get ('/attendance/monthly-report',   authenticate, authorize('hr','accounts','client_admin','super_admin_client'), attImportCtrl.downloadAttendanceReport);
 
 // ── OD / WFH apply (all employees) ───────────────────────────────────────────
 router.post('/attendance/od',              authenticate, attCtrl.applyOD);
@@ -148,21 +148,21 @@ router.post('/attendance/od/:id/action',   authenticate, authorize('hr','super_a
 router.post('/attendance/wfh',             authenticate, attCtrl.applyWFH);
 router.get ('/attendance/wfh',             authenticate, attCtrl.getWFHRequests);
 router.post('/attendance/wfh/:id/action',  authenticate, authorize('hr','super_admin','admin','manager','tl'), attCtrl.actionWFH);
-router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts','client_admin'), attImportCtrl.downloadAttendanceReport);
+router.get ('/attendance/report/download',  authenticate, authorize('hr','accounts','client_admin','super_admin_client'), attImportCtrl.downloadAttendanceReport);
 // KC718 / super_admin: mark own attendance for a date range without punch in/out
 router.post('/attendance/mark-range',      authenticate, attCtrl.markRange);
 
 // ── Movement Tracking ──────────────────────────────────────────────────────
 router.post('/attendance/movement/log',           authenticate, attCtrl.logMovement);
 router.post('/attendance/movement/log-batch',     authenticate, attCtrl.logMovementBatch);
-router.get ('/attendance/movement/segmented',     authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), attCtrl.getMovementSegmented);
-router.get ('/attendance/movement/history',       authenticate, authorize('hr','super_admin','admin','manager','tl','employee','client_admin'), attCtrl.getMovementHistory); // employee allowed for multi-live map self-query
-router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), attCtrl.getMovementSummary);
+router.get ('/attendance/movement/segmented',     authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin','super_admin_client'), attCtrl.getMovementSegmented);
+router.get ('/attendance/movement/history',       authenticate, authorize('hr','super_admin','admin','manager','tl','employee','client_admin','super_admin_client'), attCtrl.getMovementHistory); // employee allowed for multi-live map self-query
+router.get ('/attendance/movement/summary', authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin','super_admin_client'), attCtrl.getMovementSummary);
 
 // ── Feature #10: Tracking Alerts ──────────────────────────────────────────────
-router.get ('/attendance/movement/alerts',              authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), alertsCtrl.getActiveAlerts);
-router.post('/attendance/movement/alerts/:id/resolve',  authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), alertsCtrl.resolveAlert);
-router.get ('/attendance/movement/alerts/employee/:employee_id', authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin'), alertsCtrl.getEmployeeAlertHistory);
+router.get ('/attendance/movement/alerts',              authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin','super_admin_client'), alertsCtrl.getActiveAlerts);
+router.post('/attendance/movement/alerts/:id/resolve',  authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin','super_admin_client'), alertsCtrl.resolveAlert);
+router.get ('/attendance/movement/alerts/employee/:employee_id', authenticate, authorize('hr','super_admin','admin','manager','tl','client_admin','super_admin_client'), alertsCtrl.getEmployeeAlertHistory);
 
 // ── Feature #7: Beat Plan / PJP ───────────────────────────────────────────────
 router.post('/attendance/beat-plan',                    authenticate, authorize('hr','super_admin','admin','manager','tl'), beatPlanCtrl.createPlan);
@@ -232,8 +232,8 @@ router.put ('/leave/balance',         authenticate, authorize(...HR_ADMIN), leav
 router.post('/leave/monthly-accrual',        authenticate, authorize(...HR_ADMIN), leaveCtrl.monthlyAccrual);
 router.post('/leave/recalculate/:id',        authenticate, authorize(...HR_ADMIN), leaveCtrl.recalculateEmployee);
 router.get ('/leave/report',                 authenticate,                        leaveCtrl.getLeaveReport);
-router.get ('/leave/summary',                authenticate, authorize('hr','super_admin','admin','accounts','client_admin'), leaveCtrl.getLeaveSummary);
-router.get ('/leave/transactions',           authenticate, authorize('hr','super_admin','admin','accounts','client_admin'), leaveCtrl.getLeaveTransactions);
+router.get ('/leave/summary',                authenticate, authorize('hr','super_admin','admin','accounts','client_admin','super_admin_client'), leaveCtrl.getLeaveSummary);
+router.get ('/leave/transactions',           authenticate, authorize('hr','super_admin','admin','accounts','client_admin','super_admin_client'), leaveCtrl.getLeaveTransactions);
 
 // ── Comp Off ──────────────────────────────────────────────────────────────────
 router.post  ('/compoff/grant',        authenticate, authorize('hr','admin','super_admin'), compoffCtrl.grantCredit);
