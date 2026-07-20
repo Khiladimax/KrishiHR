@@ -24,7 +24,8 @@ exports.uploadMiddleware = upload.single('file');
 exports.uploadMultiMiddleware = upload.array('files', 10);
 
 // Roles allowed to view/edit ANY employee's documents
-const HR_ROLES = ['hr', 'accounts', 'client_admin'];
+const HR_ROLES = ['hr', 'accounts', 'client_admin', 'super_admin_client'];
+const CLIENT_SIDE = ['client_admin', 'super_admin_client'];
 
 // ── Fixed document checklist definition ────────────────────────────────────────
 // key must be stable — used as the unique identifier per employee per document
@@ -281,7 +282,7 @@ exports.deleteDocument = async (req, res) => {
 
     const row     = result.rows[0];
     const isOwner = parseInt(row.employee_id) === parseInt(reqUser.id);
-    const isAdmin = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin'].includes(reqUser.role);
+    const isAdmin = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin', 'super_admin_client'].includes(reqUser.role);
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
@@ -306,7 +307,7 @@ exports.submitDocument = async (req, res) => {
     const result  = await db.query(`SELECT employee_id FROM employee_doc_checklist WHERE id = $1`, [docId]);
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Document not found' });
     const isOwner = parseInt(result.rows[0].employee_id) === parseInt(reqUser.id);
-    const isAdmin = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin'].includes(reqUser.role);
+    const isAdmin = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin', 'super_admin_client'].includes(reqUser.role);
     if (!isOwner && !isAdmin) return res.status(403).json({ success: false, message: 'Access denied' });
     await db.query(`UPDATE employee_doc_checklist SET is_submitted = true WHERE id = $1`, [docId]);
     res.json({ success: true, message: 'Document submitted' });
@@ -322,9 +323,9 @@ exports.getEmployeesForPicker = async (req, res) => {
     if (!HR_ROLES.includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    // client_admin only sees their own org's employees
-    const clientFilter = (req.user.role === 'client_admin' && req.user.client_id)
-      ? `AND client_id = ${parseInt(req.user.client_id)}`
+    // client_admin → own client + state; super_admin_client → own client; else all
+    const clientFilter = CLIENT_SIDE.includes(String(req.user.role || '').toLowerCase())
+      ? `AND (${docScopeWhere(req.user, 'client')})`
       : '';
     const result = await db.query(
       `SELECT id, employee_code, first_name, last_name
@@ -341,8 +342,16 @@ exports.getEmployeesForPicker = async (req, res) => {
 // "main" = own-company staff (client_id IS NULL); "client" = deployed staff
 // (client_id IS NOT NULL). A client_admin is always locked to their own client.
 function docScopeWhere(reqUser, scope) {
-  if (reqUser.role === 'client_admin')
-    return reqUser.client_id ? `client_id = ${parseInt(reqUser.client_id)}` : '1=0';
+  const role = String(reqUser.role || '').toLowerCase();
+  if (CLIENT_SIDE.includes(role)) {
+    if (!reqUser.client_id) return '1=0';
+    let f = `client_id = ${parseInt(reqUser.client_id)}`;
+    if (role === 'client_admin' && reqUser.state) {   // super_admin_client = all states
+      const st = String(reqUser.state).trim().replace(/'/g, "''");
+      f += ` AND LOWER(TRIM(COALESCE(state,''))) = LOWER('${st}')`;
+    }
+    return f;
+  }
   return scope === 'client' ? 'client_id IS NOT NULL' : 'client_id IS NULL';
 }
 
@@ -431,12 +440,15 @@ exports.setVerify = async (req, res) => {
     const verified = !(req.body.verified === false || req.body.verified === 'false');
     if (!empId) return res.status(400).json({ success: false, message: 'employee_id required' });
 
-    // client_admin may only verify their own client's staff
-    if (req.user.role === 'client_admin') {
-      const chk = await db.query('SELECT client_id FROM employees WHERE id = $1', [empId]);
-      if (!chk.rows[0] || parseInt(chk.rows[0].client_id) !== parseInt(req.user.client_id)) {
-        return res.status(403).json({ success: false, message: 'Access denied' });
-      }
+    // client-side admins may only verify their own client (and own state) staff
+    const role = String(req.user.role || '').toLowerCase();
+    if (CLIENT_SIDE.includes(role)) {
+      const chk = await db.query('SELECT client_id, state FROM employees WHERE id = $1', [empId]);
+      const row = chk.rows[0];
+      const okClient = row && parseInt(row.client_id) === parseInt(req.user.client_id);
+      const okState  = role !== 'client_admin' || !req.user.state ||
+        String(row && row.state || '').trim().toLowerCase() === String(req.user.state).trim().toLowerCase();
+      if (!okClient || !okState) return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     await db.query(

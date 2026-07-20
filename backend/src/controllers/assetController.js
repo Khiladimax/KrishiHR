@@ -2,7 +2,8 @@
 // One row per allocated item, with qty / serial / status (allocated|returned).
 const db = require('../config/db');
 
-const HR_ROLES = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin'];
+const HR_ROLES = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin', 'super_admin_client'];
+const CLIENT_SIDE = ['client_admin', 'super_admin_client'];
 
 // Default dropdown items (the UI also allows a free-text "Other").
 const DEFAULT_ITEMS = [
@@ -41,7 +42,17 @@ const canAccess = (u, empId) => canManage(u) || parseInt(empId) === parseInt(u.i
 // deployed staff (optionally a single client via clientId). A client_admin is
 // always locked to their own client.
 function scopeWhere(reqUser, scope, col, clientId) {
-  if (reqUser.role === 'client_admin') return reqUser.client_id ? `${col} = ${parseInt(reqUser.client_id)}` : '1=0';
+  const role = String(reqUser.role || '').toLowerCase();
+  if (CLIENT_SIDE.includes(role)) {
+    if (!reqUser.client_id) return '1=0';
+    let f = `${col} = ${parseInt(reqUser.client_id)}`;
+    if (role === 'client_admin' && reqUser.state) {   // super_admin_client = all states
+      const stCol = col.replace(/client_id$/, 'state');
+      const st = String(reqUser.state).trim().replace(/'/g, "''");
+      f += ` AND LOWER(TRIM(COALESCE(${stCol},''))) = LOWER('${st}')`;
+    }
+    return f;
+  }
   if (scope === 'client') return clientId ? `${col} = ${parseInt(clientId)}` : `${col} IS NOT NULL`;
   return `${col} IS NULL`;
 }
@@ -50,7 +61,7 @@ function scopeWhere(reqUser, scope, col, clientId) {
 exports.getClients = async (req, res) => {
   try {
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
-    if (req.user.role === 'client_admin') {
+    if (CLIENT_SIDE.includes(String(req.user.role || '').toLowerCase())) {
       const r = await db.query('SELECT id, name FROM clients WHERE id = $1', [req.user.client_id]);
       return res.json({ success: true, data: r.rows });
     }
@@ -64,10 +75,15 @@ exports.getClients = async (req, res) => {
 
 // A client_admin may only touch their own client's employees.
 async function inClientScope(reqUser, employeeId) {
-  if (reqUser.role !== 'client_admin') return true;
+  const role = String(reqUser.role || '').toLowerCase();
+  if (!CLIENT_SIDE.includes(role)) return true;
   if (!reqUser.client_id) return false;
-  const r = await db.query('SELECT client_id FROM employees WHERE id = $1', [employeeId]);
-  return r.rows[0] && parseInt(r.rows[0].client_id) === parseInt(reqUser.client_id);
+  const r = await db.query('SELECT client_id, state FROM employees WHERE id = $1', [employeeId]);
+  if (!r.rows[0] || parseInt(r.rows[0].client_id) !== parseInt(reqUser.client_id)) return false;
+  if (role === 'client_admin' && reqUser.state) {
+    return String(r.rows[0].state || '').trim().toLowerCase() === String(reqUser.state).trim().toLowerCase();
+  }
+  return true;
 }
 
 // ── GET /assets/items — dropdown catalogue ────────────────────────────────────

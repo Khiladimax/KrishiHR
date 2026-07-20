@@ -10,6 +10,20 @@ const multer = require('multer');
 const MONTH_NAMES = ['January','February','March','April','May','June',
   'July','August','September','October','November','December'];
 
+// client_admin → own client + own state; super_admin_client → own client (all
+// states); others → no extra filter. Returns an "AND …" fragment (or '').
+const CLIENT_SIDE = ['client_admin', 'super_admin_client'];
+function clientAdminFilter(user, alias = 'e') {
+  const role = String(user.role || '').toLowerCase();
+  if (!CLIENT_SIDE.includes(role) || !user.client_id) return '';
+  let f = `AND ${alias}.client_id = ${parseInt(user.client_id)}`;
+  if (role === 'client_admin' && user.state) {
+    const st = String(user.state).trim().replace(/'/g, "''");
+    f += ` AND LOWER(TRIM(COALESCE(${alias}.state,''))) = LOWER('${st}')`;
+  }
+  return f;
+}
+
 // ── Upload middleware ─────────────────────────────────────────────────────────
 exports.uploadMiddleware = multer({
   storage: multer.memoryStorage(),
@@ -101,7 +115,7 @@ exports.downloadTemplate = async (req, res) => {
       LEFT JOIN clients cl ON e.client_id = cl.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
-      WHERE e.client_id IS NOT NULL AND e.is_active = true
+      WHERE e.client_id IS NOT NULL AND e.is_active = true ${clientAdminFilter(req.user, 'e')}
       ORDER BY COALESCE(cl.name,''), e.first_name`);
 
     const wb = new ExcelJS.Workbook();
@@ -297,8 +311,7 @@ exports.exportPayroll = async (req, res) => {
     const y = parseInt(req.query.year)  || new Date().getFullYear();
     const { cycleLabel, periodLabel } = labels(m, y);
 
-    const isClientAdmin = req.user.role === 'client_admin';
-    const clientFilter  = isClientAdmin && req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+    const clientFilter = clientAdminFilter(req.user, 'e');
 
     const result = await db.query(`
       SELECT cp.*, e.employee_code,
@@ -424,8 +437,7 @@ exports.listPayroll = async (req, res) => {
 
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year)  || new Date().getFullYear();
-    const isClientAdmin = req.user.role === 'client_admin';
-    const clientFilter  = isClientAdmin && req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+    const clientFilter = clientAdminFilter(req.user, 'e');
 
     const result = await db.query(`
       SELECT cp.*, e.employee_code,
