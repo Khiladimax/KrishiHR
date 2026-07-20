@@ -923,7 +923,13 @@ exports.bulkSend = async (req, res) => {
       let joiningDate = null;
       if (joiningDateRaw) {
         const d = joiningDateRaw instanceof Date ? joiningDateRaw : new Date(joiningDateRaw);
-        if (!isNaN(d)) joiningDate = d.toISOString().split('T')[0];
+        if (!isNaN(d)) {
+          // Excel date cells authored in IST come through as ~midnight-minus in UTC
+          // (e.g. 8 Jul → 2026-07-07T18:30Z), which naive UTC formatting rolls back a
+          // day. Round to the NEAREST day so the intended calendar date is kept.
+          const rounded = new Date(Math.round(d.getTime() / 86400000) * 86400000);
+          joiningDate = rounded.toISOString().split('T')[0];
+        }
       }
 
       // Build offer letter object (same shape as DB row)
