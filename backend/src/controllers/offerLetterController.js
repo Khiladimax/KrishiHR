@@ -26,13 +26,18 @@ const COMPANY = {
 // per-offer uploaded sig1_image overrides it). stamp.jpeg = company round seal.
 // Both are JPEGs on a white background — rendered with mix-blend-mode:multiply so
 // the white blends into the page.
-function loadAssetB64(file) {
-  try { return 'data:image/jpeg;base64,' + fs.readFileSync(path.join(__dirname, '../assets/' + file)).toString('base64'); }
-  catch (_) { return ''; }
+// Tries each candidate filename and returns the first that exists (base64).
+function loadAssetB64(...files) {
+  for (const file of files) {
+    try { return 'data:image/jpeg;base64,' + fs.readFileSync(path.join(__dirname, '../assets/' + file)).toString('base64'); }
+    catch (_) { /* try next */ }
+  }
+  return '';
 }
-const DEFAULT_SIGNATURE_B64 = loadAssetB64('Sign.jpeg');
-const STAMP_IMG_B64         = loadAssetB64('stamp.jpeg');
-console.log(`✅ Offer letter assets — signature:${DEFAULT_SIGNATURE_B64?'ok':'missing'} stamp:${STAMP_IMG_B64?'ok':'missing'}`);
+const DEFAULT_SIGNATURE_B64    = loadAssetB64('Authorized Signatory.jpeg', 'Sign.jpeg');  // left — authorized signatory
+const DEFAULT_HR_SIGNATURE_B64 = loadAssetB64('HR_Sign.jpg', 'HR_Sign.jpeg');             // right — Human Resource
+const STAMP_IMG_B64            = loadAssetB64('stamp.jpg', 'stamp.jpeg');
+console.log(`✅ Offer letter assets — sig:${DEFAULT_SIGNATURE_B64?'ok':'missing'} hrSig:${DEFAULT_HR_SIGNATURE_B64?'ok':'missing'} stamp:${STAMP_IMG_B64?'ok':'missing'}`);
 
 // ── DB Init ────────────────────────────────────────────────────────────────────
 exports.initTables = async () => {
@@ -265,9 +270,10 @@ try {
   const sig1HTML = sigImg
     ? '<img src="' + sigImg + '" style="height:52px;display:block;margin-bottom:2px;mix-blend-mode:multiply;" alt="">'
     : '<div style="height:46px;"></div>';
-  const sig2HTML = ol.sig2_image
-    ? '<img src="' + ol.sig2_image + '" style="height:44px;display:block;margin-left:auto;margin-bottom:4px;" alt="">'
-    : '<div style="height:44px;"></div>';
+  const hrSig = ol.sig2_image || DEFAULT_HR_SIGNATURE_B64 || '';
+  const sig2HTML = hrSig
+    ? '<img src="' + hrSig + '" style="height:52px;display:block;margin-left:auto;margin-bottom:2px;mix-blend-mode:multiply;" alt="">'
+    : '<div style="height:46px;"></div>';
 
   // ── Shared header HTML (logo + company name) ──────────────────────────────
   const hdr = `
