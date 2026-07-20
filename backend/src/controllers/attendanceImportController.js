@@ -6,6 +6,7 @@ const fcm = require('../services/fcmService');
 //        professional styled Excel export.
 
 const db   = require('../config/db');
+const { clientScopeFragment } = require('../utils/scope');
 const XLSX = require('xlsx');
 const multer = require('multer');
 
@@ -336,16 +337,17 @@ const MONTH_NAMES = ['January','February','March','April','May','June',
 exports.downloadAttendanceReport = async (req, res) => {
   try {
     // ── 1. Role gate ───────────────────────────────────────────────────────
-    const allowedRoles = ['hr', 'accounts', 'client_admin'];
+    const allowedRoles = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin', 'super_admin_client'];
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only HR, Accounts and Client Admin can download attendance reports.'
+        message: 'Access denied. Only HR, Accounts and Client Admins can download attendance reports.'
       });
     }
 
-    const isClientAdmin = req.user.role === 'client_admin';
-    const clientId      = req.user.client_id;
+    // Employee visibility: client_admin → own client+state, super_admin_client →
+    // own client (all states), main staff (hr/accounts/admin) → everyone.
+    const scopeFrag = clientScopeFragment(req.user, 'e');   // string fragment or null
 
     const { month, year, department_id } = req.query;
     const mon       = parseInt(month) || new Date().getMonth() + 1;
@@ -358,6 +360,7 @@ exports.downloadAttendanceReport = async (req, res) => {
                             CONCAT(e.first_name,' ',e.last_name) AS name,
                             d.name AS department,
                             des.title AS designation,
+                            e.client_id, e.state AS emp_state,
                             COALESCE(e.saturday_policy, '2nd_4th_off') AS saturday_policy
                      FROM employees e
                      LEFT JOIN departments d  ON e.department_id  = d.id
@@ -366,38 +369,31 @@ exports.downloadAttendanceReport = async (req, res) => {
     let empParams = [];
     let paramIdx  = 1;
 
-    // Client admin: restrict to their client's employees only
-    if (isClientAdmin && clientId) {
-      empQuery += ` AND e.client_id = $${paramIdx++}`;
-      empParams.push(clientId);
-    }
+    if (scopeFrag) empQuery += ` AND (${scopeFrag})`;   // client-side admins → own client/state
     if (department_id) {
       empQuery += ` AND e.department_id = $${paramIdx++}`;
       empParams.push(department_id);
     }
-    empQuery += ` ORDER BY d.name, e.first_name`;
+    // Group blocks: main employees first, then client staff grouped by state.
+    empQuery += ` ORDER BY (e.client_id IS NOT NULL), COALESCE(e.state,''), d.name, e.first_name`;
     const employees = await db.query(empQuery, empParams);
 
-    // ── 3. Fetch attendance for the month scoped by client ───────────────
-    let attQuery  = `SELECT employee_id,
-                            TO_CHAR(date,'YYYY-MM-DD') AS date_str,
-                            EXTRACT(DAY FROM date)::int AS day,
-                            status, working_hours, punch_in_location,
-                            TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
-                            TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
-                            punch_in, punch_out
-                     FROM attendance
-                     WHERE EXTRACT(MONTH FROM date) = $1
-                       AND EXTRACT(YEAR  FROM date) = $2`;
-    let attParams = [mon, yr];
-    if (isClientAdmin && clientId) {
-      attQuery  += ` AND employee_id IN (SELECT id FROM employees WHERE client_id = $3)`;
-      attParams.push(clientId);
-    } else if (department_id) {
-      attQuery  += ` AND employee_id IN (SELECT id FROM employees WHERE department_id = $3)`;
-      attParams.push(department_id);
-    }
-    const attendance = await db.query(attQuery, attParams);
+    // ── 3. Fetch attendance for just those employees for the month ───────
+    const empIds = employees.rows.map(e => e.id);
+    const attendance = empIds.length
+      ? await db.query(
+          `SELECT employee_id,
+                  TO_CHAR(date,'YYYY-MM-DD') AS date_str,
+                  EXTRACT(DAY FROM date)::int AS day,
+                  status, working_hours, punch_in_location, remarks,
+                  TO_CHAR(punch_in,  'HH12:MI AM') AS punch_in_fmt,
+                  TO_CHAR(punch_out, 'HH12:MI AM') AS punch_out_fmt,
+                  punch_in, punch_out
+             FROM attendance
+            WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+              AND employee_id = ANY($3::int[])`,
+          [mon, yr, empIds])
+      : { rows: [] };
 
     // ── 4. Fetch holidays ────────────────────────────────────────────────
     const holidays = await db.query(
@@ -438,6 +434,13 @@ exports.downloadAttendanceReport = async (req, res) => {
     const weeklyOffDays_allWork = buildWeeklyOffDays('all_working');
 
     // ── 7. Build summary data ─────────────────────────────────────────────
+    // State-group label: main staff → one block, client staff → per state.
+    const groupOf = (emp) => {
+      if (!emp.client_id) return 'MAIN — KCMS EMPLOYEES';
+      const st = String(emp.emp_state || '').trim();
+      return st ? `STATE — ${st.toUpperCase()}` : 'CLIENT — (STATE NOT SET)';
+    };
+
     const reportRows = employees.rows.map(emp => {
       const weeklyOffDays = emp.saturday_policy === 'all_working'
         ? weeklyOffDays_allWork
@@ -487,6 +490,7 @@ exports.downloadAttendanceReport = async (req, res) => {
 
       const effectiveDays = P + (H * 0.5) + OD + EL;
       return {
+        group:         groupOf(emp),
         emp_code:      emp.employee_code,
         name:          emp.name,
         department:    emp.department || '—',
@@ -517,18 +521,20 @@ exports.downloadAttendanceReport = async (req, res) => {
       [`Generated on: ${new Date().toLocaleString('en-IN')} | By: ${req.user.first_name || ''} ${req.user.last_name || ''} (${req.user.role})`],
       [], // blank
       summaryHeaders,
-      ...reportRows.map((r, i) => [
-        i + 1,
-        r.emp_code,
-        r.name,
-        r.department,
-        r.designation,
-        r.working_days,
-        r.P, r.A, r.H,
-        r.LWP, r.EL, r.SL||0, r.CL||0, r.OD, r.WFH, r.WO, r.HOL,
-        r.effective_days,
-        r.salary_days,
-      ]),
+    ];
+    // Data rows grouped by state (main block first, then each client state).
+    {
+      let lastGroup = null, sn = 0;
+      for (const r of reportRows) {
+        if (r.group !== lastGroup) { summaryData.push([`▶  ${r.group}`]); lastGroup = r.group; }
+        summaryData.push([
+          ++sn, r.emp_code, r.name, r.department, r.designation, r.working_days,
+          r.P, r.A, r.H, r.LWP, r.EL, r.SL||0, r.CL||0, r.OD, r.WFH, r.WO, r.HOL,
+          r.effective_days, r.salary_days,
+        ]);
+      }
+    }
+    summaryData.push(
       // Totals row
       [
         '', 'TOTAL', '', '', '',
@@ -546,7 +552,7 @@ exports.downloadAttendanceReport = async (req, res) => {
         reportRows.reduce((s,r)=>s+r.effective_days,0).toFixed(1),
         reportRows.reduce((s,r)=>s+r.salary_days,0).toFixed(1),
       ]
-    ];
+    );
 
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
 
@@ -583,7 +589,9 @@ exports.downloadAttendanceReport = async (req, res) => {
       dayHeaders,
     ];
 
+    let dailyLastGroup = null;
     for (const r of reportRows) {
+      if (r.group !== dailyLastGroup) { dailyData.push([`▶  ${r.group}`]); dailyLastGroup = r.group; }
       // Use this employee's own weekly-off set (respects their saturday_policy)
       const empWeeklyOffDays = r._weeklyOffDays;
       const row = [r.emp_code, r.name, r.department];
@@ -653,7 +661,10 @@ exports.downloadAttendanceReport = async (req, res) => {
       punchHeaders,
     ];
 
+    let punchLastGroup = null;
     for (const emp of employees.rows) {
+      const g = groupOf(emp);
+      if (g !== punchLastGroup) { punchData.push([`▶  ${g}`]); punchLastGroup = g; }
       const empAtt = attIndex[emp.id] || {};
       const row = [emp.employee_code, emp.name, emp.department || '—'];
       for (let d = 1; d <= numDays; d++) {
