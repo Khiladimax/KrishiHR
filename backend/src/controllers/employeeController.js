@@ -1511,12 +1511,18 @@ exports.exportMasterExcel = async (req, res) => {
     const y = parseInt(year)  || new Date().getFullYear();
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-    const isClientAdmin = req.user.role === 'client_admin';
+    // client-side admins (client_admin + super_admin_client). client_admin is also
+    // limited to their own state; super_admin_client sees all states of the client.
+    const caRole        = String(req.user.role || '').toLowerCase();
+    const isClientAdmin = caRole === 'client_admin' || caRole === 'super_admin_client';
     const clientId      = req.user.client_id;
-    const clientFilter  = isClientAdmin && clientId ? `AND e.client_id = ${parseInt(clientId)}` : '';
+    const caStateSql    = (caRole === 'client_admin' && req.user.state)
+      ? ` AND LOWER(TRIM(COALESCE(e.state,''))) = LOWER('${String(req.user.state).trim().replace(/'/g, "''")}')`
+      : '';
+    const clientFilter  = isClientAdmin && clientId ? `AND e.client_id = ${parseInt(clientId)}${caStateSql}` : '';
     // Scope anchor: main users (HR/Accounts/Super) see own-company staff (client_id IS NULL);
-    // a client_admin sees ONLY their own client's employees — never main-company rows.
-    const scopeAnchor   = isClientAdmin && clientId ? `e.client_id = ${parseInt(clientId)}` : `e.client_id IS NULL`;
+    // a client-side admin sees ONLY their own client's employees — never main-company rows.
+    const scopeAnchor   = isClientAdmin && clientId ? `e.client_id = ${parseInt(clientId)}${caStateSql}` : `e.client_id IS NULL`;
 
     // ── 1. Employees + salary structure ─────────────────────────────────────
     const empResult = await db.query(`
@@ -2629,14 +2635,18 @@ exports.exportAttendanceRegister = async (req, res) => {
     const y = parseInt(year)  || new Date().getFullYear();
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-    const isClientAdmin = req.user.role === 'client_admin';
-    // Scope anchor: main users see own-company staff (client_id IS NULL); a
-    // client_admin sees ONLY their own client's employees — never main-company rows.
+    const caRole        = String(req.user.role || '').toLowerCase();
+    const isClientAdmin = caRole === 'client_admin' || caRole === 'super_admin_client';
+    const caStateSql    = (caRole === 'client_admin' && req.user.state)
+      ? ` AND LOWER(TRIM(COALESCE(e.state,''))) = LOWER('${String(req.user.state).trim().replace(/'/g, "''")}')`
+      : '';
+    // Scope anchor: main users see own-company staff (client_id IS NULL); a client
+    // admin sees ONLY their own client (client_admin also limited to their state).
     const scopeAnchor   = isClientAdmin && req.user.client_id
-      ? `e.client_id = ${parseInt(req.user.client_id)}` : `e.client_id IS NULL`;
+      ? `e.client_id = ${parseInt(req.user.client_id)}${caStateSql}` : `e.client_id IS NULL`;
     // Passed to the client-sheet builders (Client Attn / Client Punch).
     const clientFilter  = isClientAdmin && req.user.client_id
-      ? `AND e.client_id = ${parseInt(req.user.client_id)}` : '';
+      ? `AND e.client_id = ${parseInt(req.user.client_id)}${caStateSql}` : '';
 
     // ── Employees (basic info only — no salary data needed) ─────────────────
     const empResult = await db.query(`
