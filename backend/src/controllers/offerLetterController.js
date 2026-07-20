@@ -21,16 +21,18 @@ const COMPANY = {
   tel:        process.env.COMPANY_TEL        || '+912268284109',
 };
 
-// ── Default authorized-signatory signature ─────────────────────────────────────
-// Drop a PNG (ideally transparent) at backend/src/assets/signature.png and it
-// appears on every offer letter above "Authorized Signatory". A per-offer
-// sig1_image (uploaded in the form) overrides it. Empty string = no default.
-let DEFAULT_SIGNATURE_B64 = '';
-try {
-  const sigPath = path.join(__dirname, '../assets/signature.png');
-  DEFAULT_SIGNATURE_B64 = 'data:image/png;base64,' + fs.readFileSync(sigPath).toString('base64');
-  console.log('✅ Offer letter: default signature loaded');
-} catch (_) { /* no default signature file — signature stays blank until uploaded */ }
+// ── Default signature + company stamp images (from backend/src/assets) ─────────
+// Sign.jpeg = authorized-signatory signature (shows on every offer letter; a
+// per-offer uploaded sig1_image overrides it). stamp.jpeg = company round seal.
+// Both are JPEGs on a white background — rendered with mix-blend-mode:multiply so
+// the white blends into the page.
+function loadAssetB64(file) {
+  try { return 'data:image/jpeg;base64,' + fs.readFileSync(path.join(__dirname, '../assets/' + file)).toString('base64'); }
+  catch (_) { return ''; }
+}
+const DEFAULT_SIGNATURE_B64 = loadAssetB64('Sign.jpeg');
+const STAMP_IMG_B64         = loadAssetB64('stamp.jpeg');
+console.log(`✅ Offer letter assets — signature:${DEFAULT_SIGNATURE_B64?'ok':'missing'} stamp:${STAMP_IMG_B64?'ok':'missing'}`);
 
 // ── DB Init ────────────────────────────────────────────────────────────────────
 exports.initTables = async () => {
@@ -244,12 +246,15 @@ try {
 <text x="100" y="128" font-family="Georgia,serif" font-size="11" fill="#4b3f8f" text-anchor="middle">★  ★  ★</text>
 </svg>`;
 
-  // ── Signature images (uploaded per-offer, or a saved default) ─────────────
-  // A default authorized-signatory signature can be embedded once (see
-  // DEFAULT_SIGNATURE_B64 below); a per-offer sig1_image overrides it.
+  // Real company stamp (JPEG) if available, else the drawn SVG seal fallback.
+  const stampHTML = STAMP_IMG_B64
+    ? '<img src="' + STAMP_IMG_B64 + '" style="width:96px;height:auto;mix-blend-mode:multiply;" alt="">'
+    : STAMP_SVG;
+
+  // ── Signature images (uploaded per-offer, or the saved default) ───────────
   const sigImg = ol.sig1_image || DEFAULT_SIGNATURE_B64 || '';
   const sig1HTML = sigImg
-    ? '<img src="' + sigImg + '" style="height:46px;display:block;margin-bottom:2px;" alt="">'
+    ? '<img src="' + sigImg + '" style="height:52px;display:block;margin-bottom:2px;mix-blend-mode:multiply;" alt="">'
     : '<div style="height:46px;"></div>';
   const sig2HTML = ol.sig2_image
     ? '<img src="' + ol.sig2_image + '" style="height:44px;display:block;margin-left:auto;margin-bottom:4px;" alt="">'
@@ -402,10 +407,10 @@ try {
   <div class="main-signature-block">
     <p>Yours truly,<br>From <strong>Krishi Care &amp; Management Services Private Limited,</strong></p>
     <div class="dual-signature">
-      <div class="sig-left" style="position:relative;">
-        ${sig1HTML}
-        <div class="company-stamp">${STAMP_SVG}</div>
-        Authorized Signatory
+      <div class="sig-left" style="position:relative;height:112px;width:280px;">
+        ${sigImg ? `<img src="${sigImg}" style="position:absolute;top:0;left:4px;height:54px;mix-blend-mode:multiply;" alt="">` : ''}
+        <div style="position:absolute;top:34px;left:96px;transform:rotate(-6deg);">${stampHTML}</div>
+        <div style="position:absolute;bottom:0;left:0;">Authorized Signatory</div>
       </div>
       <div class="sig-right">${sig2HTML}(Authorized Signatory)<br><br>Human Resource</div>
     </div>
