@@ -21,6 +21,17 @@ const COMPANY = {
   tel:        process.env.COMPANY_TEL        || '+912268284109',
 };
 
+// ── Default authorized-signatory signature ─────────────────────────────────────
+// Drop a PNG (ideally transparent) at backend/src/assets/signature.png and it
+// appears on every offer letter above "Authorized Signatory". A per-offer
+// sig1_image (uploaded in the form) overrides it. Empty string = no default.
+let DEFAULT_SIGNATURE_B64 = '';
+try {
+  const sigPath = path.join(__dirname, '../assets/signature.png');
+  DEFAULT_SIGNATURE_B64 = 'data:image/png;base64,' + fs.readFileSync(sigPath).toString('base64');
+  console.log('✅ Offer letter: default signature loaded');
+} catch (_) { /* no default signature file — signature stays blank until uploaded */ }
+
 // ── DB Init ────────────────────────────────────────────────────────────────────
 exports.initTables = async () => {
   try {
@@ -222,10 +233,24 @@ try {
 } catch (e) {
   console.error('Logo file not found at', LOGO_PATH, e.message);
 }
-  // ── Signature images ──────────────────────────────────────────────────────
-  const sig1HTML = ol.sig1_image
-    ? '<img src="' + ol.sig1_image + '" style="height:44px;display:block;margin-bottom:4px;" alt="">'
-    : '<div style="height:44px;"></div>';
+  // ── Company round seal (rubber-stamp) — always shown on the letter ────────
+  const STAMP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 200 200">
+<defs><path id="stpT" d="M 22 112 A 78 78 0 0 1 178 112"/><path id="stpB" d="M 30 106 A 70 70 0 0 0 170 106"/></defs>
+<g fill="none" stroke="#4b3f8f" stroke-width="2.4"><circle cx="100" cy="100" r="94"/><circle cx="100" cy="100" r="80"/></g>
+<text font-family="Georgia,serif" font-size="11.5" font-weight="bold" fill="#4b3f8f" letter-spacing="0.2"><textPath href="#stpT" startOffset="50%" text-anchor="middle">KRISHI CARE &amp; MANAGEMENT SERVICES</textPath></text>
+<text font-family="Georgia,serif" font-size="13" font-weight="bold" fill="#4b3f8f" letter-spacing="2"><textPath href="#stpB" startOffset="50%" text-anchor="middle">PVT. LTD.</textPath></text>
+<text x="100" y="84" font-family="Georgia,serif" font-size="11" fill="#4b3f8f" text-anchor="middle">★  ★  ★</text>
+<text x="100" y="110" font-family="Georgia,serif" font-size="20" font-weight="bold" fill="#4b3f8f" text-anchor="middle" letter-spacing="1">MUMBAI</text>
+<text x="100" y="128" font-family="Georgia,serif" font-size="11" fill="#4b3f8f" text-anchor="middle">★  ★  ★</text>
+</svg>`;
+
+  // ── Signature images (uploaded per-offer, or a saved default) ─────────────
+  // A default authorized-signatory signature can be embedded once (see
+  // DEFAULT_SIGNATURE_B64 below); a per-offer sig1_image overrides it.
+  const sigImg = ol.sig1_image || DEFAULT_SIGNATURE_B64 || '';
+  const sig1HTML = sigImg
+    ? '<img src="' + sigImg + '" style="height:46px;display:block;margin-bottom:2px;" alt="">'
+    : '<div style="height:46px;"></div>';
   const sig2HTML = ol.sig2_image
     ? '<img src="' + ol.sig2_image + '" style="height:44px;display:block;margin-left:auto;margin-bottom:4px;" alt="">'
     : '<div style="height:44px;"></div>';
@@ -316,6 +341,7 @@ try {
   .data-table tr.highlight td { font-weight: bold; background-color: #f2f2f2; }
   .main-signature-block { margin-top: 20px; font-size: 14px; }
   .dual-signature { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px; }
+  .company-stamp { position: absolute; left: 8px; bottom: 6px; opacity: 0.9; transform: rotate(-8deg); pointer-events: none; }
   .sig-left { text-align: left; }
   .sig-right { text-align: right; }
   @media print {
@@ -376,7 +402,11 @@ try {
   <div class="main-signature-block">
     <p>Yours truly,<br>From <strong>Krishi Care &amp; Management Services Private Limited,</strong></p>
     <div class="dual-signature">
-      <div class="sig-left">${sig1HTML}Authorized Signatory</div>
+      <div class="sig-left" style="position:relative;">
+        ${sig1HTML}
+        <div class="company-stamp">${STAMP_SVG}</div>
+        Authorized Signatory
+      </div>
       <div class="sig-right">${sig2HTML}(Authorized Signatory)<br><br>Human Resource</div>
     </div>
   </div>
