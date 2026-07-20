@@ -167,7 +167,11 @@ async function htmlToPdf(htmlString, browser) {
   if (ownBrowser) browser = await launchBrowser();
   try {
     const page = await browser.newPage();
-    await page.setContent(htmlString, { waitUntil: 'networkidle0' });
+    // The HTML is fully self-contained (logo/signatures/stamp are inline data URIs),
+    // so wait for 'load' (fast) rather than 'networkidle0', which can hang on the
+    // serverless Chromium and time out. Give it a generous ceiling too.
+    page.setDefaultNavigationTimeout(90000);
+    await page.setContent(htmlString, { waitUntil: 'load', timeout: 90000 });
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
@@ -978,15 +982,20 @@ exports.bulkSend = async (req, res) => {
         status:                  'draft',
       };
 
-      // Generate PDF
+      // Generate PDF (one retry on a transient render failure/timeout)
       let offerPdfBuffer = null;
-      try {
+      {
         const offerHTML = buildOfferLetterHTML(ol);
-        offerPdfBuffer = await htmlToPdf(offerHTML, browser);
-      } catch (pdfErr) {
-        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `PDF generation failed: ${pdfErr.message}` });
-        failed++;
-        continue;
+        let lastErr = null;
+        for (let attempt = 1; attempt <= 2 && !offerPdfBuffer; attempt++) {
+          try { offerPdfBuffer = await htmlToPdf(offerHTML, browser); }
+          catch (pdfErr) { lastErr = pdfErr; console.error(`[bulkSend] PDF attempt ${attempt} failed for ${candidateName}: ${pdfErr.message}`); }
+        }
+        if (!offerPdfBuffer) {
+          results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `PDF generation failed: ${lastErr ? lastErr.message : 'unknown'}` });
+          failed++;
+          continue;
+        }
       }
 
       // Build email payload
