@@ -211,19 +211,18 @@ function buildOfferLetterHTML(ol) {
   const noticeStr   = noticeWords[ol.notice_period_months] || `${ol.notice_period_months||3}`;
 
   // ── Employment type label ─────────────────────────────────────────────────
-  const empType = (ol.employment_type || 'permanent').toLowerCase();
+  // Match by substring so "Contractual"/"Contract"/"Provisional" all work, and
+  // always state the basis (incl. Permanent) so it's explicit on the letter.
+  const empTypeRaw     = (ol.employment_type || 'permanent').toLowerCase();
+  const isContract     = empTypeRaw.includes('contract');
+  const isProvision    = empTypeRaw.includes('provision');
   const contractMonths = parseInt(ol.contract_months) || 0;
-  let empTypeLabel = '';
-  if (empType === 'contract' && contractMonths > 0) {
-    empTypeLabel = ' on a <strong>Contract basis for ' + contractMonths + ' months</strong>';
-  } else if (empType === 'contract') {
-    empTypeLabel = ' on a <strong>Contract basis</strong>';
-  } else if (empType === 'provision') {
-    empTypeLabel = ' on a <strong>Provisional basis</strong>';
-  } else {
-    // Permanent is the default/implied employment type — no need to call it out.
-    empTypeLabel = '';
-  }
+  let empTypeLabel;
+  if (isContract && contractMonths > 0) empTypeLabel = ' on a <strong>Contract basis for ' + contractMonths + ' months</strong>';
+  else if (isContract)                  empTypeLabel = ' on a <strong>Contract basis</strong>';
+  else if (isProvision)                 empTypeLabel = ' on a <strong>Provisional basis</strong>';
+  else                                  empTypeLabel = ' on a <strong>Permanent basis</strong>';
+  const empType = isContract ? 'contract' : (isProvision ? 'provision' : 'permanent');
 
   // ── Client deployment clause (shown only for deployed staff) ──────────────
   const clientName = String(ol.client_name || '').trim();
@@ -345,13 +344,14 @@ try {
     text-align: center; font-size: 10px; color: #000;
     border-top: 1px solid #000; padding-top: 5px;
     font-family: 'Arial',sans-serif; font-weight: bold;
+    background: #fff; z-index: 5;
   }
-  .date-row { text-align: right; font-weight: bold; font-size: 13.5px; margin-top: 58px; margin-bottom: 15px; }
-  .candidate-info { margin-bottom: 15px; font-size: 14px; line-height: 1.3; }
-  .subject-line { text-align: center; font-weight: bold; text-decoration: underline; margin: 15px 0; font-size: 14.5px; }
-  p { margin: 8px 0; text-align: justify; font-size: 13px; }
+  .date-row { text-align: right; font-weight: bold; font-size: 13.5px; margin-top: 32px; margin-bottom: 12px; }
+  .candidate-info { margin-bottom: 12px; font-size: 14px; line-height: 1.3; }
+  .subject-line { text-align: center; font-weight: bold; text-decoration: underline; margin: 12px 0; font-size: 14.5px; }
+  p { margin: 6px 0; text-align: justify; font-size: 13px; }
   ul { margin-top: 0; padding-left: 25px; }
-  li { margin-bottom: 5px; text-align: justify; font-size: 13px; }
+  li { margin-bottom: 3px; text-align: justify; font-size: 13px; }
   .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-family: 'Arial',sans-serif; border: 1px solid #000; }
   .data-table th, .data-table td { border: 1px solid #000; padding: 8px 8px; font-size: 12px; }
   .data-table th { background-color: #1a4d2e; color: #fff; font-weight: bold; text-transform: uppercase; }
@@ -359,6 +359,7 @@ try {
   .col-part { width: 48%; text-align: left; }
   .col-num { width: 22%; text-align: right; }
   .data-table tr.highlight td { font-weight: bold; background-color: #f2f2f2; }
+  .data-table tr.section td { font-weight: bold; font-size: 11px; text-transform: uppercase; background-color: #dfe7e2; color: #1a4d2e; letter-spacing: .03em; padding: 5px 8px; }
   .main-signature-block { margin-top: 20px; font-size: 14px; }
   .dual-signature { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px; }
   .company-stamp { position: absolute; left: 8px; bottom: 6px; opacity: 0.9; transform: rotate(-8deg); pointer-events: none; }
@@ -454,21 +455,24 @@ try {
       </tr>
     </thead>
     <tbody>
+      <tr class="section"><td colspan="4">A. EARNINGS</td></tr>
       <tr><td class="col-sr">1</td><td class="col-part">Fixed Basic</td><td class="col-num">${fmtV(basic)}</td><td class="col-num">${fmtV(basic*12)}</td></tr>
       <tr><td class="col-sr">2</td><td class="col-part">HRA</td><td class="col-num">${fmtV(hra)}</td><td class="col-num">${fmtV(hra*12)}</td></tr>
       ${convRow}
       <tr><td class="col-sr">3</td><td class="col-part">Other Allowances</td><td class="col-num">${fmtV(other)}</td><td class="col-num">${fmtV(other*12)}</td></tr>
-      <tr class="highlight"><td class="col-sr">4</td><td class="col-part">Gross Pay</td><td class="col-num">${fmtV(gross)}</td><td class="col-num">${fmtV(gross*12)}</td></tr>
-      <tr><td class="col-sr">5</td><td class="col-part">Provident Fund</td><td class="col-num">${pfEmp>0?fmtV(pfEmp):''}</td><td class="col-num">${pfEmp>0?fmtV(pfEmp*12):''}</td></tr>
-      <tr><td class="col-sr">6</td><td class="col-part">ESIC (Employee)</td><td class="col-num">${esiEmp>0?fmtV(esiEmp):''}</td><td class="col-num">${esiEmp>0?fmtV(esiEmp*12):''}</td></tr>
-      <tr><td class="col-sr">7</td><td class="col-part">Professional Tax</td><td class="col-num">${pt>0?fmtV(pt):''}</td><td class="col-num">${pt>0?fmtV(pt*12):''}</td></tr>
-      <tr class="highlight"><td class="col-sr">8</td><td class="col-part">Total Deduction</td><td class="col-num">${totalDed>0?fmtV(totalDed):''}</td><td class="col-num">${totalDed>0?fmtV(totalDed*12):''}</td></tr>
-      <tr class="highlight"><td class="col-sr">9</td><td class="col-part">Net Salary (Gross - Total Deduction)</td><td class="col-num">${fmtV(netSalary)}</td><td class="col-num">${fmtV(netSalary*12)}</td></tr>
-      <tr><td class="col-sr">10</td><td class="col-part">Employer PF contribution</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr):''}</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr*12):''}</td></tr>
-      <tr><td class="col-sr">11</td><td class="col-part">Employer ESIC contribution</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr):''}</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr*12):''}</td></tr>
-      <tr><td class="col-sr">12</td><td class="col-part">Employer PF contribution Admin charges</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin):''}</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin*12):''}</td></tr>
-      <tr><td class="col-sr">13</td><td class="col-part">Gratuity (Employer contribution)</td><td class="col-num">${gratuity>0?fmtV(gratuity):''}</td><td class="col-num">${gratuity>0?fmtV(gratuity*12):''}</td></tr>
-      <tr class="highlight"><td class="col-sr">14</td><td class="col-part">Total Compensation Package</td><td class="col-num">${fmtV(ctcMonthly)}</td><td class="col-num">${fmtV(ctcAnnual)}</td></tr>
+      <tr class="highlight"><td class="col-sr"></td><td class="col-part">Gross Pay (A)</td><td class="col-num">${fmtV(gross)}</td><td class="col-num">${fmtV(gross*12)}</td></tr>
+      <tr class="section"><td colspan="4">B. DEDUCTIONS (Employee Contribution)</td></tr>
+      <tr><td class="col-sr">4</td><td class="col-part">Provident Fund (Employee)</td><td class="col-num">${pfEmp>0?fmtV(pfEmp):''}</td><td class="col-num">${pfEmp>0?fmtV(pfEmp*12):''}</td></tr>
+      <tr><td class="col-sr">5</td><td class="col-part">ESIC (Employee)</td><td class="col-num">${esiEmp>0?fmtV(esiEmp):''}</td><td class="col-num">${esiEmp>0?fmtV(esiEmp*12):''}</td></tr>
+      <tr><td class="col-sr">6</td><td class="col-part">Professional Tax</td><td class="col-num">${pt>0?fmtV(pt):''}</td><td class="col-num">${pt>0?fmtV(pt*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr"></td><td class="col-part">Total Deduction (B)</td><td class="col-num">${totalDed>0?fmtV(totalDed):''}</td><td class="col-num">${totalDed>0?fmtV(totalDed*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr"></td><td class="col-part">Net Salary in Hand (A - B)</td><td class="col-num">${fmtV(netSalary)}</td><td class="col-num">${fmtV(netSalary*12)}</td></tr>
+      <tr class="section"><td colspan="4">C. EMPLOYER CONTRIBUTIONS (Cost to Company)</td></tr>
+      <tr><td class="col-sr">7</td><td class="col-part">Provident Fund (Employer)</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr):''}</td><td class="col-num">${pfEmpr>0?fmtV(pfEmpr*12):''}</td></tr>
+      <tr><td class="col-sr">8</td><td class="col-part">ESIC (Employer)</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr):''}</td><td class="col-num">${esiEmpr>0?fmtV(esiEmpr*12):''}</td></tr>
+      <tr><td class="col-sr">9</td><td class="col-part">PF Admin Charges (Employer)</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin):''}</td><td class="col-num">${pfAdmin>0?fmtV(pfAdmin*12):''}</td></tr>
+      <tr><td class="col-sr">10</td><td class="col-part">Gratuity (Employer)</td><td class="col-num">${gratuity>0?fmtV(gratuity):''}</td><td class="col-num">${gratuity>0?fmtV(gratuity*12):''}</td></tr>
+      <tr class="highlight"><td class="col-sr"></td><td class="col-part">Total Compensation Package (CTC = A + C)</td><td class="col-num">${fmtV(ctcMonthly)}</td><td class="col-num">${fmtV(ctcAnnual)}</td></tr>
     </tbody>
   </table>
   <div style="margin-top:15px;">
