@@ -858,49 +858,78 @@ async function startBulkSend() {
   const fd = new FormData();
   fd.append('file', fileInput.files[0]);
 
+  // Show live panels up front
+  document.getElementById('bulk-summary').style.display = 'flex';
+  document.getElementById('bulk-results-wrap').style.display = 'block';
+  const tbody = document.getElementById('bulk-results-tbody');
+  tbody.innerHTML = '';
+  bulkReportData = [];
+  let total = 0, sent = 0, failed = 0;
+  const setCounts = () => {
+    document.getElementById('bulk-sent-count').textContent   = sent;
+    document.getElementById('bulk-failed-count').textContent = failed;
+    document.getElementById('bulk-total-count').textContent  = total;
+  };
+
   try {
     const resp = await fetch(API_BASE + '/offer-letters/bulk-send', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + Auth.getToken() },
       body: fd,
     });
-
-    const data = await resp.json();
-
-    if (!resp.ok || !data.success) {
-      alert('Error: ' + (data.message || 'Unknown error'));
-      btn.disabled = false;
-      btn.textContent = '📤 Generate PDFs & Send All Emails';
-      return;
+    if (!resp.ok || !resp.body) {
+      const t = await resp.text().catch(() => '');
+      throw new Error(t || ('HTTP ' + resp.status));
     }
 
-    // Show results
-    document.getElementById('bulk-progress-bar').style.width = '100%';
-    document.getElementById('bulk-progress-text').textContent = `Done — ${data.sent} sent, ${data.failed} failed`;
-    document.getElementById('bulk-summary').style.display = 'flex';
-    document.getElementById('bulk-sent-count').textContent  = data.sent;
-    document.getElementById('bulk-failed-count').textContent = data.failed;
-    document.getElementById('bulk-total-count').textContent  = data.total;
+    // Read the NDJSON stream line-by-line and update the UI as each finishes.
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line) continue;
+        let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
 
-    // Results table
-    bulkReportData = data.results;
-    const tbody = document.getElementById('bulk-results-tbody');
-    tbody.innerHTML = '';
-    data.results.forEach(r => {
-      const isFailed = r.status === 'failed';
-      tbody.innerHTML += `
-        <tr style="border-bottom:1px solid #f0f0f0;background:${isFailed?'#FFF3E0':'#fff'};">
-          <td style="padding:7px 10px;">${r.row}</td>
-          <td style="padding:7px 10px;">${r.name}</td>
-          <td style="padding:7px 10px;">${r.email}</td>
-          <td style="padding:7px 10px;font-weight:600;color:${isFailed?'#E65100':'#2E7D32'};">${r.status}</td>
-          <td style="padding:7px 10px;color:#666;font-size:11px;">${r.reason||'—'}</td>
-        </tr>`;
-    });
-    document.getElementById('bulk-results-wrap').style.display = 'block';
-
+        if (ev.type === 'start') {
+          total = ev.total; setCounts();
+          document.getElementById('bulk-progress-text').textContent = `Starting — 0/${total} sent`;
+        } else if (ev.type === 'progress') {
+          sent = ev.sent; failed = ev.failed; setCounts();
+          const doneCount = sent + failed;
+          const pct = total ? Math.round(doneCount / total * 100) : 0;
+          document.getElementById('bulk-progress-bar').style.width = pct + '%';
+          document.getElementById('bulk-progress-text').textContent =
+            `Sending ${doneCount}/${total} — ${sent} sent · ${failed} failed · ${total - doneCount} remaining`;
+          const isFailed = ev.status === 'failed';
+          bulkReportData.push({ row: ev.row, name: ev.name, email: ev.email, status: ev.status, reason: ev.reason });
+          tbody.innerHTML += `
+            <tr style="border-bottom:1px solid #f0f0f0;background:${isFailed?'#FFF3E0':'#fff'};">
+              <td style="padding:7px 10px;">${ev.row}</td>
+              <td style="padding:7px 10px;">${ev.name}</td>
+              <td style="padding:7px 10px;">${ev.email}</td>
+              <td style="padding:7px 10px;font-weight:600;color:${isFailed?'#E65100':'#2E7D32'};">${ev.status}</td>
+              <td style="padding:7px 10px;color:#666;font-size:11px;">${ev.reason||'—'}</td>
+            </tr>`;
+          const wrap = document.getElementById('bulk-results-wrap');
+          if (wrap) wrap.scrollTop = wrap.scrollHeight;
+        } else if (ev.type === 'done') {
+          document.getElementById('bulk-progress-bar').style.width = '100%';
+          document.getElementById('bulk-progress-text').textContent = `Done — ${ev.sent} sent, ${ev.failed} failed`;
+        } else if (ev.type === 'error') {
+          document.getElementById('bulk-progress-text').textContent = 'Error: ' + ev.message;
+        }
+      }
+    }
   } catch(e) {
-    alert('Network error: ' + e.message);
+    document.getElementById('bulk-progress-text').textContent = 'Error: ' + e.message;
+    alert('Send failed: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '📤 Generate PDFs & Send All Emails';

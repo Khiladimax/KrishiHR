@@ -21,6 +21,10 @@ const COMPANY = {
   tel:        process.env.COMPANY_TEL        || '+912268284109',
 };
 
+// Strict-enough email check — Brevo rejects the whole send if any cc/bcc is
+// malformed (e.g. "name@gmail" or "a@ b.com"), so we drop invalid addresses.
+const isValidEmail = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(String(e || '').trim());
+
 // ── Default signature + company stamp images (from backend/src/assets) ─────────
 // Sign.jpeg = authorized-signatory signature (shows on every offer letter; a
 // per-offer uploaded sig1_image overrides it). stamp.jpeg = company round seal.
@@ -798,8 +802,8 @@ exports.sendEmail = async (req, res) => {
       attachment:  attachments,
     };
 
-    const cleanCc  = (Array.isArray(cc)  ? cc  : []).map(e => (e||'').trim()).filter(e => e && e.includes('@'));
-    const cleanBcc = (Array.isArray(bcc) ? bcc : []).map(e => (e||'').trim()).filter(e => e && e.includes('@'));
+    const cleanCc  = (Array.isArray(cc)  ? cc  : []).map(e => (e||'').trim()).filter(isValidEmail);
+    const cleanBcc = (Array.isArray(bcc) ? bcc : []).map(e => (e||'').trim()).filter(isValidEmail);
     // Auto-archive a copy in the HR mailbox so the sent history + replies thread there.
     const archive = (process.env.EMAIL_ARCHIVE_BCC || hrFrom).trim();
     if (archive.includes('@') && !cleanBcc.includes(archive)) cleanBcc.push(archive);
@@ -867,11 +871,25 @@ exports.bulkSend = async (req, res) => {
     if (!rows.length) return res.status(400).json({ success: false, message: 'Excel is empty' });
 
     // CC / BCC from first data row (same for all)
-    const ccRaw  = String(rows[0]['CC']  || rows[0]['cc']  || '').split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
-    const bccRaw = String(rows[0]['BCC'] || rows[0]['bcc'] || '').split(',').map(e=>e.trim()).filter(e=>e.includes('@'));
+    const ccRaw  = String(rows[0]['CC']  || rows[0]['cc']  || '').split(',').map(e=>e.trim()).filter(isValidEmail);
+    const bccRaw = String(rows[0]['BCC'] || rows[0]['bcc'] || '').split(',').map(e=>e.trim()).filter(isValidEmail);
 
     const results = [];
     let sent = 0, failed = 0;
+
+    // ── Live streaming (NDJSON): the UI reads each line as a candidate finishes,
+    //    so it shows total / sent / remaining updating one-by-one. ────────────
+    const nonEmpty = (r) => Object.keys(r).some(k => !/^(cc|bcc)$/i.test(k) && String(r[k]).trim() !== '');
+    const total = rows.filter(nonEmpty).length;
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');   // disable proxy buffering (Render/nginx)
+    res.write(JSON.stringify({ type: 'start', total }) + '\n');
+    const emit = (r) => {
+      results.push(r);
+      if (String(r.status).startsWith('sent')) sent++; else failed++;
+      try { res.write(JSON.stringify({ type: 'progress', row: r.row, name: r.name, email: r.email, status: r.status, reason: r.reason, sent, failed, total }) + '\n'); } catch (_) {}
+    };
 
     // Fetch signatures from DB (shared across all letters)
     const sigRow = await db.query(`SELECT sig1_image, sig2_image FROM offer_letters WHERE sig1_image IS NOT NULL LIMIT 1`);
@@ -888,6 +906,7 @@ exports.bulkSend = async (req, res) => {
     try {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
+      if (!nonEmpty(row)) continue;   // skip fully-blank rows silently
       const rowNum = i + 2; // Excel row number (1=header, 2=first data)
 
       // ── Map Excel columns → offer letter object ────────────────────────────
@@ -923,13 +942,11 @@ exports.bulkSend = async (req, res) => {
 
       // Validation
       if (!candidateName || !candidateEmail || !designation) {
-        results.push({ row: rowNum, name: candidateName || '(empty)', email: candidateEmail || '(empty)', status: 'failed', reason: 'Missing required: Candidate Name, Email, or Designation' });
-        failed++;
+        emit({ row: rowNum, name: candidateName || '(empty)', email: candidateEmail || '(empty)', status: 'failed', reason: 'Missing required: Candidate Name, Email, or Designation' });
         continue;
       }
       if (!candidateEmail.includes('@')) {
-        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: 'Invalid email address' });
-        failed++;
+        emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: 'Invalid email address' });
         continue;
       }
 
@@ -992,8 +1009,7 @@ exports.bulkSend = async (req, res) => {
           catch (pdfErr) { lastErr = pdfErr; console.error(`[bulkSend] PDF attempt ${attempt} failed for ${candidateName}: ${pdfErr.message}`); }
         }
         if (!offerPdfBuffer) {
-          results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `PDF generation failed: ${lastErr ? lastErr.message : 'unknown'}` });
-          failed++;
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `PDF generation failed: ${lastErr ? lastErr.message : 'unknown'}` });
           continue;
         }
       }
@@ -1047,8 +1063,7 @@ exports.bulkSend = async (req, res) => {
       // Send email
       if (!BREVO_KEY || !emailEnabled) {
         // Simulated send (dev mode)
-        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent (simulated)', reason: '' });
-        sent++;
+        emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent (simulated)', reason: '' });
         continue;
       }
 
@@ -1060,15 +1075,12 @@ exports.bulkSend = async (req, res) => {
         });
         if (!resp.ok) {
           const errText = await resp.text();
-          results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `Email API error: ${errText.substring(0,120)}` });
-          failed++;
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `Email API error: ${errText.substring(0,120)}` });
         } else {
-          results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: '' });
-          sent++;
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: '' });
         }
       } catch (emailErr) {
-        results.push({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: emailErr.message });
-        failed++;
+        emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: emailErr.message });
       }
 
       // Small delay to avoid Brevo rate limits
@@ -1079,16 +1091,18 @@ exports.bulkSend = async (req, res) => {
       console.log('[bulkSend] Browser closed');
     }
 
-    res.json({
-      success: true,
-      total:   rows.length,
-      sent,
-      failed,
-      results,
-    });
+    // Final summary line, then close the stream.
+    res.write(JSON.stringify({ type: 'done', success: true, total, sent, failed, results }) + '\n');
+    res.end();
 
   } catch (err) {
     console.error('[offerLetter.bulkSend]', err.message);
-    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+    // If we already started streaming, emit an error line; else send JSON.
+    if (res.headersSent) {
+      try { res.write(JSON.stringify({ type: 'error', message: err.message }) + '\n'); } catch (_) {}
+      res.end();
+    } else {
+      res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+    }
   }
 };
