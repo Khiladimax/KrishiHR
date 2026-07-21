@@ -1075,9 +1075,11 @@ exports.bulkSend = async (req, res) => {
         });
         if (!resp.ok) {
           const errText = await resp.text();
-          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `Email API error: ${errText.substring(0,120)}` });
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `Brevo ${resp.status}: ${errText.substring(0,200)}` });
         } else {
-          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: '' });
+          let msgId = '';
+          try { const j = await resp.json(); msgId = j.messageId || ''; } catch (_) {}
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: msgId ? `Brevo msgId: ${msgId}` : '' });
         }
       } catch (emailErr) {
         emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: emailErr.message });
