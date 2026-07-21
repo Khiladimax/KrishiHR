@@ -9,6 +9,7 @@ const chromium = require('@sparticuz/chromium').default;
 const fs           = require('fs');
 const path         = require('path');
 const os           = require('os');
+const archiver     = require('archiver');
 
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
@@ -1106,5 +1107,102 @@ exports.bulkSend = async (req, res) => {
     } else {
       res.status(500).json({ success: false, message: `Server error: ${err.message}` });
     }
+  }
+};
+
+// Map one bulk-template row → an offer-letter object (shared by send + zip).
+function rowToOffer(row, i) {
+  const S = (...keys) => { for (const k of keys) { const v = row[k]; if (v !== undefined && String(v).trim() !== '') return String(v).trim(); } return ''; };
+  const N = (...keys) => parseFloat(String(S(...keys)).replace(/,/g, '')) || 0;
+  const name  = S('Candidate Name', 'candidate_name');
+  const email = S('Email', 'email', 'candidate_email');
+  const desig = S('Designation', 'designation');
+  if (!name || !desig) return { error: 'Missing Candidate Name or Designation' };
+
+  let joiningDate = null;
+  const jdRaw = row['Joining Date'] || row['joining_date'] || '';
+  if (jdRaw) {
+    const d = jdRaw instanceof Date ? jdRaw : new Date(jdRaw);
+    if (!isNaN(d)) joiningDate = new Date(Math.round(d.getTime() / 86400000) * 86400000).toISOString().split('T')[0];
+  }
+  const ol = {
+    id: `zip_${i}`,
+    candidate_name: name, candidate_email: email,
+    candidate_address: S('Address', 'address'), candidate_mobile: S('Mobile', 'mobile'),
+    designation: desig, location: S('Location', 'location') || 'Mumbai',
+    joining_date: joiningDate, offer_date: null,
+    offer_valid_days: parseInt(S('Offer Valid Days', 'offer_valid_days')) || 7,
+    probation_months: parseInt(S('Probation Months', 'probation_months')) || 6,
+    notice_period_months: parseInt(S('Notice Period Months', 'notice_period_months')) || 3,
+    employee_code: S('Employee Code', 'employee_code'),
+    ctc_annual: N('CTC', 'CTC Annual', 'ctc_annual'),
+    basic_monthly: N('Basic Salary', 'Basic Monthly', 'basic_monthly'),
+    hra_monthly: N('HRA', 'HRA Monthly', 'hra_monthly'),
+    conveyance_monthly: N('Travel Allowance', 'Conveyance Monthly', 'conveyance_monthly'),
+    other_allowance_monthly: N('Special Allowance', 'Other Allowance', 'other_allowance_monthly'),
+    gratuity_monthly: N('Gratuity Monthly', 'gratuity_monthly'),
+    pf_employee_monthly: N('PF Employee', 'pf_employee_monthly'),
+    pf_employer_monthly: N('PF Employer', 'pf_employer_monthly'),
+    pf_admin_monthly: N('PF Admin', 'pf_admin_monthly'),
+    esi_employee_monthly: N('ESIC Employee', 'ESI Employee', 'esi_employee_monthly'),
+    esi_employer_monthly: N('ESIC Employer', 'ESI Employer', 'esi_employer_monthly'),
+    professional_tax_monthly: N('Professional Tax', 'professional_tax_monthly'),
+    client_name: S('Client Name', 'Client', 'client_name') || null,
+    custom_clauses: S('Custom Clauses', 'custom_clauses') || null,
+    employment_type: (S('Employment Type', 'employment_type') || 'permanent').toLowerCase(),
+    contract_months: parseInt(S('Contract Months', 'contract_months')) || 0,
+    sig1_image: null, sig2_image: null, status: 'draft',
+  };
+  return { ol, name, email };
+}
+
+// ── POST /offer-letters/bulk-zip — offer + joining PDFs per candidate, as a ZIP
+// No email is sent (bypasses the daily quota) — for manual sending.
+exports.bulkZip = async (req, res) => {
+  const XLSX = require('xlsx');
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No Excel file uploaded' });
+    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    let hdrIdx = grid.findIndex(r => Array.isArray(r) && r.some(c => String(c || '').toLowerCase().includes('candidate name')));
+    if (hdrIdx < 0) hdrIdx = 0;
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '', range: hdrIdx });
+    const nonEmpty = (r) => Object.keys(r).some(k => !/^(cc|bcc)$/i.test(k) && String(r[k]).trim() !== '');
+
+    const joiningPath = path.join(__dirname, '..', 'assets', 'Joining_form_Krishi_Care.pdf');
+    const joiningBuf  = fs.existsSync(joiningPath) ? fs.readFileSync(joiningPath) : null;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="Offer_Letters_Bundle.zip"');
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.on('error', (e) => { console.error('[bulkZip] archive', e.message); });
+    archive.pipe(res);
+
+    const browser = await launchBrowser();
+    const used = {};
+    const skipped = [];
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        if (!nonEmpty(rows[i])) continue;
+        const parsed = rowToOffer(rows[i], i);
+        if (parsed.error || !parsed.ol) { skipped.push(`Row ${i + 2}: ${parsed.error || 'invalid'}`); continue; }
+        let pdf;
+        try { pdf = await htmlToPdf(buildOfferLetterHTML(parsed.ol), browser); }
+        catch (e) { skipped.push(`Row ${i + 2} (${parsed.name}): PDF failed — ${e.message}`); continue; }
+
+        let folder = String(parsed.name || `Candidate_${i}`).replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '_') || `Candidate_${i}`;
+        if (used[folder]) folder = `${folder}_${++used[folder]}`; else used[folder] = 1;
+        archive.append(pdf, { name: `${folder}/Offer_Letter_${folder}.pdf` });
+        if (joiningBuf) archive.append(joiningBuf, { name: `${folder}/Joining_Form.pdf` });
+      }
+    } finally {
+      await browser.close();
+    }
+    if (skipped.length) archive.append(skipped.join('\n'), { name: '_skipped.txt' });
+    archive.finalize();
+  } catch (err) {
+    console.error('[offerLetter.bulkZip]', err.message);
+    if (!res.headersSent) res.status(500).json({ success: false, message: err.message });
   }
 };

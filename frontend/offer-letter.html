@@ -729,6 +729,9 @@ loadNotifBadge();
       <button id="bulk-send-btn" onclick="startBulkSend()" style="background:linear-gradient(135deg,#E65100,#F57C00);color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">
         📤 Generate PDFs &amp; Send All Emails
       </button>
+      <button id="bulk-zip-btn" onclick="downloadBulkZip()" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:11px 28px;font-size:13.5px;font-weight:700;cursor:pointer;width:100%;margin-top:10px;">
+        ⬇ Download ZIP (Offer + Joining PDFs) — no email, send manually
+      </button>
 
       <!-- Progress -->
       <div id="bulk-progress" style="display:none;margin-top:20px;">
@@ -933,6 +936,29 @@ async function startBulkSend() {
   } finally {
     btn.disabled = false;
     btn.textContent = '📤 Generate PDFs & Send All Emails';
+  }
+}
+
+async function downloadBulkZip() {
+  const fileInput = document.getElementById('bulk-file');
+  if (!fileInput.files[0]) { alert('Please select an Excel file first.'); return; }
+  const btn = document.getElementById('bulk-zip-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ Building PDFs & zipping… (may take a minute)';
+  try {
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    const resp = await fetch(API_BASE + '/offer-letters/bulk-zip', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + Auth.getToken() }, body: fd,
+    });
+    if (!resp.ok) { const t = await resp.text().catch(()=> ''); throw new Error(t || ('HTTP ' + resp.status)); }
+    const blob = await resp.blob();
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'Offer_Letters_Bundle.zip' });
+    a.click(); URL.revokeObjectURL(a.href);
+  } catch (e) {
+    alert('ZIP download failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = orig;
   }
 }
 

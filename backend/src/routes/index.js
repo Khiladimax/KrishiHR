@@ -898,6 +898,7 @@ router.post  ('/offer-letters/:id/apply-structure', authenticate, authorize(...H
 // Bulk send — multipart Excel upload
 const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 router.post('/offer-letters/bulk-send', authenticate, authorize('hr'), xlsxUpload.single('file'), offerCtrl.bulkSend);
+router.post('/offer-letters/bulk-zip',  authenticate, authorize('hr'), xlsxUpload.single('file'), offerCtrl.bulkZip);
 
 // ── Relieving Letters ─────────────────────────────────────────────────────
 router.get ('/relieving-letters/eligible',     authenticate, authorize('hr','admin','super_admin'), relievingCtrl.getEligible);
