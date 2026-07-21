@@ -805,7 +805,7 @@ exports.sendEmail = async (req, res) => {
     const cleanCc  = (Array.isArray(cc)  ? cc  : []).map(e => (e||'').trim()).filter(isValidEmail);
     const cleanBcc = (Array.isArray(bcc) ? bcc : []).map(e => (e||'').trim()).filter(isValidEmail);
     // Auto-archive a copy in the HR mailbox so the sent history + replies thread there.
-    const archive = (process.env.EMAIL_ARCHIVE_BCC || hrFrom).trim();
+    const archive = String(process.env.EMAIL_ARCHIVE_BCC || '').trim();  // off unless set (saves quota)
     if (archive.includes('@') && !cleanBcc.includes(archive)) cleanBcc.push(archive);
     if (cleanCc.length)  payload.cc  = cleanCc.map(e => ({ email: e }));
     if (cleanBcc.length) payload.bcc = cleanBcc.map(e => ({ email: e }));
@@ -1054,7 +1054,7 @@ exports.bulkSend = async (req, res) => {
         attachment:  attachments,
       };
       // Auto-archive a copy in the HR mailbox for the sent history + reply threading.
-      const archive  = (process.env.EMAIL_ARCHIVE_BCC || hrFrom).trim();
+      const archive  = String(process.env.EMAIL_ARCHIVE_BCC || '').trim();  // off unless set (saves quota)
       const bccList  = [...bccRaw];
       if (archive.includes('@') && !bccList.includes(archive)) bccList.push(archive);
       if (ccRaw.length)   payload.cc  = ccRaw.map(e => ({ email: e }));
