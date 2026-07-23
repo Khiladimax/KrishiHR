@@ -156,6 +156,8 @@ exports.list = async (req, res) => {
     const y = parseInt(req.query.year)  || new Date().getFullYear();
     const r = await db.query(`
       SELECT a.*,
+             TO_CHAR(a.agreement_start, 'YYYY-MM-DD') AS agreement_start,
+             TO_CHAR(a.agreement_end,   'YYYY-MM-DD') AS agreement_end,
              p.paid AS paid_this_month, p.paid_at,
              (SELECT COALESCE(SUM(quantity),0) FROM pfc_assets WHERE pfc_id = a.id) AS asset_count,
              (a.agreement_end IS NOT NULL AND a.agreement_end <= (CURRENT_DATE + INTERVAL '31 days')) AS expiring_soon,
@@ -200,7 +202,7 @@ exports.notifyExpiring = async (req, res) => {
     await ensureSchema();
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
     const due = await db.query(`
-      SELECT * FROM pfc_agreements
+      SELECT *, TO_CHAR(agreement_end, 'YYYY-MM-DD') AS agreement_end FROM pfc_agreements
        WHERE agreement_end IS NOT NULL
          AND agreement_end <= (CURRENT_DATE + INTERVAL '31 days')
          AND agreement_end >= CURRENT_DATE
