@@ -791,29 +791,45 @@ exports.sendEmail = async (req, res) => {
       console.warn('[offerLetter.sendEmail] Joining form not found at:', joiningFormPath);
     }
 
-    // ── Send via SMTP (nodemailer) ────────────────────────────────────────────
-    const hrFrom     = process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || process.env.SMTP_USER || 'no-reply@krishicare.in';
+    // ── Brevo payload with all attachments ───────────────────────────────────
+    const hrFrom     = process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com';
     const senderName = process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.';
+    const payload = {
+      sender:      { name: senderName, email: hrFrom },
+      to:          [{ email: ol.candidate_email, name: ol.candidate_name }],
+      replyTo:     { email: hrFrom, name: senderName },   // replies come back to HR
+      subject:     `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
+      htmlContent: coverHtml,
+      attachment:  attachments,
+    };
+
     const cleanCc  = (Array.isArray(cc)  ? cc  : []).map(e => (e||'').trim()).filter(isValidEmail);
     const cleanBcc = (Array.isArray(bcc) ? bcc : []).map(e => (e||'').trim()).filter(isValidEmail);
-    const archive = String(process.env.EMAIL_ARCHIVE_BCC || '').trim();
-    if (archive && isValidEmail(archive) && !cleanBcc.includes(archive)) cleanBcc.push(archive);
+    // Auto-archive a copy in the HR mailbox so the sent history + replies thread there.
+    const archive = String(process.env.EMAIL_ARCHIVE_BCC || '').trim();  // off unless set (saves quota)
+    if (archive.includes('@') && !cleanBcc.includes(archive)) cleanBcc.push(archive);
+    if (cleanCc.length)  payload.cc  = cleanCc.map(e => ({ email: e }));
+    if (cleanBcc.length) payload.bcc = cleanBcc.map(e => ({ email: e }));
 
-    if (process.env.EMAIL_ENABLED !== 'true') {
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_KEY || process.env.EMAIL_ENABLED !== 'true') {
       await db.query(`UPDATE offer_letters SET status='sent', sent_at=NOW() WHERE id=$1`, [ol.id]);
-      return res.json({ success: true, message: `[Simulated] Offer letter to ${ol.candidate_email} with ${attachments.length} attachment(s)` });
+      return res.json({
+        success: true,
+        message: `[Simulated] Offer letter sent to ${ol.candidate_email} with ${attachments.length} attachment(s): ${attachments.map(a => a.name).join(', ')}`
+      });
     }
 
-    const r = await emailSvc.sendRaw({
-      from: { email: hrFrom, name: senderName },
-      to: ol.candidate_email, toName: ol.candidate_name,
-      replyTo: hrFrom, replyToName: senderName,
-      subject: `Offer Letter — ${ol.designation} | Krishi Care & Management Services`,
-      html: coverHtml,
-      cc: cleanCc, bcc: cleanBcc,
-      attachments,   // [{ name, content(base64) }]
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+      body: JSON.stringify(payload)
     });
-    if (!r.ok) return res.status(500).json({ success: false, message: `Email failed: ${r.error}` });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      return res.status(500).json({ success: false, message: `Email failed: ${err}` });
+    }
 
     await db.query(`UPDATE offer_letters SET status='sent', sent_at=NOW() WHERE id=$1`, [ol.id]);
     res.json({ success: true, message: `Offer letter sent to ${ol.candidate_email} with ${attachments.length} attachment(s)` });
@@ -1028,31 +1044,49 @@ exports.bulkSend = async (req, res) => {
         attachments.push({ name: 'Joining_Form_Krishi_Care.pdf', content: fs.readFileSync(joiningFormPath).toString('base64') });
       }
 
-      const hrFrom     = process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || process.env.SMTP_USER || 'no-reply@krishicare.in';
+      const hrFrom     = process.env.EMAIL_FROM_HR || process.env.EMAIL_FROM || 'anonymous.agritech@gmail.com';
       const senderName = process.env.EMAIL_FROM_NAME_HR || 'Krishi Care & Management Services Pvt. Ltd.';
-      const archive  = String(process.env.EMAIL_ARCHIVE_BCC || '').trim();
+      const payload = {
+        sender:      { name: senderName, email: hrFrom },
+        to:          [{ email: candidateEmail, name: candidateName }],
+        replyTo:     { email: hrFrom, name: senderName },   // replies come back to HR
+        subject:     `Offer Letter — ${designation} | Krishi Care & Management Services`,
+        htmlContent: coverHtml,
+        attachment:  attachments,
+      };
+      // Auto-archive a copy in the HR mailbox for the sent history + reply threading.
+      const archive  = String(process.env.EMAIL_ARCHIVE_BCC || '').trim();  // off unless set (saves quota)
       const bccList  = [...bccRaw];
-      if (archive && isValidEmail(archive) && !bccList.includes(archive)) bccList.push(archive);
+      if (archive.includes('@') && !bccList.includes(archive)) bccList.push(archive);
+      if (ccRaw.length)   payload.cc  = ccRaw.map(e => ({ email: e }));
+      if (bccList.length) payload.bcc = bccList.map(e => ({ email: e }));
 
-      // Send via SMTP (nodemailer)
-      if (!emailEnabled) {
+      // Send email
+      if (!BREVO_KEY || !emailEnabled) {
+        // Simulated send (dev mode)
         emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent (simulated)', reason: '' });
         continue;
       }
 
-      const r = await emailSvc.sendRaw({
-        from: { email: hrFrom, name: senderName },
-        to: candidateEmail, toName: candidateName,
-        replyTo: hrFrom, replyToName: senderName,
-        subject: `Offer Letter — ${designation} | Krishi Care & Management Services`,
-        html: coverHtml,
-        cc: ccRaw, bcc: bccList,
-        attachments,
-      });
-      if (r.ok) emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: r.messageId ? `msgId: ${r.messageId}` : '' });
-      else emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `SMTP: ${r.error}` });
+      try {
+        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: `Brevo ${resp.status}: ${errText.substring(0,200)}` });
+        } else {
+          let msgId = '';
+          try { const j = await resp.json(); msgId = j.messageId || ''; } catch (_) {}
+          emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'sent', reason: msgId ? `Brevo msgId: ${msgId}` : '' });
+        }
+      } catch (emailErr) {
+        emit({ row: rowNum, name: candidateName, email: candidateEmail, status: 'failed', reason: emailErr.message });
+      }
 
-      // Small delay between sends
+      // Small delay to avoid Brevo rate limits
       await new Promise(r => setTimeout(r, 300));
     }
     } finally {

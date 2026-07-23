@@ -1,23 +1,7 @@
 // Relieving Letter Controller
 const db = require('../config/db');
-const emailSvc = require('../config/emailService');
 const path = require('path');
 const fs = require('fs');
-
-// Send a Brevo-shaped payload via SMTP (nodemailer). Returns { ok, error, messageId }.
-async function sendPayloadSMTP(payload) {
-  const to0 = (payload.to && payload.to[0]) || {};
-  return emailSvc.sendRaw({
-    from: payload.sender,
-    to: to0.email, toName: to0.name,
-    replyTo: payload.replyTo && payload.replyTo.email, replyToName: payload.replyTo && payload.replyTo.name,
-    subject: payload.subject,
-    html: payload.htmlContent,
-    cc:  (payload.cc  || []).map(x => x.email || x),
-    bcc: (payload.bcc || []).map(x => x.email || x),
-    attachments: payload.attachment || [],
-  });
-}
 const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium').default;
 
@@ -391,13 +375,22 @@ exports.sendRelievingLetter = async (req, res) => {
     if (ccList.length) payload.cc = ccList;
     if (bccList.length) payload.bcc = bccList;
 
-    if (process.env.EMAIL_ENABLED !== 'true') {
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_KEY || process.env.EMAIL_ENABLED !== 'true') {
       await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [empId]);
       return res.json({ success: true, message: `[Simulated] Relieving letter sent to ${personalEmail}` });
     }
 
-    const r = await sendPayloadSMTP(payload);
-    if (!r.ok) return res.status(500).json({ success: false, message: `Email failed: ${r.error}` });
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+      body: JSON.stringify(payload)
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      return res.status(500).json({ success: false, message: `Email failed: ${err}` });
+    }
 
     await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [empId]);
     res.json({ success: true, message: `Relieving letter sent to ${personalEmail}` });
@@ -489,18 +482,24 @@ exports.bulkSend = async (req, res) => {
             }],
           };
 
-          if (!emailEnabled) {
+          if (!BREVO_KEY || !emailEnabled) {
             await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
             results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'sent', reason: '[Simulated]' });
             sent++;
           } else {
-            const r = await sendPayloadSMTP(payload);
-            if (r.ok) {
+            const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+              body: JSON.stringify(payload)
+            });
+
+            if (resp.ok) {
               await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
               results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'sent', reason: '' });
               sent++;
             } else {
-              results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'failed', reason: `SMTP: ${r.error}` });
+              const errText = await resp.text();
+              results.push({ id: emp.id, name: fullName, email: personalEmail, status: 'failed', reason: `Email API: ${errText.substring(0, 120)}` });
               failed++;
             }
           }
@@ -641,18 +640,23 @@ exports.bulkSendExcel = async (req, res) => {
           if (ccRaw.length) payload.cc = ccRaw.map(e => ({ email: e }));
           if (bccRaw.length) payload.bcc = bccRaw.map(e => ({ email: e }));
 
-          if (!emailEnabled) {
+          if (!BREVO_KEY || !emailEnabled) {
             await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
             results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'sent', reason: '[Simulated]' });
             sent++;
           } else {
-            const r = await sendPayloadSMTP(payload);
-            if (r.ok) {
+            const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'api-key': BREVO_KEY },
+              body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
               await db.query(`UPDATE separations SET relieving_letter_sent_at = NOW() WHERE employee_id = $1`, [emp.id]);
               results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'sent', reason: '' });
               sent++;
             } else {
-              results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'failed', reason: `SMTP: ${r.error}` });
+              const errText = await resp.text();
+              results.push({ row: rowNum, name: fullName, email: targetEmail, status: 'failed', reason: errText.substring(0, 120) });
               failed++;
             }
           }
