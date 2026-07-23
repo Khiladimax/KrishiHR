@@ -232,10 +232,20 @@ exports.updatePFC = async (req, res) => {
     await ensureSchema();
     if (!canManage(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
     const id = parseInt(req.params.id);
-    const allowed = ['contact_person', 'contact_no', 'owner_name', 'mobile_no', 'month_rent', 'advance', 'office_address', 'agreement_start', 'agreement_end', 'district', 'taluka'];
+    const allowed = ['sr_no', 'district', 'taluka', 'owner_name', 'mobile_no', 'office_address', 'owner_address',
+      'advance', 'month_rent', 'aadhar', 'pan', 'bank_name', 'account_no', 'ifsc', 'branch',
+      'agreement_start', 'agreement_end', 'contact_person', 'contact_no'];
+    const numeric = ['sr_no', 'advance', 'month_rent'];
+    const dates = ['agreement_start', 'agreement_end'];
     const sets = [], vals = [];
     let i = 1;
-    for (const f of allowed) if (req.body[f] !== undefined) { sets.push(`${f}=$${i++}`); vals.push(req.body[f] === '' ? null : req.body[f]); }
+    for (const f of allowed) if (req.body[f] !== undefined) {
+      let v = req.body[f];
+      if (v === '' || v === null) v = null;
+      else if (numeric.includes(f)) { v = N(v); }
+      else if (dates.includes(f)) { v = toISODate(v); }
+      sets.push(`${f}=$${i++}`); vals.push(v);
+    }
     if (!sets.length) return res.status(400).json({ success: false, message: 'Nothing to update' });
     sets.push('updated_at=now()'); vals.push(id);
     await db.query(`UPDATE pfc_agreements SET ${sets.join(',')} WHERE id=$${i}`, vals);
