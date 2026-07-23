@@ -1085,6 +1085,20 @@ router.post  ('/documents/:id/submit',     authenticate,                    docs
 router.delete('/documents/:id',            authenticate,                    docsCtrl.deleteDocument);
 
 // ── Asset Allocation module ───────────────────────────────────────────────────
+// ── PFC (rented field offices) ───────────────────────────────────────────────
+const pfcCtrl = require('../controllers/pfcController');
+const PFC_ROLES = ['hr','accounts','admin','super_admin'];
+router.get   ('/pfc/template',        authenticate, authorize(...PFC_ROLES), pfcCtrl.downloadTemplate);
+router.post  ('/pfc/import',          authenticate, authorize(...PFC_ROLES), pfcCtrl.uploadMiddleware, pfcCtrl.importPFC);
+router.post  ('/pfc/pay',             authenticate, authorize(...PFC_ROLES), pfcCtrl.setPaid);
+router.post  ('/pfc/notify-expiring', authenticate, authorize(...PFC_ROLES), pfcCtrl.notifyExpiring);
+router.get   ('/pfc/:id/assets',      authenticate, authorize(...PFC_ROLES), pfcCtrl.listAssets);
+router.post  ('/pfc/:id/assets',      authenticate, authorize(...PFC_ROLES), pfcCtrl.addAsset);
+router.delete('/pfc/assets/:id',      authenticate, authorize(...PFC_ROLES), pfcCtrl.removeAsset);
+router.patch ('/pfc/:id',             authenticate, authorize(...PFC_ROLES), pfcCtrl.updatePFC);
+router.delete('/pfc/:id',             authenticate, authorize(...PFC_ROLES), pfcCtrl.remove);
+router.get   ('/pfc',                 authenticate, authorize(...PFC_ROLES), pfcCtrl.list);
+
 const assetCtrl = require('../controllers/assetController');
 router.get   ('/assets/items',     authenticate,                        assetCtrl.getItems);
 router.get   ('/assets/employees', authenticate, authorize(...EMP_MGMT), assetCtrl.getEmployees);

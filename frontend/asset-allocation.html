@@ -52,6 +52,14 @@ table.mx tbody tr:nth-child(even) td.zero { background:#f6f8f3; }
 /* black borders on the detail/list table too */
 table.aa-tbl th, table.aa-tbl td { border:1px solid #000; }
 table.aa-tbl th { color:#000; }
+/* PFC register */
+table.pfc-tbl { border-collapse:collapse;width:100%;font-size:12.5px; }
+table.pfc-tbl th, table.pfc-tbl td { border:1px solid #cbd5c0;padding:6px 9px;text-align:left;white-space:nowrap; }
+table.pfc-tbl thead th { background:#1b5e20;color:#fff;position:sticky;top:0;font-weight:700; }
+table.pfc-tbl tbody tr:nth-child(even) { background:#f6f8f3; }
+table.pfc-tbl tr.pfc-expiring, table.pfc-tbl tr.pfc-expiring:nth-child(even) { background:#ffe1e1; }
+table.pfc-tbl tr.pfc-expired, table.pfc-tbl tr.pfc-expired:nth-child(even) { background:#ffb3b3;color:#7a0000; }
+.pfc-swatch { display:inline-block;width:14px;height:14px;border:1px solid #999;vertical-align:middle;margin:0 2px; }
 </style>
 </head>
 <body>
@@ -88,25 +96,27 @@ table.aa-tbl th { color:#000; }
       <!-- Employee picker (managers only) -->
       <div class="aa-topbar" id="picker-bar" style="display:none">
         <div class="aa-tabs" id="aa-tabs" style="display:flex;gap:6px;margin-bottom:14px"></div>
-        <div id="client-filter-wrap" style="display:none;align-items:center;gap:10px;margin-bottom:12px">
-          <span class="aa-label">Client:</span>
-          <select id="client-filter" class="aa-input" style="width:auto;min-width:240px;padding-left:12px" onchange="onClientChange()"></select>
-        </div>
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
-          <span class="aa-label">Allocate for:</span>
-          <div class="aa-searchbar">
-            <span class="aa-search-icon">🔍</span>
-            <input id="emp-search" class="aa-input" placeholder="Type name or employee code…" autocomplete="off"
-              oninput="onSearch()" onfocus="openDrop()" onblur="closeDropDelayed()">
-            <div id="emp-drop" class="aa-dropdown"></div>
+        <div id="asset-controls">
+          <div id="client-filter-wrap" style="display:none;align-items:center;gap:10px;margin-bottom:12px">
+            <span class="aa-label">Client:</span>
+            <select id="client-filter" class="aa-input" style="width:auto;min-width:240px;padding-left:12px" onchange="onClientChange()"></select>
           </div>
-          <div id="emp-badge" style="display:none">
-            <span class="aa-badge">👤 <span id="emp-label"></span><span class="clr" onclick="clearEmp()" title="Clear">×</span></span>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+            <span class="aa-label">Allocate for:</span>
+            <div class="aa-searchbar">
+              <span class="aa-search-icon">🔍</span>
+              <input id="emp-search" class="aa-input" placeholder="Type name or employee code…" autocomplete="off"
+                oninput="onSearch()" onfocus="openDrop()" onblur="closeDropDelayed()">
+              <div id="emp-drop" class="aa-dropdown"></div>
+            </div>
+            <div id="emp-badge" style="display:none">
+              <span class="aa-badge">👤 <span id="emp-label"></span><span class="clr" onclick="clearEmp()" title="Clear">×</span></span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="aa-body">
+      <div class="aa-body" id="asset-body">
         <!-- Allocate form (managers, after selecting employee) -->
         <div id="alloc-form" style="display:none">
           <h2 class="aa-h">➕ Add items</h2>
@@ -140,7 +150,36 @@ table.aa-tbl th { color:#000; }
         <div id="alloc-table"><div class="muted">Loading…</div></div>
       </div>
 
+      <!-- ============ PFC PANEL (rented field offices) ============ -->
+      <div id="pfc-panel" style="display:none">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+          <span class="aa-label">Rent month:</span>
+          <select id="pfc-month" class="aa-input" style="width:auto;padding-left:12px" onchange="loadPFC()"></select>
+          <select id="pfc-year" class="aa-input" style="width:auto;padding-left:12px" onchange="loadPFC()"></select>
+          <div style="flex:1"></div>
+          <button class="btn btn-outline btn-sm" onclick="downloadPFCTemplate()">⬇️ Template</button>
+          <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0">
+            📥 Import Excel
+            <input type="file" id="pfc-file" accept=".xlsx,.xls" style="display:none" onchange="importPFC(this)">
+          </label>
+          <button class="btn btn-outline btn-sm" onclick="downloadPFCExcel()">⬇️ Export</button>
+        </div>
+        <div id="pfc-summary" class="muted" style="margin-bottom:10px"></div>
+        <div id="pfc-table"><div class="muted">Loading…</div></div>
+      </div>
+
     </div>
+  </div>
+</div>
+
+<!-- PFC assets modal -->
+<div id="pfc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto">
+  <div class="card" style="max-width:720px;width:100%;background:#fff">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 class="aa-h" id="pfc-modal-title" style="margin:0">PFC details</h2>
+      <button class="btn btn-outline btn-sm" onclick="closePFCModal()">✕ Close</button>
+    </div>
+    <div id="pfc-modal-body"></div>
   </div>
 </div>
 
@@ -215,15 +254,27 @@ window.addEventListener('load', async () => {
   }
 });
 
+const PFC_TAB_ROLES = ['hr', 'accounts', 'admin', 'super_admin'];
 function renderTabs() {
-  document.getElementById('aa-tabs').innerHTML = scopes.map(s =>
-    `<button class="aa-tab ${s.id === currentScope ? 'active' : ''}" onclick="switchTab('${s.id}')">${s.id === 'client' ? '🏭 ' : '🏢 '}${s.label}</button>`).join('');
+  const icon = s => s === 'client' ? '🏭 ' : (s === 'pfc' ? '🏠 ' : '🏢 ');
+  let html = scopes.map(s =>
+    `<button class="aa-tab ${s.id === currentScope ? 'active' : ''}" onclick="switchTab('${s.id}')">${icon(s.id)}${s.label}</button>`).join('');
+  if (PFC_TAB_ROLES.includes(Auth.getUser().role)) {
+    html += `<button class="aa-tab ${currentScope === 'pfc' ? 'active' : ''}" onclick="switchTab('pfc')">🏠 PFC (Field Offices)</button>`;
+  }
+  document.getElementById('aa-tabs').innerHTML = html;
 }
 function switchTab(scope) {
   currentScope = scope;
   currentClientId = '';
   renderTabs();
   clearEmp();
+  const isPfc = scope === 'pfc';
+  document.getElementById('asset-controls').style.display = isPfc ? 'none' : '';
+  document.getElementById('asset-body').style.display = isPfc ? 'none' : '';
+  document.getElementById('pfc-panel').style.display = isPfc ? 'block' : 'none';
+  document.getElementById('dl-btn').style.display = isPfc ? 'none' : '';
+  if (isPfc) { initPFC(); return; }
   if (scope === 'client') loadClients();
   else document.getElementById('client-filter-wrap').style.display = 'none';
   document.getElementById('tbl-title').textContent = 'All employees — item counts (' + (scope === 'client' ? 'Client' : 'Main') + ')';
@@ -402,6 +453,208 @@ async function delAlloc(id) {
   if (!confirm('Delete this asset record?')) return;
   try { await api('/assets/' + id, { method: 'DELETE' }); toast('Deleted'); loadMatrix(); loadEmpDetail(); }
   catch (e) { toast(e.message, 'error'); }
+}
+
+/* ============================ PFC (Field Offices) ============================ */
+const PFC_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let pfcRows = [], pfcInited = false;
+
+function initPFC() {
+  if (!pfcInited) {
+    const now = new Date();
+    const mSel = document.getElementById('pfc-month'), ySel = document.getElementById('pfc-year');
+    mSel.innerHTML = PFC_MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+    mSel.value = now.getMonth() + 1;
+    const yr = now.getFullYear();
+    ySel.innerHTML = [yr - 1, yr, yr + 1].map(y => `<option value="${y}">${y}</option>`).join('');
+    ySel.value = yr;
+    pfcInited = true;
+    // Fire the "agreement ending soon" alert to HR + Accounts once on entry (throttled server-side).
+    api('/pfc/notify-expiring', { method: 'POST', body: JSON.stringify({}) })
+      .then(r => { if (r.notified) toast(`⚠️ ${r.notified} PFC agreement(s) ending soon — HR & Accounts notified`, 'warning'); })
+      .catch(() => {});
+  }
+  loadPFC();
+}
+
+function pfcMY() {
+  return { month: +document.getElementById('pfc-month').value, year: +document.getElementById('pfc-year').value };
+}
+
+async function loadPFC() {
+  const box = document.getElementById('pfc-table');
+  box.innerHTML = '<div class="muted">Loading…</div>';
+  try {
+    const { month, year } = pfcMY();
+    const r = await api(`/pfc?month=${month}&year=${year}`);
+    pfcRows = r.data || [];
+    renderPFC();
+  } catch (e) { box.innerHTML = `<div class="muted">Error: ${e.message}</div>`; }
+}
+
+function renderPFC() {
+  const box = document.getElementById('pfc-table');
+  const { month, year } = pfcMY();
+  if (!pfcRows.length) {
+    box.innerHTML = '<div class="muted">No PFC offices yet. Use <b>Import Excel</b> to add them.</div>';
+    document.getElementById('pfc-summary').textContent = '';
+    return;
+  }
+  const expiringCnt = pfcRows.filter(r => r.expiring_soon).length;
+  const unpaidCnt = pfcRows.filter(r => !r.paid_this_month).length;
+  document.getElementById('pfc-summary').innerHTML =
+    `<b>${pfcRows.length}</b> field office(s) · <span style="color:#c62828">${expiringCnt} ending soon</span> · ` +
+    `<b>${unpaidCnt}</b> rent unpaid for ${PFC_MONTHS[month - 1]} ${year}`;
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const head = ['#', 'Dist', 'Taluka', 'Owner', 'Mobile', 'Office Address', 'Advance', 'Rent', 'Start', 'End', 'Contact Person', 'Contact No', 'Assets', `Paid (${PFC_MONTHS[month - 1]})`, ''];
+  const rows = pfcRows.map(r => {
+    const cls = r.expired ? 'pfc-expired' : (r.expiring_soon ? 'pfc-expiring' : '');
+    const endTxt = r.agreement_end ? esc(r.agreement_end) + (r.expired ? ' ⛔' : (r.expiring_soon ? ' ⚠️' : '')) : '—';
+    return `<tr class="${cls}">
+      <td>${esc(r.sr_no ?? '')}</td>
+      <td>${esc(r.district)}</td>
+      <td>${esc(r.taluka)}</td>
+      <td><b>${esc(r.owner_name)}</b></td>
+      <td>${esc(r.mobile_no)}</td>
+      <td style="max-width:220px;white-space:normal">${esc(r.office_address)}</td>
+      <td>₹${esc(r.advance)}</td>
+      <td>₹${esc(r.month_rent)}</td>
+      <td style="white-space:nowrap">${esc(r.agreement_start) || '—'}</td>
+      <td style="white-space:nowrap;font-weight:600">${endTxt}</td>
+      <td>${esc(r.contact_person) || '—'}</td>
+      <td>${esc(r.contact_no) || '—'}</td>
+      <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="openPFCModal(${r.id})">${r.asset_count || 0} 📦</button></td>
+      <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer" ${r.paid_this_month ? 'checked' : ''} onchange="setPaidPFC(${r.id}, this)"></td>
+      <td><button class="btn btn-outline btn-sm" onclick="delPFC(${r.id})" title="Delete">🗑️</button></td>
+    </tr>`;
+  }).join('');
+
+  box.innerHTML = `<div style="overflow-x:auto"><table class="pfc-tbl">
+    <thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <div class="muted" style="margin-top:8px;font-size:12px">
+      <span class="pfc-swatch pfc-expiring"></span> last month of agreement &nbsp;
+      <span class="pfc-swatch pfc-expired"></span> already expired
+    </div>`;
+}
+
+async function setPaidPFC(id, cb) {
+  const { month, year } = pfcMY();
+  const paid = cb.checked;
+  try {
+    await api('/pfc/pay', { method: 'POST', body: JSON.stringify({ pfc_id: id, year, month, paid }) });
+    const row = pfcRows.find(r => r.id === id); if (row) row.paid_this_month = paid;
+    toast(paid ? 'Marked paid' : 'Marked unpaid');
+    renderPFC();
+  } catch (e) { cb.checked = !paid; toast(e.message, 'error'); }
+}
+
+async function importPFC(input) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  toast('Importing…');
+  try {
+    const res = await fetch(API_BASE + '/pfc/import', { method: 'POST', headers: { Authorization: 'Bearer ' + Auth.getToken() }, body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) throw new Error(data.message || ('HTTP ' + res.status));
+    toast('✅ ' + (data.message || 'Imported'));
+    loadPFC();
+  } catch (e) { toast(e.message, 'error'); }
+  input.value = '';
+}
+
+async function downloadPFCTemplate() {
+  try {
+    const res = await fetch(API_BASE + '/pfc/template', { headers: { Authorization: 'Bearer ' + Auth.getToken() } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob(); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'PFC_Import_Template.xlsx'; a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function downloadPFCExcel() {
+  if (!pfcRows.length) return toast('Nothing to export', 'warning');
+  const { month, year } = pfcMY();
+  const H = ['SR.NO', 'Dist', 'Taluka', 'Owner Name', 'Mobile', 'Office Address', 'Owner Address', 'Advance', 'Month Rent', 'Aadhar', 'PAN', 'Bank', 'Account No', 'IFSC', 'Branch', 'Agreement Start', 'Agreement End', 'Contact Person', 'Contact No', 'Assets', `Paid ${PFC_MONTHS[month - 1]} ${year}`];
+  const cell = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [H.join(',')];
+  pfcRows.forEach(r => lines.push([r.sr_no, r.district, r.taluka, r.owner_name, r.mobile_no, r.office_address, r.owner_address, r.advance, r.month_rent, r.aadhar, r.pan, r.bank_name, r.account_no, r.ifsc, r.branch, r.agreement_start, r.agreement_end, r.contact_person, r.contact_no, r.asset_count, r.paid_this_month ? 'YES' : 'NO'].map(cell).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = `PFC_Register_${PFC_MONTHS[month - 1]}_${year}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+async function delPFC(id) {
+  const row = pfcRows.find(r => r.id === id);
+  if (!confirm(`Delete PFC "${row ? row.owner_name : id}" and all its assets & payment history?`)) return;
+  try { await api('/pfc/' + id, { method: 'DELETE' }); toast('Deleted'); loadPFC(); }
+  catch (e) { toast(e.message, 'error'); }
+}
+
+/* ---- PFC details modal: contact person/no + assets ---- */
+let pfcModalId = null;
+function closePFCModal() { document.getElementById('pfc-modal').style.display = 'none'; pfcModalId = null; }
+async function openPFCModal(id) {
+  pfcModalId = id;
+  const r = pfcRows.find(x => x.id === id) || {};
+  const esc = s => String(s == null ? '' : s).replace(/"/g, '&quot;');
+  document.getElementById('pfc-modal-title').textContent = '🏠 ' + (r.owner_name || 'PFC') + (r.taluka ? ' — ' + r.taluka : '');
+  document.getElementById('pfc-modal-body').innerHTML = `
+    <div class="aa-grid" style="margin-bottom:16px">
+      <div class="aa-field"><label>Contact Person</label><input id="pfc-cp" value="${esc(r.contact_person)}" placeholder="Name"></div>
+      <div class="aa-field"><label>Contact No</label><input id="pfc-cn" value="${esc(r.contact_no)}" placeholder="Phone"></div>
+      <div class="aa-field" style="align-self:end"><button class="btn btn-primary btn-sm" onclick="savePFCContact()">💾 Save contact</button></div>
+    </div>
+    <h2 class="aa-h" style="font-size:15px">📦 Assets at this office</h2>
+    <div class="aa-grid" style="margin:8px 0">
+      <div class="aa-field"><label>Item</label><input id="pfc-ai" placeholder="Chair, Table, Sign board…"></div>
+      <div class="aa-field"><label>Qty</label><input id="pfc-aq" type="number" min="1" value="1"></div>
+      <div class="aa-field"><label>Serial / tag</label><input id="pfc-as" placeholder="optional"></div>
+      <div class="aa-field"><label>Remark</label><input id="pfc-ar" placeholder="optional"></div>
+      <div class="aa-field" style="align-self:end"><button class="btn btn-outline btn-sm" onclick="addPFCAsset()">+ Add</button></div>
+    </div>
+    <div id="pfc-asset-list"><div class="muted">Loading…</div></div>`;
+  document.getElementById('pfc-modal').style.display = 'flex';
+  loadPFCAssets();
+}
+async function loadPFCAssets() {
+  const box = document.getElementById('pfc-asset-list');
+  try {
+    const r = await api('/pfc/' + pfcModalId + '/assets');
+    const list = r.data || [];
+    if (!list.length) { box.innerHTML = '<div class="muted">No assets recorded yet.</div>'; return; }
+    const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    box.innerHTML = `<table class="pfc-tbl"><thead><tr><th>Item</th><th>Qty</th><th>Serial</th><th>Remark</th><th></th></tr></thead><tbody>` +
+      list.map(a => `<tr><td><b>${esc(a.item_name)}</b></td><td>${esc(a.quantity)}</td><td>${esc(a.serial_no) || '—'}</td><td>${esc(a.remark) || '—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="removePFCAsset(${a.id})">🗑️</button></td></tr>`).join('') +
+      `</tbody></table>`;
+  } catch (e) { box.innerHTML = `<div class="muted">Error: ${e.message}</div>`; }
+}
+async function addPFCAsset() {
+  const item = document.getElementById('pfc-ai').value.trim();
+  if (!item) return toast('Item name required', 'warning');
+  const body = { item_name: item, quantity: +document.getElementById('pfc-aq').value || 1, serial_no: document.getElementById('pfc-as').value.trim(), remark: document.getElementById('pfc-ar').value.trim() };
+  try {
+    await api('/pfc/' + pfcModalId + '/assets', { method: 'POST', body: JSON.stringify(body) });
+    document.getElementById('pfc-ai').value = ''; document.getElementById('pfc-aq').value = 1;
+    document.getElementById('pfc-as').value = ''; document.getElementById('pfc-ar').value = '';
+    const row = pfcRows.find(r => r.id === pfcModalId); if (row) row.asset_count = (+row.asset_count || 0) + body.quantity;
+    loadPFCAssets(); renderPFC();
+  } catch (e) { toast(e.message, 'error'); }
+}
+async function removePFCAsset(id) {
+  try { await api('/pfc/assets/' + id, { method: 'DELETE' }); loadPFCAssets(); loadPFC(); }
+  catch (e) { toast(e.message, 'error'); }
+}
+async function savePFCContact() {
+  const body = { contact_person: document.getElementById('pfc-cp').value.trim(), contact_no: document.getElementById('pfc-cn').value.trim() };
+  try {
+    await api('/pfc/' + pfcModalId, { method: 'PATCH', body: JSON.stringify(body) });
+    const row = pfcRows.find(r => r.id === pfcModalId); if (row) { row.contact_person = body.contact_person; row.contact_no = body.contact_no; }
+    toast('Contact saved'); renderPFC();
+  } catch (e) { toast(e.message, 'error'); }
 }
 </script>
 </body>
