@@ -1,16 +1,73 @@
 // emailService.js — KrishiHR Email Notification Service
-// Provider: Brevo (Sendinblue) via HTTP API (not SMTP — Render blocks SMTP ports)
-// Add to .env:
-//   BREVO_API_KEY=your-brevo-api-key   (from Brevo → Settings → SMTP & API → API keys)
-//   EMAIL_FROM=anonymous.agritech@gmail.com  (must be verified sender in Brevo)
-//   EMAIL_FROM_NAME=KrishiHR
+// Provider: SMTP (nodemailer). Set on the host (e.g. Rediffmail Pro):
+//   SMTP_HOST=smtp.rediffmailpro.com
+//   SMTP_PORT=465            (465 = SSL, 587 = STARTTLS)
+//   SMTP_SECURE=true         (true for 465, false for 587)
+//   SMTP_USER=HR_KCMS@krishicare.in
+//   SMTP_PASS=<mailbox password>
+//   EMAIL_FROM=HR_KCMS@krishicare.in   (usually same as SMTP_USER; many servers
+//                                        require From = authenticated mailbox)
+//   EMAIL_FROM_NAME=Krishi Care & Management Services Pvt. Ltd.
 //   EMAIL_ENABLED=true
+// NOTE: Render blocks outbound SMTP ports on most plans — if sends time out, the
+//       host is blocking SMTP and you must allow it / use a relay that permits it.
 
 const db = require('./db');
+const nodemailer = require('nodemailer');
 
 const FROM_NAME  = process.env.EMAIL_FROM_NAME || 'Krishi Care & Management Services Pvt. Ltd.';
-const FROM_EMAIL = process.env.EMAIL_FROM      || 'anonymous.agritech@gmail.com';
+const FROM_EMAIL = process.env.EMAIL_FROM      || process.env.SMTP_USER || 'no-reply@krishicare.in';
 const ENABLED    = process.env.EMAIL_ENABLED === 'true';
+
+// ── Shared SMTP transport (lazy, cached) ──────────────────────────────────────
+let _transport = null;
+function getTransport() {
+  if (_transport) return _transport;
+  const host = process.env.SMTP_HOST;
+  if (!host) { console.warn('[Email] SMTP_HOST not set — email disabled'); return null; }
+  const port = parseInt(process.env.SMTP_PORT) || 587;
+  _transport = nodemailer.createTransport({
+    host, port,
+    secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 20000, greetingTimeout: 20000, socketTimeout: 30000,
+  });
+  return _transport;
+}
+
+// Low-level SMTP send used by everything (notifications + offer letters).
+// opts: { from:{email,name}, to, toName, subject, html, cc?, bcc?, replyTo?, replyToName?, attachments? }
+// attachments: [{ filename, content(Buffer|base64), contentType? }]. Returns
+// { ok, messageId, error }.
+async function sendRaw(opts) {
+  if (!ENABLED) { console.log(`[Email DISABLED] Would send to ${opts.to}: ${opts.subject}`); return { ok: false, error: 'EMAIL_ENABLED not true' }; }
+  const tx = getTransport();
+  if (!tx) return { ok: false, error: 'SMTP not configured' };
+  const from = opts.from || { email: FROM_EMAIL, name: FROM_NAME };
+  const mail = {
+    from: `"${(from.name || FROM_NAME).replace(/"/g, '')}" <${from.email}>`,
+    to: opts.toName ? `"${String(opts.toName).replace(/"/g, '')}" <${opts.to}>` : opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  };
+  if (opts.cc && opts.cc.length)   mail.cc  = opts.cc.map(e => (typeof e === 'string' ? e : e.email));
+  if (opts.bcc && opts.bcc.length) mail.bcc = opts.bcc.map(e => (typeof e === 'string' ? e : e.email));
+  if (opts.replyTo) mail.replyTo = opts.replyToName ? `"${opts.replyToName}" <${opts.replyTo}>` : opts.replyTo;
+  if (opts.attachments && opts.attachments.length) {
+    mail.attachments = opts.attachments.map(a => ({
+      filename: a.filename || a.name,
+      content:  Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content, 'base64'),
+      contentType: a.contentType,
+    }));
+  }
+  try {
+    const info = await tx.sendMail(mail);
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email] SMTP send failed to ${opts.to}:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
 
 // ── Role-based senders ────────────────────────────────────────────────────────
 // Each mail can pick a sender by category. Every entry falls back to the default
@@ -107,49 +164,17 @@ function baseTemplate(title, bodyHtml, previewText = '') {
 
 // ── Send helper ───────────────────────────────────────────────────────────────
 async function send({ to, toName, subject, html, preview, category = 'hr', replyTo, replyToName, cc, bcc }) {
-  if (!ENABLED) {
-    console.log(`[Email DISABLED] Would send to ${to}: ${subject}`);
-    return;
-  }
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey) {
-    console.warn('[Email] BREVO_API_KEY not set — skipping email');
-    return;
-  }
-  try {
-    const sender  = resolveSender(category);
-    const payload = {
-      sender,
-      to:      [{ email: to, name: toName || to }],
-      subject,
-      htmlContent: baseTemplate(subject, html, preview || subject),
-    };
-    // Manager/owner replies should reach the real person, even though the mail is
-    // sent from a verified role address (Brevo can't send "from" a personal inbox).
-    if (replyTo) payload.replyTo = { email: replyTo, name: replyToName || replyTo };
-    if (cc && cc.length)  payload.cc  = cc.map(e => (typeof e === 'string' ? { email: e } : e));
-    if (bcc && bcc.length) payload.bcc = bcc.map(e => (typeof e === 'string' ? { email: e } : e));
-    const body = JSON.stringify(payload);
-
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method:  'POST',
-      headers: {
-        'accept':       'application/json',
-        'api-key':      apiKey,
-        'content-type': 'application/json',
-      },
-      body,
-    });
-
-    const data = await res.json();
-    if (res.ok) {
-      console.log(`[Email] Sent to ${to}: ${subject}`);
-    } else {
-      console.error(`[Email] Failed to ${to}:`, JSON.stringify(data));
-    }
-  } catch (err) {
-    console.error(`[Email] Failed to ${to}:`, err.message);
-  }
+  const from = resolveSender(category);
+  const r = await sendRaw({
+    from,
+    to, toName,
+    subject,
+    html: baseTemplate(subject, html, preview || subject),
+    replyTo, replyToName, cc, bcc,
+  });
+  if (r.ok) console.log(`[Email] Sent to ${to}: ${subject}`);
+  else console.error(`[Email] Failed to ${to}: ${r.error}`);
+  return r;
 }
 
 // ── Get employee email helper ─────────────────────────────────────────────────
@@ -1506,6 +1531,8 @@ async function notifyProvisionInitiated(employeeId, confirmationDate) {
 
 module.exports = {
   send,
+  sendRaw,          // low-level SMTP send (used by offer letters, with attachments)
+  resolveSender,    // pick { email, name } for a category
   notifyLeaveApplied,
   notifyLeaveFullyApproved,
   notifyLeaveApprovedByManager: notifyLeaveApplied, // reuse — notifies next in chain
