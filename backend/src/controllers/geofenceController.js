@@ -1,5 +1,6 @@
 // src/controllers/geofenceController.js — COMPLETE
 const db = require('../config/db');
+const { mainStaffFrag } = require('../utils/scope');
 
 // Haversine distance in meters
 function haversine(lat1, lon1, lat2, lon2) {
@@ -1340,7 +1341,7 @@ exports.getAllBufferRules = async (req, res) => {
         clientFilter = `AND e.client_id = ${parseInt(qf)}`;
       } else {
         // default 'own' — only KC employees
-        clientFilter = `AND e.client_id IS NULL`;
+        clientFilter = `AND ${mainStaffFrag('e')}`;
       }
     }
 

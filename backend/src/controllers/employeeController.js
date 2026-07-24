@@ -16,6 +16,7 @@ function toISTDateString(date) {
 }
 const { getEmployeeRegion } = require('../config/regionHelper');
 const db = require('../config/db');
+const { clientManpowerFrag, mainStaffFrag } = require('../utils/scope');
 
 // Auto-generate employee code
 async function generateEmployeeCode(client, employeeCategory) {
@@ -97,7 +98,7 @@ exports.getAll = async (req, res) => {
     const { client_id: qClientId } = req.query;
     if (qClientId !== undefined && ['admin','super_admin','hr','accounts'].includes(userRole)) {
       if (qClientId === 'own' || qClientId === 'null' || qClientId === '') {
-        conditions.push(`e.client_id IS NULL`);
+        conditions.push(mainStaffFrag('e'));
       } else if (qClientId === 'all') {
         // no filter — show everything
       } else {
@@ -176,8 +177,8 @@ exports.getAllForChat = async (req, res) => {
     if (user.client_id) {
       clientFilter = `AND e.client_id = ${parseInt(user.client_id)}`;
     } else if (user.role === 'employee') {
-      // Own-company employee: only sees own-company employees (client_id IS NULL)
-      clientFilter = `AND e.client_id IS NULL`;
+      // Own-company employee: only sees own-company KC employees (no client_id, not KC-C)
+      clientFilter = `AND ${mainStaffFrag('e')}`;
     }
 
     const result = await db.query(
@@ -531,7 +532,7 @@ exports.exportExcel = async (req, res) => {
        LEFT JOIN clients      cl  ON e.client_id = cl.id
        WHERE e.is_active = true ${clientFilterExport}
        ORDER BY
-         CASE WHEN e.client_id IS NULL THEN 0 ELSE 1 END,
+         CASE WHEN ${mainStaffFrag('e')} THEN 0 ELSE 1 END,
          COALESCE(cl.name,''),
          d.name, e.first_name`
     );
@@ -1000,7 +1001,7 @@ async function buildClientAttendanceSheet(wb, m, y, MONTH_NAMES, db, getEmployee
     LEFT JOIN departments  d   ON e.department_id  = d.id
     LEFT JOIN designations des ON e.designation_id = des.id
     LEFT JOIN clients      cl  ON e.client_id      = cl.id
-    WHERE e.client_id IS NOT NULL ${clientFilter}
+    WHERE ${clientManpowerFrag('e')} ${clientFilter}
       AND (
         e.is_active = true
         OR EXISTS (SELECT 1 FROM attendance a
@@ -1237,7 +1238,7 @@ async function buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmplo
     FROM employees e
     LEFT JOIN departments d  ON e.department_id = d.id
     LEFT JOIN clients     cl ON e.client_id     = cl.id
-    WHERE e.client_id IS NOT NULL ${clientFilter}
+    WHERE ${clientManpowerFrag('e')} ${clientFilter}
       AND (e.is_active = true OR EXISTS (
         SELECT 1 FROM attendance a WHERE a.employee_id = e.id AND a.date BETWEEN $1 AND $2))
     ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [startStr, endStr]);
@@ -1258,7 +1259,7 @@ async function buildClientPunchRegisterSheet(wb, m, y, MONTH_NAMES, db, getEmplo
            a.working_hours
     FROM attendance a
     JOIN employees e ON e.id = a.employee_id
-    WHERE a.date BETWEEN $1 AND $2 AND e.client_id IS NOT NULL ${clientFilter}`,
+    WHERE a.date BETWEEN $1 AND $2 AND ${clientManpowerFrag('e')} ${clientFilter}`,
     [startStr, endStr]);
   const punchMap = {};
   for (const r of punchRes.rows) {
@@ -1522,7 +1523,7 @@ exports.exportMasterExcel = async (req, res) => {
     const clientFilter  = isClientAdmin && clientId ? `AND e.client_id = ${parseInt(clientId)}${caStateSql}` : '';
     // Scope anchor: main users (HR/Accounts/Super) see own-company staff (client_id IS NULL);
     // a client-side admin sees ONLY their own client's employees — never main-company rows.
-    const scopeAnchor   = isClientAdmin && clientId ? `e.client_id = ${parseInt(clientId)}${caStateSql}` : `e.client_id IS NULL`;
+    const scopeAnchor   = isClientAdmin && clientId ? `e.client_id = ${parseInt(clientId)}${caStateSql}` : mainStaffFrag('e');
 
     // ── 1. Employees + salary structure ─────────────────────────────────────
     const empResult = await db.query(`
@@ -1693,7 +1694,7 @@ exports.exportMasterExcel = async (req, res) => {
                cp.gross_salary, cp.tds_amount, cp.amount_payable
         FROM client_payroll_cycles cp
         JOIN employees e ON e.id = cp.employee_id
-        WHERE cp.cycle_month = $1 AND cp.cycle_year = $2 AND e.client_id IS NOT NULL ${clientFilter}
+        WHERE cp.cycle_month = $1 AND cp.cycle_year = $2 AND ${clientManpowerFrag('e')} ${clientFilter}
         ORDER BY e.employee_code`, [m, y]);
       let cr = 4;
       cpay.rows.forEach(row => {
@@ -2038,7 +2039,7 @@ exports.exportMasterExcel = async (req, res) => {
         LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
         LEFT JOIN clients cl ON e.client_id = cl.id
         LEFT JOIN client_payroll_cycles cp ON cp.employee_id = e.id AND cp.cycle_month = $1 AND cp.cycle_year = $2
-        WHERE e.client_id IS NOT NULL AND e.is_active = true
+        WHERE ${clientManpowerFrag('e')} AND e.is_active = true
         ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [m, y]);
 
       // Get current last row in ws2
@@ -2243,7 +2244,7 @@ exports.exportMasterExcel = async (req, res) => {
         LEFT JOIN designations des ON e.designation_id = des.id
         LEFT JOIN employees m2     ON e.reporting_manager_id = m2.id
         LEFT JOIN clients cl       ON e.client_id = cl.id
-        WHERE e.client_id IS NOT NULL AND e.is_active = true
+        WHERE ${clientManpowerFrag('e')} AND e.is_active = true
         ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, []);
 
       let dirClientRow = ws3.lastRow ? ws3.lastRow.number + 2 : employees.length + 5;
@@ -2643,7 +2644,7 @@ exports.exportAttendanceRegister = async (req, res) => {
     // Scope anchor: main users see own-company staff (client_id IS NULL); a client
     // admin sees ONLY their own client (client_admin also limited to their state).
     const scopeAnchor   = isClientAdmin && req.user.client_id
-      ? `e.client_id = ${parseInt(req.user.client_id)}${caStateSql}` : `e.client_id IS NULL`;
+      ? `e.client_id = ${parseInt(req.user.client_id)}${caStateSql}` : mainStaffFrag('e');
     // Passed to the client-sheet builders (Client Attn / Client Punch).
     const clientFilter  = isClientAdmin && req.user.client_id
       ? `AND e.client_id = ${parseInt(req.user.client_id)}${caStateSql}` : '';

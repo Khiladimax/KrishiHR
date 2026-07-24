@@ -6,6 +6,7 @@
 const db     = require('../config/db');
 const XLSX   = require('xlsx');
 const multer = require('multer');
+const { clientManpowerFrag } = require('../utils/scope');
 
 const MONTH_NAMES = ['January','February','March','April','May','June',
   'July','August','September','October','November','December'];
@@ -115,7 +116,7 @@ exports.downloadTemplate = async (req, res) => {
       LEFT JOIN clients cl ON e.client_id = cl.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN employee_salary_structure s ON s.employee_id = e.id
-      WHERE e.client_id IS NOT NULL AND e.is_active = true ${clientAdminFilter(req.user, 'e')}
+      WHERE ${clientManpowerFrag('e')} AND e.is_active = true ${clientAdminFilter(req.user, 'e')}
       ORDER BY COALESCE(cl.name,''), e.first_name`);
 
     const wb = new ExcelJS.Workbook();
@@ -235,7 +236,7 @@ exports.importPayroll = async (req, res) => {
       const empRes = await client.query(
         `SELECT e.id, e.first_name, e.last_name, cl.name AS client_name
            FROM employees e LEFT JOIN clients cl ON e.client_id = cl.id
-          WHERE UPPER(e.employee_code) = $1 AND e.client_id IS NOT NULL AND e.is_active = true`, [empCode]);
+          WHERE UPPER(e.employee_code) = $1 AND ${clientManpowerFrag('e')} AND e.is_active = true`, [empCode]);
       if (!empRes.rows.length) { errors.push(`Row ${ri+1}: ${empCode} — not an active client employee`); skipped++; continue; }
       const emp = empRes.rows[0];
 
@@ -323,7 +324,7 @@ exports.exportPayroll = async (req, res) => {
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
       LEFT JOIN clients      cl  ON e.client_id      = cl.id
-      WHERE cp.cycle_month=$1 AND cp.cycle_year=$2 AND e.client_id IS NOT NULL ${clientFilter}
+      WHERE cp.cycle_month=$1 AND cp.cycle_year=$2 AND ${clientManpowerFrag('e')} ${clientFilter}
       ORDER BY COALESCE(cl.name,''), d.name, e.first_name`, [m, y]);
     const rows = result.rows;
 
@@ -448,7 +449,7 @@ exports.listPayroll = async (req, res) => {
       LEFT JOIN departments  d   ON e.department_id  = d.id
       LEFT JOIN designations des ON e.designation_id = des.id
       LEFT JOIN clients      cl  ON e.client_id      = cl.id
-      WHERE cp.cycle_month=$1 AND cp.cycle_year=$2 AND e.client_id IS NOT NULL ${clientFilter}
+      WHERE cp.cycle_month=$1 AND cp.cycle_year=$2 AND ${clientManpowerFrag('e')} ${clientFilter}
       ORDER BY COALESCE(cl.name,''), e.first_name`, [m, y]);
 
     res.json({ success: true, data: result.rows, count: result.rows.length });

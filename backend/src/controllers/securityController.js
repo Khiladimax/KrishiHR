@@ -3,6 +3,7 @@
 // admins manage device locks / blocks from the Security Logs page.
 const db = require('../config/db');
 const fcm = require('../services/fcmService');
+const { clientManpowerFrag, mainStaffFrag } = require('../utils/scope');
 
 const ADMIN_CONTACT = 'Akshay Rai (7651900038)';
 const BLOCK_HOURS = 24;
@@ -85,9 +86,9 @@ exports.getSecurityLogs = async (req, res) => {
       params.push(req.user.client_id || 0);
       where += ` AND e.client_id = $${params.length}`;
     } else if (type === 'client') {
-      where += ` AND e.client_id IS NOT NULL`;   // Client Employee tab
+      where += ` AND ${clientManpowerFrag('e')}`;   // Client Employee tab
     } else {
-      where += ` AND e.client_id IS NULL`;        // KC Employee tab
+      where += ` AND ${mainStaffFrag('e')}`;        // KC Employee tab
     }
 
     if (q) {
@@ -138,8 +139,8 @@ async function fetchSecurityRows(req) {
   const params = [];
   let where = `WHERE e.is_active = true AND LOWER(e.role) <> 'super_admin'`;
   if (role === 'client_admin') { params.push(req.user.client_id || 0); where += ` AND e.client_id = $${params.length}`; }
-  else if (type === 'client')  { where += ` AND e.client_id IS NOT NULL`; }
-  else                          { where += ` AND e.client_id IS NULL`; }
+  else if (type === 'client')  { where += ` AND ${clientManpowerFrag('e')}`; }
+  else                          { where += ` AND ${mainStaffFrag('e')}`; }
   if (q) {
     params.push(`%${q}%`); const p = params.length;
     where += ` AND (e.first_name ILIKE $${p} OR e.last_name ILIKE $${p} OR e.employee_code ILIKE $${p}
@@ -246,8 +247,8 @@ exports.resetAll = async (req, res) => {
     const params = [];
     let where = `WHERE is_active = true AND LOWER(role) <> 'super_admin'`;
     if (role === 'client_admin') { params.push(req.user.client_id || 0); where += ` AND client_id = $${params.length}`; }
-    else if (type === 'client')  { where += ` AND client_id IS NOT NULL`; }
-    else                          { where += ` AND client_id IS NULL`; }
+    else if (type === 'client')  { where += ` AND ${clientManpowerFrag('')}`; }
+    else                          { where += ` AND ${mainStaffFrag('')}`; }
     const r = await db.query(
       `UPDATE employees
           SET locked_device_id=NULL, device_token=NULL, blocked_until=NULL,

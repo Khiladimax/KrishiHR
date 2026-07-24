@@ -7,6 +7,7 @@
 const db     = require('../config/db');
 const multer = require('multer');
 const path   = require('path');
+const { clientManpowerFrag, mainStaffFrag } = require('../utils/scope');
 
 // ── Multer — memory storage for document uploads ──────────────────────────────
 const upload = multer({
@@ -339,8 +340,9 @@ exports.getEmployeesForPicker = async (req, res) => {
 };
 
 // ── Tab scoping (same rule as Asset Allocation) ───────────────────────────────
-// "main" = own-company staff (client_id IS NULL); "client" = deployed staff
-// (client_id IS NOT NULL). A client_admin is always locked to their own client.
+// "main" = own-company KC staff (no client_id and not a KC-C code); "client" =
+// deployed manpower (client_id set OR a KC-C-… code). A client_admin is always
+// locked to their own client.
 function docScopeWhere(reqUser, scope) {
   const role = String(reqUser.role || '').toLowerCase();
   if (CLIENT_SIDE.includes(role)) {
@@ -352,7 +354,7 @@ function docScopeWhere(reqUser, scope) {
     }
     return f;
   }
-  return scope === 'client' ? 'client_id IS NOT NULL' : 'client_id IS NULL';
+  return scope === 'client' ? clientManpowerFrag('') : mainStaffFrag('');
 }
 
 // ── GET /documents/matrix?scope=main|client ───────────────────────────────────

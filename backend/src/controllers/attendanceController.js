@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { getEmployeeRegion } = require('../config/regionHelper');
 const emailSvc = require('../config/emailService');
 const { validateEmployeeBuffer } = require('./geofenceController');
+const { mainStaffFrag } = require('../utils/scope');
 
 // ── IST Helpers (UTC+5:30) ────────────────────────────────────────────────────
 // Always use IST regardless of server timezone (Render runs UTC)
@@ -733,7 +734,7 @@ exports.getTeamToday = async (req, res) => {
         params.push(parseInt(clientIdFilter));
       } else {
         // Default / explicit "kc" tab: restrict to KC's own employees only
-        empCond += ` AND e.client_id IS NULL`;
+        empCond += ` AND ${mainStaffFrag('e')}`;
       }
     }
 
@@ -890,7 +891,7 @@ exports.getPunchLocations = async (req, res) => {
         empCond = `AND e.client_id = $2`;
         params.push(parseInt(clientIdFilter));
       } else {
-        empCond += ` AND e.client_id IS NULL`;
+        empCond += ` AND ${mainStaffFrag('e')}`;
       }
     }
 
@@ -2508,7 +2509,7 @@ exports.getMovementSummary = async (req, res) => {
     } else if (seeAll) {
       // KC admin/super_admin/hr: filter by client dropdown selection
       if (clientIdFilter === 'null' || clientIdFilter === 'kc') {
-        whereClauses += ` AND e.client_id IS NULL`;
+        whereClauses += ` AND ${mainStaffFrag('e')}`;
       } else if (clientIdFilter && clientIdFilter !== 'all') {
         params.push(parseInt(clientIdFilter));
         whereClauses += ` AND e.client_id = $${params.length}`;
@@ -2549,7 +2550,7 @@ exports.getMovementSummary = async (req, res) => {
       scopeFilter = `AND e.client_id = $${zeroParams.length}`;
     } else if (seeAll) {
       if (clientIdFilter === 'null' || clientIdFilter === 'kc') {
-        scopeFilter = `AND e.client_id IS NULL`;
+        scopeFilter = `AND ${mainStaffFrag('e')}`;
       } else if (clientIdFilter && clientIdFilter !== 'all') {
         zeroParams.push(parseInt(clientIdFilter));
         scopeFilter = `AND e.client_id = $${zeroParams.length}`;

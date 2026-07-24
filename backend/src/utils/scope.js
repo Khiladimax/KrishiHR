@@ -24,8 +24,28 @@ function clientScopeFragment(user, alias = 'e') {
   return null; // main office staff — see everything
 }
 
+// ── Main vs client-manpower classification ───────────────────────────────────
+// A person counts as "client / deployed manpower" if they are linked to a client
+// (client_id set) OR their employee_code follows the deployed convention KC-C…
+// (e.g. KC-C-0001). "Main" = own-company KC staff: no client_id AND not a KC-C code.
+// Use these instead of a bare `client_id IS [NOT] NULL` so KC-C-coded staff are
+// always grouped with client manpower even when their client_id wasn't filled in.
+const CLIENT_CODE_LIKE = "ILIKE 'KC-C%'";
+
+function clientManpowerFrag(alias = 'e') {
+  const c = alias ? `${alias}.` : '';
+  return `(${c}client_id IS NOT NULL OR ${c}employee_code ${CLIENT_CODE_LIKE})`;
+}
+function mainStaffFrag(alias = 'e') {
+  const c = alias ? `${alias}.` : '';
+  return `(${c}client_id IS NULL AND (${c}employee_code IS NULL OR ${c}employee_code NOT ${CLIENT_CODE_LIKE}))`;
+}
+
 // Roles that are client-side admins (scoped to one client).
 const CLIENT_ADMIN_ROLES = ['client_admin', 'super_admin_client'];
 const isClientSideAdmin  = (role) => CLIENT_ADMIN_ROLES.includes(String(role || '').toLowerCase());
 
-module.exports = { clientScopeFragment, CLIENT_ADMIN_ROLES, isClientSideAdmin };
+module.exports = {
+  clientScopeFragment, CLIENT_ADMIN_ROLES, isClientSideAdmin,
+  clientManpowerFrag, mainStaffFrag, CLIENT_CODE_LIKE,
+};

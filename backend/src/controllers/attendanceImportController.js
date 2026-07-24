@@ -6,7 +6,7 @@ const fcm = require('../services/fcmService');
 //        professional styled Excel export.
 
 const db   = require('../config/db');
-const { clientScopeFragment } = require('../utils/scope');
+const { clientScopeFragment, clientManpowerFrag } = require('../utils/scope');
 const XLSX = require('xlsx');
 const multer = require('multer');
 
@@ -375,7 +375,7 @@ exports.downloadAttendanceReport = async (req, res) => {
       empParams.push(department_id);
     }
     // Group blocks: main employees first, then client staff grouped by state.
-    empQuery += ` ORDER BY (e.client_id IS NOT NULL), COALESCE(e.state,''), d.name, e.first_name`;
+    empQuery += ` ORDER BY (${clientManpowerFrag('e')}), COALESCE(e.state,''), d.name, e.first_name`;
     const employees = await db.query(empQuery, empParams);
 
     // ── 3. Fetch attendance for just those employees for the month ───────

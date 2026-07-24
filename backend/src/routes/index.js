@@ -3,6 +3,7 @@ const express  = require('express');
 const router   = express.Router();
 const multer   = require('multer');
 const { authenticate, authorize } = require('../middleware/auth');
+const { clientManpowerFrag, mainStaffFrag } = require('../utils/scope');
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 const chatCtrl       = require('../controllers/chatController');
@@ -447,7 +448,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
     // Total employee count scoped by client
     const empCountFilter = req.user.client_id
       ? `WHERE client_id = ${parseInt(req.user.client_id)} AND is_active = true`
-      : `WHERE client_id IS NULL AND is_active = true`;
+      : `WHERE ${mainStaffFrag('')} AND is_active = true`;
     const empCountRes = await db.query(`SELECT COUNT(*) FROM employees ${empCountFilter}`);
     const totalEmployees = parseInt(empCountRes.rows[0].count) || 0;
 
@@ -678,7 +679,7 @@ router.get('/birthdays/upcoming', authenticate, async (req, res) => {
         AND e.date_of_birth IS NOT NULL
         ${req.user.client_id
           ? `AND e.client_id = ${parseInt(req.user.client_id)}`
-          : `AND e.client_id IS NULL`
+          : `AND ${mainStaffFrag('e')}`
         }
       ORDER BY gs.offset_days ASC, e.first_name ASC
     `, [today, empId]);
@@ -867,7 +868,7 @@ router.get('/anniversaries/upcoming', authenticate, async (req, res) => {
        WHERE e.is_active = true
          AND e.joining_date IS NOT NULL
          AND EXTRACT(YEAR FROM e.joining_date) < $1
-         ${req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : `AND e.client_id IS NULL`}
+         ${req.user.client_id ? `AND e.client_id = ${parseInt(req.user.client_id)}` : `AND ${mainStaffFrag('e')}`}
          AND (
            TO_CHAR(e.joining_date,'MMDD') = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata','MMDD')
            OR (

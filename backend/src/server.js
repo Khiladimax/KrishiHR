@@ -4,6 +4,7 @@ const express = require('express');
 const cors    = require('cors');
 const cron    = require('node-cron');
 const db      = require('./config/db');
+const { mainStaffFrag } = require('./utils/scope');
 const http    = require('http');
 const { Server: SocketIO } = require('socket.io');
 const jwt_sock = require('jsonwebtoken');
@@ -670,13 +671,13 @@ cron.schedule('0 8 * * *', async () => {
     const todayBdays = await db.query(
       `SELECT id, first_name, last_name, employee_code
        FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
-       AND client_id IS NULL
+       AND ${mainStaffFrag('')}
        AND TO_CHAR(date_of_birth,'MMDD') = $1`, [todayMD]
     );
 
     for (const emp of todayBdays.rows) {
       // Only notify own employees (client_id IS NULL), not client employees
-      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id IS NULL AND id != $1`, [emp.id]);
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND ${mainStaffFrag('')} AND id != $1`, [emp.id]);
       for (const r of all.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, title, message, type)
@@ -696,13 +697,13 @@ cron.schedule('0 8 * * *', async () => {
     // TOMORROW birthdays — own employees only (client_id IS NULL excludes client employees)
     const tomorrowBdays = await db.query(
       `SELECT id, first_name, last_name FROM employees WHERE is_active=TRUE AND date_of_birth IS NOT NULL
-       AND client_id IS NULL
+       AND ${mainStaffFrag('')}
        AND TO_CHAR(date_of_birth,'MMDD') = $1`, [tomorrowMD]
     );
 
     for (const emp of tomorrowBdays.rows) {
       // Only notify own employees (client_id IS NULL)
-      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND client_id IS NULL AND id != $1`, [emp.id]);
+      const all = await db.query(`SELECT id FROM employees WHERE is_active=TRUE AND ${mainStaffFrag('')} AND id != $1`, [emp.id]);
       for (const r of all.rows) {
         await db.query(
           `INSERT INTO notifications(employee_id, title, message, type)

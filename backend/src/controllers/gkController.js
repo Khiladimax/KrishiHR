@@ -3,6 +3,7 @@ const fcm = require('../services/fcmService');
 // Daily GK Questions + Thought of the Day
 // Scoring: +1 correct, -0.33 wrong, 0 skipped
 const db     = require('../config/db');
+const { mainStaffFrag } = require('../utils/scope');
 const XLSX   = require('xlsx');
 const multer = require('multer');
 
@@ -302,7 +303,7 @@ exports.getLeaderboard = async (req, res) => {
     const clientFilter = req.user.client_id
       ? `AND e.client_id = ${parseInt(req.user.client_id)}`
       : req.user.role === 'employee' && !req.user.client_id
-        ? `AND e.client_id IS NULL`
+        ? `AND ${mainStaffFrag('e')}`
         : '';
 
     // ── Step 2: Main leaderboard query (scores, counts) ──

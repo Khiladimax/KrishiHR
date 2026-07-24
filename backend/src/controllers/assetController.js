@@ -1,6 +1,7 @@
 // assetController.js — Asset Allocation (laptop kit, fan, chair, …) per employee
 // One row per allocated item, with qty / serial / status (allocated|returned).
 const db = require('../config/db');
+const { clientManpowerFrag, mainStaffFrag } = require('../utils/scope');
 
 const HR_ROLES = ['hr', 'accounts', 'admin', 'super_admin', 'client_admin', 'super_admin_client'];
 const CLIENT_SIDE = ['client_admin', 'super_admin_client'];
@@ -38,11 +39,13 @@ async function ensureSchema() {
 const canManage = (u) => HR_ROLES.includes(u.role);
 const canAccess = (u, empId) => canManage(u) || parseInt(empId) === parseInt(u.id);
 
-// Tab scoping: "main" = own-company staff (client_id IS NULL); "client" =
-// deployed staff (optionally a single client via clientId). A client_admin is
-// always locked to their own client.
+// Tab scoping. "client" = deployed manpower: client_id set OR a KC-C-… code.
+// "main" = own-company KC staff (no client_id and not a KC-C code). A client_admin
+// is always locked to their own client (a specific client_id, so the code-prefix
+// rule doesn't widen their view).
 function scopeWhere(reqUser, scope, col, clientId) {
-  const role = String(reqUser.role || '').toLowerCase();
+  const role  = String(reqUser.role || '').toLowerCase();
+  const alias = col.includes('.') ? col.split('.')[0] : '';
   if (CLIENT_SIDE.includes(role)) {
     if (!reqUser.client_id) return '1=0';
     let f = `${col} = ${parseInt(reqUser.client_id)}`;
@@ -53,8 +56,8 @@ function scopeWhere(reqUser, scope, col, clientId) {
     }
     return f;
   }
-  if (scope === 'client') return clientId ? `${col} = ${parseInt(clientId)}` : `${col} IS NOT NULL`;
-  return `${col} IS NULL`;
+  if (scope === 'client') return clientId ? `${col} = ${parseInt(clientId)}` : clientManpowerFrag(alias);
+  return mainStaffFrag(alias);
 }
 
 // ── GET /assets/clients — clients for the dropdown (client tab) ────────────────

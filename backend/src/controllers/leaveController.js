@@ -1,6 +1,7 @@
 const fcm = require('../services/fcmService');
 // src/controllers/leaveController.js — COMPLETE with approval chain
 const db      = require('../config/db');
+const { mainStaffFrag } = require('../utils/scope');
 const { getEmployeeRegion } = require('../config/regionHelper');
 const emailSvc = require('../config/emailService');
 
@@ -472,8 +473,8 @@ exports.getRequests = async (req, res) => {
       conds.push(`lr.employee_id != $${idx++}`);
       params.push(userId);
       if (['super_admin','hr','admin'].includes(userRole)) {
-        // Own-company HR: only non-client employees
-        conds.push(`e.client_id IS NULL`);
+        // Own-company HR: only KC (non-client) employees
+        conds.push(mainStaffFrag('e'));
       } else if (userRole === 'client_admin' && req.user.client_id) {
         // Client admin: only their client's employees
         conds.push(`e.client_id = $${idx++}`);
@@ -1317,7 +1318,7 @@ exports.getLeaveSummary = async (req, res) => {
       empConds.push(`e.client_id = $${idx++}`);
       empParams.push(req.user.client_id);
     } else if (clientId === 'own') {
-      empConds.push(`e.client_id IS NULL`);
+      empConds.push(mainStaffFrag('e'));
     } else if (clientId && clientId !== 'all') {
       empConds.push(`e.client_id = $${idx++}`);
       empParams.push(parseInt(clientId));
@@ -1382,7 +1383,7 @@ exports.getLeaveTransactions = async (req, res) => {
     if (role === 'client_admin' && req.user.client_id) {
       conds.push(`e.client_id = $${idx++}`); params.push(req.user.client_id);
     } else if (clientId === 'own') {
-      conds.push(`e.client_id IS NULL`);
+      conds.push(mainStaffFrag('e'));
     } else if (clientId && clientId !== 'all') {
       conds.push(`e.client_id = $${idx++}`); params.push(parseInt(clientId));
     }
