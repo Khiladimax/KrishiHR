@@ -232,7 +232,10 @@ function buildOfferLetterHTML(ol) {
   const totalDed   = pfEmp + esiEmp + pt;
   const netSalary  = gross - totalDed;
   const ctcMonthly = gross + gratuity + pfEmpr + esiEmpr + pfAdmin;
-  const ctcAnnual  = parseFloat(ol.ctc_annual || (ctcMonthly * 12));
+  // CTC is derived bottom-up from the monthly components, so the annual figure is
+  // always monthly × 12 (keeps column C consistent with every other row). Only fall
+  // back to a stored ctc_annual when there is no component breakup to derive from.
+  const ctcAnnual  = ctcMonthly > 0 ? ctcMonthly * 12 : parseFloat(ol.ctc_annual || 0);
 
   const fmtV = v => Number(Math.round(v)).toLocaleString('en-IN');
 
