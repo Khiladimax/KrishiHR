@@ -11,6 +11,28 @@ const path         = require('path');
 const os           = require('os');
 const archiver     = require('archiver');
 
+// Robustly parse a joining/offer date from an Excel cell → 'YYYY-MM-DD' (or null).
+// Handles three shapes: a real Date (cellDates), an Excel serial NUMBER that was
+// left in "General" format (e.g. 46215 → 2026-07-04; naive `new Date(46215)` would
+// wrongly read it as 46215 ms after epoch = 1 Jan 1970), and a plain date string.
+function parseExcelDate(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  let d;
+  if (raw instanceof Date) {
+    d = raw;
+  } else if (typeof raw === 'number' || /^\d+(\.\d+)?$/.test(String(raw).trim())) {
+    const serial = Number(raw);
+    if (!(serial > 0)) return null;                 // 0 / negative → not a real date
+    d = new Date(Math.round((serial - 25569) * 86400000)); // Excel serial → epoch ms
+  } else {
+    d = new Date(raw);
+  }
+  if (isNaN(d)) return null;
+  // Round to nearest day (IST-authored cells arrive as ~prev-day 18:30Z).
+  const rounded = new Date(Math.round(d.getTime() / 86400000) * 86400000);
+  return isNaN(rounded) ? null : rounded.toISOString().split('T')[0];
+}
+
 // ── Company details — override any of these via environment variables ──────────
 const COMPANY = {
   name:       process.env.COMPANY_NAME       || 'Krishi Care & Management Services Private Limited',
@@ -951,18 +973,8 @@ exports.bulkSend = async (req, res) => {
         continue;
       }
 
-      // Parse joining date
-      let joiningDate = null;
-      if (joiningDateRaw) {
-        const d = joiningDateRaw instanceof Date ? joiningDateRaw : new Date(joiningDateRaw);
-        if (!isNaN(d)) {
-          // Excel date cells authored in IST come through as ~midnight-minus in UTC
-          // (e.g. 8 Jul → 2026-07-07T18:30Z), which naive UTC formatting rolls back a
-          // day. Round to the NEAREST day so the intended calendar date is kept.
-          const rounded = new Date(Math.round(d.getTime() / 86400000) * 86400000);
-          joiningDate = rounded.toISOString().split('T')[0];
-        }
-      }
+      // Parse joining date (handles Date, Excel serial number, or date string)
+      const joiningDate = parseExcelDate(joiningDateRaw);
 
       // Build offer letter object (same shape as DB row)
       const ol = {
@@ -1119,12 +1131,7 @@ function rowToOffer(row, i) {
   const desig = S('Designation', 'designation');
   if (!name || !desig) return { error: 'Missing Candidate Name or Designation' };
 
-  let joiningDate = null;
-  const jdRaw = row['Joining Date'] || row['joining_date'] || '';
-  if (jdRaw) {
-    const d = jdRaw instanceof Date ? jdRaw : new Date(jdRaw);
-    if (!isNaN(d)) joiningDate = new Date(Math.round(d.getTime() / 86400000) * 86400000).toISOString().split('T')[0];
-  }
+  const joiningDate = parseExcelDate(row['Joining Date'] || row['joining_date'] || '');
   const ol = {
     id: `zip_${i}`,
     candidate_name: name, candidate_email: email,
